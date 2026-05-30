@@ -1265,14 +1265,14 @@ input[type=range]::-moz-range-thumb{
     <div class="ref-sect">
       <div class="ref-sect-h">FRAME LAYER（描ける下絵）</div>
       <div class="ref-frame-row">
-        <button id="btn-frame-edit" class="ref-btn" title="FRAMEレイヤーに直接描画するモード">EDIT</button>
-        <button id="btn-frame-vis" class="ref-btn" title="FRAMEレイヤー表示ON/OFF">✕</button>
+        <button id="btn-frame-edit" class="ref-btn" title="このレイヤーに直接描画するモード（ON中は下絵に描ける）">EDIT</button>
         <button id="btn-frame-clear" class="ref-btn del" title="FRAMEレイヤーをクリア">CLR</button>
         <button id="btn-frame-img" class="ref-btn" title="参照画像をFRAMEレイヤーに読み込み">IMG</button>
       </div>
       <div class="ref-op-row" style="margin-top:6px;">
-        <span class="ref-op-tag">OPACITY</span>
-        <input type="range" id="frame-opacity" min="0" max="100" value="40" title="FRAMEレイヤー不透明度">
+        <span class="ref-op-tag">表示</span>
+        <input type="range" id="frame-opacity" min="0" max="100" value="40" title="FRAMEレイヤーの表示濃度（0=非表示）">
+        <span class="ref-op-val" id="frame-opacity-val">40%</span>
       </div>
       <input type="file" id="frame-img-input" accept="image/*" style="display:none;">
     </div>
@@ -1481,17 +1481,19 @@ const state = {
 // ============================================================
 function applyFrameLayerStyle(){
   const fl = state.frameLayer;
-  frameLayerCanvas.style.display = fl.visible ? 'block' : 'none';
-  // 編集モード中はやや明るめに、通常時はopacityのまま
+  // 可視性は「不透明度>0」で判定（専用の表示ON/OFFボタンは廃止）。
+  // 編集モード中は強制的に見えるよう下限0.6を確保。
+  const shown = fl.editMode || fl.opacity > 0;
+  frameLayerCanvas.style.display = shown ? 'block' : 'none';
   frameLayerCanvas.style.opacity = fl.editMode ? Math.max(0.6, fl.opacity) : fl.opacity;
-  // 編集モードを示すトップバーボタン状態
+  // 内部フラグも整合（保存/スポイト合成判定で参照される）
+  fl.visible = shown;
+  // 編集モードを示すボタン状態
   const btn = document.getElementById('btn-frame-edit');
   if(btn) btn.classList.toggle('on', fl.editMode);
-  const visBtn = document.getElementById('btn-frame-vis');
-  if(visBtn){
-    visBtn.classList.toggle('on', fl.visible);
-    visBtn.textContent = fl.visible ? '●' : '✕';
-  }
+  // 不透明度の数値表示
+  const val = document.getElementById('frame-opacity-val');
+  if(val) val.textContent = Math.round(fl.opacity * 100) + '%';
   // 編集中は描画レイヤーを少しフェードして区別
   drawCanvas.style.opacity = fl.editMode ? 0.45 : 1;
   // ステージにモード表示
@@ -5353,19 +5355,18 @@ document.getElementById('btn-mirror').addEventListener('dblclick', () => {
 // FRAMEレイヤー UI
 document.getElementById('btn-frame-edit').addEventListener('click', () => {
   state.frameLayer.editMode = !state.frameLayer.editMode;
-  // 編集モードに入る/出る時は表示も自動でON（編集中は見えないと困る）
-  if(state.frameLayer.editMode) state.frameLayer.visible = true;
-  applyFrameLayerStyle();
-  scheduleSave();
-});
-document.getElementById('btn-frame-vis').addEventListener('click', () => {
-  state.frameLayer.visible = !state.frameLayer.visible;
+  // 編集ONで濃度が0だと描いても見えないので最低限まで上げる
+  if(state.frameLayer.editMode && state.frameLayer.opacity <= 0){
+    state.frameLayer.opacity = 0.4;
+    const slider = document.getElementById('frame-opacity');
+    if(slider) slider.value = '40';
+  }
   applyFrameLayerStyle();
   scheduleSave();
 });
 document.getElementById('frame-opacity').addEventListener('input', e => {
   state.frameLayer.opacity = (parseInt(e.target.value, 10) || 0) / 100;
-  applyFrameLayerStyle();
+  applyFrameLayerStyle(); // 0で自動的に非表示、>0で表示
   scheduleSave();
 });
 document.getElementById('btn-frame-clear').addEventListener('click', () => {

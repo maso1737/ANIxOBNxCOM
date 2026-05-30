@@ -3,6 +3,48 @@ _新チャット冒頭にこのファイルを貼り付けてください_
 
 ---
 
+## ⚑ 次チャットへの申し送り（最新・優先）
+
+### 作業環境メモ（重要）
+- 実ファイルは `animator.html`（リポジトリ直下）。`index.html` はランディング。
+- このチャットは git worktree
+  `C:\Users\so173\Documents\Claude\Projects\Animation_Paint\.claude\worktrees\dazzling-meitner-3ee247`
+  で作業し、`origin/master` へは「一時worktreeをorigin/masterから作り、animator.html等をコピー→commit→push」
+  方式でデプロイしている（masterを直接checkoutしない運用）。
+- 反映先 GitHub Pages: https://maso1737.github.io/animation-paint/
+- 変更後は必ず構文チェック:
+  `node -e "const fs=require('fs');const h=fs.readFileSync('animator.html','utf8');const m=[...h.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)].map(x=>x[1]).filter(s=>s.length>200).join('\\n;\\n');new Function(m);console.log('OK')"`
+
+### 直近で対応済み（このチャット）
+- Undo全面刷新（gUndo/gRedoの一元ログ。最後に触った系統を1手ずつ戻す）
+- 「Undoで一気に先頭へ戻る」修正:
+  ①フレーム構造変更の履歴記録漏れを補完（空き末尾追加/コマ数切替/表示切替/空→描画昇格）
+  ②restoreTL を id ベースのマージに変更（構造のみ復元・各コマの絵は生オブジェクト温存）
+- FILL PALETTEフローティング/スポイト/MIRROR軸V-H/SEQ PNG など（下の各セクション参照）
+- **FRAME LAYER の表示ON/OFFボタン（✕/●）を廃止**。可視性はOPACITYスライダー（0=非表示）に一本化。
+  EDITは「下絵に描くモード」専用。EDIT ONで濃度0なら自動で40%に底上げ。
+  applyFrameLayerStyle が `shown = editMode || opacity>0` で表示判定し fl.visible を同期。
+
+### ★未解決（次チャットで要対応）— REF ANIMATORS の JSON FILE 読み込み
+- 症状（ユーザー報告）: 「+ JSON FILE で参照を追加すると“初めの画だけ”見えて、
+  ちゃんと読み込まれていない感じ」
+- 調査メモ:
+  - 読み込み経路: `ref-json-input change → addRefAnimator → parseRefSource → expandRefTicks`。
+    expandRefTicks は各cellごとに Image を decode し ticks[] を「1ティック=1画像」で埋める（コード上は全コマ展開される）。
+  - 描画: `renderRefLayer()` が `currentSyncTick()` のティックの画像を ref-layer canvas に合成。
+    非再生時 `currentSyncTick = frameStartTick(state.currentFrame)`（＝現在コマの開始ティック）。
+    つまり**参照は“現在コマの時間位置”に同期**する設計。再生中は再生ティックに追従（loop内 renderRefLayer(tick)）。
+  - したがって、手元プロジェクトのコマ数/尺が短いと参照の先頭ティックしか到達できず
+    「最初の画だけ」に見える可能性がある（仕様の可能性）。
+  - 要確認（ユーザーに依頼）: ①手元プロジェクトの総コマ数、②コマ送り（←→）や再生で参照画が変わるか、
+    ③読み込んだJSONのフォーマット（PROJECT_v1 cells / ANIMATOR_v1 frames）と総コマ数、
+    ④REFリストに出る `Nf`（totalTicks）が想定通りか。
+  - もし「コマ送りしても変わらない＝本当に1枚しか展開されていない」なら expandRefTicks の
+    decode 完了前に renderRefLayer された等のタイミングを疑う（addRefAnimator は await 済みなので考えにくい）。
+    その場合は ticks[] の中身（非null数）をログして切り分ける。
+
+---
+
 ## プロジェクト概要
 ブラウザベース・日本アニメ作画特化アニメーションエディタ。
 単一HTMLファイル（`index.html`）、IndexedDB自動保存、Chrome/iPad Safari対応。
