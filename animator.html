@@ -2940,6 +2940,7 @@ function buildStrip(){
         f.hidden = !f.hidden;
         markFrameDirty(f);
         buildStrip();
+        pushTimelineHistory(); // タイムライン操作記録（表示/非表示切替）
       });
       cell.appendChild(visBtn);
       if(f.hidden) cell.classList.add('fc-frame-hidden');
@@ -3032,6 +3033,7 @@ function buildStrip(){
       buildStrip();
       updateDurInfo();
       updateTimeTrack();
+      pushTimelineHistory(); // タイムライン操作記録（コマ数1/2/3切替）
     });
 
     strip.appendChild(cell);
@@ -3185,6 +3187,7 @@ function handleCellTap(idx){
     switchToFrame(idx);
     markMetaDirty();
     scheduleSave();
+    pushTimelineHistory(); // タイムライン操作記録（空→描画フレーム昇格）
   } else {
     switchToFrame(idx);
   }
@@ -3289,6 +3292,7 @@ function setupEmptyTail(tail){
     switchToFrame(state.frames.length - 1);
     scrollFrameIntoView(state.frames.length - 1);
     scheduleSave();
+    pushTimelineHistory(); // タイムライン操作記録（空き末尾クリックでのフレーム追加）
   });
 }
 
