@@ -220,6 +220,28 @@ let tlHistIdx = -1;
 - pushTimelineHistory に等価判定を追加し、同一スナップの重複登録を排除
   （「Undoが何度か効かない」感の軽減）
 
+### Undo/Redo を一元ディスパッチャ方式に刷新（重要）
+- 従来は state.lastEditWas（2値）＋ frameLayer.editMode（現在モード）で
+  3系統（canvas/timeline/framelayer）を切替えていたため、編集系統をまたぐと
+  「効いたり効かなかったり」「一気に先頭へ戻る」不具合があった
+- 新方式: グローバルUndoログ gUndo[] / gRedo[] に編集を時系列で記録
+  （各エントリ {type:'canvas',frameId} | {type:'timeline'} | {type:'framelayer'}）。
+  undo()=最後のエントリをpopして該当系統を1ステップ戻す / redo()=その逆。
+  → 「直前に触った場所のUndoが効く」を保証。FRAMEレイヤー編集中でも、
+    直前がキャンバス描画ならキャンバスを戻す
+- 各系統の単発操作は stepCanvasUndo/Redo・stepTimelineUndo/Redo・
+  stepFrameLayerUndo/Redo に分離。実行不可エントリ（履歴上限で消えた等）は
+  popして次の有効エントリへスキップ（暴走防止）
+- canvasエントリは frameId で対象コマを特定し、別コマなら switchToFrame して表示
+- フック: pushHistory→gLog(canvas) / pushTimelineHistory→gLog(timeline,
+  ただし最初の基準スナップは除外) / pushFrameLayerHistory→gLog(framelayer)
+- FRAMEレイヤーは ensureFlBaseline() で「編集前の基準」を1枚積む
+  （startStroke/fill/CLR/IMG の各編集前に呼ぶ）。最初の1編集もUndo可能に
+- プロジェクト読込（applyProjectJSON）と起動完了時に resetGlobalHistory()。
+  tb-undo/redo は gUndo/gRedo の有無で disabled 表示
+- 補足: キャンバスUndoは従来どおり「コマ単位で独立」（各コマ50ステップ）。
+  これは仕様（斬新で良いとの評価）。コマをまたぐ統合Undoにはしていない
+
 ## 次回実装候補（優先度おまかせ）
 
 ### 機能要望メモ

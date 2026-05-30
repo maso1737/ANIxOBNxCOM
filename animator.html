@@ -206,6 +206,8 @@ html,body{
 }
 .tb-undoredo:hover{border-color:var(--border-bright);color:var(--acid);}
 .tb-undoredo:active{background:rgba(54,255,0,0.1);}
+.tb-undoredo:disabled{opacity:0.25;cursor:default;border-color:var(--border);color:rgba(255,255,255,0.3);}
+.tb-undoredo:disabled:hover{border-color:var(--border);color:rgba(255,255,255,0.3);}
 .tb-bg .lbl{
   font-size:8px;letter-spacing:0.15em;
   color:rgba(54,255,0,0.5);
@@ -1541,7 +1543,16 @@ const flHistory = [];
 let flHistIdx = -1;
 const FL_HIST_MAX = 20;
 
+// 編集前の状態を基準スナップとして1枚積んでおく（最初の1編集もUndoできるように）
+// ※必ず「編集を加える前」に呼ぶこと
+function ensureFlBaseline(){
+  if(flHistory.length === 0){
+    flHistory.push(frameLayerCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H));
+    flHistIdx = 0;
+  }
+}
 function pushFrameLayerHistory(){
+  ensureFlBaseline(); // 念のため（通常は編集前に呼ばれ済み）
   // 現在のframeLayerCtxピクセルをスナップ
   const snap = frameLayerCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H);
   if(flHistIdx < flHistory.length - 1) flHistory.splice(flHistIdx + 1);
@@ -1549,19 +1560,9 @@ function pushFrameLayerHistory(){
   if(flHistory.length > FL_HIST_MAX) flHistory.shift();
   flHistIdx = flHistory.length - 1;
   scheduleFrameLayerSave();
+  gLog({ type: 'framelayer' });
 }
-function undoFrameLayer(){
-  if(flHistIdx <= 0) return;
-  flHistIdx--;
-  frameLayerCtx.putImageData(flHistory[flHistIdx], 0, 0);
-  scheduleFrameLayerSave();
-}
-function redoFrameLayer(){
-  if(flHistIdx >= flHistory.length - 1) return;
-  flHistIdx++;
-  frameLayerCtx.putImageData(flHistory[flHistIdx], 0, 0);
-  scheduleFrameLayerSave();
-}
+// （単発の undoFrameLayer/redoFrameLayer は global undo log に統合済み）
 
 // ============================================================
 // REF ANIMATORS (複数ANIMATORをコマ同期で参照表示)
@@ -2455,6 +2456,7 @@ function pushHistory(){
   updateStats();
   markFrameDirty(f);
   state.lastEditWas = 'canvas'; // キャンバス操作を記録
+  gLog({ type: 'canvas', frameId: f.id });
 }
 
 // ============================================================
@@ -2463,6 +2465,32 @@ function pushHistory(){
 const tlHistory = [];   // タイムライン操作履歴
 let tlHistIdx = -1;     // 現在位置
 const TL_HIST_MAX = 20;
+
+// ============================================================
+// GLOBAL UNDO LOG（直前に触った場所のUndoが効く一元ディスパッチャ）
+//   3系統（canvas / timeline / framelayer）の編集を時系列で記録し、
+//   Undo/Redo は「最後に編集した系統」を1ステップずつ戻す/進める。
+//   各エントリ: {type:'canvas',frameId} | {type:'timeline'} | {type:'framelayer'}
+// ============================================================
+const gUndo = [];
+const gRedo = [];
+const G_MAX = 240;
+function gLog(entry){
+  gUndo.push(entry);
+  if(gUndo.length > G_MAX) gUndo.shift();
+  gRedo.length = 0;
+  updateUndoButtons();
+}
+function resetGlobalHistory(){
+  gUndo.length = 0; gRedo.length = 0;
+  updateUndoButtons();
+}
+function updateUndoButtons(){
+  const u = document.getElementById('tb-undo');
+  const r = document.getElementById('tb-redo');
+  if(u) u.disabled = gUndo.length === 0;
+  if(r) r.disabled = gRedo.length === 0;
+}
 
 // 現在のタイムライン状態をスナップショット（drawDataはref、historyはshallow copy）
 function snapshotTL(){
@@ -2494,8 +2522,9 @@ function tlSnapEquals(a, b){
 }
 function pushTimelineHistory(){
   const snap = snapshotTL();
+  const isBaseline = (tlHistory.length === 0); // 最初の1回は基準状態（Undo対象にしない）
   // 末尾と等価ならスキップ（無駄な「効かないUndo」を防止）
-  if(tlHistIdx >= 0 && tlSnapEquals(tlHistory[tlHistIdx], snap)){
+  if(!isBaseline && tlHistIdx >= 0 && tlSnapEquals(tlHistory[tlHistIdx], snap)){
     state.lastEditWas = 'timeline';
     return;
   }
@@ -2504,6 +2533,7 @@ function pushTimelineHistory(){
   if(tlHistory.length > TL_HIST_MAX) tlHistory.shift();
   tlHistIdx = tlHistory.length - 1;
   state.lastEditWas = 'timeline';
+  if(!isBaseline) gLog({ type: 'timeline' });
 }
 
 function restoreTL(snap){
@@ -2532,57 +2562,82 @@ function restoreTL(snap){
   scheduleSave();
 }
 
-function undoTimeline(){
-  if(tlHistIdx <= 0) return;
+// 個別系統の1ステップ操作（呼び出し側がガード済み前提で true/false を返す）
+function stepCanvasUndo(frameId){
+  const idx = state.frames.findIndex(fr => fr.id === frameId);
+  if(idx < 0) return false;
+  const f = state.frames[idx];
+  if(!f || f.kind !== 'draw' || !f.history || f.histIdx <= 0) return false;
+  if(idx !== state.currentFrame) switchToFrame(idx); // 触ったコマを表示
+  f.histIdx--;
+  restoreSnap(f.history[f.histIdx]);
+  syncFrameFromCanvas(f);
+  updateStats(); markFrameDirty(f);
+  return true;
+}
+function stepCanvasRedo(frameId){
+  const idx = state.frames.findIndex(fr => fr.id === frameId);
+  if(idx < 0) return false;
+  const f = state.frames[idx];
+  if(!f || f.kind !== 'draw' || !f.history || f.histIdx >= f.history.length - 1) return false;
+  if(idx !== state.currentFrame) switchToFrame(idx);
+  f.histIdx++;
+  restoreSnap(f.history[f.histIdx]);
+  syncFrameFromCanvas(f);
+  updateStats(); markFrameDirty(f);
+  return true;
+}
+function stepFrameLayerUndo(){
+  if(flHistIdx <= 0) return false;
+  flHistIdx--;
+  frameLayerCtx.putImageData(flHistory[flHistIdx], 0, 0);
+  scheduleFrameLayerSave();
+  return true;
+}
+function stepFrameLayerRedo(){
+  if(flHistIdx >= flHistory.length - 1) return false;
+  flHistIdx++;
+  frameLayerCtx.putImageData(flHistory[flHistIdx], 0, 0);
+  scheduleFrameLayerSave();
+  return true;
+}
+function stepTimelineUndo(){
+  if(tlHistIdx <= 0) return false;
   tlHistIdx--;
   restoreTL(tlHistory[tlHistIdx]);
+  return true;
 }
-function redoTimeline(){
-  if(tlHistIdx >= tlHistory.length - 1) return;
+function stepTimelineRedo(){
+  if(tlHistIdx >= tlHistory.length - 1) return false;
   tlHistIdx++;
   restoreTL(tlHistory[tlHistIdx]);
+  return true;
 }
 
+// 「最後に触った系統」を1ステップ戻す。実行不可エントリ（履歴上限で消えた等）は
+// 飛ばして次の有効なエントリを探す。
 function undo(){
-  // FRAMEレイヤー編集中は専用履歴を使う
-  if(state.frameLayer.editMode){
-    undoFrameLayer();
-    return;
+  while(gUndo.length){
+    const e = gUndo.pop();
+    let ok = false;
+    if(e.type === 'canvas')         ok = stepCanvasUndo(e.frameId);
+    else if(e.type === 'framelayer') ok = stepFrameLayerUndo();
+    else if(e.type === 'timeline')   ok = stepTimelineUndo();
+    if(ok){ gRedo.push(e); updateUndoButtons(); return; }
+    // ok=false → このエントリは無効。捨てて次へ
   }
-  if(state.lastEditWas === 'timeline'){
-    undoTimeline();
-  } else {
-    const f = curDrawFrame();
-    if(f && f.histIdx > 0){
-      f.histIdx--;
-      restoreSnap(f.history[f.histIdx]);
-      syncFrameFromCanvas(f);
-      updateStats();
-      markFrameDirty(f);
-    } else {
-      undoTimeline();
-    }
-  }
+  updateUndoButtons();
 }
 function redo(){
-  if(state.frameLayer.editMode){
-    redoFrameLayer();
-    return;
+  while(gRedo.length){
+    const e = gRedo.pop();
+    let ok = false;
+    if(e.type === 'canvas')         ok = stepCanvasRedo(e.frameId);
+    else if(e.type === 'framelayer') ok = stepFrameLayerRedo();
+    else if(e.type === 'timeline')   ok = stepTimelineRedo();
+    if(ok){ gUndo.push(e); updateUndoButtons(); return; }
   }
-  if(state.lastEditWas === 'timeline'){
-    redoTimeline();
-  } else {
-    const f = curDrawFrame();
-    if(f && f.histIdx < (f.history?.length || 0) - 1){
-      f.histIdx++;
-      restoreSnap(f.history[f.histIdx]);
-      syncFrameFromCanvas(f);
-      updateStats();
-      markFrameDirty(f);
-    } else {
-      redoTimeline();
-    }
-  }
+  updateUndoButtons();
 }
 function updateStats(){
   const f = curDrawFrame();
@@ -3575,6 +3630,7 @@ stage.addEventListener('pointerdown', e => {
     if(state.tool === 'eyedrop'){
       eyedropAt(e.clientX, e.clientY);
     } else if(state.tool === 'fill'){
+      if(state.frameLayer.editMode) ensureFlBaseline();
       const {x, y} = toCanvasCoord(e.clientX, e.clientY);
       floodFill(x, y, state.fillColor);
       if(state.frameLayer.editMode) pushFrameLayerHistory();
@@ -3681,6 +3737,8 @@ function pressureRadius(pressure){
 }
 let lastR = 1;
 function startStroke(clientX, clientY, pressure){
+  // FRAMEレイヤー編集中は最初の1ストロークもUndoできるよう編集前に基準を確保
+  if(state.frameLayer.editMode) ensureFlBaseline();
   const {x, y} = toCanvasCoord(clientX, clientY);
   lastX = x; lastY = y;
   strokeBuffer = [{x, y}];
@@ -3757,6 +3815,7 @@ drawCanvas.addEventListener('pointerdown', e => {
   if(state.tool === 'eyedrop' || e.altKey){
     eyedropAt(e.clientX, e.clientY);
   } else if(state.tool === 'fill'){
+    if(state.frameLayer.editMode) ensureFlBaseline();
     const {x, y} = toCanvasCoord(e.clientX, e.clientY);
     floodFill(x, y, state.fillColor);
     if(state.frameLayer.editMode) pushFrameLayerHistory();
@@ -4259,6 +4318,10 @@ async function applyProjectJSON(json){
   if(!cellList || cellList.length === 0){
     alert('フレームが含まれていません'); return;
   }
+  // プロジェクト読み込みで全履歴をリセット（古いframeId参照を残さない）
+  tlHistory.length = 0; tlHistIdx = -1;
+  flHistory.length = 0; flHistIdx = -1;
+  resetGlobalHistory();
   // 新しいフレーム配列を構築
   const newFrames = [];
   for(const fj of cellList){
@@ -5288,6 +5351,7 @@ document.getElementById('frame-opacity').addEventListener('input', e => {
 });
 document.getElementById('btn-frame-clear').addEventListener('click', () => {
   if(!confirm('FRAMEレイヤーをクリアしますか？')) return;
+  ensureFlBaseline(); // クリア前の状態をUndo用に確保
   clearFrameLayer();
   pushFrameLayerHistory();
 });
@@ -5303,6 +5367,7 @@ document.getElementById('frame-img-input').addEventListener('change', e => {
   const url = URL.createObjectURL(file);
   const im = new Image();
   im.onload = () => {
+    ensureFlBaseline(); // 画像読込前の状態をUndo用に確保
     const cw = CFG.WORK_W, ch = CFG.WORK_H;
     const scale = Math.min(cw / im.width, ch / im.height);
     const dw = Math.round(im.width * scale);
@@ -5576,9 +5641,10 @@ window.addEventListener('resize', () => {
   await loadRefs();
   // 初回保存
   if(state.pendingSaveFrames.size > 0) scheduleSave();
-  // タイムライン履歴の初期スナップ（ロード後の状態を記録）
+  // タイムライン履歴の初期スナップ（ロード後の状態を記録＝基準）
   pushTimelineHistory();
   state.lastEditWas = 'canvas'; // 初期はキャンバスUNDO優先
+  resetGlobalHistory(); // 起動直後はUndo対象なし（基準のみ）
 })();
 
 // ページ離脱前に強制保存
