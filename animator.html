@@ -2537,7 +2537,22 @@ function pushTimelineHistory(){
 }
 
 function restoreTL(snap){
+  // タイムライン履歴は「構造（どのコマが・順序・尺・表示）」の復元に使い、
+  // 各コマの絵と描画履歴は“生オブジェクト”を id で温存する。
+  // これにより、あるコマ作成のUndoが他コマの絵まで巻き戻すのを防ぐ。
+  const curBefore = state.frames[state.currentFrame];
+  if(curBefore && curBefore.kind === 'draw') syncFrameFromCanvas(curBefore);
+  const liveById = new Map(state.frames.map(f => [f.id, f]));
   state.frames = snap.map(s => {
+    const live = liveById.get(s.id);
+    if(live && live.kind === s.kind){
+      // 種別が一致する既存コマ → 絵/履歴は温存し、構造だけ合わせる
+      live.duration = s.duration;
+      live.hidden = !!s.hidden;
+      live.dirty = true;
+      return live;
+    }
+    // 生が無い（削除されていた）／種別が違う（空⇄描画の取消）→ スナップショットから復元
     if(s.kind === 'empty'){
       return { id: s.id, kind: 'empty', duration: s.duration, dirty: true };
     }

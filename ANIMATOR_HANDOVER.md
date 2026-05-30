@@ -256,6 +256,22 @@ let tlHistIdx = -1;
 - 既に記録済みだった操作: addFrame / duplicate / delete / split / 並び替え(move) /
   paste / dur ハンドルscrub / IN/OUT scrub
 
+### restoreTL を「構造のみ復元・絵は生オブジェクト温存」に変更（重要）
+- 症状: 各コマに順に描いてUndoしていくと、キャンバスUndoがコマ作成の取消に
+  当たったタイミングで、他コマの絵まで一緒に巻き戻る（FRAMEが一気に戻る感じ）
+- 原因: タイムライン履歴は全フレームの“丸ごとスナップショット”で、restoreTL が
+  state.frames を snapshot で総入れ替えしていた。snapshot 内の drawData は撮影時点の
+  もの（=そのコマがまだ空だった頃）なので、コマ作成Undoで前コマの絵が消えた
+- 修正: restoreTL を id ベースのマージに変更。
+  ・snapshot と現在の両方に在るコマ（種別一致）→ 生オブジェクトを温存し、
+    duration/hidden など構造だけ snapshot に合わせる（絵・per-frame履歴は維持）
+  ・snapshot にしか無い（＝削除済み）／種別が違う（空⇄描画の取消）→ snapshotから復元
+  ・復元前に現在表示コマを syncFrameFromCanvas で確定
+- 効果: コマ作成のUndoは「そのコマを消す」だけになり、前コマの絵は保持。
+  「描く→次コマ作成→描く…」を逆順に1手ずつ正しく戻れる
+- 注意: 構造境界をまたぐ Redo は per-frame履歴の都合で塗りが戻りきらない場合あり
+  （多くのエディタ同様、分岐時のredoは部分的。実害は小）
+
 ## 次回実装候補（優先度おまかせ）
 
 ### 機能要望メモ
