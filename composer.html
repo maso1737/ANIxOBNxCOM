@@ -26,6 +26,8 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
 #topbar button.primary{border-color:var(--acid);color:var(--acid);}
 #topbar button.primary:hover{background:rgba(54,255,0,0.1);}
 #topbar button:disabled{opacity:0.3;cursor:default;}
+#live-toast{position:fixed;top:46px;right:16px;z-index:300;background:rgba(8,8,8,0.92);border:1px solid var(--acid);color:var(--acid);font-family:var(--mono);font-size:9px;letter-spacing:0.14em;padding:6px 12px;opacity:0;transform:translateY(-6px);transition:opacity 0.18s,transform 0.18s;pointer-events:none;}
+#live-toast.show{opacity:1;transform:translateY(0);}
 
 /* VIEWPORT */
 #viewport{position:relative;background:#080808;overflow:hidden;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--border);cursor:grab;}
@@ -208,11 +210,14 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
       <button id="btn-export-project" disabled>EXPORT PROJECT</button>
       <button id="btn-export" disabled>EXPORT 4K PNG</button>
       <button id="btn-load-audio" title="BGM/SE音声ファイルを読み込む">♪ AUDIO</button>
+      <button id="btn-live" class="primary" title="ANIMATORの編集をライブ反映中（クリックでOFF）">LIVE ●</button>
       <button id="btn-home" title="ランディングページに戻る">HOME</button>
       <input type="file" id="file-input" accept=".json">
       <input type="file" id="audio-file-input" accept="audio/*">
     </div>
   </div>
+
+  <div id="live-toast"></div>
 
   <div id="viewport">
     <div class="corner tl"><span class="lbl">CMP/</span><span class="val" id="meta-tl">—</span></div>
@@ -1485,15 +1490,75 @@ $('#btn-export').addEventListener('click',exportPNG);
 $('#btn-export-project').addEventListener('click',exportProject);
 $('#btn-home').addEventListener('click',()=>{location.href='index.html';});
 
+// ── LIVE SYNC（ANIMATORの編集をリアルタイム受信 / BroadcastChannel）──
+let gLiveChan=null, gLiveOn=true;
+function postLive(msg){ if(gLiveChan){ try{ gLiveChan.postMessage(msg); }catch(e){} } }
+function flashLive(text){
+  const el=$('#live-toast'); if(!el) return;
+  el.textContent=text; el.classList.add('show');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),1600);
+}
+// トラックの「絵」だけ差し替え（KF/マーカー/トランスフォーム/表示状態は保持）
+function liveUpdateTrack(track,json){
+  const fresh=parseTrackFromJSON(json); if(!fresh) return false;
+  track.cellsRaw=fresh.cellsRaw;
+  track.cellInfos=fresh.cellInfos;
+  track.frames=fresh.frames;
+  track.totalFrames=fresh.totalFrames;
+  // 画像のデコード完了時に再描画
+  fresh.cellInfos.forEach(ci=>{ if(ci.image){ ci.image.onload=()=>{ if(state.tracks.includes(track)) drawCurrentFrame(); }; } });
+  return true;
+}
+function onLiveProjectUpdate(json){
+  if(!json||!json.projectId) return;
+  let matched=false;
+  state.tracks.forEach(t=>{ if(t.projectId===json.projectId){ if(liveUpdateTrack(t,json)) matched=true; } });
+  if(matched){
+    state.totalFrames=Math.max(0,...state.tracks.map(t=>t.totalFrames));
+    if(state.workArea) state.workArea.endFrame=Math.max(state.workArea.endFrame,state.totalFrames);
+    if(state.currentFrame>=state.totalFrames) state.currentFrame=Math.max(0,state.totalFrames-1);
+    rebuildAllTrackUI(); updateTransport(); updateInspector(); drawCurrentFrame();
+    flashLive('● SYNCED '+String(json.scene||json.name||json.projectId).slice(0,16).toUpperCase());
+  } else if(state.tracks.length===0){
+    loadJSON(json); flashLive('● LIVE LOADED');
+  }
+}
+function requestSyncAll(){
+  const ids=[...new Set(state.tracks.map(t=>t.projectId).filter(Boolean))];
+  if(ids.length) ids.forEach(id=>postLive({type:'request-sync',projectId:id}));
+  else postLive({type:'request-sync'});
+}
+function setupLiveSync(){
+  if(typeof BroadcastChannel==='undefined') return;
+  try{ gLiveChan=new BroadcastChannel('tdr_live'); }catch(e){ return; }
+  gLiveChan.onmessage=ev=>{
+    const m=ev.data; if(!m||!gLiveOn) return;
+    if(m.type==='project-update') onLiveProjectUpdate(m.payload);
+    else if(m.type==='animator-hello') postLive({type:'request-sync',projectId:m.projectId||null});
+  };
+  postLive({type:'composer-hello'}); // 既に開いているANIMATOR群へ通知
+  requestSyncAll();
+}
+$('#btn-live').addEventListener('click',()=>{
+  gLiveOn=!gLiveOn;
+  const b=$('#btn-live');
+  b.classList.toggle('primary',gLiveOn);
+  b.textContent=gLiveOn?'LIVE ●':'LIVE ○';
+  b.title=gLiveOn?'ANIMATORの編集をライブ反映中（クリックでOFF）':'ライブ反映OFF（クリックでON）';
+  if(gLiveOn) requestSyncAll();
+});
+
 // URL ?id=xxx で来た場合 EXCHANGE DB から自動読込
 (async()=>{
   exCleanup();
   const urlId=new URLSearchParams(location.search).get('id');
-  if(!urlId) return;
-  try{
-    const rec=await exGet(urlId);
-    if(rec){ loadJSON(rec); history.replaceState(null,'','composer.html'); }
-  }catch(e){ console.warn('exchange load failed',e); }
+  if(urlId){
+    try{
+      const rec=await exGet(urlId);
+      if(rec){ loadJSON(rec); history.replaceState(null,'','composer.html'); }
+    }catch(e){ console.warn('exchange load failed',e); }
+  }
+  setupLiveSync(); // ライブ連携を起動（トラック読込後に同期要求）
 })();
 
 $('#btn-kf-add').addEventListener('click',addKfAtCurrent);

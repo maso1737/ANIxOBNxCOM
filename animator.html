@@ -329,15 +329,44 @@ html,body{
 .ref-frame-row .ref-btn{flex:1;text-align:center;padding:4px 0;}
 .ref-op-tag{font-size:8px;letter-spacing:0.12em;color:rgba(255,255,255,0.4);min-width:54px;}
 .ref-op-row input[type=range]{flex:1;height:3px;accent-color:var(--acid);cursor:pointer;}
-/* ツール列 左右入替ボタン */
-.tb-swap{
-  width:48px;height:28px;margin-bottom:4px;
-  background:transparent;border:1px solid var(--border);
-  color:rgba(255,255,255,0.5);font-size:13px;cursor:pointer;
-  transition:all 0.12s;flex-shrink:0;
+/* SETTINGS フローティングパネル（ref-panel と同じ作法） */
+#settings-panel{
+  position:fixed;top:80px;right:24px;width:320px;
+  background:rgba(8,8,8,0.96);
+  border:1px solid var(--border-bright);
+  box-shadow:0 8px 40px rgba(0,0,0,0.7),0 0 0 1px rgba(0,0,0,0.4);
+  z-index:121;font-family:var(--mono);color:#fff;
+  display:none;
 }
-.tb-swap:hover{color:var(--acid);border-color:var(--border-bright);}
-.tb-swap.on{color:var(--acid);border-color:rgba(54,255,0,0.4);background:rgba(54,255,0,0.08);}
+#settings-panel.show{display:block;}
+#settings-panel-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;cursor:move;
+  background:linear-gradient(90deg,rgba(54,255,0,0.10),transparent);
+  border-bottom:1px solid var(--border);
+  font-size:9px;letter-spacing:0.3em;color:var(--acid);
+  user-select:none;
+}
+#settings-panel-close{cursor:pointer;color:rgba(255,255,255,0.4);font-size:12px;line-height:1;padding:0 2px;}
+#settings-panel-close:hover{color:var(--acid);}
+#settings-panel-body{padding:8px 10px;max-height:66vh;overflow-y:auto;}
+#settings-panel-body::-webkit-scrollbar{width:4px;}
+#settings-panel-body::-webkit-scrollbar-thumb{background:rgba(54,255,0,0.3);}
+.sc-hint{font-size:7px;color:rgba(255,255,255,0.35);letter-spacing:0.08em;margin-bottom:8px;line-height:1.5;}
+.sc-row{
+  display:flex;align-items:center;gap:8px;
+  padding:3px 4px;border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.sc-label{flex:1;font-size:9px;letter-spacing:0.05em;color:rgba(255,255,255,0.75);}
+.sc-key{
+  min-width:54px;text-align:center;
+  background:transparent;border:1px solid var(--border);
+  color:rgba(255,255,255,0.7);font-family:var(--mono);font-size:9px;
+  padding:3px 8px;cursor:pointer;line-height:1.4;transition:all 0.12s;letter-spacing:0.08em;
+}
+.sc-key:hover{border-color:var(--border-bright);color:var(--acid);}
+.sc-key.capturing{border-color:var(--acid);color:var(--acid);background:rgba(54,255,0,0.12);}
+.sc-key.unbound{color:rgba(255,255,255,0.3);}
 
 .layer{
   position:absolute;top:0;left:0;
@@ -1062,6 +1091,7 @@ input[type=range]::-moz-range-thumb{
       <button id="btn-mirror" title="左右ミラー描画（M）">MIRROR</button>
       <span class="sep">/</span>
       <button id="btn-ref-panel" title="REF ANIMATORS / FRAMEレイヤー（R）">REF</button>
+      <button id="btn-settings" title="設定（ショートカット変更）">⚙</button>
       <span class="sep">/</span>
       <button id="btn-export" title="クリック: 4K書き出し / Shift+クリック: BG透明で書き出し">EXPORT 4K</button>
       <button id="btn-export-seq" title="全コマを4K BG透過の連番PNGでZIP書き出し（AE合成用）">SEQ PNG</button>
@@ -1070,13 +1100,13 @@ input[type=range]::-moz-range-thumb{
       <input type="file" id="json-file-input" accept="application/json,.json" style="display:none;">
       <span class="sep">/</span>
       <button id="btn-send-composer" title="現在のプロジェクトを共有DB経由でCOMPOSERに送る">→ COMPOSER</button>
+      <button id="btn-live" title="COMPOSER未接続（COMPOSERを開くと自動でライブ連携）">LIVE ○</button>
       <button id="btn-home" title="ランディングページに戻る">HOME</button>
     </div>
   </div>
 
   <!-- LEFT TOOLBAR -->
   <div id="toolbar">
-    <button id="btn-swap-toolbar" class="tb-swap" title="ツールバー左右入れ替え (Tab)">⇄</button>
     <button class="tool on" data-tool="pen" title="ペン (B)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M3 21l4-1 11-11-3-3L4 17l-1 4z"></path>
@@ -1098,13 +1128,6 @@ input[type=range]::-moz-range-thumb{
         <circle cx="20" cy="18" r="2"></circle>
       </svg>
       <span class="lbl">FILL</span>
-    </button>
-    <button class="tool" data-tool="eyedrop" title="スポイト（色を吸い取る・Alt+クリックでも可）">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M19 3a2.5 2.5 0 0 1 0 3.5l-2 2-2.5-2.5 2-2A2.5 2.5 0 0 1 19 3z"></path>
-        <path d="M14.5 6.5L5 16v3h3l9.5-9.5"></path>
-      </svg>
-      <span class="lbl">PICK</span>
     </button>
 
     <div class="tool-sep"></div>
@@ -1286,6 +1309,22 @@ input[type=range]::-moz-range-thumb{
       <div id="ref-list"></div>
     </div>
     <input type="file" id="ref-json-input" accept="application/json,.json" multiple style="display:none;">
+  </div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div id="settings-panel">
+  <div id="settings-panel-head">
+    <span>SETTINGS</span>
+    <span id="settings-panel-close" title="閉じる">✕</span>
+  </div>
+  <div id="settings-panel-body">
+    <div class="ref-sect">
+      <div class="ref-sect-h">KEYBOARD SHORTCUTS</div>
+      <div class="sc-hint">キーをクリック → 新しいキーを押して変更（ESCで取消）</div>
+      <div id="shortcut-list"></div>
+      <button id="shortcut-reset" class="ref-btn" style="width:100%;margin-top:8px;padding:5px 0;">RESET DEFAULTS</button>
+    </div>
   </div>
 </div>
 
@@ -3934,15 +3973,12 @@ function applyToolbarSwap(){
     requestAnimationFrame(() => { fitToStage(); });
   }
 }
-const swapBtn = document.getElementById('btn-swap-toolbar');
-if(swapBtn){
-  swapBtn.addEventListener('click', () => {
-    state.toolbarSwapped = !state.toolbarSwapped;
-    swapBtn.classList.toggle('on', state.toolbarSwapped);
-    applyToolbarSwap();
-    if(typeof markMetaDirty === 'function') markMetaDirty();
-    scheduleSave();
-  });
+// ツールバー左右入替（Tabキーから呼ぶ。専用ボタンは廃止）
+function toggleToolbarSwap(){
+  state.toolbarSwapped = !state.toolbarSwapped;
+  applyToolbarSwap();
+  if(typeof markMetaDirty === 'function') markMetaDirty();
+  scheduleSave();
 }
 
 // スポイトで取り込んだ色をパレットのスウォッチに反映
@@ -4562,6 +4598,55 @@ document.getElementById('btn-home').addEventListener('click', () => {
   location.href = 'index.html';
 });
 
+// ============================================================
+// LIVE SYNC（ANIMATOR → COMPOSER リアルタイム連携 / BroadcastChannel）
+//   ・COMPOSERが開いている間、編集（autosave完了）を即ブロードキャスト
+//   ・接続中（gLiveActive）のときだけ送信＝未接続時は負荷ゼロ
+// ============================================================
+let gLiveChan = null, gLiveActive = false, gLiveBcTimer = null;
+function postLive(msg){ if(gLiveChan){ try{ gLiveChan.postMessage(msg); }catch(e){} } }
+function broadcastProjectNow(){
+  if(!gLiveChan || !gLiveActive) return;
+  try{ postLive({ type:'project-update', projectId: ensureProjectId(), payload: buildProjectPayload() }); }catch(e){}
+}
+function broadcastProjectDebounced(){
+  if(!gLiveActive) return;
+  if(gLiveBcTimer) clearTimeout(gLiveBcTimer);
+  gLiveBcTimer = setTimeout(broadcastProjectNow, 250);
+}
+function updateLiveUI(){
+  const b = document.getElementById('btn-live');
+  if(!b) return;
+  b.classList.toggle('on', gLiveActive);
+  b.textContent = gLiveActive ? 'LIVE ●' : 'LIVE ○';
+  b.title = gLiveActive
+    ? 'COMPOSERとライブ連携中（クリックで手動再送）'
+    : 'COMPOSER未接続（COMPOSERを開くと自動でライブ連携）';
+}
+function setupLiveSync(){
+  if(typeof BroadcastChannel === 'undefined') return;
+  try{ gLiveChan = new BroadcastChannel('tdr_live'); }catch(e){ return; }
+  gLiveChan.onmessage = ev => {
+    const m = ev.data; if(!m) return;
+    if(m.type === 'request-sync'){
+      if(m.projectId && state.projectId && m.projectId !== state.projectId) return; // 他プロジェクト宛は無視
+      gLiveActive = true; updateLiveUI();
+      broadcastProjectNow();
+    } else if(m.type === 'composer-hello'){
+      gLiveActive = true; updateLiveUI();
+      broadcastProjectNow();
+    }
+  };
+  // 既に開いているCOMPOSERへ自分の存在を通知
+  postLive({ type:'animator-hello', projectId: state.projectId || null });
+}
+document.getElementById('btn-live').addEventListener('click', () => {
+  // 手動: 接続フラグを立てて即再送（COMPOSER未起動でも害なし）
+  gLiveActive = true; updateLiveUI();
+  postLive({ type:'animator-hello', projectId: state.projectId || null });
+  broadcastProjectNow();
+});
+
 function exportPNG(opts){
   opts = opts || {};
   // オフスクリーン4Kキャンバス作成
@@ -4763,6 +4848,7 @@ async function flushSave(){
     });
     state.dirty = false;
     setSaveState('saved');
+    broadcastProjectDebounced(); // ライブ連携中ならCOMPOSERへ送信
   }catch(err){
     console.error('save failed', err);
     setSaveState('dirty');
@@ -5548,76 +5634,145 @@ document.getElementById('frame-strip').addEventListener('wheel', e => {
 // ============================================================
 // KEYBOARD
 // ============================================================
+// 単発キーのアクション定義（Ctrl系のUndo/Redo/Copy/Pasteは固定で別処理）
+const SHORTCUT_ACTIONS = [
+  { id:'pen',       label:'ペン',               def:'B',          run:()=>document.querySelector('.tool[data-tool="pen"]')?.click() },
+  { id:'erase',     label:'消しゴム',           def:'E',          run:()=>document.querySelector('.tool[data-tool="erase"]')?.click() },
+  { id:'fill',      label:'塗りつぶし',         def:'G',          run:()=>document.querySelector('.tool[data-tool="fill"]')?.click() },
+  { id:'size1',     label:'サイズ 1px',         def:'1',          run:()=>document.querySelector('.tb-pen[data-size="1"]')?.click() },
+  { id:'size2',     label:'サイズ 2px',         def:'2',          run:()=>document.querySelector('.tb-pen[data-size="2"]')?.click() },
+  { id:'size3',     label:'サイズ 20px',        def:'3',          run:()=>document.querySelector('.tb-pen[data-size="20"]')?.click() },
+  { id:'onion',     label:'オニオンスキン',     def:'O',          run:()=>document.getElementById('btn-onion')?.click() },
+  { id:'newFrame',  label:'新規フレーム',       def:'N',          run:()=>document.getElementById('btn-add-frame')?.click() },
+  { id:'dupFrame',  label:'フレーム複製',       def:'D',          run:()=>document.getElementById('btn-dup-frame')?.click() },
+  { id:'split',     label:'SPLIT（分割）',      def:'S',          run:()=>splitAtPlayhead() },
+  { id:'workReset', label:'ワークエリア全範囲', def:'W',          run:()=>{ state.workStart=0; state.workEnd=totalTicks(); updateTimeTrack(); updateDurInfo(); markMetaDirty(); } },
+  { id:'play',      label:'再生 / 停止',        def:'Space',      prevent:true, run:()=>document.getElementById('btn-play')?.click() },
+  { id:'prevFrame', label:'前のコマ',           def:'ArrowLeft',  prevent:true, run:()=>document.getElementById('strip-prev')?.click() },
+  { id:'nextFrame', label:'次のコマ',           def:'ArrowRight', prevent:true, run:()=>document.getElementById('strip-next')?.click() },
+  { id:'delFrame',  label:'フレーム削除',       def:'Delete',     prevent:true, run:()=>{ if(state.selectedFrameIds && state.selectedFrameIds.size>0) deleteSelectedFrames(); else deleteCurrentFrame(); } },
+  { id:'fit',       label:'FIT（ズーム合わせ）',def:'F',          run:()=>fitToStage() },
+  { id:'mirror',    label:'MIRROR',             def:'M',          run:()=>document.getElementById('btn-mirror')?.click() },
+  { id:'flip',      label:'FLIP',               def:'X',          run:()=>document.getElementById('btn-flip')?.click() },
+  { id:'refPanel',  label:'REFパネル',          def:'R',          run:()=>toggleRefPanel() },
+  { id:'swap',      label:'ツールバー左右入替', def:'Tab',        prevent:true, run:()=>toggleToolbarSwap() },
+];
+const SC_BY_ID = Object.fromEntries(SHORTCUT_ACTIONS.map(a=>[a.id,a]));
+const KEYMAP_LS = 'animator_keymap_v1';
+let gKeymap = {};        // {actionId: key}
+let gCaptureId = null;   // キー取得中のアクションID
+
+function defaultKeymap(){ const m={}; SHORTCUT_ACTIONS.forEach(a=>m[a.id]=a.def); return m; }
+function loadKeymap(){
+  gKeymap = defaultKeymap();
+  try{
+    const raw = localStorage.getItem(KEYMAP_LS);
+    if(raw){ const o=JSON.parse(raw); for(const a of SHORTCUT_ACTIONS){ if(typeof o[a.id]==='string') gKeymap[a.id]=o[a.id]; } }
+  }catch(e){}
+}
+function saveKeymap(){ try{ localStorage.setItem(KEYMAP_LS, JSON.stringify(gKeymap)); }catch(e){} }
+
+// e.key を正規化（'a'→'A', ' '→'Space', 矢印/Tab等はそのまま）
+function normKey(e){
+  const k = e.key;
+  if(k===' '||k==='Spacebar') return 'Space';
+  if(k.length===1) return k.toUpperCase();
+  return k;
+}
+const KEY_DISP = { 'Space':'SPACE','ArrowLeft':'←','ArrowRight':'→','ArrowUp':'↑','ArrowDown':'↓','Delete':'DEL','Backspace':'⌫','Tab':'TAB','Escape':'ESC','Enter':'⏎' };
+function dispKey(k){ return k ? (KEY_DISP[k] || k) : '—'; }
+
+// ── 設定UI ──
+function buildShortcutList(){
+  const list = document.getElementById('shortcut-list');
+  if(!list) return;
+  list.innerHTML='';
+  SHORTCUT_ACTIONS.forEach(a=>{
+    const row=document.createElement('div'); row.className='sc-row';
+    const lab=document.createElement('span'); lab.className='sc-label'; lab.textContent=a.label;
+    const key=document.createElement('button'); key.className='sc-key'; key.dataset.id=a.id;
+    const cur=gKeymap[a.id]||'';
+    key.textContent = (gCaptureId===a.id) ? '…' : dispKey(cur);
+    if(gCaptureId===a.id) key.classList.add('capturing');
+    if(!cur) key.classList.add('unbound');
+    key.addEventListener('click',()=>{ gCaptureId=(gCaptureId===a.id)?null:a.id; buildShortcutList(); });
+    row.appendChild(lab); row.appendChild(key); list.appendChild(row);
+  });
+}
+function toggleSettingsPanel(force){
+  const p=document.getElementById('settings-panel');
+  const show=(typeof force==='boolean')?force:!p.classList.contains('show');
+  p.classList.toggle('show',show);
+  document.getElementById('btn-settings').classList.toggle('on',show);
+  gCaptureId=null;
+  if(show) buildShortcutList();
+}
+// キー取得モードの処理（true=このキーイベントを消費した）
+function handleShortcutCapture(e){
+  if(!gCaptureId) return false;
+  e.preventDefault(); e.stopPropagation();
+  if(['Shift','Control','Alt','Meta'].includes(e.key)) return true; // 修飾単体は無視
+  const k = normKey(e);
+  if(k==='Escape'){ gCaptureId=null; buildShortcutList(); return true; } // 取消
+  // 同キーを持つ他アクションは解除（重複防止）
+  for(const id in gKeymap){ if(id!==gCaptureId && gKeymap[id]===k) gKeymap[id]=''; }
+  gKeymap[gCaptureId]=k;
+  gCaptureId=null;
+  saveKeymap();
+  buildShortcutList();
+  return true;
+}
+// 設定UIの配線
+document.getElementById('btn-settings').addEventListener('click', ()=>toggleSettingsPanel());
+document.getElementById('settings-panel-close').addEventListener('click', ()=>toggleSettingsPanel(false));
+document.getElementById('shortcut-reset').addEventListener('click', async ()=>{
+  const ok = await modalConfirm('ショートカットを初期設定に戻しますか？');
+  if(!ok) return;
+  gKeymap = defaultKeymap(); gCaptureId=null; saveKeymap(); buildShortcutList();
+});
+// 設定パネルのドラッグ移動
+(function(){
+  const panel=document.getElementById('settings-panel');
+  const head=document.getElementById('settings-panel-head');
+  let dragging=false, sx=0, sy=0, ox=0, oy=0;
+  head.addEventListener('pointerdown', e=>{
+    if(e.target.id==='settings-panel-close') return;
+    dragging=true;
+    const r=panel.getBoundingClientRect();
+    sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
+    panel.style.left=ox+'px'; panel.style.top=oy+'px'; panel.style.right='auto';
+    head.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  head.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    panel.style.left=(ox+e.clientX-sx)+'px';
+    panel.style.top=Math.max(0, oy+e.clientY-sy)+'px';
+  });
+  head.addEventListener('pointerup', ()=>{ dragging=false; });
+})();
+
+loadKeymap(); // 起動時にキーマップを復元（localStorage）
+
 window.addEventListener('keydown', e => {
+  if(handleShortcutCapture(e)) return; // キー取得モード優先
   if(e.target.tagName === 'INPUT') return;
+  // Ctrl/Cmd 系（固定）
   if((e.ctrlKey||e.metaKey) && e.key === 'z'){ e.preventDefault(); undo(); return; }
   if((e.ctrlKey||e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))){ e.preventDefault(); redo(); return; }
-  if(e.key === 'b' || e.key === 'B'){ document.querySelector('.tool[data-tool="pen"]').click(); }
-  if(e.key === 'e' || e.key === 'E'){ document.querySelector('.tool[data-tool="erase"]').click(); }
-  if(e.key === 'g' || e.key === 'G'){ document.querySelector('.tool[data-tool="fill"]').click(); }
-  if(e.key === '1'){ document.querySelector('.tb-pen[data-size="1"]').click(); }
-  if(e.key === '2'){ document.querySelector('.tb-pen[data-size="2"]').click(); }
-  if(e.key === '3'){ document.querySelector('.tb-pen[data-size="20"]').click(); }
-  if(e.key === 'o' || e.key === 'O'){ document.getElementById('btn-onion').click(); }
-  if(e.key === 'n' || e.key === 'N'){ document.getElementById('btn-add-frame').click(); }
-  if(e.key === 'd' || e.key === 'D'){ document.getElementById('btn-dup-frame').click(); }
-  if(e.key === 's' || e.key === 'S'){ splitAtPlayhead(); }
-  if(e.key === 'w' || e.key === 'W'){
-    // ワークエリアを全範囲にリセット
-    state.workStart = 0;
-    state.workEnd = totalTicks();
-    updateTimeTrack();
-    updateDurInfo();
-    markMetaDirty();
-  }
-  if(e.key === ' '){
-    e.preventDefault();
-    document.getElementById('btn-play').click();
-  }
-  if(e.key === 'ArrowLeft'){
-    e.preventDefault();
-    document.getElementById('strip-prev').click();
-  }
-  if(e.key === 'ArrowRight'){
-    e.preventDefault();
-    document.getElementById('strip-next').click();
-  }
-  if(e.key === 'Delete' || e.key === 'Backspace'){
-    e.preventDefault();
-    if(state.selectedFrameIds && state.selectedFrameIds.size > 0){
-      deleteSelectedFrames();
-    } else {
-      deleteCurrentFrame();
+  if((e.ctrlKey||e.metaKey) && (e.key === 'c' || e.key === 'C')){ e.preventDefault(); copySelectedFrames(); return; }
+  if((e.ctrlKey||e.metaKey) && (e.key === 'v' || e.key === 'V')){ e.preventDefault(); pasteFramesAfterCurrent(); return; }
+  if(e.ctrlKey || e.metaKey || e.altKey) return; // その他の修飾付きは無視
+  // 固定: Escape=選択解除 / Backspace=削除（Deleteの別名）
+  if(e.key === 'Escape'){ clearFrameSelection(); return; }
+  if(e.key === 'Backspace'){ e.preventDefault(); SC_BY_ID.delFrame.run(); return; }
+  // 可変ショートカット（keymap照合）
+  const k = normKey(e);
+  for(const a of SHORTCUT_ACTIONS){
+    if(gKeymap[a.id] && gKeymap[a.id] === k){
+      if(a.prevent) e.preventDefault();
+      a.run();
+      return;
     }
-  }
-  if((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')){
-    e.preventDefault();
-    copySelectedFrames();
-  }
-  if((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')){
-    e.preventDefault();
-    pasteFramesAfterCurrent();
-  }
-  if(e.key === 'Escape'){
-    clearFrameSelection();
-  }
-  if(e.key === 'f' || e.key === 'F'){
-    // F: ズームをFITに
-    fitToStage();
-  }
-  if(e.key === 'm' || e.key === 'M'){
-    document.getElementById('btn-mirror').click();
-  }
-  if(e.key === 'x' || e.key === 'X'){
-    document.getElementById('btn-flip').click();
-  }
-  if(e.key === 'r' || e.key === 'R'){
-    toggleRefPanel();
-  }
-  if(e.key === 'Tab'){
-    e.preventDefault();
-    const sb = document.getElementById('btn-swap-toolbar');
-    if(sb) sb.click();
   }
 });
 
@@ -5684,8 +5839,6 @@ window.addEventListener('resize', () => {
   // ツールバー左右入れ替え復元
   if(state.toolbarSwapped){
     document.getElementById('app').classList.add('swapped');
-    const sb = document.getElementById('btn-swap-toolbar');
-    if(sb) sb.classList.add('on');
     fitToStage();
   }
   // FILL PALETTE フローティング復元
@@ -5698,6 +5851,8 @@ window.addEventListener('resize', () => {
   pushTimelineHistory();
   state.lastEditWas = 'canvas'; // 初期はキャンバスUNDO優先
   resetGlobalHistory(); // 起動直後はUndo対象なし（基準のみ）
+  setupLiveSync();      // COMPOSERとのライブ連携（BroadcastChannel）
+  updateLiveUI();
 })();
 
 // ページ離脱前に強制保存
