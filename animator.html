@@ -367,6 +367,17 @@ html,body{
 .sc-key:hover{border-color:var(--border-bright);color:var(--acid);}
 .sc-key.capturing{border-color:var(--acid);color:var(--acid);background:rgba(54,255,0,0.12);}
 .sc-key.unbound{color:rgba(255,255,255,0.3);}
+.sc-key.on{border-color:var(--acid);color:var(--acid);background:rgba(54,255,0,0.12);}
+.sg-row{display:flex;align-items:center;gap:6px;padding:4px 2px;}
+.sg-toggle{min-width:64px;}
+.sg-num{
+  width:58px;background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  color:rgba(255,255,255,0.85);font-family:var(--mono);font-size:9px;
+  padding:3px 5px;text-align:right;letter-spacing:0.04em;
+}
+.sg-num:focus{outline:none;border-color:var(--acid);color:var(--acid);}
+.sg-x{font-size:9px;color:rgba(255,255,255,0.45);}
+.sg-preset{min-width:0;font-size:8px;letter-spacing:0.02em;padding:3px 6px;}
 
 .layer{
   position:absolute;top:0;left:0;
@@ -1187,6 +1198,7 @@ input[type=range]::-moz-range-thumb{
       <canvas class="layer" id="onion-prev" width="2048" height="1152" style="width: 842.457px; height: 473.882px;"></canvas>
       <canvas class="layer" id="onion-next" width="2048" height="1152" style="width: 842.457px; height: 473.882px;"></canvas>
       <canvas class="layer" id="draw-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px; opacity: 1; cursor: crosshair;"></canvas>
+      <canvas class="layer" id="guide-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px; pointer-events: none; z-index: 15;"></canvas>
     </div>
     <!-- ミラーガイド: stage基準で配置（ズーム/パンに追従しない固定ライン） -->
     <div id="mirror-guide" style="display:none;position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(255,80,80,0.7);box-shadow:0 0 6px rgba(255,80,80,0.6);pointer-events:none;z-index:20;transform:translateX(-50%);"></div>
@@ -1320,6 +1332,39 @@ input[type=range]::-moz-range-thumb{
   </div>
   <div id="settings-panel-body">
     <div class="ref-sect">
+      <div class="ref-sect-h">CANVAS SIZE（作業領域・書き出し解像度）</div>
+      <div class="sc-hint">PAN等で大判にできます。上限は約4K面積。変更すると既存の絵は中央フィットで保持されます</div>
+      <div class="sg-row">
+        <input type="number" id="canvas-w" class="sg-num" min="256" step="1" title="横(px)">
+        <span class="sg-x">×</span>
+        <input type="number" id="canvas-h" class="sg-num" min="256" step="1" title="縦(px)">
+        <button id="canvas-apply" class="sc-key" style="min-width:54px;">APPLY</button>
+      </div>
+      <div class="sg-row" style="flex-wrap:wrap;gap:4px;">
+        <button class="sc-key sg-preset" data-w="1920" data-h="1080">1920×1080</button>
+        <button class="sc-key sg-preset" data-w="2048" data-h="1152">2048×1152</button>
+        <button class="sc-key sg-preset" data-w="3840" data-h="1080">3840×1080(PAN)</button>
+        <button class="sc-key sg-preset" data-w="4096" data-h="2304">4096×2304</button>
+      </div>
+    </div>
+    <div class="ref-sect">
+      <div class="ref-sect-h">CANVAS GUIDES（解像度枠 / セーフ）</div>
+      <div class="sc-hint">出力範囲の目安。表示のみで書き出し・COMPOSERには影響しません</div>
+      <div class="sg-row">
+        <button id="guide-res-toggle" class="sc-key sg-toggle" title="解像度枠の表示ON/OFF">解像度枠</button>
+        <input type="number" id="guide-res-w" class="sg-num" min="16" step="1" title="解像度枠 横(px)">
+        <span class="sg-x">×</span>
+        <input type="number" id="guide-res-h" class="sg-num" min="16" step="1" title="解像度枠 縦(px)">
+      </div>
+      <div class="sg-row">
+        <button id="guide-safe-toggle" class="sc-key sg-toggle" title="セーフフレームの表示ON/OFF">セーフ</button>
+        <input type="number" id="guide-safe-a" class="sg-num" min="1" max="100" step="1" title="アクションセーフ(%)">
+        <span class="sg-x">%</span>
+        <input type="number" id="guide-safe-b" class="sg-num" min="1" max="100" step="1" title="タイトルセーフ(%)">
+        <span class="sg-x">%</span>
+      </div>
+    </div>
+    <div class="ref-sect">
       <div class="ref-sect-h">KEYBOARD SHORTCUTS</div>
       <div class="sc-hint">キーをクリック → 新しいキーを押して変更（ESCで取消）</div>
       <div id="shortcut-list"></div>
@@ -1341,10 +1386,14 @@ input[type=range]::-moz-range-thumb{
 // CONFIG
 // ============================================================
 const CFG = {
-  // 内部作業解像度 (16:9, 2K相当)
+  // 内部作業解像度 (16:9, 2K相当) ※可変（左上ラベルから変更可）
   WORK_W: 2048,
   WORK_H: 1152,
-  // 書き出し解像度 (4K)
+  // 作業キャンバスの上限（総ピクセル数 ≒ 4K面積）と各辺上限
+  MAX_AREA: 4096 * 2304,   // ≈9.4MP
+  MAX_SIDE: 8192,
+  MIN_SIDE: 256,
+  // 書き出し解像度（旧4K固定。現在は作業解像度そのままで書き出す）
   EXPORT_W: 3840,
   EXPORT_H: 2160,
   // 履歴保持数（フレーム単位）
@@ -1453,6 +1502,11 @@ const state = {
   // FILL PALETTE フローティング
   paletteFloat: false,
   paletteFloatPos: null, // {left,top}
+  // キャンバスガイド（解像度枠/セーフフレーム。表示のみ・ラスターには影響しない）
+  guides: {
+    resOn: false, resW: 1920, resH: 1080,   // 解像度枠（出力クロップの目安）
+    safeOn: false, safeA: 90, safeB: 80,     // セーフフレーム（解像度枠に対する%）
+  },
   // ズームとパン
   zoom: 1,
   fitMode: true,
@@ -2132,6 +2186,8 @@ const onionPrev  = document.getElementById('onion-prev');
 const onionNext  = document.getElementById('onion-next');
 const frameLayerCanvas = document.getElementById('frame-layer');
 const refLayerCanvas = document.getElementById('ref-layer');
+const guideLayerCanvas = document.getElementById('guide-layer');
+const guideCtx = guideLayerCanvas.getContext('2d');
 const refLayerCtx = refLayerCanvas.getContext('2d');
 const bgCtx      = bgCanvas.getContext('2d');
 const drawCtx    = drawCanvas.getContext('2d', { willReadFrequently: true });
@@ -2141,7 +2197,7 @@ const frameLayerCtx = frameLayerCanvas.getContext('2d', { willReadFrequently: tr
 
 // 内部解像度設定
 function setupCanvas(){
-  [bgCanvas, drawCanvas, onionPrev, onionNext, frameLayerCanvas].forEach(c => {
+  [bgCanvas, drawCanvas, onionPrev, onionNext, frameLayerCanvas, refLayerCanvas, guideLayerCanvas].forEach(c => {
     c.width  = CFG.WORK_W;
     c.height = CFG.WORK_H;
   });
@@ -2181,7 +2237,7 @@ function applyZoom(){
   const sx = state.flipped ? -1 : 1;
   wrap.style.transform = `translate(${state.panX}px, ${state.panY}px) scaleX(${sx})`;
   wrap.style.transformOrigin = '50% 50%';
-  [bgCanvas, drawCanvas, onionPrev, onionNext, frameLayerCanvas, refLayerCanvas].forEach(c => {
+  [bgCanvas, drawCanvas, onionPrev, onionNext, frameLayerCanvas, refLayerCanvas, guideLayerCanvas].forEach(c => {
     c.style.width  = w + 'px';
     c.style.height = h + 'px';
   });
@@ -2190,6 +2246,133 @@ function applyZoom(){
   document.getElementById('zoom-val').textContent =
     Math.round(state.zoom*100)+'%';
   updateMirrorGuide();
+  renderGuides();
+}
+
+// 解像度枠 / セーフフレームのガイドを描画（表示のみ・書き出しには含めない）
+function renderGuides(){
+  if(!guideCtx) return;
+  guideCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
+  const g = state.guides;
+  if(!g || (!g.resOn && !g.safeOn)) return;
+  // 解像度枠（作業キャンバス中央。作業キャンバスより大きい指定は収める）
+  const rw = Math.min(Math.max(16, g.resW|0), CFG.WORK_W);
+  const rh = Math.min(Math.max(16, g.resH|0), CFG.WORK_H);
+  const rx = (CFG.WORK_W - rw) / 2;
+  const ry = (CFG.WORK_H - rh) / 2;
+  // 線幅は画面上で一定に見えるようズームで補正（最小1px相当）
+  const lw = Math.max(1, 2 / Math.max(0.01, state.zoom));
+  if(g.resOn){
+    guideCtx.strokeStyle = 'rgba(54,255,0,0.9)';
+    guideCtx.lineWidth = lw;
+    guideCtx.strokeRect(rx, ry, rw, rh);
+    // 枠外を軽く暗く（出力範囲を視認しやすく）
+    guideCtx.save();
+    guideCtx.fillStyle = 'rgba(0,0,0,0.18)';
+    guideCtx.beginPath();
+    guideCtx.rect(0, 0, CFG.WORK_W, CFG.WORK_H);
+    guideCtx.rect(rx, ry, rw, rh);
+    guideCtx.fill('evenodd');
+    guideCtx.restore();
+  }
+  if(g.safeOn){
+    guideCtx.strokeStyle = 'rgba(255,210,60,0.75)';
+    guideCtx.setLineDash([Math.max(6, lw*4), Math.max(4, lw*3)]);
+    [g.safeA, g.safeB].forEach(pct => {
+      const p = Math.min(100, Math.max(1, pct|0)) / 100;
+      const sw = rw * p, sh = rh * p;
+      const sx = rx + (rw - sw) / 2, sy = ry + (rh - sh) / 2;
+      guideCtx.lineWidth = Math.max(1, lw * 0.85);
+      guideCtx.strokeRect(sx, sy, sw, sh);
+    });
+    guideCtx.setLineDash([]);
+  }
+}
+
+// ============================================================
+// 作業キャンバスサイズ変更（Phase B）
+//   ・上限: 総ピクセル数 CFG.MAX_AREA（≒4K面積）/ 各辺 MIN_SIDE〜MAX_SIDE
+//   ・既存の絵はアスペクト維持で中央フィット（nearest）して保持
+//   ・Undo履歴はサイズ非互換のためリセット
+// ============================================================
+function clampCanvasSize(w, h){
+  w = Math.round(Math.max(CFG.MIN_SIDE, Math.min(CFG.MAX_SIDE, w || 0)));
+  h = Math.round(Math.max(CFG.MIN_SIDE, Math.min(CFG.MAX_SIDE, h || 0)));
+  if(w * h > CFG.MAX_AREA){
+    const s = Math.sqrt(CFG.MAX_AREA / (w * h));
+    w = Math.max(CFG.MIN_SIDE, Math.floor(w * s));
+    h = Math.max(CFG.MIN_SIDE, Math.floor(h * s));
+  }
+  return [w, h];
+}
+// drawData(sw×sh) を dw×dh にアスペクト維持・中央フィットで再サンプル（nearest）
+function resampleDrawData(data, sw, sh, dw, dh){
+  const out = new Uint8ClampedArray(dw * dh * 4);
+  if(!data || data.length !== sw * sh * 4) return out; // 不正データは透明で返す
+  const src = document.createElement('canvas'); src.width = sw; src.height = sh;
+  src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data), sw, sh), 0, 0);
+  const dst = document.createElement('canvas'); dst.width = dw; dst.height = dh;
+  const dc = dst.getContext('2d'); dc.imageSmoothingEnabled = false;
+  const scale = Math.min(dw / sw, dh / sh);
+  const w = Math.round(sw * scale), h = Math.round(sh * scale);
+  const x = Math.floor((dw - w) / 2), y = Math.floor((dh - h) / 2);
+  dc.drawImage(src, 0, 0, sw, sh, x, y, w, h);
+  return new Uint8ClampedArray(dc.getImageData(0, 0, dw, dh).data);
+}
+// フレームのサムネをdrawDataから再生成
+function regenThumb(f){
+  if(!f || f.kind !== 'draw' || !f.thumbCanvas) return;
+  const tmp = document.createElement('canvas');
+  tmp.width = CFG.WORK_W; tmp.height = CFG.WORK_H;
+  tmp.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(f.drawData), CFG.WORK_W, CFG.WORK_H), 0, 0);
+  const tc = f.thumbCanvas.getContext('2d');
+  tc.imageSmoothingEnabled = false;
+  tc.fillStyle = '#fff'; tc.fillRect(0, 0, CFG.THUMB_W, CFG.THUMB_H);
+  tc.drawImage(tmp, 0, 0, CFG.THUMB_W, CFG.THUMB_H);
+}
+function updateResLabel(){
+  const el = document.getElementById('info-res');
+  if(el) el.textContent = CFG.WORK_W + '×' + CFG.WORK_H;
+}
+// メインのサイズ変更処理（呼び出し側で確認ダイアログ）
+function setCanvasSize(newW, newH){
+  [newW, newH] = clampCanvasSize(newW, newH);
+  const oldW = CFG.WORK_W, oldH = CFG.WORK_H;
+  if(newW === oldW && newH === oldH) return false;
+  // 現在のコマを確定
+  const cur = curFrame();
+  if(cur) syncFrameFromCanvas(cur);
+  // 既存の絵を再サンプルして保持
+  for(const f of state.frames){
+    if(f.kind !== 'draw' || !f.drawData) continue;
+    f.drawData = resampleDrawData(f.drawData, oldW, oldH, newW, newH);
+    f.history = []; f.histIdx = -1; // サイズ非互換の履歴は破棄
+    f.dirty = true; state.pendingSaveFrames.add(f.id);
+  }
+  // FRAMEレイヤーも再サンプル
+  let flData = null;
+  try{ flData = frameLayerCtx.getImageData(0, 0, oldW, oldH).data; }catch(e){}
+  // サイズ適用 → レイヤーcanvas再構築
+  CFG.WORK_W = newW; CFG.WORK_H = newH;
+  setupCanvas();
+  if(flData){
+    const rs = resampleDrawData(new Uint8ClampedArray(flData), oldW, oldH, newW, newH);
+    frameLayerCtx.putImageData(new ImageData(rs, newW, newH), 0, 0);
+  }
+  // 履歴・サムネ・表示を更新
+  resetGlobalHistory();
+  state.frames.forEach(regenThumb);
+  loadFrameToCanvas(curFrame());
+  updateOnion();
+  renderRefLayer();
+  applyFrameLayerStyle();
+  buildStrip();
+  updateResLabel();
+  fitToStage();        // applyZoom 内で renderGuides も走る
+  updateStats();
+  markMetaDirty();
+  scheduleSave();
+  return true;
 }
 
 // ミラー軸ガイドラインをズーム・パン・flipに追従させる
@@ -4405,6 +4588,11 @@ async function applyProjectJSON(json){
   if(!cellList || cellList.length === 0){
     alert('フレームが含まれていません'); return;
   }
+  // 作業キャンバスサイズの復元（cell画像をdecodeする前に適用）
+  if(typeof json.width === 'number' && typeof json.height === 'number' && json.width > 0 && json.height > 0){
+    const [cw, ch] = clampCanvasSize(json.width, json.height);
+    if(cw !== CFG.WORK_W || ch !== CFG.WORK_H){ CFG.WORK_W = cw; CFG.WORK_H = ch; setupCanvas(); }
+  }
   // プロジェクト読み込みで全履歴をリセット（古いframeId参照を残さない）
   tlHistory.length = 0; tlHistIdx = -1;
   flHistory.length = 0; flHistIdx = -1;
@@ -4483,6 +4671,8 @@ async function applyProjectJSON(json){
   }
   applyFrameLayerStyle();
   renderRefLayer();
+  updateResLabel();
+  fitToStage();
   scheduleSave();
   pushTimelineHistory();
 }
@@ -4649,18 +4839,19 @@ document.getElementById('btn-live').addEventListener('click', () => {
 
 function exportPNG(opts){
   opts = opts || {};
-  // オフスクリーン4Kキャンバス作成
+  // 作業解像度そのままで書き出し（ビューと同じ解像度）
+  const W = CFG.WORK_W, H = CFG.WORK_H;
   const ex = document.createElement('canvas');
-  ex.width  = CFG.EXPORT_W;
-  ex.height = CFG.EXPORT_H;
+  ex.width  = W;
+  ex.height = H;
   const exCtx = ex.getContext('2d');
   exCtx.imageSmoothingEnabled = false;
   // 背景（透明オプション時はスキップ）
   if(!opts.transparentBG){
-    exCtx.drawImage(bgCanvas, 0, 0, CFG.EXPORT_W, CFG.EXPORT_H);
+    exCtx.drawImage(bgCanvas, 0, 0, W, H);
   }
   // 描画レイヤー
-  exCtx.drawImage(drawCanvas, 0, 0, CFG.EXPORT_W, CFG.EXPORT_H);
+  exCtx.drawImage(drawCanvas, 0, 0, W, H);
   // ダウンロード
   ex.toBlob(blob => {
     const url = URL.createObjectURL(blob);
@@ -4668,7 +4859,7 @@ function exportPNG(opts){
     const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
     const tag = opts.transparentBG ? '_alpha' : '';
     a.href = url;
-    a.download = `frame_${ts}_4k${tag}.png`;
+    a.download = `frame_${ts}_${W}x${H}${tag}.png`;
     a.click();
     URL.revokeObjectURL(url);
   }, 'image/png');
@@ -4682,19 +4873,17 @@ async function exportSequencePNG(){
   if(cur) syncFrameFromCanvas(cur);
   const total = totalTicks();
   if(total <= 0){ await modalAlert('書き出すコマがありません'); return; }
-  const ok = await modalConfirm(`全 ${total} コマを 4K BG透過の連番PNGで書き出します。\nコマ数が多いと時間がかかります。続行しますか？`);
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  const ok = await modalConfirm(`全 ${total} コマを ${W}×${H} BG透過の連番PNGで書き出します。\nコマ数が多いと時間がかかります。続行しますか？`);
   if(!ok) return;
 
   const btn = document.getElementById('btn-export-seq');
   const origLabel = btn.textContent;
   btn.disabled = true;
 
-  // WORK解像度→4Kへ nearest 拡大する一時キャンバス
-  const work = document.createElement('canvas');
-  work.width = CFG.WORK_W; work.height = CFG.WORK_H;
-  const workCtx = work.getContext('2d');
+  // 作業解像度そのままで1枚ずつ生成
   const ex = document.createElement('canvas');
-  ex.width = CFG.EXPORT_W; ex.height = CFG.EXPORT_H;
+  ex.width = W; ex.height = H;
   const exCtx = ex.getContext('2d');
   exCtx.imageSmoothingEnabled = false;
 
@@ -4706,10 +4895,9 @@ async function exportSequencePNG(){
       const f = state.frames[i];
       const dur = Math.max(1, f.duration | 0);
       // このセルの1枚を生成（draw かつ非hidden のときのみ絵を描く）
-      exCtx.clearRect(0, 0, CFG.EXPORT_W, CFG.EXPORT_H);
+      exCtx.clearRect(0, 0, W, H);
       if(f.kind === 'draw' && !f.hidden && f.drawData){
-        workCtx.putImageData(new ImageData(new Uint8ClampedArray(f.drawData), CFG.WORK_W, CFG.WORK_H), 0, 0);
-        exCtx.drawImage(work, 0, 0, CFG.EXPORT_W, CFG.EXPORT_H);
+        exCtx.putImageData(new ImageData(new Uint8ClampedArray(f.drawData), W, H), 0, 0);
       }
       const dataURL = ex.toDataURL('image/png').split(',')[1];
       for(let d = 0; d < dur; d++){
@@ -4725,7 +4913,7 @@ async function exportSequencePNG(){
     const a = document.createElement('a');
     const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
     a.href = url;
-    a.download = `sequence_${ts}_4k_alpha.zip`;
+    a.download = `sequence_${ts}_${W}x${H}_alpha.zip`;
     a.click();
     URL.revokeObjectURL(url);
   }catch(err){
@@ -4830,6 +5018,8 @@ async function flushSave(){
       toolbarSwapped: state.toolbarSwapped,
       paletteFloat: state.paletteFloat,
       paletteFloatPos: state.paletteFloatPos,
+      workW: CFG.WORK_W, workH: CFG.WORK_H,
+      guides: { ...state.guides },
       mirrorAxis: state.mirrorAxis,
       mirrorAxisX: state.mirrorAxisX,
       mirrorAxisY: state.mirrorAxisY,
@@ -4869,6 +5059,12 @@ async function loadProject(){
     });
     if(!meta || !meta.frameOrder || meta.frameOrder.length === 0) return false;
 
+    // 作業キャンバスサイズの復元（カスタムサイズ対応・フレーム再構築の前に適用）
+    if(typeof meta.workW === 'number' && typeof meta.workH === 'number' && meta.workW > 0 && meta.workH > 0){
+      const [cw, ch] = clampCanvasSize(meta.workW, meta.workH);
+      if(cw !== CFG.WORK_W || ch !== CFG.WORK_H){ CFG.WORK_W = cw; CFG.WORK_H = ch; setupCanvas(); }
+    }
+
     // 旧形式（id配列）と新形式（{id,kind,duration}配列）の両対応
     const orderItems = meta.frameOrder.map(item =>
       typeof item === 'object' ? item : { id: item, kind: 'draw' }
@@ -4898,10 +5094,17 @@ async function loadProject(){
       const thumbCanvas = document.createElement('canvas');
       thumbCanvas.width = CFG.THUMB_W;
       thumbCanvas.height = CFG.THUMB_H;
+      // drawData を現在の作業サイズに合わせる（保存時と異なる場合は再サンプル）
+      let dd = data.drawData ? new Uint8ClampedArray(data.drawData) : null;
+      const dsw = data.width || CFG.WORK_W, dsh = data.height || CFG.WORK_H;
+      if(dd && (dsw !== CFG.WORK_W || dsh !== CFG.WORK_H || dd.length !== CFG.WORK_W * CFG.WORK_H * 4)){
+        dd = resampleDrawData(dd, dsw, dsh, CFG.WORK_W, CFG.WORK_H);
+      }
+      if(!dd) dd = new Uint8ClampedArray(CFG.WORK_W * CFG.WORK_H * 4);
       const f = {
         id: data.id,
         kind: 'draw',
-        drawData: data.drawData ? new Uint8ClampedArray(data.drawData) : new Uint8ClampedArray(CFG.WORK_W * CFG.WORK_H * 4),
+        drawData: dd,
         thumbCanvas,
         duration: data.duration || 2,
         history: [],
@@ -4939,6 +5142,7 @@ async function loadProject(){
     if(typeof meta.toolbarSwapped === 'boolean') state.toolbarSwapped = meta.toolbarSwapped;
     if(typeof meta.paletteFloat === 'boolean') state.paletteFloat = meta.paletteFloat;
     if(meta.paletteFloatPos && typeof meta.paletteFloatPos === 'object') state.paletteFloatPos = meta.paletteFloatPos;
+    if(meta.guides && typeof meta.guides === 'object') state.guides = Object.assign(state.guides, meta.guides);
     if(meta.mirrorAxis === 'h' || meta.mirrorAxis === 'v') state.mirrorAxis = meta.mirrorAxis;
     if(typeof meta.mirrorAxisX === 'number') state.mirrorAxisX = meta.mirrorAxisX;
     if(typeof meta.mirrorAxisY === 'number') state.mirrorAxisY = meta.mirrorAxisY;
@@ -5705,7 +5909,7 @@ function toggleSettingsPanel(force){
   p.classList.toggle('show',show);
   document.getElementById('btn-settings').classList.toggle('on',show);
   gCaptureId=null;
-  if(show) buildShortcutList();
+  if(show){ buildShortcutList(); applyGuideUI(); applyCanvasSizeUI(); }
 }
 // キー取得モードの処理（true=このキーイベントを消費した）
 function handleShortcutCapture(e){
@@ -5749,6 +5953,78 @@ document.getElementById('shortcut-reset').addEventListener('click', async ()=>{
     panel.style.top=Math.max(0, oy+e.clientY-sy)+'px';
   });
   head.addEventListener('pointerup', ()=>{ dragging=false; });
+})();
+
+// ── CANVAS GUIDES（解像度枠/セーフ）配線 ──
+function applyGuideUI(){
+  const g = state.guides;
+  const t1=document.getElementById('guide-res-toggle');
+  const t2=document.getElementById('guide-safe-toggle');
+  if(t1) t1.classList.toggle('on', g.resOn);
+  if(t2) t2.classList.toggle('on', g.safeOn);
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el && document.activeElement!==el) el.value=v; };
+  set('guide-res-w', g.resW); set('guide-res-h', g.resH);
+  set('guide-safe-a', g.safeA); set('guide-safe-b', g.safeB);
+}
+function commitGuides(){ renderGuides(); markMetaDirty(); scheduleSave(); }
+document.getElementById('guide-res-toggle').addEventListener('click', ()=>{
+  state.guides.resOn=!state.guides.resOn;
+  document.getElementById('guide-res-toggle').classList.toggle('on', state.guides.resOn);
+  commitGuides();
+});
+document.getElementById('guide-safe-toggle').addEventListener('click', ()=>{
+  state.guides.safeOn=!state.guides.safeOn;
+  document.getElementById('guide-safe-toggle').classList.toggle('on', state.guides.safeOn);
+  commitGuides();
+});
+function bindGuideNum(id, key, min, maxFn){
+  const el=document.getElementById(id); if(!el) return;
+  el.addEventListener('change', ()=>{
+    const max=(typeof maxFn==='function')?maxFn():maxFn;
+    let v=parseInt(el.value,10); if(isNaN(v)) v=state.guides[key];
+    v=Math.max(min, Math.min(max, v));
+    state.guides[key]=v; el.value=v; commitGuides();
+  });
+}
+bindGuideNum('guide-res-w','resW',16,()=>CFG.WORK_W);
+bindGuideNum('guide-res-h','resH',16,()=>CFG.WORK_H);
+bindGuideNum('guide-safe-a','safeA',1,100);
+bindGuideNum('guide-safe-b','safeB',1,100);
+
+// ── CANVAS SIZE（作業領域）配線 ──
+function applyCanvasSizeUI(){
+  const w=document.getElementById('canvas-w'), h=document.getElementById('canvas-h');
+  if(w && document.activeElement!==w) w.value=CFG.WORK_W;
+  if(h && document.activeElement!==h) h.value=CFG.WORK_H;
+  // 解像度枠の上限が変わるので入力の上限も同期
+  const gw=document.getElementById('guide-res-w'), gh=document.getElementById('guide-res-h');
+  if(gw) gw.max=CFG.WORK_W; if(gh) gh.max=CFG.WORK_H;
+}
+async function applyCanvasSizeFromInputs(rawW, rawH){
+  const [cw,ch]=clampCanvasSize(rawW, rawH);
+  if(cw===CFG.WORK_W && ch===CFG.WORK_H){ applyCanvasSizeUI(); return; }
+  let msg = `作業キャンバスを ${cw}×${ch} に変更します。`;
+  if(cw!==Math.round(rawW)||ch!==Math.round(rawH)) msg += `\n（上限により ${cw}×${ch} に調整）`;
+  msg += `\n既存の絵は中央フィットで保持し、Undo履歴はリセットされます。続行しますか？`;
+  const ok = await modalConfirm(msg);
+  if(!ok){ applyCanvasSizeUI(); return; }
+  setCanvasSize(cw, ch);
+  applyCanvasSizeUI();
+  applyGuideUI();
+}
+document.getElementById('canvas-apply').addEventListener('click', ()=>{
+  applyCanvasSizeFromInputs(
+    parseInt(document.getElementById('canvas-w').value,10),
+    parseInt(document.getElementById('canvas-h').value,10)
+  );
+});
+document.querySelectorAll('.sg-preset').forEach(b=>{
+  b.addEventListener('click', ()=> applyCanvasSizeFromInputs(parseInt(b.dataset.w,10), parseInt(b.dataset.h,10)));
+});
+// 左上の解像度ラベルクリックで設定パネルを開く
+(function(){
+  const lbl=document.getElementById('info-res');
+  if(lbl){ lbl.style.cursor='pointer'; lbl.title='クリックで作業キャンバスサイズを変更'; lbl.addEventListener('click', ()=>toggleSettingsPanel(true)); }
 })();
 
 loadKeymap(); // 起動時にキーマップを復元（localStorage）
@@ -5853,6 +6129,9 @@ window.addEventListener('resize', () => {
   resetGlobalHistory(); // 起動直後はUndo対象なし（基準のみ）
   setupLiveSync();      // COMPOSERとのライブ連携（BroadcastChannel）
   updateLiveUI();
+  updateResLabel();     // 読込後の作業キャンバスサイズをラベルに反映
+  fitToStage();         // 復元サイズに合わせて再フィット（applyZoom内でrenderGuidesも実行）
+  applyGuideUI();
 })();
 
 // ページ離脱前に強制保存
