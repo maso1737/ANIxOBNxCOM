@@ -1,121 +1,117 @@
-COMPOSER v0.5（単一HTML）の続き開発です。
+COMPOSER v0.6（単一HTML）の続き開発用ハンドオフ。
 
-【現在の実装済み仕様】（v0.5 時点）
+【概要】
+ANIMATORの作画コマを複数トラックで重ね、トランスフォーム/キーフレームでカメラワーク・タイミングを付け、4K連番PNGで書き出す合成ツール。tDRスタイル（--acid:#36FF00 / --neon:#F9FF47 / モノスペース / 黒基調）。
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 ■ マルチトラック
-- state.tracks[] 配列でトラック管理
-- tracks[0] = BG（最背面）、tracks[N-1] = 最前面（描画順）
-- UI表示はAE/PS準拠：上が前面レイヤー、下がBG
-- コンポジット描画：drawFrame() が tracks[0]→[N-1] を順に重ね描き
-- 各トラックが独立した keyframes / markers / visible / solo / cellInfos を保持
+- state.tracks[] = [{projectId,name,width,height,cellsRaw,cellInfos,frames,totalFrames,keyframes,markers,visible,solo}]
+- tracks[0]=最背面(BG)、tracks[N-1]=最前面。drawFrame()が0→N-1で重ね描き
+- UI表示はAE/PS準拠：上=前面、下=BG（rebuildAllTrackUIは i=N-1→0 で生成）
+- 各トラックボタン：◉表示/非表示, S(SOLO), PNG(単体4K書出), ✕削除
+  ※ ANM(ANIMATOR送信)ボタンは廃止（LIVE連携と二重で混乱するため）。sendTrackToAnimatorは未使用で残置
+- ⠿ドラッグで並び替え、名前ダブルクリックでインライン編集
+- width/height はトラック固有（解像度違いの基点ずれ対策。下記レンダリング参照）
 
-■ トラック操作
-- IMPORT JSON ボタン：全トラック置き換えで読み込み
-- + TRACK ボタン：既存トラックを保持したまま新トラックを最前面に追加
-- 各トラックに ◉（表示/非表示）、S（SOLO）、ANM（→ANIMATOR送信）、PNG（単体書き出し）、✕（削除）ボタン
-- タイムラインのトラック行クリックで選択（KF編集対象が切り替わる）
-- 選択中トラックをハイライト表示（--acid 色）
-- ⠿ドラッグハンドルでトラック並び替え（D&D、ドロップインジケーター付き）
-- トラック名ダブルクリックでインライン編集（Enter確定/Escキャンセル）
+■ インポート（IMPORT JSON に一本化、+TRACK廃止）
+- importJSON(json)：空なら新規読込、既存があれば「追加」。複数回で2つ3つと重ねられる
+- PROJECT_v2=loadJSON（全置換 or 追加）、PROJECT_v1/ANIMATOR_v1=単一トラック追加
+- finishImport()が共通の後処理（totalFrames/workArea/UI再構築/announceLive）
+- ドラッグ&ドロップ対応（JSON / audio両対応）
 
-■ SOLO
-- Sボタンで対象トラックをソロ（それ以外を非表示）
-- 複数トラックを同時ソロ可能
-- ソロOFFのトラックはUIで薄暗く表示（.soloed-off）
-- drawOneTrack() がhasSoloフラグで判断
+■ レンダリング（drawOneTrack）
+- sx=出力W/state.width, sy=出力H/state.height（コンポ→出力）
+- トラック固有 trW/trH を使い drawW=trW*sx, drawH=trH*sy で「コンポ中央に原寸配置」（AE準拠）。解像度違いでも基点がずれない
+- Z軸疑似3D：persp=PERSP_FOCAL(1000)/max(1,1000+Z)、eff=scale*persp で乗算（scaleと独立）。Z>0=奥、Z<0=手前。TU演出はZを0→負へ
+- 透明背景なし＝bgBrightのグレーで塗りつぶし後に重ね描き
 
-■ 動的トラック高さ
-- updateTrackHeights() がトラック数・オーディオ行の有無に応じて高さを自動調整
-- CSS変数 --track-h（32px〜54px）で制御
-- rebuildAllTrackUI() / loadJSON() / resize 時に再計算
+■ トランスフォーム / プロパティ（ALL_PROPS）
+- 順序：x,y,z,s,ax,ay,rot,op（UI表示順=AX/AY→X/Y/Z→ROT→SCL→OP）
+- PROP_STEP / PROP_MIN / PROP_MAX / propDefOf（s,op既定=1, 他=0）/ fmtProp / clampProp
+- commitProp(prop,value,record)：現フレームにキーが無ければ作成＝「変化した瞬間に即キー」
+- インスペクター(#kf-*)とFX HUD(#fx-*)は同じprop群。インスペクターのトランスフォームは常時表示、FX HUDのみP/S/A/R/T/Uの表示トグルに連動（applyPropVisibleは#fx-hudのみ対象）
+- ◀▶ステッパ(.num-step, data-step/data-fxstep + data-dir)、Shift=×10
+- 数値スクラブ：ラベル(.k)と入力欄自体をドラッグで変更。入力欄はクリック=編集 / ドラッグ=スクラブ（ドラッグ開始までcapture/preventDefaultしない）。Shift=×10, Ctrl=×0.1
+- updateKfUI/updateFxHud は ALL_PROPS をループ（document.activeElement!==el のとき値上書き＝編集中は保持）
 
-■ KFシステム（全関数にkfsパラメータ）
-- getKfValue(prop, frame, kfs) / getTransform(frame, kfs)
-- hasKfAt(prop, frame, kfs) / setKf(prop, frame, value, kfs)
-- removeKf(prop, frame, kfs)
-- selTrack() → 選択中トラックオブジェクト
-- kfsNow() → 選択中トラックのkeyframesを返す
+■ キーフレーム（線形補間＋イーズ）
+- 構造：track.keyframes[prop] = [{f,v,ez}]（ezは0=リニア / 1=最大。smoothstepへ ez 量ブレンド）
+- getKfValue：区間内 t を ez で smoothstep へブレンド。ez=Math.max(両端)
+- 即キー：数値変更/スクラブ/ステッパ/ハンドルドラッグで現フレームにキー生成
+- KFダイヤ（renderKfDiamonds）：data-track/data-f を持つ。形でイーズ表示
+  - リニア=鋭い菱形(ネオン) / 最大=円(マゼンタ, .ez-max) / 中=角丸(水色, .ez-mid※インスペクターEASEボタンの0.5用)
 
-■ プロパティ（全7種）
-- X/Y（位置）、SCL（スケール）、AX/AY（アンカー）、ROT（回転）、OP（不透明度）
-- 線形補間
+■ KF選択モデル
+- kfSel = [{t,f}]（トラックまたぎ）。kfSelHas/Set/Toggle/Clear, refreshKfSelClasses（.sel付与）
+- ダイヤ：クリック=単一選択+seek / Shift+クリック=トグル / Ctrl(Cmd)+クリック・ダブルタップ=イーズ切替(cycleEase 0↔1)
+- ドラッグ=移動（単一）。複数選択キーを掴むとグループ移動（groupSnap+2パスで衝突回避, 端でクランプ）。Shift+ドラッグ=複製。ドラッグ直後も選択維持→Del可
+- マーキー選択：#tl-tracks上でドラッグ（サムネはpointer-events:none/draggable=false）。横=ダイヤ中心X / 縦=トラック行全体と交差で判定。Shiftで追加
+- コピペ：copyKeyframes(選択優先, 未選択時はトラック全体, 最小フレーム基準の相対items) / pasteKeyframes(再生ヘッド基準で additive・同一/別トラック可)。Ctrl+C/V でも可
+- 削除：Del/BackSpace = 選択分 or 再生ヘッド位置（deleteSelectedOrCurrentKf）
+- イーズ一括：インスペクターのEASEボタン（クリック=中0.5 / Shift=最大1.0）。選択優先
 
-■ 数値スクラブ（AE-style）
-- FX HUD・インスペクターのプロパティラベルをドラッグで値を変更
-- Shift = ×10、Ctrl = ×0.1
-- KFが現フレームに存在する場合のみ値を更新（既存change evtと同挙動）
-- カーソルは ew-resize
+■ マーカー（グローバル/ワークエリア）
+- state.markers = [{frame,label}]（旧：トラック単位。現在はM=ルーラー上のグローバルマーカー）
+- renderGlobalMarkers()：#tl-ruler-markers に配置。ドラッグ移動 / クリックseek / ダブルクリックでメモ(prompt) / Ctrl(Cmd)+クリックで削除(AE準拠)
+- PROJECT_v2 top-level markers として保存/復元、undoスナップに gmarkers
+- 旧 per-track markers(renderMarkers) は読込互換で残置
 
-■ キーボードショートカット（AE準拠）
-- Space: 再生/停止
-- ←/→: 1フレーム移動
-- Home/End: 先頭/末尾
-- B/N: ワークエリア イン/アウト設定
-- M: 選択中トラックにマーカー追加/削除
-- P: X/Y表示トグル
-- S: Scale表示トグル
-- A: Anchor表示トグル
-- R: Rotation表示トグル
-- T: Opacity表示トグル
-- U: KFがあるプロパティのみ表示
-- X: FX HUDトグル
-- Ctrl+Z / Ctrl+Shift+Z: Undo/Redo
-- ESC: FX HUD閉じる
+■ ビューポート（pan/zoom = ANIMATOR準拠）
+- state.view={zoom,panX,panY,baseW,baseH}。applyView()が #viewport-inner に transform
+- ホイール転がし=ズーム(カーソル基点 zoomViewportAt) / 中ボタンドラッグ=PAN / ダブルクリック=resetView(FIT)
+- touch-action:none（液タブのペン途切れ対策）。ドラッグ移動量は screenToCanvasScale() でズーム補正
+- 位置ハンドル(□)=X/Yオートキー、アンカーハンドル(×)=AX/AYオートキー（button!==0は無視＝中ボタンと競合しない）
+- setupViewport末尾で必ず drawCurrentFrame()（canvas.width再設定でクリアされる→リサイズ直後の黒画面対策）
 
-■ ワークエリア
-- B/Nキーでイン/アウト設定（AE準拠）
-- タイムラインにハンドル表示・ドラッグ操作
-- 再生はワークエリア内でループ
+■ ガイド（解像度枠 / セーフフレーム）
+- #guide-canvas（viewport-inner内, pointer-events:none）。renderGuides()が state.guides で描画。表示のみ・書き出し非合成
+- 設定パネル(⚙)で ON/OFF・サイズ・セーフ%。lwはズーム補正
 
-■ UNDO/REDO
-- 変更後記録方式（recordHistory()）
-- 全トラックのkeyframes+markersをスナップショット
-- 上限50ステップ
+■ 設定パネル（フローティング, ANIMATOR準拠）
+- ⚙ #btn-settings でトグル。ヘッダドラッグ移動、下端 #settings-resize でリサイズ（.set-sectの境目スナップ）
+- CANVAS GUIDES + KEYBOARD SHORTCUTS（再割当UI）。※解像度変更はcomposerでは行わない
 
-■ FX HUD（浮動パネル）
-- ヘッダドラッグで移動
-- 全プロパティ表示・編集・KFドット
-- P/S/A/R/T/Uショートカットと連動
+■ ショートカット（登録制＋再割当, localStorage:composer_keymap_v1）
+- SHORTCUT_ACTIONS[].{id,label,def,prevent,run(e)}。gKeymapでキー→action。設定パネルで変更
+- 既定：Space再生 / ←→コマ(Shift=10) / Home/End / B,N ワークエリア / M マーカー / i キー追加 / J,K 前後キーへ / Del キー削除 / F FIT / P/S/A/R/T/U HUD表示 / X FX HUD / , 設定
+- Ctrl+Z/Shift+Z=undo/redo、Ctrl+C/V=KFコピペ、BackSpace=削除、Escape=メニュー/選択/HUD/設定を閉じる
 
-■ ビューポート
-- 位置ハンドル（□）ドラッグ：選択中トラックにX/Yオートキー
-- アンカーハンドル（×）ドラッグ：選択中トラックにAX/AYオートキー
+■ タイムコード
+- frameToTimecode(idx)=AE準拠 H:MM:SS:FF（1始まり, 末尾=コマ）。先頭=0:00:00:01
+- 右下TIME=タイムコード。コーナーの「FRM/」クリックで コマ⇔タイムコード切替（state.timeMode）
 
-■ オーディオ（BGM/SE）
-- ♪ AUDIOボタンまたはドラッグ&ドロップ（audio/*）で読み込み
-- AudioContext で再生・停止
-- アニメーション再生と同期（play/pause/loop 時に自動連動）
-- タイムライン下部に波形表示（キャンバス描画）
-- 波形エリアを左右ドラッグでオフセット調整（開始フレームずらし）
-- ミュートボタン（◉）・削除ボタン（✕）
-- state外の const audio オブジェクトで管理
+■ タイムライン
+- グリッド行 var(--tl-h) を #tl-resize の上端ドラッグで高さ変更
+- トラック区切り線強調、ストリップ高はトラック高に追従、サムネ object-fit:cover（歪み防止）
+- KFダイヤ拡大+黒フチ+ホバー点滅。最小トラック高46px（下回ればスクロール）
+- ◀▶コマ送りボタンは廃止（ショートカットのみ）
 
-■ PNG書き出し
-- EXPORT 4K PNG：全可視トラックをコンポジットして連番PNG→ZIP
-- 各トラックPNGボタン：そのトラック単体を4K書き出し（KF変形込み）
-- ANMボタン（各トラック）→ IndexedDB経由でANIMATORに送信
+■ ワークエリア / 再生 / オーディオ / 書き出し / Undo
+- ワークエリア：B/N、ルーラーのハンドルドラッグ、再生ループ
+- 4K PNG：EXPORT 4K PNG（全可視合成）/ 各トラックPNG。書き出しは drawFrame/drawOneTrack を OUT_W/OUT_H で
+- AUDIO：♪ボタン/ドラッグ、波形、オフセット、ミュート（state外の const audio）
+- Undo：cloneEditState（tracks.keyframes+markers, gmarkers, selectedTrack）, recordHistory（変更後記録）, 上限50
 
-■ インポート
-- PROJECT_v1（単一トラック）
-- PROJECT_v2（複数トラック）
-- ANIMATOR_v1（互換読込）
-- ドラッグ&ドロップ対応（JSONファイル・オーディオファイル両対応）
+■ ライブ連携（BroadcastChannel 'tdr_live'）
+- ANIMATOR保存(autosave)→project-update。COMPOSERは projectId一致トラックの「絵だけ」差し替え（KF/transform/表示状態は保持, liveUpdateTrackがwidth/heightも追従）
+- announceLive()=composer-hello+requestSyncAll。setupLiveSync（起動+700ms遅延再通知+window focus時）と、loadJSON/finishImport完了時に呼ぶ＝LIVEボタンを押さなくても自動反映
+- ANIMATOR側は gLiveActive が立つと autosave毎に broadcast。composer-hello / request-sync / animator-hello で立つ
 
-【未実装（将来フェーズ）】
-- FRAME参照画像（ANIMATORでの複数ANIMATOR参照）
-
-【デザイントーン】
-tDRスタイル（--acid:#36FF00、--neon:#F9FF47、モノスペース、黒基調）
-
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 【コードの注意点】
-- KF関数はすべてkfsパラメータを明示（グローバル参照なし）
-- 「変更後に記録」方式：recordHistory() は操作完了後に呼ぶ
-- op=0 の扱い：parseFloat()||1 ではなく isNaN(v)?1:v で判定
-- KFダイヤモンドのドラッグ中はrenderKfDiamonds()を呼ばない
-- data-track属性でDOM要素→state.tracks[idx]をマッピング
-- rebuildAllTrackUI() でトラック全再構築（オーディオ行 #tl-audio-row を保存して再追加）
-- renderKfDiamonds(trackIdx) / renderMarkers(trackIdx) はDOMに要素が追加された後に呼ぶ
-- const audio = {...} はstate外のグローバルオブジェクト
-- drawOneTrack(ctx,w,h,frame,track,hasSolo) の第6引数hasSoloを必ず渡す
-- UI SOLOボタンのインデックス：el.querySelectorAll('.tl-tbtn')[1] = soloBtn
+- KF関数はkfsパラメータ明示。op=0は isNaN(v)?1:v で判定
+- ALL_PROPS にprop追加時は #kf-*/#fx-*/#dot-*/#fx-dot-* のUIも要追加（updateKfUI/Fxがループ参照）
+- KFダイヤのドラッグ中はrenderKfDiamondsを呼ばない（pointer capture喪失）。pointerup後に再描画
+- data-track属性でDOM→state.tracks[idx]対応
+- rebuildAllTrackUI()で全再構築（#tl-audio-row退避→再追加）。renderKfDiamonds/renderMarkers/renderGlobalMarkersはDOM追加後
+- drawOneTrack(ctx,w,h,frame,track,hasSolo) 第6引数hasSolo必須
+- SOLOボタンは el.querySelectorAll('.tl-tbtn')[1]
+- 確認ダイアログ(confirm)は全廃方針
 
+【未実装 / 将来候補】
+- FRAME参照画像（複数ANIMATOR参照）
+- イーズの数値カーブ編集 / グラフエディタ
+- モーションブラー、調整レイヤー的なエフェクト
+
+【変更後チェック】
+node -e "const fs=require('fs');const h=fs.readFileSync('composer.html','utf8');const m=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]).filter(s=>s.length>200).join('\n;\n');new Function(m);console.log('OK')"

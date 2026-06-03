@@ -1294,10 +1294,10 @@ function renderKfDiamonds(trackIdx){
   }
 }
 
-// ── EASE 順送り（Ctrl+クリック / ダブルタップ）：リニア→中→最大→リニア（AE準拠） ──
+// ── EASE トグル（Ctrl+クリック / ダブルタップ）：リニア↔最大（0↔1） ──
 function cycleEase(trackIdx,f){
   const cur=getFrameEz(trackIdx,f);
-  const next = cur<0.01 ? 0.5 : (cur<0.99 ? 1 : 0);
+  const next = cur<0.5 ? 1 : 0;
   applyEaseToFrame(trackIdx,f,next);
   flashLive('∿ EASE '+easeLabel(next));
 }
