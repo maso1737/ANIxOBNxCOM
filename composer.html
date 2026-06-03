@@ -119,8 +119,10 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-kf-d:hover{background:var(--acid);box-shadow:0 0 6px 1px var(--acid);transform:translate(-50%,-50%) rotate(45deg) scale(1.35);animation:kf-pulse .6s ease-in-out infinite;}
 @keyframes kf-pulse{0%,100%{box-shadow:0 0 4px 1px var(--acid);}50%{box-shadow:0 0 10px 3px var(--acid);}}
 .tl-kf-d.sel{background:#fff;border-color:var(--acid);box-shadow:0 0 6px 1px var(--acid);z-index:4;}
-.tl-kf-d.eased{border-radius:50%;background:#7af9ff;box-shadow:0 0 0 1px rgba(122,249,255,0.5);}
-.tl-kf-d.eased.sel{background:#fff;}
+/* イーズ別の形：中=角丸(水色) / 最大=円(マゼンタ)。リニアは既定の鋭い菱形(ネオン) */
+.tl-kf-d.ez-mid{border-radius:3px;background:#7af9ff;box-shadow:0 0 0 1px rgba(122,249,255,0.5);}
+.tl-kf-d.ez-max{border-radius:50%;background:#ff7ae0;box-shadow:0 0 0 1px rgba(255,122,224,0.5);}
+.tl-kf-d.ez-mid.sel,.tl-kf-d.ez-max.sel{background:#fff;}
 #tl-marquee{position:fixed;border:1px solid var(--acid);background:rgba(54,255,0,0.10);pointer-events:none;z-index:200;display:none;}
 .tl-marker-row{position:absolute;bottom:0;left:0;right:0;height:11px;pointer-events:none;z-index:4;}
 .tl-marker{position:absolute;top:0;bottom:0;width:10px;pointer-events:all;cursor:grab;transform:translateX(-50%);background:transparent;}
@@ -1214,14 +1216,14 @@ function renderKfDiamonds(trackIdx){
     const d=document.createElement('div'); d.className='tl-kf-d';
     d.dataset.track=trackIdx; d.dataset.f=f;
     if(kfSelHas(trackIdx,f)) d.classList.add('sel');
-    // この frame にイーズが付いていればマーク
-    const eased=ALL_PROPS.some(p=>{const k=track.keyframes[p].find(k=>k.f===f);return k&&(k.ez||0)>0;});
-    if(eased) d.classList.add('eased');
-    d.style.left=(f/total*100)+'%'; d.title=`F${f+1}`+(eased?' (EASE)':'');
+    // この frame のイーズ量に応じて形を変える（リニア=菱形 / 中=角丸 / 最大=円）
+    let ezAmt=0; ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k)ezAmt=Math.max(ezAmt,k.ez||0);});
+    if(ezAmt>=0.99) d.classList.add('ez-max'); else if(ezAmt>0) d.classList.add('ez-mid');
+    d.style.left=(f/total*100)+'%'; d.title=`F${f+1}`+(ezAmt>=0.99?' (EASE最大)':ezAmt>0?' (EASE中)':'')+'  Ctrl+クリックでイーズ切替';
     // この frame の各プロパティ値（単一移動/複製で持ち回る）
     const kfVals={}, kfEz={};
     ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k){kfVals[p]=k.v;kfEz[p]=k.ez||0;}});
-    let dragActive=false, wasDragged=false, origF=f, shiftStart=false, copyF=f;
+    let dragActive=false, wasDragged=false, origF=f, shiftStart=false, ctrlStart=false, copyF=f;
     let groupMode=false, groupSnap=null, lastDelta=0, gMin=0, gMax=total-1;
     function putKeys(targetF,removeF){
       ALL_PROPS.forEach(p=>{
@@ -1243,7 +1245,7 @@ function renderKfDiamonds(trackIdx){
     }
     d.addEventListener('pointerdown',e=>{
       dragActive=true; wasDragged=false; origF=f; copyF=f; lastDelta=0;
-      shiftStart=e.shiftKey;
+      shiftStart=e.shiftKey; ctrlStart=e.ctrlKey||e.metaKey;
       // 複数選択中のキーを掴んだ場合はグループ移動
       groupMode = !shiftStart && kfSel.length>1 && kfSelHas(trackIdx,f);
       if(groupMode){
@@ -1283,43 +1285,23 @@ function renderKfDiamonds(trackIdx){
         else if(shiftStart){ kfSel=[{t:trackIdx,f:copyF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); } // 複製→新キーを選択
         else { kfSel=[{t:trackIdx,f:origF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); seek(origF); } // 移動後も選択（直後に削除可）
       }
+      else if(ctrlStart){ cycleEase(trackIdx,origF); } // Ctrl+クリックでイーズ順送り(AE準拠)
       else if(shiftStart){ kfSelToggle(trackIdx,origF); }
       else { kfSelSet(trackIdx,origF); seek(origF); }
     });
-    d.addEventListener('dblclick',e=>{ e.stopPropagation(); showEaseMenu(e.clientX,e.clientY,trackIdx,origF); });
+    d.addEventListener('dblclick',e=>{ e.stopPropagation(); cycleEase(trackIdx,origF); }); // iPad用ダブルタップでも切替
     row.appendChild(d);
   }
 }
 
-// ── EASE コンテキストメニュー（キーをダブルクリック） ──
-function showEaseMenu(x,y,trackIdx,f){
-  closeEaseMenu();
+// ── EASE 順送り（Ctrl+クリック / ダブルタップ）：リニア→中→最大→リニア（AE準拠） ──
+function cycleEase(trackIdx,f){
   const cur=getFrameEz(trackIdx,f);
-  const menu=document.createElement('div'); menu.id='ease-menu';
-  menu.style.cssText=`position:fixed;left:${x}px;top:${y}px;z-index:300;background:rgba(8,8,8,0.97);border:1px solid var(--acid);font-family:var(--mono);font-size:9px;letter-spacing:.08em;min-width:140px;box-shadow:0 6px 24px rgba(0,0,0,0.6);`;
-  const head=document.createElement('div');
-  head.textContent='KEYFRAME EASE';
-  head.style.cssText='padding:5px 12px;font-size:8px;letter-spacing:.2em;color:var(--acid);border-bottom:1px solid rgba(54,255,0,0.2);';
-  menu.appendChild(head);
-  const opts=[['リニア (なし)',0],['中 EASE',0.5],['最大 EASE',1]];
-  opts.forEach(([label,amt])=>{
-    const active=Math.abs(cur-amt)<0.01;
-    const b=document.createElement('div');
-    b.textContent=(active?'● ':'　 ')+label;
-    b.style.cssText='padding:6px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.06);'+(active?'color:var(--acid);background:rgba(54,255,0,0.08);':'color:rgba(255,255,255,0.8);');
-    b.addEventListener('mouseenter',()=>{ if(!active) b.style.color='var(--acid)'; });
-    b.addEventListener('mouseleave',()=>{ if(!active) b.style.color='rgba(255,255,255,0.8)'; });
-    b.addEventListener('click',()=>{ applyEaseToFrame(trackIdx,f,amt); closeEaseMenu(); flashLive('∿ EASE '+easeLabel(amt)); });
-    menu.appendChild(b);
-  });
-  document.body.appendChild(menu);
-  // 画面外にはみ出さないよう補正
-  const r=menu.getBoundingClientRect();
-  if(r.right>window.innerWidth) menu.style.left=(window.innerWidth-r.width-6)+'px';
-  if(r.bottom>window.innerHeight) menu.style.top=(window.innerHeight-r.height-6)+'px';
-  setTimeout(()=>document.addEventListener('pointerdown',closeEaseMenu,{once:true,capture:true}),0);
+  const next = cur<0.01 ? 0.5 : (cur<0.99 ? 1 : 0);
+  applyEaseToFrame(trackIdx,f,next);
+  flashLive('∿ EASE '+easeLabel(next));
 }
-function closeEaseMenu(){ const m=$('#ease-menu'); if(m) m.remove(); }
+function closeEaseMenu(){} // 旧メニュー互換のno-op（Escハンドラから呼ばれる）
 
 function renderMarkers(trackIdx){
   const row=document.querySelector(`.tl-marker-row[data-track="${trackIdx}"]`); if(!row) return;
