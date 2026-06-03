@@ -106,7 +106,9 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-tbtn.del:hover{color:#ff4444;border-color:rgba(255,68,68,0.4);}
 .tl-track-strip{position:relative;flex:1;height:calc(var(--track-h,54px) - 10px);background:rgba(255,255,255,0.02);border:1px solid var(--border);overflow:hidden;}
 .tl-frame-block{position:absolute;top:0;height:100%;border-right:1px solid rgba(0,0,0,0.5);overflow:hidden;}
-.tl-frame-block img.tl-thumb{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;image-rendering:pixelated;image-rendering:-moz-crisp-edges;display:block;}
+.tl-frame-block img.tl-thumb{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;image-rendering:pixelated;image-rendering:-moz-crisp-edges;display:block;pointer-events:none;-webkit-user-drag:none;user-select:none;}
+.tl-frame-block{pointer-events:none;}
+.tl-track-strip{pointer-events:auto;}
 .tl-frame-block .tl-label{position:absolute;bottom:1px;left:3px;font-size:7px;line-height:1;z-index:1;pointer-events:none;}
 .tl-frame-block.draw{border-right-color:rgba(54,255,0,0.3);}
 .tl-frame-block.draw .tl-label{color:rgba(0,0,0,0.8);}
@@ -117,6 +119,8 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-kf-d:hover{background:var(--acid);box-shadow:0 0 6px 1px var(--acid);transform:translate(-50%,-50%) rotate(45deg) scale(1.35);animation:kf-pulse .6s ease-in-out infinite;}
 @keyframes kf-pulse{0%,100%{box-shadow:0 0 4px 1px var(--acid);}50%{box-shadow:0 0 10px 3px var(--acid);}}
 .tl-kf-d.sel{background:#fff;border-color:var(--acid);box-shadow:0 0 6px 1px var(--acid);z-index:4;}
+.tl-kf-d.eased{border-radius:50%;background:#7af9ff;box-shadow:0 0 0 1px rgba(122,249,255,0.5);}
+.tl-kf-d.eased.sel{background:#fff;}
 #tl-marquee{position:fixed;border:1px solid var(--acid);background:rgba(54,255,0,0.10);pointer-events:none;z-index:200;display:none;}
 .tl-marker-row{position:absolute;bottom:0;left:0;right:0;height:11px;pointer-events:none;z-index:4;}
 .tl-marker{position:absolute;top:0;bottom:0;width:10px;pointer-events:all;cursor:grab;transform:translateX(-50%);background:transparent;}
@@ -599,23 +603,34 @@ function deleteSelectedOrCurrentKf(){
     if(any){ recordHistory(); renderKfDiamonds(state.selectedTrack); drawCurrentFrame(); updateKfUI(); flashLive('✕ KF DELETED'); }
   }
 }
+function easeLabel(a){ return a>=1?'MAX':a>0?'MID':'LINEAR'; }
 function applyEase(amount){ // インスペクターのEASEボタン：選択 or 選択トラック全体
   if(kfSel.length){
-    kfSel.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k) k.ez=amount; }); });
-    recordHistory(); drawCurrentFrame(); flashLive('∿ EASE '+(amount>=1?'MAX':'MID')+' (選択)'); return;
+    const tracksInv=new Set();
+    kfSel.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k) k.ez=amount; }); tracksInv.add(s.t); });
+    recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); drawCurrentFrame();
+    flashLive('∿ EASE '+easeLabel(amount)+' (選択)'); return;
   }
   const t=selTrack(); if(!t) return; let n=0;
   ALL_PROPS.forEach(p=>t.keyframes[p].forEach(k=>{k.ez=amount;n++;}));
   if(!n){ flashLive('キーがありません'); return; }
-  recordHistory(); drawCurrentFrame(); flashLive('∿ EASE '+(amount>=1?'MAX':'MID')+' ×'+n);
+  recordHistory(); renderKfDiamonds(state.selectedTrack); refreshKfSelClasses(); drawCurrentFrame();
+  flashLive('∿ EASE '+easeLabel(amount)+' ×'+n);
 }
 function applyEaseToFrame(trackIdx,f,amount){
+  const tracksInv=new Set([trackIdx]);
   if(kfSel.length && kfSelHas(trackIdx,f)){
-    kfSel.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k) k.ez=amount; }); });
+    kfSel.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k) k.ez=amount; }); tracksInv.add(s.t); });
   } else {
     const t=state.tracks[trackIdx]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===f); if(k) k.ez=amount; });
   }
-  recordHistory(); drawCurrentFrame();
+  recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); drawCurrentFrame();
+}
+// 現フレーム(grabbed)のイーズ量を取得（メニューの現在値表示用）
+function getFrameEz(trackIdx,f){
+  const t=state.tracks[trackIdx]; if(!t) return 0;
+  for(const p of ALL_PROPS){ const k=t.keyframes[p].find(k=>k.f===f); if(k) return k.ez||0; }
+  return 0;
 }
 
 // ── KFナビゲーション（J/K） ──
@@ -642,14 +657,18 @@ function renderGlobalMarkers(){
     el.style.left=(LABEL_W+m.frame/total*aw)+'px';
     el.dataset.label=m.label||('M'+(idx+1));
     el.title=`コマ${m.frame+1}${m.label?' — '+m.label:''}（ダブルクリックでメモ）`;
-    let dragActive=false, wasDragged=false;
-    el.addEventListener('pointerdown',e=>{ dragActive=true; wasDragged=false; el.setPointerCapture(e.pointerId); e.stopPropagation(); e.preventDefault(); });
+    let dragActive=false, wasDragged=false, ctrlStart=false;
+    el.addEventListener('pointerdown',e=>{ dragActive=true; wasDragged=false; ctrlStart=e.ctrlKey||e.metaKey; el.setPointerCapture(e.pointerId); e.stopPropagation(); e.preventDefault(); });
     el.addEventListener('pointermove',e=>{
-      if(!dragActive) return; wasDragged=true;
+      if(!dragActive||ctrlStart) return; wasDragged=true;
       const f=Math.round(Math.max(0,Math.min(total-1,(e.clientX-$('#tl-ruler').getBoundingClientRect().left-LABEL_W)/aw*total)));
       m.frame=f; el.style.left=(LABEL_W+f/total*aw)+'px';
     });
-    el.addEventListener('pointerup',()=>{ if(!dragActive) return; dragActive=false; if(wasDragged){ state.markers.sort((a,b)=>a.frame-b.frame); recordHistory(); renderGlobalMarkers(); } else seek(m.frame); });
+    el.addEventListener('pointerup',()=>{
+      if(!dragActive) return; dragActive=false;
+      if(ctrlStart){ const i=state.markers.indexOf(m); if(i>=0) state.markers.splice(i,1); recordHistory(); renderGlobalMarkers(); flashLive('✕ MARKER DELETED'); return; } // Ctrl+クリックで削除(AE準拠)
+      if(wasDragged){ state.markers.sort((a,b)=>a.frame-b.frame); recordHistory(); renderGlobalMarkers(); } else seek(m.frame);
+    });
     el.addEventListener('dblclick',e=>{ e.stopPropagation(); const v=prompt('マーカーのメモ', m.label||''); if(v!==null){ m.label=v; recordHistory(); renderGlobalMarkers(); } });
     cont.appendChild(el);
   });
@@ -1095,12 +1114,6 @@ function buildTrackElement(idx){
   soloBtn.title='ソロ（このトラックのみ表示）';
   soloBtn.addEventListener('click',e=>{e.stopPropagation();toggleTrackSolo(idx);});
 
-  const anmBtn=document.createElement('button');
-  anmBtn.className='tl-tbtn anm';
-  anmBtn.textContent='ANM';
-  anmBtn.title='ANIMATORに送る';
-  anmBtn.addEventListener('click',e=>{e.stopPropagation();sendTrackToAnimator(idx);});
-
   const pngBtn=document.createElement('button');
   pngBtn.className='tl-tbtn';
   pngBtn.textContent='PNG';
@@ -1113,7 +1126,7 @@ function buildTrackElement(idx){
   delBtn.title='トラック削除';
   delBtn.addEventListener('click',e=>{e.stopPropagation();removeTrack(idx);});
 
-  btns.appendChild(visBtn); btns.appendChild(soloBtn); btns.appendChild(anmBtn); btns.appendChild(pngBtn); btns.appendChild(delBtn);
+  btns.appendChild(visBtn); btns.appendChild(soloBtn); btns.appendChild(pngBtn); btns.appendChild(delBtn);
   label.appendChild(nameEl); label.appendChild(btns);
 
   // Strip
@@ -1201,11 +1214,15 @@ function renderKfDiamonds(trackIdx){
     const d=document.createElement('div'); d.className='tl-kf-d';
     d.dataset.track=trackIdx; d.dataset.f=f;
     if(kfSelHas(trackIdx,f)) d.classList.add('sel');
-    d.style.left=(f/total*100)+'%'; d.title=`F${f+1}`;
-    // この frame の各プロパティ値（移動/複製で持ち回る）
+    // この frame にイーズが付いていればマーク
+    const eased=ALL_PROPS.some(p=>{const k=track.keyframes[p].find(k=>k.f===f);return k&&(k.ez||0)>0;});
+    if(eased) d.classList.add('eased');
+    d.style.left=(f/total*100)+'%'; d.title=`F${f+1}`+(eased?' (EASE)':'');
+    // この frame の各プロパティ値（単一移動/複製で持ち回る）
     const kfVals={}, kfEz={};
     ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k){kfVals[p]=k.v;kfEz[p]=k.ez||0;}});
-    let dragActive=false, wasDragged=false, origF=f, shiftStart=false, copyMode=false, copyF=f;
+    let dragActive=false, wasDragged=false, origF=f, shiftStart=false, copyF=f;
+    let groupMode=false, groupSnap=null, lastDelta=0, gMin=0, gMax=total-1;
     function putKeys(targetF,removeF){
       ALL_PROPS.forEach(p=>{
         if(!(p in kfVals)) return;
@@ -1216,9 +1233,23 @@ function renderKfDiamonds(trackIdx){
         }
       });
     }
+    function applyGroupDelta(delta){
+      delta=Math.max(-gMin,Math.min(total-1-gMax,delta));
+      if(delta===lastDelta) return;
+      // 2パス：旧位置から除去 → 新位置へ配置（グループ内衝突回避）
+      groupSnap.forEach(it=>{ const t=state.tracks[it.t]; const from=it.f+lastDelta; it.props.forEach(pr=>{ t.keyframes[pr.p]=t.keyframes[pr.p].filter(k=>k.f!==from); }); });
+      groupSnap.forEach(it=>{ const t=state.tracks[it.t]; const to=it.f+delta; it.props.forEach(pr=>{ if(!t.keyframes[pr.p].some(k=>k.f===to)){ t.keyframes[pr.p].push({f:to,v:pr.v,ez:pr.ez}); t.keyframes[pr.p].sort((a,b)=>a.f-b.f);} }); });
+      lastDelta=delta;
+    }
     d.addEventListener('pointerdown',e=>{
-      dragActive=true; wasDragged=false; origF=f; copyMode=false; copyF=f;
+      dragActive=true; wasDragged=false; origF=f; copyF=f; lastDelta=0;
       shiftStart=e.shiftKey;
+      // 複数選択中のキーを掴んだ場合はグループ移動
+      groupMode = !shiftStart && kfSel.length>1 && kfSelHas(trackIdx,f);
+      if(groupMode){
+        groupSnap=kfSel.map(s=>{ const t=state.tracks[s.t]; const it={t:s.t,f:s.f,props:[]}; ALL_PROPS.forEach(p=>{const k=t.keyframes[p].find(k=>k.f===s.f);if(k)it.props.push({p,v:k.v,ez:k.ez||0});}); return it; });
+        gMin=Math.min(...groupSnap.map(it=>it.f)); gMax=Math.max(...groupSnap.map(it=>it.f));
+      }
       d.setPointerCapture(e.pointerId);
       e.stopPropagation(); e.preventDefault();
     });
@@ -1227,9 +1258,12 @@ function renderKfDiamonds(trackIdx){
       const rect=strip.getBoundingClientRect();
       const newF=Math.round(Math.max(0,Math.min(total-1,(e.clientX-rect.left)/rect.width*total)));
       if(!wasDragged){ if(Math.abs(e.clientX-(rect.left+origF/total*rect.width))<3) return; wasDragged=true; }
-      if(shiftStart){
+      if(groupMode){
+        applyGroupDelta(newF-f);
+        d.style.left=((f+lastDelta)/total*100)+'%'; d.title=`F${f+lastDelta+1}`;
+        drawCurrentFrame(); updateKfUI();
+      } else if(shiftStart){
         // Shift+ドラッグ＝複製（元のキーは残す）
-        copyMode=true;
         if(newF===copyF) return;
         putKeys(newF, copyF===origF?null:copyF);
         copyF=newF;
@@ -1239,12 +1273,16 @@ function renderKfDiamonds(trackIdx){
         putKeys(newF, origF);
         origF=newF;
         d.style.left=(newF/total*100)+'%'; d.title=`F${newF+1}`;
+        drawCurrentFrame(); updateKfUI();
       }
-      drawCurrentFrame(); updateKfUI();
     });
     d.addEventListener('pointerup',()=>{
       if(!dragActive) return; dragActive=false;
-      if(wasDragged){ recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); }
+      if(wasDragged){
+        if(groupMode){ kfSel=groupSnap.map(it=>({t:it.t,f:it.f+lastDelta})); const tracksInv=new Set(groupSnap.map(it=>it.t)); recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); }
+        else if(shiftStart){ kfSel=[{t:trackIdx,f:copyF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); } // 複製→新キーを選択
+        else { kfSel=[{t:trackIdx,f:origF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); seek(origF); } // 移動後も選択（直後に削除可）
+      }
       else if(shiftStart){ kfSelToggle(trackIdx,origF); }
       else { kfSelSet(trackIdx,origF); seek(origF); }
     });
@@ -1256,19 +1294,29 @@ function renderKfDiamonds(trackIdx){
 // ── EASE コンテキストメニュー（キーをダブルクリック） ──
 function showEaseMenu(x,y,trackIdx,f){
   closeEaseMenu();
+  const cur=getFrameEz(trackIdx,f);
   const menu=document.createElement('div'); menu.id='ease-menu';
-  menu.style.cssText=`position:fixed;left:${x}px;top:${y}px;z-index:300;background:rgba(8,8,8,0.97);border:1px solid var(--acid);font-family:var(--mono);font-size:9px;letter-spacing:.08em;min-width:120px;box-shadow:0 6px 24px rgba(0,0,0,0.6);`;
+  menu.style.cssText=`position:fixed;left:${x}px;top:${y}px;z-index:300;background:rgba(8,8,8,0.97);border:1px solid var(--acid);font-family:var(--mono);font-size:9px;letter-spacing:.08em;min-width:140px;box-shadow:0 6px 24px rgba(0,0,0,0.6);`;
+  const head=document.createElement('div');
+  head.textContent='KEYFRAME EASE';
+  head.style.cssText='padding:5px 12px;font-size:8px;letter-spacing:.2em;color:var(--acid);border-bottom:1px solid rgba(54,255,0,0.2);';
+  menu.appendChild(head);
   const opts=[['リニア (なし)',0],['中 EASE',0.5],['最大 EASE',1]];
   opts.forEach(([label,amt])=>{
+    const active=Math.abs(cur-amt)<0.01;
     const b=document.createElement('div');
-    b.textContent=label;
-    b.style.cssText='padding:6px 12px;cursor:pointer;color:rgba(255,255,255,0.8);border-bottom:1px solid rgba(255,255,255,0.06);';
-    b.addEventListener('mouseenter',()=>b.style.color='var(--acid)');
-    b.addEventListener('mouseleave',()=>b.style.color='rgba(255,255,255,0.8)');
-    b.addEventListener('click',()=>{ applyEaseToFrame(trackIdx,f,amt); closeEaseMenu(); flashLive('∿ EASE '+(amt>=1?'MAX':amt>0?'MID':'LINEAR')); });
+    b.textContent=(active?'● ':'　 ')+label;
+    b.style.cssText='padding:6px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.06);'+(active?'color:var(--acid);background:rgba(54,255,0,0.08);':'color:rgba(255,255,255,0.8);');
+    b.addEventListener('mouseenter',()=>{ if(!active) b.style.color='var(--acid)'; });
+    b.addEventListener('mouseleave',()=>{ if(!active) b.style.color='rgba(255,255,255,0.8)'; });
+    b.addEventListener('click',()=>{ applyEaseToFrame(trackIdx,f,amt); closeEaseMenu(); flashLive('∿ EASE '+easeLabel(amt)); });
     menu.appendChild(b);
   });
   document.body.appendChild(menu);
+  // 画面外にはみ出さないよう補正
+  const r=menu.getBoundingClientRect();
+  if(r.right>window.innerWidth) menu.style.left=(window.innerWidth-r.width-6)+'px';
+  if(r.bottom>window.innerHeight) menu.style.top=(window.innerHeight-r.height-6)+'px';
   setTimeout(()=>document.addEventListener('pointerdown',closeEaseMenu,{once:true,capture:true}),0);
 }
 function closeEaseMenu(){ const m=$('#ease-menu'); if(m) m.remove(); }
@@ -2230,8 +2278,12 @@ window.addEventListener('pointerup',()=>{scrubbing=false;});
     const r={left:Math.min(sx,e.clientX),right:Math.max(sx,e.clientX),top:Math.min(sy,e.clientY),bottom:Math.max(sy,e.clientY)};
     if(!addMode) kfSel=[];
     document.querySelectorAll('.tl-kf-d').forEach(d=>{
-      const b=d.getBoundingClientRect(), cx=b.left+b.width/2, cy=b.top+b.height/2;
-      if(cx>=r.left&&cx<=r.right&&cy>=r.top&&cy<=r.bottom){
+      const b=d.getBoundingClientRect(), cx=b.left+b.width/2;
+      // 横はダイヤ中心、縦はトラック行全体と交差していれば選択（薄い帯でも掴みやすく）
+      const strip=d.closest('.tl-track-strip')||d, sb=strip.getBoundingClientRect();
+      const xin=cx>=r.left&&cx<=r.right;
+      const yin=sb.bottom>=r.top&&sb.top<=r.bottom;
+      if(xin&&yin){
         const t=+d.dataset.track, f=+d.dataset.f;
         if(!kfSelHas(t,f)) kfSel.push({t,f});
       }
