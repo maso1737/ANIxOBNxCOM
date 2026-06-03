@@ -132,7 +132,7 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-gmarker{position:absolute;top:0;bottom:0;width:12px;transform:translateX(-50%);pointer-events:all;cursor:grab;background:transparent;}
 .tl-gmarker:active{cursor:grabbing;}
 .tl-gmarker::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--neon);transform:translateX(-50%);box-shadow:0 0 4px rgba(249,255,71,0.7);}
-.tl-gmarker::after{content:attr(data-label);position:absolute;top:1px;left:7px;font-size:7px;color:var(--neon);white-space:nowrap;line-height:1;text-shadow:0 0 3px #000;}
+.tl-gmarker::after{content:attr(data-label);position:absolute;top:1px;left:8px;font-size:9px;font-weight:700;color:var(--neon);white-space:nowrap;line-height:1;letter-spacing:0.04em;text-shadow:0 0 3px #000,0 0 2px #000;}
 .tl-gmarker:hover::before{background:#fff;box-shadow:0 0 8px var(--neon);}
 #tl-playhead{position:absolute;top:0;bottom:0;width:1px;background:var(--acid);pointer-events:none;z-index:5;box-shadow:0 0 6px rgba(54,255,0,0.5);}
 #tl-playhead::before{content:'';position:absolute;top:0;left:-4px;width:9px;height:6px;background:var(--acid);}
@@ -840,6 +840,7 @@ function loadJSON(json){
   $('#empty-state').style.display='none';
   updateExportButtons();
   state.history=[cloneEditState()]; state.historyIdx=0; updateUndoButtons();
+  announceLive(); // 読み込んだprojectIdの最新をANIMATORへ要求＝以後の編集が自動反映
 }
 
 // インポート統一：既存トラックがあれば「追加」、空なら新規読込（IMPORT JSON で2つ3つと重ねられる）
@@ -871,6 +872,7 @@ function finishImport(){
   $('#empty-state').style.display='none';
   updateExportButtons();
   recordHistory();
+  announceLive();
 }
 
 // ── TRACK MANAGEMENT ──
@@ -1887,16 +1889,25 @@ function requestSyncAll(){
   if(ids.length) ids.forEach(id=>postLive({type:'request-sync',projectId:id}));
   else postLive({type:'request-sync'});
 }
+// ANIMATOR群へ「COMPOSER居るよ＋このIDの最新を送って」と通知（gLiveActive を確実に立てる）
+function announceLive(){
+  if(!gLiveChan||!gLiveOn) return;
+  postLive({type:'composer-hello'});
+  requestSyncAll();
+}
 function setupLiveSync(){
   if(typeof BroadcastChannel==='undefined') return;
   try{ gLiveChan=new BroadcastChannel('tdr_live'); }catch(e){ return; }
   gLiveChan.onmessage=ev=>{
     const m=ev.data; if(!m||!gLiveOn) return;
     if(m.type==='project-update') onLiveProjectUpdate(m.payload);
-    else if(m.type==='animator-hello') postLive({type:'request-sync',projectId:m.projectId||null});
+    else if(m.type==='animator-hello') announceLive();
   };
-  postLive({type:'composer-hello'}); // 既に開いているANIMATOR群へ通知
-  requestSyncAll();
+  announceLive();
+  // 起動直後のタブ生成レースでANIMATORに届かない場合に備え、少し遅れて再通知
+  setTimeout(announceLive, 700);
+  // ウィンドウ復帰時にも再同期要求（裏で編集→前面化時に取りこぼし防止）
+  window.addEventListener('focus', announceLive);
 }
 $('#btn-live').addEventListener('click',()=>{
   gLiveOn=!gLiveOn;
