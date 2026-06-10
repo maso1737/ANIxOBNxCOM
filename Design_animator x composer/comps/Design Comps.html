@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>animator × composer — Redesign Comps</title>
+
+<!-- fonts: Bank Gothic は ローカル(themes.css内 @font-face)、mono/JP は Google -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- KINETIC STAGE tokens (デザインシステム) -->
+<link rel="stylesheet" href="assets/colors_and_type.css">
+<script src="../_ds/kinetic-stage-design-system-bfe4c6e7-5846-4ac3-abfb-b4c3c57ee77d/_ds_bundle.js"></script>
+
+<!-- comp styles -->
+<link rel="stylesheet" href="themes.css">
+<link rel="stylesheet" href="animator-comp.css">
+<link rel="stylesheet" href="composer-comp.css">
+<link rel="stylesheet" href="index-comp.css">
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="AnimatorComp.jsx"></script>
+<script type="text/babel" src="ComposerComp.jsx"></script>
+<script type="text/babel" src="IndexComp.jsx"></script>
+
+<script type="text/babel">
+/*
+  ─────────────────────────────────────────────────────────────
+  animator × composer — リデザインカンプ
+  前提・方針（ヒアリング結果より）:
+  · レイアウトは現状のまま（手に近い配置を尊重）— 色/タイポ/質感のみ
+  · まず静止カンプで方向決め → OK後に実ファイルへCSS差し替え
+  · Bank Gothic Light = メイン表示書体（タイトル/ボタン/ラベル）
+    数値データは IBM Plex Mono、JPは Noto Sans JP
+  · グローはクローム（バー・ボタン）のみ。ステージ/キャンバス上は
+    無装飾 — 描画負荷ゼロ方針（starfield不使用・backdrop-filter不使用）
+  · ラベル文字は +1px(密度維持) / +2px(ゆったり)
+  ─────────────────────────────────────────────────────────────
+*/
+const { DesignCanvas, DCSection, DCArtboard, DCPostIt } = window;
+
+const W = 1280, H = 800;
+
+function App() {
+  return (
+    <DesignCanvas title="animator × composer — Redesign">
+
+      <DCSection id="animator-dir" title="ANIMATOR — 方向性 ×3（密度は現状のまま）"
+        subtitle="レイアウト不変。テーマトークンの差し替えのみで実現できる3方向">
+        <DCArtboard id="an-stage" label="01 · FULL STAGE — rouge×ice×gold / KINETIC STAGE全面移行" width={W} height={H}>
+          <AnimatorComp theme="theme-stage" />
+        </DCArtboard>
+        <DCArtboard id="an-acid" label="02 · ACID HYBRID — tDRのacid greenを主役のまま舞台だけplumへ" width={W} height={H}>
+          <AnimatorComp theme="theme-acid" />
+        </DCArtboard>
+        <DCArtboard id="an-ice" label="03 · ICE BOOTH — ice主体の静かな作業環境（rougeはLIVEのみ）" width={W} height={H}>
+          <AnimatorComp theme="theme-ice" />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="animator-density" title="ANIMATOR — 密度バリエーション"
+        subtitle="バー高 +8〜16px / ラベル +2px / 余白増。ツール配置は同じ">
+        <DCArtboard id="an-stage-roomy" label="01R · FULL STAGE × ゆったり" width={W} height={H}>
+          <AnimatorComp theme="theme-stage" roomy />
+        </DCArtboard>
+        <DCArtboard id="an-acid-roomy" label="02R · ACID HYBRID × ゆったり" width={W} height={H}>
+          <AnimatorComp theme="theme-acid" roomy />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="composer" title="COMPOSER — 同テーマ適用（3トラック+AUDIOの想定図）"
+        subtitle="KFダイヤ＝イーズ表現（菱形=リニア / 角丸=中 / 円=最大）を維持">
+        <DCArtboard id="cp-stage" label="01 · FULL STAGE" width={W} height={H}>
+          <ComposerComp theme="theme-stage" />
+        </DCArtboard>
+        <DCArtboard id="cp-acid" label="02 · ACID HYBRID" width={W} height={H}>
+          <ComposerComp theme="theme-acid" />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="landing" title="INDEX — ランディング"
+        subtitle="ランディングのみ演出強め（グラデーションタイトル＋ゴーストタイプ）">
+        <DCArtboard id="ix-stage" label="01 · FULL STAGE" width={W} height={720}>
+          <IndexComp theme="theme-stage" />
+        </DCArtboard>
+        <DCArtboard id="ix-acid" label="02 · ACID HYBRID" width={W} height={720}>
+          <IndexComp theme="theme-acid" />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="notes" title="NOTES">
+        <DCPostIt id="note-1">
+          描画負荷ゼロ方針：グローはクロームのみ／ステージ層は無装飾。
+          starfield・backdrop-filter 不使用。実装はCSS変数の差し替えだけで
+          JSに触れません。
+        </DCPostIt>
+        <DCPostIt id="note-2">
+          Bank Gothic はタイトル・ボタン・ツールラベルに。数値（FPS/座標/
+          タイムコード）は等幅の IBM Plex Mono を維持＝桁ブレ防止。
+        </DCPostIt>
+        <DCPostIt id="note-3">
+          次ステップ：方向を1つ選んでもらえれば、animator.html /
+          composer.html / index.html の :root トークン＋スタイルブロックを
+          差し替えます（レイアウト・JSは不変）。
+        </DCPostIt>
+      </DCSection>
+
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

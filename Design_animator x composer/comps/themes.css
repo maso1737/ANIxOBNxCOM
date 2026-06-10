@@ -1,0 +1,153 @@
+/* ════════════════════════════════════════════════════════════
+   animator × composer — REDESIGN COMPS · theme layer
+   ------------------------------------------------------------
+   3 directions, each expressed as a CSS var set consumed by
+   animator-comp.css / composer-comp.css / index-comp.css.
+
+   .theme-stage : 01 FULL STAGE — KINETIC STAGE 全面移行
+                  rouge primary / ice data / gold labels / plum
+   .theme-acid  : 02 ACID HYBRID — tDRのacid greenを主役のまま
+                  KINETIC STAGEの舞台（plum・gold・glow）に載せる
+   .theme-ice   : 03 ICE BOOTH — ice主体の静かな作業環境。
+                  rougeはLIVE/RECなど「熱い」状態にだけ予約
+
+   .roomy       : 密度バリエーション（バー高+8〜16px、文字+1〜2px）
+
+   Performance note for the real build: glows live on CHROME only
+   (bars, buttons) — never on #stage layers; no backdrop-filter,
+   no starfield behind the drawing surface.
+   ════════════════════════════════════════════════════════════ */
+
+@font-face{
+  font-family:'Bank Gothic';
+  src:url('assets/bank-gothic-light-bt.ttf') format('truetype');
+  font-weight:300 500;
+  font-display:swap;
+}
+
+.ks-comp{
+  /* type */
+  --bank:'Bank Gothic','Barlow Condensed',sans-serif;
+  --mono:'IBM Plex Mono','Menlo','Consolas',monospace;
+  --jp:'Noto Sans JP',-apple-system,'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
+
+  /* density metrics (dense = current layout, labels +1px) */
+  --m-top:38px;          /* topbar height   (was 36) */
+  --m-tool:74px;         /* left toolbar    (was 72) */
+  --m-side:100px;        /* right palette   (was 96) */
+  --m-strip:132px;       /* frame strip     (was 130) */
+  --m-bot:34px;          /* bottombar       (was 32) */
+  --fs-label:10px;       /* eyebrow / lbl   (was 9)  */
+  --fs-btn:10px;         /* button text     (was 9)  */
+  --fs-data:11.5px;      /* mono data       (was 11) */
+  --fs-title:13px;       /* app title       */
+  --pad-bar:14px;
+  --gap-bar:12px;
+  --btn-pad:4px 10px;
+
+  font-family:var(--mono);
+  color:var(--t-text);
+  background:var(--t-bg);
+}
+
+.ks-comp.roomy{
+  --m-top:46px;
+  --m-tool:88px;
+  --m-side:116px;
+  --m-strip:152px;
+  --m-bot:40px;
+  --fs-label:11px;
+  --fs-btn:10.5px;
+  --fs-data:12.5px;
+  --fs-title:15px;
+  --pad-bar:16px;
+  --gap-bar:10px;
+  --btn-pad:6px 9px;
+}
+.ks-comp.roomy .an-btn{letter-spacing:0.12em;}
+
+/* ── 01 FULL STAGE ─────────────────────────────────────────── */
+.theme-stage{
+  --t-primary:#FF4FA8;
+  --t-primary-soft:rgba(255,79,168,0.12);
+  --t-primary-line:rgba(255,79,168,0.45);
+  --t-glow:0 0 10px rgba(255,79,168,0.4);
+  --t-glow-strong:0 0 16px rgba(255,79,168,0.5);
+  --t-data:#5AE9FF;
+  --t-data-glow:0 0 6px rgba(90,233,255,0.45);
+  --t-label:#FFD27A;
+  --t-muted:rgba(181,142,255,0.62);
+  --t-text:#F8EFFF;
+  --t-bg:#07030f;
+  --t-panel:#100722;
+  --t-panel2:#150927;
+  --t-cell:#0d0620;
+  --t-border:rgba(255,210,122,0.13);
+  --t-border-soft:rgba(181,142,255,0.12);
+  --t-grad-active:linear-gradient(135deg,#FF4FA8,#B850FF);
+  --t-active-text:#0a0612;
+  --t-stage-tint:radial-gradient(ellipse 65% 50% at 50% -12%,rgba(255,79,168,0.10),transparent 60%);
+  --t-corner:linear-gradient(90deg,#FFD27A,#FF4FA8);
+  --t-corner-glow:rgba(255,79,168,0.5);
+  --t-work:#FFD27A;             /* work-area band */
+  --t-canvas-halo:0 0 0 1px rgba(255,210,122,0.22), 0 0 34px rgba(184,80,255,0.25);
+}
+
+/* ── 02 ACID HYBRID ────────────────────────────────────────── */
+.theme-acid{
+  --t-primary:#36FF00;
+  --t-primary-soft:rgba(54,255,0,0.10);
+  --t-primary-line:rgba(54,255,0,0.45);
+  --t-glow:0 0 10px rgba(54,255,0,0.35);
+  --t-glow-strong:0 0 16px rgba(54,255,0,0.45);
+  --t-data:#5AE9FF;
+  --t-data-glow:0 0 6px rgba(90,233,255,0.45);
+  --t-label:#FFD27A;
+  --t-muted:rgba(181,142,255,0.62);
+  --t-text:#F4FFEF;
+  --t-bg:#06040d;
+  --t-panel:#0e081c;
+  --t-panel2:#120a22;
+  --t-cell:#0b0618;
+  --t-border:rgba(255,210,122,0.12);
+  --t-border-soft:rgba(181,142,255,0.11);
+  --t-grad-active:linear-gradient(135deg,#36FF00,#28D9A0);
+  --t-active-text:#04130a;
+  --t-stage-tint:radial-gradient(ellipse 65% 50% at 50% -12%,rgba(54,255,0,0.07),transparent 60%);
+  --t-corner:linear-gradient(90deg,#FFD27A,#36FF00);
+  --t-corner-glow:rgba(54,255,0,0.45);
+  --t-work:#F9FF47;
+  --t-canvas-halo:0 0 0 1px rgba(54,255,0,0.18), 0 0 34px rgba(54,255,0,0.12);
+}
+
+/* ── 03 ICE BOOTH ──────────────────────────────────────────── */
+.theme-ice{
+  --t-primary:#5AE9FF;
+  --t-primary-soft:rgba(90,233,255,0.10);
+  --t-primary-line:rgba(90,233,255,0.42);
+  --t-glow:0 0 10px rgba(90,233,255,0.32);
+  --t-glow-strong:0 0 14px rgba(90,233,255,0.42);
+  --t-data:#FFD27A;
+  --t-data-glow:0 0 6px rgba(255,210,122,0.4);
+  --t-label:rgba(181,142,255,0.85);
+  --t-muted:rgba(157,141,179,0.75);
+  --t-text:#F0F4FF;
+  --t-bg:#05040e;
+  --t-panel:#0d091c;
+  --t-panel2:#110d24;
+  --t-cell:#0a0717;
+  --t-border:rgba(181,142,255,0.14);
+  --t-border-soft:rgba(181,142,255,0.10);
+  --t-grad-active:linear-gradient(135deg,#5AE9FF,#B58EFF);
+  --t-active-text:#070512;
+  --t-stage-tint:radial-gradient(ellipse 65% 50% at 50% -12%,rgba(90,233,255,0.07),transparent 60%);
+  --t-corner:linear-gradient(90deg,#B58EFF,#5AE9FF);
+  --t-corner-glow:rgba(90,233,255,0.4);
+  --t-work:#5AE9FF;
+  --t-canvas-halo:0 0 0 1px rgba(90,233,255,0.16), 0 0 30px rgba(90,233,255,0.10);
+  /* rouge stays reserved for LIVE / REC */
+  --t-hot:#FF4FA8;
+  --t-hot-glow:0 0 10px rgba(255,79,168,0.45);
+}
+.theme-stage{ --t-hot:#5AE9FF; --t-hot-glow:0 0 10px rgba(90,233,255,0.5); }
+.theme-acid{  --t-hot:#36FF00; --t-hot-glow:0 0 10px rgba(54,255,0,0.5); }

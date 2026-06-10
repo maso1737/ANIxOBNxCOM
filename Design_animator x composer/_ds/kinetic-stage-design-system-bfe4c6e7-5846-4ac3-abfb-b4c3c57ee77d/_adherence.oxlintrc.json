@@ -1,0 +1,164 @@
+{
+  "plugins": [
+    "react",
+    "import"
+  ],
+  "rules": {
+    "react/forbid-elements": [
+      "warn",
+      {
+        "forbid": []
+      }
+    ],
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": [
+          {
+            "group": [
+              "ui_kits/principle-app/**"
+            ],
+            "message": "Import design-system components from 'index.js', not component internals."
+          }
+        ]
+      }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+        "message": "Raw hex color — use a design-system color token via var()."
+      },
+      {
+        "selector": "Literal[value=/\\b\\d+px\\b/]",
+        "message": "Raw px value — use a design-system spacing token via var()."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/index.js"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "x-omelette": {
+    "components": {},
+    "tokens": [
+      "--acid",
+      "--bg-0",
+      "--bg-1",
+      "--black",
+      "--body-size",
+      "--border",
+      "--cell",
+      "--code-size",
+      "--disp",
+      "--fg-1",
+      "--fg-2",
+      "--fg-3",
+      "--fg-accent",
+      "--fg-emphasis",
+      "--fg-label",
+      "--fg-muted",
+      "--glow-gold",
+      "--glow-ice",
+      "--glow-rouge",
+      "--gold",
+      "--grad-btn",
+      "--grad-page",
+      "--grad-spot",
+      "--grey",
+      "--h1-size",
+      "--h2-size",
+      "--h3-size",
+      "--ice",
+      "--ink",
+      "--jp",
+      "--jp-serif",
+      "--label-size",
+      "--lavender",
+      "--magenta",
+      "--mono",
+      "--neon",
+      "--orn",
+      "--panel",
+      "--panel-2",
+      "--r-lg",
+      "--r-md",
+      "--r-pill",
+      "--r-sm",
+      "--r-xs",
+      "--rouge",
+      "--rouge-deep",
+      "--shadow-modal",
+      "--sp-1",
+      "--sp-2",
+      "--sp-3",
+      "--sp-4",
+      "--sp-5",
+      "--sp-6",
+      "--white"
+    ],
+    "tokenKinds": {
+      "--rouge": "color",
+      "--rouge-deep": "color",
+      "--ice": "color",
+      "--gold": "color",
+      "--lavender": "color",
+      "--magenta": "color",
+      "--acid": "color",
+      "--neon": "color",
+      "--ink": "color",
+      "--black": "color",
+      "--bg-0": "color",
+      "--bg-1": "color",
+      "--panel": "color",
+      "--panel-2": "color",
+      "--cell": "color",
+      "--white": "color",
+      "--grey": "color",
+      "--border": "color",
+      "--fg-1": "color",
+      "--fg-2": "color",
+      "--fg-3": "color",
+      "--fg-muted": "color",
+      "--fg-accent": "color",
+      "--fg-emphasis": "color",
+      "--fg-label": "color",
+      "--mono": "other",
+      "--disp": "other",
+      "--orn": "other",
+      "--jp": "other",
+      "--jp-serif": "other",
+      "--grad-spot": "other",
+      "--grad-btn": "color",
+      "--grad-page": "other",
+      "--glow-rouge": "shadow",
+      "--glow-ice": "shadow",
+      "--glow-gold": "shadow",
+      "--shadow-modal": "shadow",
+      "--r-xs": "spacing",
+      "--r-sm": "spacing",
+      "--r-md": "spacing",
+      "--r-lg": "spacing",
+      "--r-pill": "spacing",
+      "--sp-1": "spacing",
+      "--sp-2": "spacing",
+      "--sp-3": "spacing",
+      "--sp-4": "spacing",
+      "--sp-5": "spacing",
+      "--sp-6": "spacing",
+      "--h1-size": "spacing",
+      "--h2-size": "spacing",
+      "--h3-size": "spacing",
+      "--body-size": "spacing",
+      "--label-size": "spacing",
+      "--code-size": "spacing"
+    },
+    "fontFamilies": []
+  }
+}

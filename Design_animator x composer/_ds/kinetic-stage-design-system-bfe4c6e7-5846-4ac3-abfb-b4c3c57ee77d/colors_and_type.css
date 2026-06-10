@@ -1,0 +1,156 @@
+/* ════════════════════════════════════════════════════════════════
+   KINETIC STAGE — Colors & Type tokens
+   12 Principles of Animation · touch-&-learn browser app series
+   ----------------------------------------------------------------
+   Low-level + semantic CSS variables. Import this for tokens only;
+   import stage-system.css for the full component + layout library.
+
+   <link rel="stylesheet" href="colors_and_type.css">
+   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;0,900;1,700;1,900&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;600;800&family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500;1,700&display=swap" rel="stylesheet">
+   ════════════════════════════════════════════════════════════════ */
+
+:root{
+  /* ── BRAND ACCENTS ─────────────────────────────────────────── */
+  --rouge:#FF4FA8;        /* PRIMARY — hot idol pink. The star. */
+  --rouge-deep:#C9248A;   /* pressed / deep rouge */
+  --ice:#5AE9FF;          /* SECONDARY — stage spotlight cyan. Emphasis. */
+  --gold:#FFD27A;         /* TERTIARY — champagne. Labels, eyebrows, numerals. */
+  --lavender:#B58EFF;     /* SUPPORT — neon violet. Muted UI text, JP captions. */
+  --magenta:#B850FF;      /* gradient partner for rouge */
+  /* legacy aliases used inside app JS / inline styles — keep both */
+  --acid:#FF4FA8;
+  --neon:#5AE9FF;
+
+  /* ── NEUTRALS & SURFACES (dark, midnight plum) ─────────────── */
+  --ink:#0a0612;          /* near-black plum — deepest base */
+  --black:#0a0612;
+  --bg-0:#07030f;         /* page floor */
+  --bg-1:#0c061d;         /* page ceiling */
+  --panel:#150927;        /* side panel base */
+  --panel-2:#100728;      /* main stage base */
+  --cell:#0d0620;         /* recessed surfaces / cells */
+  --white:#F8EFFF;        /* primary text — warm white */
+  --grey:#9d8db3;         /* dimmed text */
+  --border:rgba(255,79,168,0.15);
+
+  /* ── FOREGROUND ROLES (semantic) ───────────────────────────── */
+  --fg-1:#F8EFFF;                       /* primary text */
+  --fg-2:rgba(248,239,255,0.62);        /* secondary / body copy */
+  --fg-3:rgba(181,142,255,0.7);         /* tertiary / JP captions, labels */
+  --fg-muted:rgba(248,239,255,0.5);     /* muted / disabled */
+  --fg-accent:#FF4FA8;                  /* rouge text */
+  --fg-emphasis:#5AE9FF;                /* ice / neon emphasis */
+  --fg-label:#FFD27A;                   /* gold labels */
+
+  /* ── TYPE FAMILIES ─────────────────────────────────────────── */
+  --mono:'IBM Plex Mono',monospace;       /* UI, labels, data, code */
+  --disp:'Barlow Condensed',sans-serif;   /* display headlines (900 italic) */
+  --orn:'Cormorant Garamond',serif;       /* ornament: numerals, EN quotes */
+  --jp:'Noto Sans JP',sans-serif;         /* JP body & captions */
+  --jp-serif:'Noto Serif JP',serif;       /* JP quotes & sample sentences */
+
+  /* ── SIGNATURE GRADIENTS ───────────────────────────────────── */
+  --grad-spot:linear-gradient(120deg,#FFE9B0,#FFD27A 26%,#FF4FA8 62%,#B58EFF 100%); /* spotlight sweep */
+  --grad-btn:linear-gradient(135deg,#FF4FA8,#B850FF);   /* active button / chip */
+  --grad-page:radial-gradient(ellipse 85% 60% at 88% -12%, rgba(184,80,255,0.28), transparent 60%),
+              radial-gradient(ellipse 70% 60% at -8% 110%, rgba(90,233,255,0.14), transparent 65%),
+              radial-gradient(ellipse 60% 50% at 50% 110%, rgba(255,79,168,0.12), transparent 60%),
+              linear-gradient(180deg,#0c061d 0%,#07030f 100%);
+
+  /* ── ELEVATION / GLOW ──────────────────────────────────────── */
+  --glow-rouge:0 0 14px rgba(255,79,168,0.5);
+  --glow-ice:0 0 8px rgba(90,233,255,0.4);
+  --glow-gold:0 0 18px rgba(255,210,122,0.35);
+  --shadow-modal:0 20px 60px rgba(0,0,0,0.6),0 0 80px rgba(184,80,255,0.15);
+
+  /* ── RADII ─────────────────────────────────────────────────── */
+  --r-xs:2px;   /* chips, cells, stage corners */
+  --r-sm:3px;   /* buttons, keys */
+  --r-md:5px;   /* cards, panels */
+  --r-lg:6px;   /* modals */
+  --r-pill:11px;/* capsule buttons (banner toy) */
+
+  /* ── SPACING (used across panels / cards) ──────────────────── */
+  --sp-1:4px; --sp-2:8px; --sp-3:14px; --sp-4:16px; --sp-5:20px; --sp-6:32px;
+
+  /* ── TYPE SCALE (semantic) ─────────────────────────────────── */
+  --h1-size:clamp(52px,9vw,116px);  /* masthead display */
+  --h2-size:30px;                   /* section titles */
+  --h3-size:16px;                   /* sub-heads */
+  --body-size:11.5px;               /* panel body copy */
+  --label-size:9px;                 /* eyebrow / spec labels */
+  --code-size:10px;                 /* mono data */
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SEMANTIC TYPE PRESETS
+   Apply directly, e.g. <h1 class="t-display">…</h1>
+   ════════════════════════════════════════════════════════════════ */
+
+/* Big display headline — gradient spotlight text */
+.t-display{
+  font-family:var(--disp);font-weight:900;font-style:italic;
+  font-size:var(--h1-size);line-height:0.9;letter-spacing:-0.02em;
+  background:var(--grad-spot);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+  filter:drop-shadow(0 0 26px rgba(255,79,168,0.3));
+}
+
+/* Section / card title — condensed uppercase */
+.t-title{
+  font-family:var(--disp);font-weight:900;font-size:var(--h2-size);
+  letter-spacing:0.04em;text-transform:uppercase;color:var(--white);
+}
+
+/* Sub-head */
+.t-sub{
+  font-family:var(--disp);font-weight:900;font-size:var(--h3-size);
+  letter-spacing:0.06em;text-transform:uppercase;color:var(--ice);
+}
+
+/* Ornament — EN quotes, big numerals (italic serif) */
+.t-orn{
+  font-family:var(--orn);font-weight:700;font-style:italic;
+  color:var(--gold);line-height:1.2;
+}
+
+/* Principle numeral — gradient ornament numeral */
+.t-numeral{
+  font-family:var(--orn);font-weight:700;font-style:italic;letter-spacing:-0.03em;
+  background:var(--grad-spot);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+}
+
+/* Eyebrow / spec label — wide-tracked gold mono */
+.t-label{
+  font-family:var(--mono);font-size:var(--label-size);font-weight:500;
+  letter-spacing:0.32em;color:var(--gold);text-transform:uppercase;
+}
+
+/* Mono UI / key caps — wide-tracked ice mono */
+.t-mono{
+  font-family:var(--mono);font-size:13px;letter-spacing:0.2em;color:var(--ice);
+}
+
+/* Body copy */
+.t-body{
+  font-family:var(--mono);font-size:var(--body-size);line-height:1.95;
+  letter-spacing:0.02em;color:var(--fg-2);
+}
+
+/* JP serif — quotes & sample sentences */
+.t-jp-serif{
+  font-family:var(--jp-serif);font-weight:800;color:rgba(248,239,255,0.85);
+  letter-spacing:0.12em;line-height:1.6;
+}
+
+/* JP sans — body & captions */
+.t-jp{
+  font-family:var(--jp);font-size:13px;color:var(--grey);letter-spacing:0.2em;line-height:1.9;
+}
+
+/* Inline code */
+.t-code{
+  font-family:var(--mono);font-size:var(--code-size);color:var(--gold);
+  background:rgba(255,210,122,0.08);padding:1px 5px;border-radius:var(--r-xs);
+}
