@@ -16,7 +16,8 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{width:100%;height:100%;background:var(--black);color:var(--white);font-family:var(--mono);font-size:11px;overflow:hidden;-webkit-user-select:none;user-select:none;}
-#app{display:grid;grid-template-columns:1fr 220px;grid-template-rows:32px 1fr var(--tl-h,200px) 24px;height:100vh;width:100vw;}
+/* インスペクタはフローティング化したので右カラムは廃止。iPad Safariの下端切れ対策に dvh を併用（再生バー対策） */
+#app{display:grid;grid-template-columns:1fr;grid-template-rows:32px 1fr var(--tl-h,200px) 26px;height:100vh;height:100dvh;width:100vw;}
 
 /* TOPBAR */
 #topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--border);background:var(--panel);font-size:9px;letter-spacing:0.25em;}
@@ -62,8 +63,16 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
 #empty-state .hint{font-size:9px;letter-spacing:0.3em;color:rgba(255,255,255,0.4);}
 #empty-state .sub{font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.2);margin-top:4px;}
 
-/* INSPECTOR */
-#inspector{background:var(--panel);border-left:1px solid var(--border);border-bottom:1px solid var(--border);padding:10px 12px;overflow-y:auto;font-size:10px;}
+/* INSPECTOR（フローティング：設定UI同様。ドラッグ移動＋内部スクロール＝タイムラインを上げても隠れない）*/
+#inspector{position:fixed;top:40px;right:12px;width:216px;max-height:calc(100dvh - 240px);background:rgba(8,8,8,0.96);border:1px solid var(--border-bright);box-shadow:0 8px 40px rgba(0,0,0,0.7),0 0 0 1px rgba(0,0,0,0.4);z-index:60;font-size:10px;display:flex;flex-direction:column;}
+#inspector-head{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;cursor:move;background:linear-gradient(90deg,rgba(255,79,168,0.10),transparent);border-bottom:1px solid var(--border);font-size:9px;letter-spacing:0.3em;color:var(--acid);user-select:none;flex-shrink:0;}
+#inspector-collapse{cursor:pointer;color:rgba(255,255,255,0.5);font-size:12px;line-height:1;padding:0 4px;}
+#inspector-collapse:hover{color:var(--acid);}
+#inspector.collapsed{max-height:none;}
+#inspector.collapsed #inspector-body{display:none;}
+#inspector-body{padding:10px 12px;overflow-y:auto;}
+#inspector-body::-webkit-scrollbar{width:4px;}
+#inspector-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,0.3);}
 .insp-section{margin-bottom:14px;}
 .insp-h{font-size:8px;letter-spacing:0.3em;color:rgba(255,79,168,0.6);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
 .insp-row{display:flex;justify-content:space-between;padding:2px 0;}
@@ -99,10 +108,10 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-track.selected{background:rgba(255,79,168,0.04);}
 .tl-track.selected .tl-track-name{color:var(--acid);}
 .tl-track-label{width:128px;flex-shrink:0;display:flex;flex-direction:column;justify-content:center;gap:4px;padding-right:6px;overflow:hidden;}
-.tl-track-name{font-size:9px;letter-spacing:0.1em;color:rgba(255,255,255,0.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tl-track-name{font-size:12px;letter-spacing:0.08em;color:rgba(255,255,255,0.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tl-track-name .num{color:var(--acid);margin-right:4px;}
 .tl-track-btns{display:flex;gap:3px;}
-.tl-tbtn{background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.4);font-family:var(--mono);font-size:7px;letter-spacing:0.05em;padding:1px 4px;cursor:pointer;line-height:1.4;}
+.tl-tbtn{background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.4);font-family:var(--mono);font-size:9.5px;letter-spacing:0.04em;padding:2px 5px;cursor:pointer;line-height:1.4;}
 .tl-tbtn:hover{border-color:var(--border-bright);color:var(--acid);}
 .tl-tbtn.vis-off{color:rgba(255,255,255,0.18);border-style:dashed;}
 .tl-tbtn.anm{color:rgba(255,79,168,0.5);}
@@ -334,14 +343,16 @@ input[type=number]{-moz-appearance:textfield;}
     </div>
     <div id="empty-state">
       <div class="glyph">+</div>
-      <div class="hint">DRAG PROJECT_v1 JSON HERE</div>
-      <div class="hint" style="opacity:0.6">OR CLICK [IMPORT JSON]</div>
+      <div class="hint">TAP HERE TO LOAD</div>
+      <div class="hint" style="opacity:0.6">DRAG JSON / [IMPORT JSON]</div>
       <div class="sub">[ PROJECT_v1 / 24FPS / NEAREST / 4K_OUTPUT ]</div>
     </div>
     <div id="drop-overlay"><div class="msg">+ DROP TO LOAD +</div></div>
   </div>
 
   <div id="inspector">
+    <div id="inspector-head">INSPECTOR<span id="inspector-collapse" title="折りたたみ／展開">▾</span></div>
+    <div id="inspector-body">
     <div class="insp-section">
       <div class="insp-h">PROJECT</div>
       <div class="insp-row"><span class="k">FPS</span><span class="v acid" id="i-fps">—</span></div>
@@ -376,6 +387,7 @@ input[type=number]{-moz-appearance:textfield;}
       <div class="insp-row"><span class="k">FRAME</span><span class="v acid" id="i-cur">—</span></div>
       <div class="insp-row"><span class="k">CELL</span><span class="v" id="i-cell">—</span></div>
     </div>
+    </div><!-- /#inspector-body -->
   </div>
 
   <div id="timeline">
@@ -2040,6 +2052,7 @@ document.querySelectorAll('.num-step[data-step], .num-step[data-fxstep]').forEac
 const anchorHandle=$('#anchor-handle');
 let anchorDragging=false, anchorDragStart=null, anchorDragKfStart=null;
 anchorHandle.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='touch') return; // 指はキャンバス操作優先。アンカー移動はペンで
   if(e.button!==0) return;
   const t=selTrack(); if(!t) return;
   pause(); anchorDragging=true;
@@ -2065,6 +2078,7 @@ anchorHandle.addEventListener('pointerup',()=>{
 // Viewport drag (auto-key position)
 const vpInner=$('#viewport-inner');
 vpInner.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='touch') return; // 指はキャンバス操作（pan/zoom）優先。トラック移動はペンで
   if(e.button!==0) return; // 左/ペン接触のみ（中ボタンはPANに使う）
   const t=selTrack(); if(!t) return;
   pause(); state.vpDragging=true;
@@ -2119,6 +2133,74 @@ vpInner.addEventListener('pointerup',()=>{
   vp.addEventListener('auxclick',e=>{ if(e.button===1) e.preventDefault(); });
   // ダブルクリックで表示リセット（FIT）
   vp.addEventListener('dblclick',e=>{ if(state.width){ resetView(); } });
+})();
+
+// ── タッチジェスチャ: 1指=PAN / 2指=ピンチzoom+pan / 2指タップ=Undo / 3指タップ=Redo ──
+// 指はキャンバス操作優先。トラック/アンカーの移動はペンで行う（vpInner/anchorHandleはtouch無視）。
+(function(){
+  const vp=$('#viewport');
+  const ptrs=new Map();
+  let pinching=false, startDist=0, startZoom=1, startCenter={x:0,y:0}, startPan={x:0,y:0};
+  let panning=false, panId=null, panStart={x:0,y:0}, panStartView={x:0,y:0};
+  let tapStart=0, tapMax=0;
+  vp.addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='touch') return;
+    if(!state.width) return; // 未読込時はタップ→読込(click)に任せる
+    vp.setPointerCapture(e.pointerId);
+    const now=performance.now();
+    ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,st:now});
+    if(ptrs.size===1){ tapStart=now; tapMax=1; } else if(ptrs.size>tapMax) tapMax=ptrs.size;
+    if(ptrs.size===1){
+      panning=true; panId=e.pointerId;
+      panStart={x:e.clientX,y:e.clientY}; panStartView={x:state.view.panX,y:state.view.panY};
+    } else if(ptrs.size===2){
+      panning=false; pinching=true;
+      const p=[...ptrs.values()];
+      startDist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
+      startCenter={x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2};
+      startZoom=state.view.zoom; startPan={x:state.view.panX,y:state.view.panY};
+    } else { pinching=false; panning=false; }
+  });
+  vp.addEventListener('pointermove',e=>{
+    if(e.pointerType!=='touch') return;
+    const p=ptrs.get(e.pointerId); if(!p) return;
+    p.x=e.clientX; p.y=e.clientY;
+    if(pinching && ptrs.size>=2){
+      const a=[...ptrs.values()];
+      const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+      const c={x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2};
+      if(startDist>0){
+        state.view.zoom=Math.max(0.1,Math.min(12,startZoom*(d/startDist)));
+        state.view.panX=startPan.x+(c.x-startCenter.x);
+        state.view.panY=startPan.y+(c.y-startCenter.y);
+        applyView();
+      }
+    } else if(panning && e.pointerId===panId){
+      state.view.panX=panStartView.x+(e.clientX-panStart.x);
+      state.view.panY=panStartView.y+(e.clientY-panStart.y);
+      applyView();
+    }
+  });
+  function end(e){
+    if(e.pointerType!=='touch') return;
+    const p=ptrs.get(e.pointerId); if(!p) return;
+    ptrs.delete(e.pointerId);
+    if(pinching && ptrs.size<2) pinching=false;
+    if(panning && e.pointerId===panId) panning=false;
+    if(ptrs.size===0){
+      const dt=performance.now()-tapStart;
+      const moved=Math.hypot(p.x-p.sx,p.y-p.sy);
+      if(dt<300 && moved<14){
+        if(tapMax===2) undo();
+        else if(tapMax===3) redo();
+      }
+      tapMax=0;
+    }
+  }
+  vp.addEventListener('pointerup',end);
+  vp.addEventListener('pointercancel',end);
+  // 未読込時：プレビュー中央をタップ/クリックで読み込みダイアログ
+  vp.addEventListener('click',()=>{ if(!state.width) $('#btn-import').click(); });
 })();
 
 $('#btn-play').addEventListener('click',togglePlay);
@@ -2489,6 +2571,31 @@ document.querySelectorAll('#settings-panel .sg-preset[data-gw]').forEach(b=>{
     body.style.height=h+'px';
   });
   handle.addEventListener('pointerup',()=>{ active=false; handle.classList.remove('active'); });
+})();
+
+// インスペクタ（フローティング）のドラッグ移動＋折りたたみ
+(function(){
+  const panel=$('#inspector'), head=$('#inspector-head'), collapse=$('#inspector-collapse');
+  if(!panel||!head) return;
+  let dragging=false, moved=false, sx=0, sy=0, ox=0, oy=0;
+  head.addEventListener('pointerdown',e=>{
+    if(e.target===collapse) return;
+    dragging=true; moved=false; const r=panel.getBoundingClientRect();
+    sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
+    panel.style.left=ox+'px'; panel.style.top=oy+'px'; panel.style.right='auto';
+    head.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  head.addEventListener('pointermove',e=>{
+    if(!dragging) return;
+    if(Math.abs(e.clientX-sx)>3||Math.abs(e.clientY-sy)>3) moved=true;
+    // 画面内にクランプ（ヘッダが必ず掴める位置に）
+    const nx=Math.max(-panel.offsetWidth+60,Math.min(window.innerWidth-60,ox+e.clientX-sx));
+    const ny=Math.max(0,Math.min(window.innerHeight-30,oy+e.clientY-sy));
+    panel.style.left=nx+'px'; panel.style.top=ny+'px';
+  });
+  head.addEventListener('pointerup',()=>{dragging=false;});
+  // ヘッダのタップ/クリック（移動なし）または▾で折りたたみトグル
+  collapse.addEventListener('click',e=>{ e.stopPropagation(); panel.classList.toggle('collapsed'); });
 })();
 </script>
 </body>

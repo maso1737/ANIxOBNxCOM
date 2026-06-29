@@ -1198,6 +1198,15 @@ input[type=range]::-moz-range-thumb{
 #strip-toolbar .play-btn svg{width:12px;height:12px;}
 #strip-toolbar .fps-input{font-size:12px;height:22px;}
 #strip-toolbar .frame-pos{font-size:12px;}
+
+/* ── MIRROR 軸ガイド: 見た目は細い線、当たり判定は広く（iPadでドラッグ可能に）── */
+#mirror-guide{pointer-events:none;}
+#mirror-guide.on{pointer-events:auto;}
+#mirror-guide::before{content:'';position:absolute;background:rgba(90,233,255,0.7);box-shadow:0 0 6px rgba(90,233,255,0.6);}
+#mirror-guide.axis-v{cursor:ew-resize;}
+#mirror-guide.axis-v::before{left:50%;top:0;bottom:0;width:1px;transform:translateX(-50%);}
+#mirror-guide.axis-h{cursor:ns-resize;}
+#mirror-guide.axis-h::before{top:50%;left:0;right:0;height:1px;transform:translateY(-50%);}
 </style>
 </head>
 <body>
@@ -1328,7 +1337,7 @@ input[type=range]::-moz-range-thumb{
       <canvas class="layer" id="guide-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px; pointer-events: none; z-index: 15;"></canvas>
     </div>
     <!-- ミラーガイド: stage基準で配置（ズーム/パンに追従しない固定ライン） -->
-    <div id="mirror-guide" style="display:none;position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(90,233,255,0.7);box-shadow:0 0 6px rgba(90,233,255,0.6);pointer-events:none;z-index:20;transform:translateX(-50%);"></div>
+    <div id="mirror-guide" style="display:none;position:absolute;z-index:20;"></div>
     <div id="stage-hud">
       <span id="hud-coord">16 · 698</span>
     </div>
@@ -1588,12 +1597,32 @@ const PALETTE_48 = [
   '#FFFFFF','#E0DDD5','#B5B0A4','#888373','#4F4B40','#2A2722','#1A1815','#000000',
 ];
 
-// インクカラー
+// インクカラー（blue=下書 / orange=指示 はスポイト/Altクリックで上書き可・localStorage保持）
 const INK = {
   black:  '#000000',
   blue:   '#A8D8FF',  // 下書き用うすい水色
   orange: '#FFB060',  // 指示用オレンジ
 };
+const INK_LS = 'animator_ink_v1';
+(function loadInk(){
+  try{
+    const o = JSON.parse(localStorage.getItem(INK_LS) || 'null');
+    if(o && typeof o === 'object'){
+      if(o.blue)   INK.blue   = o.blue;
+      if(o.orange) INK.orange = o.orange;
+    }
+  }catch(e){}
+})();
+function saveInk(){
+  try{ localStorage.setItem(INK_LS, JSON.stringify({blue:INK.blue, orange:INK.orange})); }catch(e){}
+}
+// 下書/指示ボタンの背景を現在のインク色に同期（CSS既定色を上書き表示）
+function updateInkSwatches(){
+  document.querySelectorAll('.tb-ink, .ink-btn').forEach(b => {
+    const c = b.dataset.c;
+    if(c && c !== 'black' && INK[c]) b.style.background = INK[c];
+  });
+}
 
 // ============================================================
 // MODAL DIALOG (confirm/alertの代替)
@@ -1891,7 +1920,8 @@ async function addRefAnimator(json, fallbackName){
   if(!src){ modalAlert('フレームが含まれていません'); return; }
   const { ticks, totalTicks } = await expandRefTicks(src);
   const idx = state.refAnimators.length;
-  state.refAnimators.push({
+  // 新規はリスト先頭（=最前面）に挿入。「1番上から重なる」挙動
+  state.refAnimators.unshift({
     id: 'r_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,6),
     name: src.name,
     projectId: src.projectId,
@@ -1903,7 +1933,7 @@ async function addRefAnimator(json, fallbackName){
     source: src,
     x: 0, y: 0, scale: 1,
   });
-  centerRefAnimator(state.refAnimators[state.refAnimators.length - 1]); // 原寸・中央に初期配置
+  centerRefAnimator(state.refAnimators[0]); // 原寸・中央に初期配置
   buildRefList();
   updateTimeTrack();
   renderRefLayer();
@@ -1971,7 +2001,9 @@ function renderRefLayer(tickOverride){
   const refs = state.refAnimators;
   if(!refs.length) return;
   const t = (typeof tickOverride === 'number') ? tickOverride : currentSyncTick();
-  for(const r of refs){
+  // リスト先頭(index 0)を最前面にするため、末尾から描画（下→上）
+  for(let ri = refs.length - 1; ri >= 0; ri--){
+    const r = refs[ri];
     if(!r.visible || !r.ticks) continue;
     if(t < 0 || t >= r.ticks.length) continue;   // 参照側が尽きたら非表示
     const img = r.ticks[t];
@@ -2623,6 +2655,38 @@ function refDragEnd(){
   refDragging = false; refDragObj = null; refDragKind = null;
   markMetaDirty(); scheduleSave();
 }
+// ── MOVE中の2本指ピンチ: 選択中の参照(画像/アニメ/フレーム)を拡縮＋移動 ──
+let refPinching = false, refPinchObj = null, refPinchKind = null, refPinchStart = null;
+function refPinchBegin(cx, cy, dist){
+  const { x:wx, y:wy } = toCanvasCoord(cx, cy);
+  // 既にドラッグ中の対象があればそれを、無ければピンチ中心の画像→選択中
+  let e;
+  if(refDragObj){ e = {type:refDragKind, obj:refDragObj}; }
+  else { const hit = hitTestImage(wx, wy); e = hit ? {type:'img', obj:hit} : refFindSel(); }
+  if(!e){ refPinching = false; refPinchObj = null; return false; }
+  refDragging = false; // 単指ドラッグを終了してピンチへ
+  refPinchObj = e.obj; refPinchKind = e.type; refPinching = true;
+  refPinchStart = { dist, cx, cy, wx, wy, scale:e.obj.scale, x:e.obj.x, y:e.obj.y };
+  return true;
+}
+function refPinchMove(cx, cy, dist){
+  if(!refPinching || !refPinchObj || !refPinchStart || refPinchStart.dist <= 0) return;
+  const s = refPinchStart;
+  const ns = Math.max(0.05, Math.min(12, s.scale * (dist / s.dist)));
+  const k = ns / s.scale;
+  let dxWork = (cx - s.cx) / (state.zoom || 1);
+  const dyWork = (cy - s.cy) / (state.zoom || 1);
+  if(state.flipped) dxWork = -dxWork;
+  refPinchObj.x = Math.round(s.wx - (s.wx - s.x) * k + dxWork);
+  refPinchObj.y = Math.round(s.wy - (s.wy - s.y) * k + dyWork);
+  refPinchObj.scale = ns;
+  renderSelObj(refPinchKind);
+}
+function refPinchEnd(){
+  if(!refPinching) return;
+  refPinching = false; refPinchObj = null; refPinchKind = null; refPinchStart = null;
+  markMetaDirty(); scheduleSave();
+}
 // 移動モードが有効か（ONかつ参照表示中なら、ドラッグは移動操作として横取り）
 function refImgActive(){ return !!(state.refMoveMode && state.refMasterShow); }
 // REFパネル連動: キャンバス上の参照表示マスター
@@ -2683,7 +2747,7 @@ function renderGuides(){
 // ============================================================
 // 作業キャンバスサイズ変更（Phase B）
 //   ・上限: 総ピクセル数 CFG.MAX_AREA（≒4K面積）/ 各辺 MIN_SIDE〜MAX_SIDE
-//   ・既存の絵はアスペクト維持で中央フィット（nearest）して保持
+//   ・既存の絵は等倍のまま中央アンカーで再配置（カンバスサイズ変更：はみ出し切り落とし／不足は透明）
 //   ・Undo履歴はサイズ非互換のためリセット
 // ============================================================
 function clampCanvasSize(w, h){
@@ -2710,6 +2774,25 @@ function resampleDrawData(data, sw, sh, dw, dh){
   dc.drawImage(src, 0, 0, sw, sh, x, y, w, h);
   return new Uint8ClampedArray(dc.getImageData(0, 0, dw, dh).data);
 }
+// drawData(sw×sh) を dw×dh へ「キャンバスサイズ変更」で再配置：
+// 絵のピクセルは等倍のまま中央アンカーで配置し、はみ出しは切り落とし・不足は透明（PSDのカンバスサイズ相当）
+function recanvasDrawData(data, sw, sh, dw, dh){
+  const out = new Uint8ClampedArray(dw * dh * 4);
+  if(!data || data.length !== sw * sh * 4) return out;
+  const offX = Math.round((dw - sw) / 2);
+  const offY = Math.round((dh - sh) / 2);
+  const x0 = Math.max(0, offX), x1 = Math.min(dw, offX + sw);
+  const y0 = Math.max(0, offY), y1 = Math.min(dh, offY + sh);
+  if(x1 <= x0 || y1 <= y0) return out;
+  const rowBytes = (x1 - x0) * 4;
+  for(let dy = y0; dy < y1; dy++){
+    const sy = dy - offY;
+    const di = (dy * dw + x0) * 4;
+    const si = (sy * sw + (x0 - offX)) * 4;
+    out.set(data.subarray(si, si + rowBytes), di);
+  }
+  return out;
+}
 // フレームのサムネをdrawDataから再生成
 function regenThumb(f){
   if(!f || f.kind !== 'draw' || !f.thumbCanvas) return;
@@ -2733,21 +2816,21 @@ function setCanvasSize(newW, newH){
   // 現在のコマを確定
   const cur = curFrame();
   if(cur) syncFrameFromCanvas(cur);
-  // 既存の絵を再サンプルして保持
+  // 既存の絵は等倍のまま保持（中央アンカーのカンバスサイズ変更。拡縮しない）
   for(const f of state.frames){
     if(f.kind !== 'draw' || !f.drawData) continue;
-    f.drawData = resampleDrawData(f.drawData, oldW, oldH, newW, newH);
+    f.drawData = recanvasDrawData(f.drawData, oldW, oldH, newW, newH);
     f.history = []; f.histIdx = -1; // サイズ非互換の履歴は破棄
     f.dirty = true; state.pendingSaveFrames.add(f.id);
   }
-  // FRAMEレイヤーも再サンプル
+  // FRAMEレイヤーも等倍のまま再配置
   let flData = null;
   try{ flData = frameLayerCtx.getImageData(0, 0, oldW, oldH).data; }catch(e){}
   // サイズ適用 → レイヤーcanvas再構築
   CFG.WORK_W = newW; CFG.WORK_H = newH;
   setupCanvas();
   if(flData){
-    const rs = resampleDrawData(new Uint8ClampedArray(flData), oldW, oldH, newW, newH);
+    const rs = recanvasDrawData(new Uint8ClampedArray(flData), oldW, oldH, newW, newH);
     frameLayerCtx.putImageData(new ImageData(rs, newW, newH), 0, 0);
   }
   // 履歴・サムネ・表示を更新
@@ -2767,39 +2850,39 @@ function setCanvasSize(newW, newH){
 }
 
 // ミラー軸ガイドラインをズーム・パン・flipに追従させる
+const MIRROR_HIT = 22; // 軸ライン中央を覆う透明な当たり判定の太さ(px)
 function updateMirrorGuide(){
   const guide = document.getElementById('mirror-guide');
   if(!guide) return;
-  if(!state.mirrorOn){ guide.style.display = 'none'; return; }
+  if(!state.mirrorOn){ guide.style.display = 'none'; guide.classList.remove('on'); return; }
   guide.style.display = 'block';
-  guide.style.pointerEvents = 'auto';
-  guide.style.transform = 'none';
+  guide.classList.add('on');
   const stageRect = stage.getBoundingClientRect();
   const wrapRect  = wrap.getBoundingClientRect();
   if(state.mirrorAxis === 'h'){
     // 水平軸: 上下対称、画面上に横線
+    guide.classList.add('axis-h'); guide.classList.remove('axis-v');
     const screenY = wrapRect.top + state.mirrorAxisY * state.zoom;
-    const top = screenY - stageRect.top;
+    const top = (screenY - stageRect.top) - MIRROR_HIT / 2;
     guide.style.left = '0';
     guide.style.right = '0';
     guide.style.width = '';
     guide.style.top = top + 'px';
     guide.style.bottom = '';
-    guide.style.height = '1px';
-    guide.style.cursor = 'ns-resize';
+    guide.style.height = MIRROR_HIT + 'px';
   } else {
     // 垂直軸: 左右対称、画面上に縦線
+    guide.classList.add('axis-v'); guide.classList.remove('axis-h');
     let screenX = state.flipped
       ? wrapRect.right - state.mirrorAxisX * state.zoom
       : wrapRect.left  + state.mirrorAxisX * state.zoom;
-    const left = screenX - stageRect.left;
+    const left = (screenX - stageRect.left) - MIRROR_HIT / 2;
     guide.style.top = '0';
     guide.style.bottom = '0';
     guide.style.height = '';
     guide.style.left = left + 'px';
     guide.style.right = '';
-    guide.style.width = '1px';
-    guide.style.cursor = 'ew-resize';
+    guide.style.width = MIRROR_HIT + 'px';
   }
 }
 
@@ -3045,6 +3128,20 @@ function eyedropAt(clientX, clientY){
     savePalette();
     renderPalette();
   }
+}
+// スポイト: 下書/指示インク（blue/orange）が選択中なら、そのインク色を取り込む
+function eyedropInk(clientX, clientY){
+  const {x, y} = toCanvasCoord(clientX, clientY);
+  const hex = sampleCompositeColor(x, y);
+  if(!hex) return;
+  INK[state.inkColor] = hex;
+  saveInk();
+  updateInkSwatches();
+}
+// 下書/指示インクが選択中か（主線=blackは除外、ペン系ツール時のみ）
+function inkPickActive(){
+  return (state.inkColor === 'blue' || state.inkColor === 'orange') &&
+         (state.tool === 'pen' || state.tool === 'eyedrop');
 }
 
 // ============================================================
@@ -4300,19 +4397,11 @@ stage.addEventListener('pointerdown', e => {
     if(refImgActive()){
       refDragBegin(e.clientX, e.clientY);
     } else if(state.tool === 'eyedrop'){
-      eyedropAt(e.clientX, e.clientY);
-    } else if(state.tool === 'fill'){
-      if(state.frameLayer.editMode) ensureFlBaseline();
-      let {x, y} = toCanvasCoord(e.clientX, e.clientY);
-      if(state.frameLayer.editMode){ const fc = toFrameLocal(x, y); x = fc.x; y = fc.y; }
-      floodFill(x, y, state.fillColor);
-      if(state.frameLayer.editMode) pushFrameLayerHistory();
-      else pushHistory();
-    } else if(state.tool === 'erase'){
-      drawingPointerId = e.pointerId;
-      startStroke(e.clientX, e.clientY);
+      if(inkPickActive()) eyedropInk(e.clientX, e.clientY);
+      else eyedropAt(e.clientX, e.clientY);
     } else {
-      // ペンツール: 指=パン
+      // 指=パンのみ。描画・消去・塗りつぶしはペン(Apple Pencil)で行う。
+      // → 消しゴム/塗りで指が動作を奪い、2本指タップ(Undo/Redo)が効かない問題を回避
       tPanning = true; tPanId = e.pointerId;
       tPanStartClient = {x:e.clientX, y:e.clientY};
       tPanStartPan = {x:state.panX, y:state.panY};
@@ -4321,12 +4410,19 @@ stage.addEventListener('pointerdown', e => {
     // 2本指: ピンチ開始
     if(drawing) endStroke();
     tPanning = false;
-    tPinching = true;
     const pts = Array.from(touchPtrs.values());
-    tPinchStartDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
-    tPinchStartCenter = {x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2};
-    tPinchStartZoom = state.zoom;
-    tPinchStartPan = {x:state.panX, y:state.panY};
+    const pdist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    const pcx = (pts[0].x+pts[1].x)/2, pcy = (pts[0].y+pts[1].y)/2;
+    // MOVE中は参照(画像/アニメ/フレーム)の拡縮＋移動を優先（キャンバスズームしない）
+    if(refImgActive() && refPinchBegin(pcx, pcy, pdist)){
+      tPinching = false;
+    } else {
+      tPinching = true;
+      tPinchStartDist = pdist;
+      tPinchStartCenter = {x:pcx, y:pcy};
+      tPinchStartZoom = state.zoom;
+      tPinchStartPan = {x:state.panX, y:state.panY};
+    }
   } else {
     // 3本以上: 全動作停止（タップ判定は継続）
     if(drawing) endStroke();
@@ -4341,6 +4437,13 @@ stage.addEventListener('pointermove', e => {
   p.x = e.clientX; p.y = e.clientY;
 
   if(refDragging && touchPtrs.size === 1){ refDragMove(e.clientX, e.clientY); return; }
+  if(refPinching && touchPtrs.size >= 2){
+    const pts = Array.from(touchPtrs.values());
+    const d = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    const c = {x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2};
+    refPinchMove(c.x, c.y, d);
+    return;
+  }
   if(tPinching && touchPtrs.size >= 2){
     const pts = Array.from(touchPtrs.values());
     const d = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
@@ -4370,6 +4473,7 @@ function stageTouchEnd(e){
   touchPtrs.delete(e.pointerId);
 
   if(refDragging){ refDragEnd(); }
+  if(refPinching && touchPtrs.size < 2) refPinchEnd();
   if(tPinching && touchPtrs.size < 2) tPinching = false;
   if(tPanning && e.pointerId === tPanId) tPanning = false;
   if(drawing && e.pointerId === drawingPointerId) endStroke();
@@ -4505,7 +4609,8 @@ drawCanvas.addEventListener('pointerdown', e => {
   drawingPointerId = e.pointerId;
   if(refImgActive()){ refDragBegin(e.clientX, e.clientY); return; } // 参照画像の移動モード
   if(state.tool === 'eyedrop' || e.altKey){
-    eyedropAt(e.clientX, e.clientY);
+    if(inkPickActive()) eyedropInk(e.clientX, e.clientY);
+    else eyedropAt(e.clientX, e.clientY);
   } else if(state.tool === 'fill'){
     if(state.frameLayer.editMode) ensureFlBaseline();
     let {x, y} = toCanvasCoord(e.clientX, e.clientY);
@@ -4568,6 +4673,7 @@ function applyInkUIForTool(){
     const active = erasing ? (b.dataset.c === 'black') : (b.dataset.c === state.inkColor);
     b.classList.toggle('on', active);
   });
+  updateInkSwatches();
 }
 
 // ツールバー左右入れ替え
@@ -4665,24 +4771,38 @@ if(paletteFloatBtn){
   });
 })();
 
-// PEN ボタン ダブルクリック → 筆圧ペン ON/OFF
+// iPad対応: dblclick が発火しない端末向けに、手動ダブルタップ検出を併設する汎用ヘルパー
+function onDoubleActivate(el, handler){
+  if(!el) return;
+  el.addEventListener('dblclick', handler);
+  let lastT = 0, lastX = 0, lastY = 0;
+  el.addEventListener('pointerup', e => {
+    if(e.pointerType !== 'touch') return;
+    const now = performance.now();
+    if(now - lastT < 350 && Math.hypot(e.clientX - lastX, e.clientY - lastY) < 28){
+      lastT = 0;
+      e.preventDefault();
+      handler(e);
+    } else {
+      lastT = now; lastX = e.clientX; lastY = e.clientY;
+    }
+  });
+}
+
+// PEN ボタン ダブルクリック/ダブルタップ → 筆圧ペン ON/OFF
 const penToolBtn = document.querySelector('.tool[data-tool="pen"]');
-if(penToolBtn){
-  penToolBtn.addEventListener('dblclick', () => {
-    state.pressurePen = !state.pressurePen;
-    penToolBtn.classList.toggle('pp-on', state.pressurePen);
-    penToolBtn.title = '筆圧ペン: ' + (state.pressurePen ? 'ON（Wクリックで切替）' : 'OFF（Wクリックで切替）');
-  });
-}
-// FILL ボタン ダブルクリック → 透明塗りつぶし消し ON/OFF
+onDoubleActivate(penToolBtn, () => {
+  state.pressurePen = !state.pressurePen;
+  penToolBtn.classList.toggle('pp-on', state.pressurePen);
+  penToolBtn.title = '筆圧ペン: ' + (state.pressurePen ? 'ON（Wクリックで切替）' : 'OFF（Wクリックで切替）');
+});
+// FILL ボタン ダブルクリック/ダブルタップ → 透明塗りつぶし消し ON/OFF
 const fillToolBtn = document.querySelector('.tool[data-tool="fill"]');
-if(fillToolBtn){
-  fillToolBtn.addEventListener('dblclick', () => {
-    state.fillErase = !state.fillErase;
-    fillToolBtn.classList.toggle('fe-on', state.fillErase);
-    fillToolBtn.title = '透明塗りつぶし消し: ' + (state.fillErase ? 'ON（Wクリックで切替）' : 'OFF（Wクリックで切替）');
-  });
-}
+onDoubleActivate(fillToolBtn, () => {
+  state.fillErase = !state.fillErase;
+  fillToolBtn.classList.toggle('fe-on', state.fillErase);
+  fillToolBtn.title = '透明塗りつぶし消し: ' + (state.fillErase ? 'ON（Wクリックで切替）' : 'OFF（Wクリックで切替）');
+});
 
 document.querySelectorAll('.tb-pen').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -5172,13 +5292,13 @@ async function importJSON(file){
   if(!file) return;
   let json;
   try{ json = JSON.parse(await file.text()); }
-  catch(e){ alert('JSONの解析に失敗しました: ' + e.message); return; }
+  catch(e){ await modalAlert('JSONの解析に失敗しました: ' + e.message); return; }
   const isProjectV1 = json.format === 'PROJECT_v1';
   const isAnimatorV1 = json.format === 'ANIMATOR_v1';
   if(!isProjectV1 && !isAnimatorV1){
-    if(!confirm('未知のフォーマットです。読み込みを試みますか？')) return;
+    if(!await modalConfirm('未知のフォーマットです。読み込みを試みますか？')) return;
   }
-  if(!confirm('現在のプロジェクトを上書きします。よろしいですか？')) return;
+  if(!await modalConfirm('現在のプロジェクトを上書きします。よろしいですか？')) return;
   await applyProjectJSON(json);
 }
 
@@ -6170,8 +6290,8 @@ document.getElementById('btn-mirror').addEventListener('click', e => {
   e.target.classList.toggle('on', state.mirrorOn);
   updateMirrorGuide();
 });
-// MIRROR ダブルクリック → 垂直/水平 軸トグル
-document.getElementById('btn-mirror').addEventListener('dblclick', () => {
+// MIRROR ダブルクリック/ダブルタップ → 垂直/水平 軸トグル（iPad対応）
+onDoubleActivate(document.getElementById('btn-mirror'), () => {
   state.mirrorAxis = state.mirrorAxis === 'h' ? 'v' : 'h';
   // 切替時に軸位置を中央に再設定すると分かりやすい
   if(state.mirrorAxis === 'h') state.mirrorAxisY = CFG.WORK_H / 2;
@@ -6212,6 +6332,12 @@ document.getElementById('btn-mirror').addEventListener('dblclick', () => {
 // FRAMEレイヤー UI
 document.getElementById('btn-frame-edit').addEventListener('click', () => {
   state.frameLayer.editMode = !state.frameLayer.editMode;
+  // EDIT ON時はMOVE(参照移動)を自動でOFF（描画と移動の競合回避）
+  if(state.frameLayer.editMode && state.refMoveMode){
+    state.refMoveMode = false;
+    if(typeof applyRefImgUI === 'function') applyRefImgUI();
+    drawCanvas.style.cursor = (state.tool==='fill')?'cell':'crosshair';
+  }
   // 編集ONで濃度が0だと描いても見えないので最低限まで上げる
   if(state.frameLayer.editMode && state.frameLayer.opacity <= 0){
     state.frameLayer.opacity = 0.4;
@@ -6226,8 +6352,8 @@ document.getElementById('frame-opacity').addEventListener('input', e => {
   applyFrameLayerStyle(); // 0で自動的に非表示、>0で表示
   scheduleSave();
 });
-document.getElementById('btn-frame-clear').addEventListener('click', () => {
-  if(!confirm('FRAMEレイヤーをクリアしますか？')) return;
+document.getElementById('btn-frame-clear').addEventListener('click', async () => {
+  if(!await modalConfirm('FRAMEレイヤーをクリアしますか？')) return;
   ensureFlBaseline(); // クリア前の状態をUndo用に確保
   clearFrameLayer();
   pushFrameLayerHistory();
@@ -6258,6 +6384,11 @@ function fileToDataURL(file){
 // 共通 MOVE トグル
 document.getElementById('btn-ref-move').addEventListener('click', () => {
   state.refMoveMode = !state.refMoveMode;
+  // MOVE ON時はFRAMEレイヤーのEDIT(直接描画)を自動でOFF（描画と移動の競合回避）
+  if(state.refMoveMode && state.frameLayer.editMode){
+    state.frameLayer.editMode = false;
+    applyFrameLayerStyle();
+  }
   applyRefImgUI();
   drawCanvas.style.cursor = state.refMoveMode ? 'move' : ((state.tool==='fill')?'cell':'crosshair');
 });
@@ -6591,7 +6722,7 @@ async function applyCanvasSizeFromInputs(rawW, rawH){
   if(cw===CFG.WORK_W && ch===CFG.WORK_H){ applyCanvasSizeUI(); return; }
   let msg = `作業キャンバスを ${cw}×${ch} に変更します。`;
   if(cw!==Math.round(rawW)||ch!==Math.round(rawH)) msg += `\n（上限により ${cw}×${ch} に調整）`;
-  msg += `\n既存の絵は中央フィットで保持し、Undo履歴はリセットされます。続行しますか？`;
+  msg += `\n既存の絵は等倍のまま中央で保持（カンバスサイズ変更：はみ出しは切り落とし）し、Undo履歴はリセットされます。続行しますか？`;
   const ok = await modalConfirm(msg);
   if(!ok){ applyCanvasSizeUI(); return; }
   setCanvasSize(cw, ch);
@@ -6774,6 +6905,7 @@ window.addEventListener('resize', () => {
   applyGuideUI();
   applyRefMaster();    // REF表示マスター（パネル連動）を反映
   applyRefImgUI();     // 参照画像UIを反映
+  updateInkSwatches(); // 下書/指示インクのカスタム色をボタンへ反映
 })();
 
 // ページ離脱前に強制保存
