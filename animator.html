@@ -4188,11 +4188,7 @@ function updateOnion(){
     if(state.frames[i].kind === 'draw' && !state.frames[i].hidden){ prevDraw = state.frames[i]; break; }
   }
   if(prevDraw){
-    const img = new ImageData(
-      tintImageData(prevDraw.drawData, 220, 60, 60),
-      CFG.WORK_W, CFG.WORK_H
-    );
-    onionPrevCtx.putImageData(img, 0, 0);
+    onionPrevCtx.putImageData(onionTint(prevDraw.drawData, 'prev'), 0, 0);
   }
   // 後: drawフレームのみを探す（非表示は飛ばす）
   onionNextCtx.clearRect(0,0,CFG.WORK_W,CFG.WORK_H);
@@ -4201,11 +4197,7 @@ function updateOnion(){
     if(state.frames[i].kind === 'draw' && !state.frames[i].hidden){ nextDraw = state.frames[i]; break; }
   }
   if(nextDraw){
-    const img = new ImageData(
-      tintImageData(nextDraw.drawData, 60, 120, 220),
-      CFG.WORK_W, CFG.WORK_H
-    );
-    onionNextCtx.putImageData(img, 0, 0);
+    onionNextCtx.putImageData(onionTint(nextDraw.drawData, 'next'), 0, 0);
   }
 }
 
@@ -4218,6 +4210,19 @@ function tintImageData(srcData, r, g, b){
     }
   }
   return out;
+}
+// ティント済みImageDataのキャッシュ。drawDataは編集のたびに新しい配列が割り当てられるため、
+// 配列自体をWeakMapのキーにすると内容変更で自動的にキャッシュが外れる（明示的な無効化不要）
+const gOnionTintCache = new WeakMap(); // drawData -> {prev?: ImageData, next?: ImageData}
+function onionTint(drawData, which){
+  let e = gOnionTintCache.get(drawData);
+  if(e && e[which]) return e[which];
+  const img = which === 'prev'
+    ? new ImageData(tintImageData(drawData, 220, 60, 60), CFG.WORK_W, CFG.WORK_H)
+    : new ImageData(tintImageData(drawData, 60, 120, 220), CFG.WORK_W, CFG.WORK_H);
+  if(!e){ e = {}; gOnionTintCache.set(drawData, e); }
+  e[which] = img;
+  return img;
 }
 
 // ============================================================
