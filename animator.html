@@ -2920,8 +2920,8 @@ function drawDotRadius(ctx, x, y, r, color){
     }
   }
 }
-// 半径を線形補間しながらブレゼンハムで結ぶ（筆圧ペン用）
-function drawLineRadius(ctx, x0, y0, x1, y1, r0, r1, color){
+// ブレゼンハム直線を1ピクセルずつ辿る共通歩行。visit(x, y, t) t=進行度0..1
+function bresenham(x0, y0, x1, y1, visit){
   const dx = Math.abs(x1 - x0);
   const dy = Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1;
@@ -2930,8 +2930,7 @@ function drawLineRadius(ctx, x0, y0, x1, y1, r0, r1, color){
   let err = dx - dy;
   let x = x0, y = y0, n = 0;
   while(true){
-    const t = n / steps;
-    drawDotRadius(ctx, x, y, r0 + (r1 - r0) * t, color);
+    visit(x, y, n / steps);
     if(x === x1 && y === y1) break;
     const e2 = 2 * err;
     if(e2 > -dy){ err -= dy; x += sx; }
@@ -2939,22 +2938,14 @@ function drawLineRadius(ctx, x0, y0, x1, y1, r0, r1, color){
     n++;
   }
 }
+// 半径を線形補間しながらブレゼンハムで結ぶ（筆圧ペン用）
+function drawLineRadius(ctx, x0, y0, x1, y1, r0, r1, color){
+  bresenham(x0, y0, x1, y1, (x, y, t) => drawDotRadius(ctx, x, y, r0 + (r1 - r0) * t, color));
+}
 
 // ブレゼンハム直線で2点間を補間
 function drawLine(ctx, x0, y0, x1, y1, size, color){
-  const dx = Math.abs(x1 - x0);
-  const dy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1;
-  const sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy;
-  let x = x0, y = y0;
-  while(true){
-    drawDot(ctx, x, y, size, color);
-    if(x === x1 && y === y1) break;
-    const e2 = 2 * err;
-    if(e2 > -dy){ err -= dy; x += sx; }
-    if(e2 <  dx){ err += dx; y += sy; }
-  }
+  bresenham(x0, y0, x1, y1, (x, y) => drawDot(ctx, x, y, size, color));
 }
 
 // ============================================================
@@ -2978,19 +2969,7 @@ function eraseDot(ctx, x, y, size){
   }
 }
 function eraseLine(ctx, x0, y0, x1, y1, size){
-  const dx = Math.abs(x1 - x0);
-  const dy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1;
-  const sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy;
-  let x = x0, y = y0;
-  while(true){
-    eraseDot(ctx, x, y, size);
-    if(x === x1 && y === y1) break;
-    const e2 = 2 * err;
-    if(e2 > -dy){ err -= dy; x += sx; }
-    if(e2 <  dx){ err += dx; y += sy; }
-  }
+  bresenham(x0, y0, x1, y1, (x, y) => eraseDot(ctx, x, y, size));
 }
 
 // ============================================================
@@ -3437,13 +3416,18 @@ function switchToFrame(idx){
   state.currentFrame = idx;
   const f = state.frames[idx];
   loadFrameToCanvas(f);
+  refreshFrameUI();
+  renderRefLayer();
+}
+
+// フレーム関連UIの一括更新（ストリップ・オニオン・統計・コマ位置・全体時間・時間トラック）
+function refreshFrameUI(){
   updateStripUI();
   updateOnion();
   updateStats();
   updateFramePos();
   updateDurInfo();
   updateTimeTrack();
-  renderRefLayer();
 }
 
 // フレーム追加（カレントの直後）
@@ -3521,12 +3505,7 @@ async function deleteCurrentFrame(){
   ensureWorkAreaValid();
   buildStrip();
   loadFrameToCanvas(curFrame());
-  updateStripUI();
-  updateOnion();
-  updateStats();
-  updateFramePos();
-  updateDurInfo();
-  updateTimeTrack();
+  refreshFrameUI();
   markMetaDirty();
   pushTimelineHistory(); // タイムライン操作記録
 }
@@ -6795,12 +6774,7 @@ window.addEventListener('resize', () => {
   // カレントフレームをキャンバスに反映
   buildStrip();
   loadFrameToCanvas(curFrame());
-  updateStripUI();
-  updateOnion();
-  updateStats();
-  updateFramePos();
-  updateDurInfo();
-  updateTimeTrack();
+  refreshFrameUI();
   // FRAMEレイヤー初期表示
   applyFrameLayerStyle();
   // ツールバー左右入れ替え復元
