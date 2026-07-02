@@ -1966,32 +1966,6 @@ function setRefOpacity(id, v){
   saveRefs();
 }
 
-async function openRefInAnimator(id){
-  const r = state.refAnimators.find(x => x.id === id);
-  if(!r) return;
-  const ok = await modalConfirm(`「${r.name}」のANIMATORを開きますか？\n（現在のプロジェクトは自動保存されています）`);
-  if(!ok) return;
-  try{
-    const pid = r.projectId || ('p_' + Date.now().toString(36));
-    const payload = {
-      format:'PROJECT_v1', projectId: pid,
-      exportedAt: new Date().toISOString(),
-      fps: r.source.fps || 24, durationUnit:'frames',
-      width: CFG.WORK_W, height: CFG.WORK_H,
-      bgBright: 100,
-      cellCount: r.source.cells.length,
-      cells: r.source.cells.map((c,i) => c.kind === 'empty'
-        ? { id:'c'+i, kind:'empty', duration:c.duration }
-        : { id:'c'+i, kind:'draw', duration:c.duration, hidden:!!c.hidden, image:c.image||null }),
-      composer: null,
-    };
-    await exPut(payload);
-    location.href = 'animator.html?id=' + encodeURIComponent(pid);
-  }catch(err){
-    modalAlert('ANIMATORを開けませんでした: ' + err.message);
-  }
-}
-
 // ref-layer に現在ティックの参照フレームを合成
 function renderRefLayer(tickOverride){
   if(!refLayerCtx) return;
@@ -2244,13 +2218,6 @@ function clearFrameSelection(){
   if(state.selectedFrameIds.size === 0) return;
   state.selectedFrameIds.clear();
   refreshSelectionUI();
-}
-function pruneSelection(){
-  // 削除されたフレームIDをセットから除去
-  const live = new Set(state.frames.map(f => f.id));
-  for(const id of Array.from(state.selectedFrameIds)){
-    if(!live.has(id)) state.selectedFrameIds.delete(id);
-  }
 }
 function refreshSelectionUI(){
   document.querySelectorAll('#frame-strip .fc, #frame-strip .fc-empty').forEach(el => {
@@ -2514,13 +2481,6 @@ function refObjSize(type, obj){
   if(!img) return null;
   return { img, w: img.naturalWidth * obj.scale, h: img.naturalHeight * obj.scale };
 }
-// 上(画像)→下(アニメ)の順で可動参照を列挙（ヒットテスト用：手前から）
-function refObjList(){
-  const arr = [];
-  for(let i = state.refImages.length - 1; i >= 0; i--){ const o = state.refImages[i]; if(o.img && o.visible) arr.push({type:'img', obj:o}); }
-  for(let i = state.refAnimators.length - 1; i >= 0; i--){ const r = state.refAnimators[i]; if(r.visible) arr.push({type:'anim', obj:r}); }
-  return arr;
-}
 // キャンバスのドラッグで掴めるのは「画像のみ」（アニメ/フレームはリスト等で選択してから移動）
 function hitTestImage(wx, wy){
   for(let i = state.refImages.length - 1; i >= 0; i--){
@@ -2573,8 +2533,6 @@ function renderRefImg(){
   }
   refImgCtx.globalAlpha = 1;
 }
-// 旧API互換（表示スタイルは renderRefImg 内で処理）
-function applyRefImgStyle(){ renderRefImg(); }
 // dataURL から参照画像を1枚追加（原寸・中央、わずかにカスケード）
 function loadRefImageFromSrc(src, opts){
   opts = opts || {};
@@ -3411,16 +3369,6 @@ function createBlankFrame(){
   };
 }
 
-// 新規空ブロック
-function createEmptyBlock(duration = 1){
-  return {
-    id: newFrameId(),
-    kind: 'empty',
-    duration,
-    dirty: true,
-  };
-}
-
 // drawCanvasの内容をフレームに同期（drawフレームのみ）
 function syncFrameFromCanvas(frame){
   if(!frame || frame.kind !== 'draw') return;
@@ -3622,15 +3570,6 @@ function frameStartTick(idx){
   let t = 0;
   for(let i = 0; i < idx && i < state.frames.length; i++) t += state.frames[i].duration;
   return t;
-}
-// あるticksに対応する frame index と そのフレーム内オフセットtick
-function tickToFrameIdx(tick){
-  let acc = 0;
-  for(let i = 0; i < state.frames.length; i++){
-    if(tick < acc + state.frames[i].duration) return { idx: i, offset: tick - acc };
-    acc += state.frames[i].duration;
-  }
-  return { idx: state.frames.length - 1, offset: 0 };
 }
 // タイムラインの総ピクセル幅
 function timelineTotalPx(){
@@ -4075,16 +4014,6 @@ function updateFramePos(){
 }
 
 // 全体時間と現在時間表示
-function fmtTimeMs(ms){
-  const sec = Math.floor(ms/1000);
-  const mm = String(Math.floor(sec/60)).padStart(2,'0');
-  const ss = String(sec%60).padStart(2,'0');
-  const cs = String(Math.floor((ms%1000)/10)).padStart(2,'0');
-  return `${mm}:${ss}.${cs}`;
-}
-function ticksToMs(ticks){
-  return Math.round(ticks / state.fps * 1000);
-}
 function updateDurInfo(){
   const total = totalTicks();
   const totalSec = (total / state.fps).toFixed(2);
@@ -4690,15 +4619,6 @@ function toggleToolbarSwap(){
   applyToolbarSwap();
   if(typeof markMetaDirty === 'function') markMetaDirty();
   scheduleSave();
-}
-
-// スポイトで取り込んだ色をパレットのスウォッチに反映
-function setPickedSwatch(hex){
-  const sw = document.getElementById('picked-swatch');
-  if(sw){ sw.style.background = hex; sw.title = 'スポイト取り込み色: ' + hex; }
-  document.querySelectorAll('.pal-cell').forEach(p => {
-    p.classList.toggle('on', (p.dataset.c || '').toUpperCase() === hex.toUpperCase());
-  });
 }
 
 // FILL PALETTE フローティング切替
