@@ -9,15 +9,24 @@ _新チャット冒頭にこのファイルを貼り付けてください_
 - 実ファイルは `animator.html`（リポジトリ直下）。`index.html` はランディング、`composer.html` は合成。
 - **master ブランチで直接作業・push**（worktree 運用は不要）。
 - 反映先 GitHub Pages: https://maso1737.github.io/animation-paint/
-- 変更後は必ず構文チェック:
+- 変更後は必ずチェック:
   ```
-  node -e "const fs=require('fs');const h=fs.readFileSync('animator.html','utf8');const m=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]).filter(s=>s.length>200).join('\n;\n');new Function(m);console.log('OK')"
+  node tools/check.js
   ```
+  （3ファイルの構文 / JS→HTML id配線 / id重複 / 未参照関数を一括検査。問題があれば exit 1）
+
+### 2026-07 リファクタ＆機能追加の要点
+- **共通化ヘルパー**（重複統合。既存挙動は不変）:
+  - animator: `bresenham()`（drawLine/drawLineRadius/eraseLine の共通歩行）/ `refreshFrameUI()`（strip/onion/stats/pos/dur/timetrack の6連更新）/ `fillCircleRows()`（円ドットを水平スパン塗り。πr²回→約2r回の呼び出し削減）
+  - composer: `bindPropInputs()`（kf-/fx- プロパティ入力配線）/ `makeFloatDrag()`（フローティングパネルのドラッグ）/ `exportZipPNG()`（ZIP書き出し骨格）
+- **描き味**: pointermove で `getCoalescedEvents()` 全点処理。筆圧カーブ `PRS` ウィジェット（LIN/SOFT/HARD、`animator_pcurve_v1`）
+- **PROJECTS 保存箱**: DB v4 で `snap_meta`/`snap_data` ストア追加。トップバー PROJ →一覧/保存/開く/複製/削除＋ストレージ残量表示。`buildProjectJSON()` を EXPORT JSON と共用
+- **オニオンスキン**: ティント結果を drawData 配列キーの WeakMap でキャッシュ（drawData は編集で新配列割当のため自動無効化）
+- **動画書き出し**: ANIMATOR `VIDEO` / COMPOSER `EXPORT VIDEO`。MediaRecorder + captureStream 実時間レンダリング（Safari=MP4/Chrome=WebM 自動選択）。SEQ PNG / 4K PNG SEQUENCE はキャンセル可能に
 
 ### 未着手・次チャット候補
 
 **すぐできる（小〜中）**
-- **手振れ補正の強化**：`state.smoothing` は4点移動平均で実装済み。pull/lazy-brush 方式への強化が良い。
 - **→ANM 代替動線**：別ANIMATORを安全に別ウィンドウで開く（→COMPOSERと同方式）。現状は IMPORT JSON で手動。
 
 **中規模フェーズ**
@@ -73,12 +82,13 @@ COMPOSERと BroadcastChannel でリアルタイム連携。
 ## 実装済み機能（最新）
 
 ### キャンバス・描画
-- ペン 1px / 2px / 20px、アンチエイリアスOFF
-- 筆圧ペン（PEN ダブルクリックで黄バッジ ON/OFF）
-- インクカラー 3色（主線黒・下書き水色・指示オレンジ）
+- ペン 1px / 2px / 20px、アンチエイリアスOFF（円ドットは `fillCircleRows()` の水平スパン塗りで高速）
+- 筆圧ペン（PEN ダブルクリック/ダブルタップで黄バッジ ON/OFF）＋ 筆圧カーブ `PRS`（LIN/SOFT/HARD）
+- Apple Pencil 高レート入力対応（`getCoalescedEvents()` 全点処理）
+- インクカラー 3色（主線黒・下書き水色・指示オレンジ。下書/指示はスポイトで色上書き可 `animator_ink_v1`）
 - 消しゴム（サイズ独立記憶）
 - 塗りつぶし（スキャンラインフラッドフィル。FILL ダブルクリックで透明消しゴムモード）
-- ストローク補正（4点移動平均 / `state.smoothing`）
+- ブラシ補正 STAB（OFF/AVG=指数移動平均/PULL=レイジーマウス、`animator_stab_v1`）
 - 背景明度縦スライダー
 - ピンチズーム＋パン / FLIP（表示反転） / MIRROR（左右対称・軸ドラッグ・ダブルクリックで垂直⇄水平）
 - **CANVAS SIZE 可変**：左上ラベルクリック→設定パネル。上限≒4K面積。既存の絵は中央フィット保持。
@@ -118,6 +128,19 @@ COMPOSERと BroadcastChannel でリアルタイム連携。
 - **KEYBOARD SHORTCUTS**：全アクションをキー再割当（localStorage `animator_keymap_v1`）。RESET DEFAULTS。
 - 下端ドラッグ＋段スナップで高さ調整（ビューポート超過しない）
 - REFパネル・パレット（フローティング時）も同様のリサイズグリップ
+
+### PROJECTS 保存箱（topbar PROJ ボタン）
+- 現在の作業を PROJECT_v1 JSON のスナップショットとして IndexedDB に保存（自動保存とは別枠）
+- 一覧（名前/日時/コマ数/解像度/サイズ）から 開く（確認あり・置換）/ 複製 / 削除
+- DB v4: `snap_meta`（一覧用軽量メタ）と `snap_data`（本体）の2ストア分離＝一覧表示が軽い
+- パネル下部に `navigator.storage.estimate()` のストレージ使用量表示（90%超で赤）
+
+### 書き出し
+- **EXPORT 4K**: 現在コマをPNG（Shift+クリックでBG透明）
+- **SEQ PNG**: 全コマをBG透過連番PNGでZIP（キャンセル可）
+- **VIDEO**: ワークエリアを動画書き出し。MediaRecorder + captureStream の実時間レンダリング
+  （Safari=MP4/H.264, Chrome=WebM を `pickVideoMime()` で自動選択。キャンセル可）
+- **EXPORT JSON**: PROJECT_v1（`buildProjectJSON()` はスナップショットと共用）
 
 ### タイムライン
 - `kind: 'draw' | 'empty'` の2種セル。duration 1〜120。末尾タップで追加。

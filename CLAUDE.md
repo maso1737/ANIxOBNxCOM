@@ -6,16 +6,17 @@
 - `animator.html` — メインの作画エディタ（実体。最重要）
 - `composer.html` — マルチトラック合成（カメラ/キーフレーム/書き出し）
 - `index.html` — ランディングページ
+- `tools/check.js` — 依存ゼロのスモークチェック（構文/配線/ID重複/デッドコード）
 - `ANIMATOR_HANDOVER.md` — 詳細な実装メモ／設計履歴（深掘りはこちら）
 
 GitHub: https://github.com/maso1737/animation-paint
 Pages: https://maso1737.github.io/animation-paint/
 
-## 変更後に必ず行う構文チェック
+## 変更後に必ず行うチェック
 ```
-node -e "const fs=require('fs');const h=fs.readFileSync('animator.html','utf8');const m=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]).filter(s=>s.length>200).join('\n;\n');new Function(m);console.log('OK')"
+node tools/check.js
 ```
-composer.html も同様（ファイル名を差し替え）。実機確認は Pages か `file://` で。
+3ファイルすべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。実機確認は Pages か `file://` で。
 
 ## デプロイ
 - `animator.html` / `composer.html` を直接編集 → 構文チェック → **明示依頼があったときのみ** master に commit & push。
