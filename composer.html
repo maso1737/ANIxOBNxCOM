@@ -209,6 +209,12 @@ input[type=number]{-moz-appearance:textfield;}
 #export-overlay .eprog{color:rgba(255,255,255,0.45);font-size:9px;letter-spacing:0.2em;}
 #export-bar-wrap{width:320px;height:2px;background:rgba(255,255,255,0.1);}
 #export-bar{height:100%;width:0%;background:var(--acid);transition:width 0.08s;}
+#export-cancel{
+  background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.6);
+  font-family:var(--mono);font-size:10px;letter-spacing:0.15em;
+  padding:7px 22px;cursor:pointer;border-radius:2px;margin-top:4px;
+}
+#export-cancel:hover{border-color:#ff5555;color:#ff5555;}
 
 #file-input{display:none;}
 
@@ -319,6 +325,7 @@ input[type=number]{-moz-appearance:textfield;}
       <button id="btn-import" class="primary" title="JSONを読み込み（既存トラックに追加。複数回で重ねられます）">IMPORT JSON</button>
       <button id="btn-export-project" disabled>EXPORT PROJECT</button>
       <button id="btn-export" disabled>EXPORT 4K PNG</button>
+      <button id="btn-export-video" disabled title="全体を動画で書き出し（Safari=MP4 / Chrome=WebM・実時間レンダリング）">EXPORT VIDEO</button>
       <button id="btn-load-audio" title="BGM/SE音声ファイルを読み込む">♪ AUDIO</button>
       <button id="btn-live" class="primary" title="ANIMATORの編集をライブ反映中（クリックでOFF）">LIVE ●</button>
       <button id="btn-settings" title="設定（ガイド/ショートカット）">⚙</button>
@@ -499,9 +506,10 @@ input[type=number]{-moz-appearance:textfield;}
 <div id="tl-marquee"></div>
 
 <div id="export-overlay">
-  <div class="emsg">EXPORTING 4K PNG SEQUENCE</div>
+  <div class="emsg" id="export-msg">EXPORTING 4K PNG SEQUENCE</div>
   <div id="export-bar-wrap"><div id="export-bar"></div></div>
   <div class="eprog" id="export-prog">0 / 0</div>
+  <button id="export-cancel">キャンセル</button>
 </div>
 
 <script>
@@ -1649,6 +1657,7 @@ function updateExportButtons(){
   const has=state.tracks.length>0&&state.totalFrames>0;
   $('#btn-export').disabled=!has;
   $('#btn-export-project').disabled=!has;
+  $('#btn-export-video').disabled=!has;
 }
 
 // ── PAYLOAD / EXPORT ──
@@ -1710,28 +1719,94 @@ function exportProject(){
 }
 
 // ── 4K EXPORT ──
+let gExportCancel=false;
+$('#export-cancel').addEventListener('click',()=>{gExportCancel=true;});
 // PNG連番→ZIP書き出しの共通処理。drawAt(ctx2d, frameIdx) で1コマ描画
 async function exportZipPNG(total, zipName, drawAt){
   pause();
+  gExportCancel=false;
+  $('#export-msg').textContent='EXPORTING 4K PNG SEQUENCE';
   const ov=$('#export-overlay'); ov.classList.add('show');
   const bar=$('#export-bar'), prog=$('#export-prog');
   const oc=document.createElement('canvas'); oc.width=OUT_W; oc.height=OUT_H;
   const oc2d=oc.getContext('2d'); oc2d.imageSmoothingEnabled=false;
   const zip=new JSZip(), folder=zip.folder('frames');
+  let canceled=false;
   for(let i=0;i<total;i++){
+    if(gExportCancel){canceled=true;break;}
     drawAt(oc2d,i);
     folder.file(`frame_${String(i+1).padStart(5,'0')}.png`,oc.toDataURL('image/png').split(',')[1],{base64:true});
     const pct=((i+1)/total*100).toFixed(1);
     bar.style.width=pct+'%'; prog.textContent=`${i+1} / ${total} — ${pct}%`;
     if(i%4===3) await new Promise(r=>setTimeout(r,0));
   }
-  prog.textContent='ZIPPING...';
-  const blob=await zip.generateAsync({type:'blob'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download=zipName; a.click();
-  URL.revokeObjectURL(url);
+  if(!canceled){
+    prog.textContent='ZIPPING...';
+    const blob=await zip.generateAsync({type:'blob'});
+    if(!gExportCancel){
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download=zipName; a.click();
+      URL.revokeObjectURL(url);
+    }
+  }
   ov.classList.remove('show'); bar.style.width='0%';
 }
+// ── 動画書き出し（MediaRecorder + captureStream・実時間レンダリング）──
+function pickVideoMime(){
+  if(typeof MediaRecorder==='undefined') return null;
+  const cands=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  for(const m of cands){ try{ if(MediaRecorder.isTypeSupported(m)) return m; }catch(e){} }
+  return null;
+}
+async function exportVideoComposer(){
+  if(!state.totalFrames) return;
+  const mime=pickVideoMime();
+  if(!mime){ alert('このブラウザは動画書き出し(MediaRecorder)に未対応です'); return; }
+  const total=state.totalFrames;
+  const secs=(total/state.fps).toFixed(1);
+  const ext=mime.includes('mp4')?'mp4':'webm';
+  if(!confirm(`全 ${total}コマ（約${secs}秒）を ${ext.toUpperCase()} で書き出します。\n実時間レンダリングのため約${secs}秒かかります。続行しますか？`)) return;
+  pause();
+  gExportCancel=false;
+  $('#export-msg').textContent='EXPORTING VIDEO ('+ext.toUpperCase()+')';
+  const ov=$('#export-overlay'); ov.classList.add('show');
+  const bar=$('#export-bar'), prog=$('#export-prog');
+  const oc=document.createElement('canvas'); oc.width=OUT_W; oc.height=OUT_H;
+  const c2d=oc.getContext('2d'); c2d.imageSmoothingEnabled=false;
+  const stream=oc.captureStream(state.fps);
+  let rec;
+  try{ rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:16000000}); }
+  catch(e){ ov.classList.remove('show'); alert('MediaRecorderの初期化に失敗: '+e.message); return; }
+  const chunks=[];
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  const recStopped=new Promise(res=>{rec.onstop=res;});
+  drawFrame(c2d,OUT_W,OUT_H,0);
+  rec.start(1000);
+  const t0=performance.now(), tickMs=1000/state.fps, totalMs=total*tickMs;
+  let canceled=false;
+  await new Promise(res=>{
+    const step=()=>{
+      if(gExportCancel){canceled=true;res();return;}
+      const elapsed=performance.now()-t0;
+      const i=Math.min(total-1,Math.floor(elapsed/tickMs));
+      drawFrame(c2d,OUT_W,OUT_H,i);
+      const pct=((i+1)/total*100).toFixed(1);
+      bar.style.width=pct+'%'; prog.textContent=`${i+1} / ${total} — ${pct}%`;
+      if(elapsed>=totalMs){res();return;}
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+  rec.stop();
+  await recStopped;
+  ov.classList.remove('show'); bar.style.width='0%';
+  if(canceled||chunks.length===0) return;
+  const blob=new Blob(chunks,{type:mime.split(';')[0]});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=`composer_video.${ext}`; a.click();
+  URL.revokeObjectURL(url);
+}
+$('#btn-export-video').addEventListener('click',exportVideoComposer);
 async function exportPNG(){
   if(!state.totalFrames) return;
   await exportZipPNG(state.totalFrames,'composer_4k.zip',(ctx,i)=>drawFrame(ctx,OUT_W,OUT_H,i));

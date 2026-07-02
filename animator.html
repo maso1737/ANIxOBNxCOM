@@ -440,6 +440,23 @@ html,body{
 .snap-btn:hover{border-color:var(--acid);color:var(--acid);}
 .snap-btn.danger:hover{border-color:#ff5555;color:#ff5555;}
 .snap-empty{font-size:9px;color:rgba(255,255,255,0.35);padding:12px 4px;text-align:center;letter-spacing:0.1em;}
+/* 書き出しオーバーレイ（進捗＋キャンセル） */
+#export-ov{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:200;
+  align-items:center;justify-content:center;flex-direction:column;gap:14px;
+  font-family:var(--mono);
+}
+#export-ov.show{display:flex;}
+#export-ov .eov-msg{color:var(--acid);font-size:11px;letter-spacing:0.3em;}
+#export-ov .eov-prog{color:rgba(255,255,255,0.45);font-size:9px;letter-spacing:0.2em;}
+#eov-track{width:280px;height:4px;background:rgba(255,255,255,0.12);}
+#eov-bar{width:0%;height:100%;background:var(--acid);transition:width 0.15s;}
+#eov-cancel{
+  background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.6);
+  font-family:var(--mono);font-size:10px;letter-spacing:0.15em;
+  padding:7px 22px;cursor:pointer;border-radius:2px;margin-top:6px;
+}
+#eov-cancel:hover{border-color:#ff5555;color:#ff5555;}
 .sc-hint{font-size:7px;color:rgba(255,255,255,0.35);letter-spacing:0.08em;margin-bottom:8px;line-height:1.5;}
 .sc-row{
   display:flex;align-items:center;gap:8px;
@@ -1274,6 +1291,7 @@ input[type=range]::-moz-range-thumb{
       <span class="sep">/</span>
       <button id="btn-export" title="クリック: 4K書き出し / Shift+クリック: BG透明で書き出し">EXPORT 4K</button>
       <button id="btn-export-seq" title="全コマを4K BG透過の連番PNGでZIP書き出し（AE合成用）">SEQ PNG</button>
+      <button id="btn-export-mov" title="ワークエリアを動画で書き出し（Safari=MP4 / Chrome=WebM・実時間レンダリング）">VIDEO</button>
       <button id="btn-export-json" title="全フレームをJSONで書き出し（COMPOSER連携用）">EXPORT JSON</button>
       <button id="btn-import-json" title="JSONファイルを読み込み（既存プロジェクトを置換）">IMPORT JSON</button>
       <input type="file" id="json-file-input" accept="application/json,.json" style="display:none;">
@@ -1604,6 +1622,14 @@ input[type=range]::-moz-range-thumb{
     <div id="snap-list"></div>
     <div id="snap-storage" class="sc-hint" style="margin-top:8px;margin-bottom:0;"></div>
   </div>
+</div>
+
+<!-- EXPORT OVERLAY（進捗＋キャンセル。SEQ PNG / VIDEO 共通） -->
+<div id="export-ov">
+  <div class="eov-msg" id="eov-msg">EXPORTING…</div>
+  <div id="eov-track"><div id="eov-bar"></div></div>
+  <div class="eov-prog" id="eov-prog"></div>
+  <button id="eov-cancel">キャンセル</button>
 </div>
 
 <!-- MODAL DIALOG -->
@@ -5486,6 +5512,21 @@ function exportPNG(opts){
   }, 'image/png');
 }
 
+// ── 書き出しオーバーレイ（進捗＋キャンセル。SEQ PNG / VIDEO 共通）──
+let gExportCancel = false;
+function showExportOv(msg){
+  gExportCancel = false;
+  document.getElementById('eov-msg').textContent = msg;
+  setExportOv(0, '');
+  document.getElementById('export-ov').classList.add('show');
+}
+function setExportOv(pct, text){
+  document.getElementById('eov-bar').style.width = (pct || 0) + '%';
+  document.getElementById('eov-prog').textContent = text || '';
+}
+function hideExportOv(){ document.getElementById('export-ov').classList.remove('show'); }
+document.getElementById('eov-cancel').addEventListener('click', () => { gExportCancel = true; });
+
 // 連番PNG（4K・BG透過）をZIP一括書き出し（AE等での合成前提）
 // 1ティック=1枚（保持コマは同一画像を複製、empty/hidden=完全透明）
 async function exportSequencePNG(){
@@ -5499,8 +5540,8 @@ async function exportSequencePNG(){
   if(!ok) return;
 
   const btn = document.getElementById('btn-export-seq');
-  const origLabel = btn.textContent;
   btn.disabled = true;
+  showExportOv('EXPORTING PNG SEQUENCE');
 
   // 作業解像度そのままで1枚ずつ生成
   const ex = document.createElement('canvas');
@@ -5510,9 +5551,10 @@ async function exportSequencePNG(){
 
   const zip = new JSZip();
   const folder = zip.folder('frames');
-  let tick = 0;
+  let tick = 0, canceled = false;
   try{
     for(let i = 0; i < state.frames.length; i++){
+      if(gExportCancel){ canceled = true; break; }
       const f = state.frames[i];
       const dur = Math.max(1, f.duration | 0);
       // このセルの1枚を生成（draw かつ非hidden のときのみ絵を描く）
@@ -5525,26 +5567,122 @@ async function exportSequencePNG(){
         tick++;
         folder.file(`frame_${String(tick).padStart(5,'0')}.png`, dataURL, { base64: true });
       }
-      btn.textContent = `${Math.round(tick / total * 100)}%`;
+      setExportOv(tick / total * 100, `${tick} / ${total}`);
       await new Promise(r => setTimeout(r, 0));
     }
-    btn.textContent = 'ZIP...';
-    const blob = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    a.href = url;
-    a.download = `sequence_${ts}_${W}x${H}_alpha.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if(!canceled){
+      setExportOv(100, 'ZIPPING…');
+      const blob = await zip.generateAsync({ type: 'blob' });
+      if(!gExportCancel){
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+        a.href = url;
+        a.download = `sequence_${ts}_${W}x${H}_alpha.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    }
   }catch(err){
     await modalAlert('書き出しに失敗しました: ' + (err.message || err));
   }finally{
     btn.disabled = false;
-    btn.textContent = origLabel;
+    hideExportOv();
   }
 }
 document.getElementById('btn-export-seq').addEventListener('click', exportSequencePNG);
+
+// ── 動画書き出し（MediaRecorder + captureStream・実時間レンダリング）──
+function pickVideoMime(){
+  if(typeof MediaRecorder === 'undefined') return null;
+  const cands = [
+    'video/mp4;codecs=avc1', 'video/mp4',
+    'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm',
+  ];
+  for(const m of cands){
+    try{ if(MediaRecorder.isTypeSupported(m)) return m; }catch(e){}
+  }
+  return null;
+}
+async function exportVideo(){
+  const cur = curFrame();
+  if(cur) syncFrameFromCanvas(cur);
+  ensureWorkAreaValid();
+  const total = totalTicks();
+  if(total <= 0){ await modalAlert('書き出すコマがありません'); return; }
+  const mime = pickVideoMime();
+  if(!mime){ await modalAlert('このブラウザは動画書き出し(MediaRecorder)に未対応です'); return; }
+  const start = state.workStart;
+  const end = state.workEnd > start ? state.workEnd : total;
+  // tick→セルの列（ワークエリア範囲）
+  const seq = [];
+  for(const f of state.frames) for(let d = 0; d < Math.max(1, f.duration | 0); d++) seq.push(f);
+  const frames = seq.slice(start, Math.min(end, seq.length));
+  if(frames.length === 0){ await modalAlert('書き出す範囲がありません'); return; }
+  const secs = (frames.length / state.fps).toFixed(1);
+  const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+  const ok = await modalConfirm(`ワークエリア ${frames.length}コマ（約${secs}秒）を ${ext.toUpperCase()} で書き出します。\n実時間レンダリングのため約${secs}秒かかります。続行しますか？`);
+  if(!ok) return;
+  stop(); // 再生中なら停止
+
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  const ex = document.createElement('canvas'); ex.width = W; ex.height = H;
+  const exCtx = ex.getContext('2d'); exCtx.imageSmoothingEnabled = false;
+  const cellCv = document.createElement('canvas'); cellCv.width = W; cellCv.height = H;
+  const cellCtx = cellCv.getContext('2d');
+  let cellOf = null; // cellCv に描かれているフレーム
+  const drawTick = (f) => {
+    exCtx.drawImage(bgCanvas, 0, 0, W, H); // 背景（bgBright反映）
+    if(f && f.kind === 'draw' && !f.hidden && f.drawData){
+      if(cellOf !== f){
+        cellCtx.putImageData(new ImageData(new Uint8ClampedArray(f.drawData), W, H), 0, 0);
+        cellOf = f;
+      }
+      exCtx.drawImage(cellCv, 0, 0);
+    }
+  };
+
+  const stream = ex.captureStream(state.fps);
+  let rec;
+  try{ rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12000000 }); }
+  catch(e){ await modalAlert('MediaRecorderの初期化に失敗しました: ' + e.message); return; }
+  const chunks = [];
+  rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+  const recStopped = new Promise(res => { rec.onstop = res; });
+
+  showExportOv('EXPORTING VIDEO (' + ext.toUpperCase() + ')');
+  drawTick(frames[0]);
+  rec.start(1000);
+  const t0 = performance.now();
+  const tickMs = 1000 / state.fps;
+  const totalMs = frames.length * tickMs;
+  let canceled = false;
+  await new Promise(res => {
+    const step = () => {
+      if(gExportCancel){ canceled = true; res(); return; }
+      const elapsed = performance.now() - t0;
+      const i = Math.min(frames.length - 1, Math.floor(elapsed / tickMs));
+      drawTick(frames[i]); // 同一コマでも再描画してストリームに確実に流す
+      setExportOv((i + 1) / frames.length * 100, `${i + 1} / ${frames.length}`);
+      if(elapsed >= totalMs){ res(); return; }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+  rec.stop();
+  await recStopped;
+  hideExportOv();
+  if(canceled || chunks.length === 0) return;
+  const blob = new Blob(chunks, { type: mime.split(';')[0] });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  a.href = url;
+  a.download = `video_${ts}_${W}x${H}.${ext}`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+document.getElementById('btn-export-mov').addEventListener('click', exportVideo);
 
 // ============================================================
 // INDEXED DB (自動保存・複数フレーム対応)
