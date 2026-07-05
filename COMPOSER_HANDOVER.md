@@ -1,4 +1,12 @@
-COMPOSER v0.6（単一HTML）の続き開発用ハンドオフ。
+COMPOSER v0.7（単一HTML）の続き開発用ハンドオフ。
+
+【v0.7 MOTION COMIC — 詳細は MOTION_COMIC_SPEC.md】
+- track.type: 'anim'|'image'|'camera'、track.tid（恒久ID）、track.parent（親のtid）
+- 画像インポート: PNG/JPEG/WebP→cells1枚の擬似JSON（IMAGE_v1）→importJSON。importFiles()でJSON/画像/audio混在D&D
+- CAMERA: 普通のトラック（frames空）として実装＝KF系UIを全部流用。1つまで(dedupeCameras)。projectId=null。◉=カメラON/OFF
+  X/Y=パン(レイヤーZでパララックス) Z=ドリー ROT/SCL=全体ラップ(applyCamWrap)。カメラなし時は従来式と完全一致（後方互換）
+- 親子: applyTrackChain再帰でctx変換合成。子のZ無効/OP非継承/循環はUI除外+深度8上限。親付き子はハンドル非表示
+- バグ修正: PROJECT_v2再IMPORTでKF全損（トラック要素にformatが無く復元条件が偽）→ composerセクション有無だけで判定に変更。per-track width/heightも保存するよう修正
 
 【概要】
 ANIMATORの作画コマを複数トラックで重ね、トランスフォーム/キーフレームでカメラワーク・タイミングを付け、4K連番PNGで書き出す合成ツール。tDRスタイル（--acid:#36FF00 / --neon:#F9FF47 / モノスペース / 黒基調）。
