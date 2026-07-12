@@ -8,7 +8,12 @@
 const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
-const FILES = ['animator.html', 'composer.html', 'index.html'];
+const FILES = ['animator.html', 'oban-builder.html', 'composer.html', 'index.html'];
+
+// type属性を持たない <script> だけを対象にする（id付きJSは拾い、
+// type="application/json" 等のデータブロック＝EXPORT WEBのビューアテンプレ等は除外）。
+// matchAll と replace で別インスタンスが要るため都度生成する。
+const scriptRe = () => /<script(?![^>]*\btype\s*=)[^>]*>([\s\S]*?)<\/script>/g;
 
 // JS内で動的に生成される等、実在チェックから除外するidプレフィックス
 const ID_IGNORE = [
@@ -22,7 +27,7 @@ const ok = msg => console.log('  ✓ ' + msg);
 for(const file of FILES){
   console.log('== ' + file + ' ==');
   const html = fs.readFileSync(path.join(root, file), 'utf8');
-  const jsBlocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).filter(s => s.length > 200);
+  const jsBlocks = [...html.matchAll(scriptRe())].map(m => m[1]).filter(s => s.length > 200);
   const js = jsBlocks.join('\n;\n');
 
   // 1) 構文
@@ -32,8 +37,11 @@ for(const file of FILES){
   if(!js) { console.log(); continue; }
 
   // HTML部（scriptの中身を除いたもの）から id を収集
-  const htmlOnly = html.replace(/<script>[\s\S]*?<\/script>/g, '');
+  const htmlOnly = html.replace(scriptRe(), '');
   const htmlIds = new Set([...htmlOnly.matchAll(/\bid\s*=\s*"([^"]+)"/g)].map(m => m[1]));
+  // <script> タグ自身のid（例: id="satsuei-core"）も実在idとして登録
+  //（JS本文除去でタグごと消えるが、自分自身をidで参照するのは正当なため）
+  for(const m of html.matchAll(/<script[^>]*\bid\s*=\s*["']([^"']+)["']/g)) htmlIds.add(m[1]);
 
   // 2) 配線: getElementById('x') / $('#x') / querySelector('#x')
   const refs = new Set();

@@ -30,7 +30,7 @@ Pages: https://maso1737.github.io/animation-paint/
 ```
 node tools/check.js
 ```
-3ファイルすべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。実機確認は Pages か `file://` で。
+4ファイル（animator / oban-builder / composer / index）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※type属性の無い `<script>` のみJS扱い（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。
 
 ## デプロイ
 - `animator.html` / `composer.html` を直接編集 → 構文チェック → **明示依頼があったときのみ** master に commit & push。
