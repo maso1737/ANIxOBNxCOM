@@ -14,6 +14,7 @@
 | **oban-viewer.html** | 同フォルダの画像ファイル | （最終出力・スクロールLP） | rt実行時（`?fx=0`でOFF） |
 | **EXPORT WEBビューア** | （画像は埋め込み済み） | （最終出力・スクロールLP） | P2b(任意)でrt |
 | **AE** | 4K連番PNG | 完成動画 | AE側（fx OFFで持ち込む） |
+| **VERIFY_HARNESS** | 検証対象HTML（`window.__HARNESS__`契約実装） / baseline PNG / API録画fixtures | 統合結果JSON(summary.json) / diff PNG / baseline PNG | 検証専用（fx対象外） |
 
 ## 共通フォーマット
 
@@ -33,3 +34,4 @@
 
 - `satsuei-fx-kit` — 撮影処理チェーンの移植（正準コア＋レシピ）
 - `composer-timeline-kit` / `camera-rig-orbit-capture` / `object-rig-gizmo-capture` / `vj-audio-export-kit`
+- `single-html-verify` — 決定論VRT＋パフォーマンスバジェット＋APIモック検証（正準 `VERIFY_HARNESS/`）

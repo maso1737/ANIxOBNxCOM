@@ -1,0 +1,11 @@
+# ローカル設定
+.claude/
+
+# アーカイブ（旧プロジェクト退避・巨大）
+_済/
+
+# デザインキャンバス（Claude Design 作業スクラッチ。ツール本体へ焼き込んだら不要）
+# フォント/comps/uploads で肥大するためリポジトリには含めない
+oban-builder_Design/
+*_Design/
+Design_*/
