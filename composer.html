@@ -251,6 +251,8 @@ input[type=number]{-moz-appearance:textfield;}
 #sfx-body::-webkit-scrollbar{width:4px;}
 #sfx-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,0.3);}
 .sfx-master{display:flex;align-items:center;gap:8px;color:var(--acid);font-size:10px;letter-spacing:0.2em;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);cursor:pointer;user-select:none;}
+.sfx-master.sfx-final{color:rgba(90,233,255,0.85);font-size:9px;letter-spacing:0.14em;}
+.sfx-master.sfx-final input{accent-color:#5AE9FF;}
 .sfx-master input,.sfx-ent-head input{accent-color:var(--acid);}
 .sfx-ent{border:1px solid rgba(255,255,255,0.08);padding:6px 8px;}
 .sfx-ent.off .sfx-rows{display:none;}
@@ -2098,7 +2100,9 @@ function drawOneTrack(tCtx, tw, th, frameIdx, track, hasSolo, cam){
   if(track.type==='camera') return; // カメラ自体は描画しない
   if(!track.visible||!track.frames.length) return;
   if(soloed && !track.solo) return;
-  const fi=Math.min(frameIdx,track.totalFrames-1);
+  // SPEC_06 §6.1: セル参照のみfloor（MB finalのサブフレーム対応）。カメラ/KFへは小数のまま渡す
+  // ＝トランスフォームだけサブフレーム補間され、作画のコマは踏み替えない（アニメ撮として正しい挙動）
+  const fi=Math.max(0,Math.min(Math.floor(frameIdx),track.totalFrames-1));
   const f=track.frames[fi];
   if(!f||f.kind!=='draw'||f.hidden||!f.image||!f.image.complete) return;
   const sx=tw/state.width, sy=th/state.height; // コンポ座標→出力座標
@@ -2110,7 +2114,17 @@ function drawOneTrack(tCtx, tw, th, frameIdx, track, hasSolo, cam){
   const tr=applyTrackChain(tCtx,tw,th,frameIdx,track,sx,sy,cam,0);
   if(!tr){ tCtx.restore(); return; }
   tCtx.globalAlpha=Math.max(0,Math.min(1,tr.op));
+  // SPEC_06 §6.3: DOF（layer型）— final書き出し時のみ・root層のみ（子は親の深度平面に乗る）
+  // ctx.filterは高コストなのでプレビュー(draft)/VIDEO(rt)では掛けない
+  if(gFxTier==='final' && state.fx.enabled && !track.parent){
+    const dofE=state.fx.chain.find(e=>e.t==='dof'&&e.on);
+    if(dofE){
+      const r=SatsueiFX.dofBlurPx(tr.z||0,dofE.p);
+      if(r>0.3) tCtx.filter='blur('+(r*(tw/state.width)).toFixed(1)+'px)'; // 出力解像度スケール
+    }
+  }
   tCtx.drawImage(f.image,-drawW/2-tr.ax*sx,-drawH/2-tr.ay*sy,drawW,drawH);
+  tCtx.filter='none';
   tCtx.restore();
 }
 function drawFrame(tCtx, tw, th, frameIdx){
@@ -2126,12 +2140,33 @@ function drawFrame(tCtx, tw, th, frameIdx){
 function drawCurrentFrame(){
   if(!state.width) return;
   if(gFxPreview&&state.fx&&state.fx.enabled&&ensureFx().available){
-    // draft品質: velを渡さない＝mb素通し / DOFなし（SPEC_06 §1）
+    // 通常=draft品質（velを渡さない＝mb素通し/DOFなし）。FINAL PREVIEW ON かつ停止中は
+    // final品質（MBサブフレーム蓄積＋DOF layer）で現在フレームを確認できる（再生中は自動draft）
     if(!gFxSrc) gFxSrc=document.createElement('canvas');
     if(gFxSrc.width!==state.width||gFxSrc.height!==state.height){ gFxSrc.width=state.width; gFxSrc.height=state.height; }
     const s2d=gFxSrc.getContext('2d'); s2d.imageSmoothingEnabled=false;
-    drawFrame(s2d,state.width,state.height,state.currentFrame);
-    const out=gFx.apply(gFxSrc,state.fx,{t:state.currentFrame/state.fps});
+    const finalPrev=gFxFinalPrev&&!state.isPlaying;
+    let srcC=gFxSrc;
+    if(finalPrev) gFxTier='final'; // drawFrame内のDOF layerフックを有効化
+    try{
+      const mb=finalPrev?state.fx.chain.find(e=>e.t==='mb'&&e.on):null;
+      const win=mb?(mb.p.shutter==null?180:mb.p.shutter)/360:0;
+      if(mb&&win>0){
+        if(!gFxPrevAcc){ gFxPrevAcc=document.createElement('canvas'); gFxPrevAcc2d=gFxPrevAcc.getContext('2d'); }
+        if(gFxPrevAcc.width!==state.width||gFxPrevAcc.height!==state.height){ gFxPrevAcc.width=state.width; gFxPrevAcc.height=state.height; }
+        const N=Math.max(2,Math.round(mb.p.samples)||8);
+        for(let k=0;k<N;k++){
+          drawFrame(s2d,state.width,state.height,Math.max(0,state.currentFrame-win/2+win*(k+0.5)/N));
+          gFxPrevAcc2d.globalAlpha=1/(k+1); // 逐次平均
+          gFxPrevAcc2d.drawImage(gFxSrc,0,0);
+        }
+        gFxPrevAcc2d.globalAlpha=1;
+        srcC=gFxPrevAcc;
+      } else {
+        drawFrame(s2d,state.width,state.height,state.currentFrame);
+      }
+    } finally { if(finalPrev) gFxTier='draft'; }
+    const out=gFx.apply(srcC,state.fx,{t:state.currentFrame/state.fps}); // velなし＝rt mb不発
     ctx.clearRect(0,0,state.width,state.height);
     ctx.drawImage(out,0,0,state.width,state.height);
   } else {
@@ -2196,6 +2231,7 @@ function play(){
 function pause(){
   state.isPlaying=false; stopAudioSync();
   $('#btn-play').textContent='▶';
+  if(gFxPreview&&gFxFinalPrev) drawCurrentFrame(); // 停止した瞬間にFINAL PREVIEWへ切替
 }
 function togglePlay(){state.isPlaying?pause():play();}
 function seek(f){state.currentFrame=Math.max(0,Math.min(state.totalFrames-1,f));drawCurrentFrame();}
@@ -2420,13 +2456,22 @@ async function exportVideoComposer(){
 $('#btn-export-video').addEventListener('click',exportVideoComposer);
 async function exportPNG(){
   if(!state.totalFrames) return;
-  await exportZipPNG(state.totalFrames,'composer_4k.zip',(ctx,i)=>fxRenderExport(ctx,i));
+  gFxTier='final'; // SPEC_06 §6: PNG連番=final（MB蓄積＋DOF layer）。VIDEOはrtのまま
+  try{ await exportZipPNG(state.totalFrames,'composer_4k.zip',(ctx,i)=>fxRenderFinal(ctx,i)); }
+  finally{ gFxTier='draft'; }
 }
 
 // ── SATSUEI FX（撮影処理・SPEC_06 P0）──
 // enabled:false は fx.apply を呼ばない経路（従来出力とピクセル一致＝後方互換の要）
 let gFx=null, gFxSrc=null, gFxPreview=false, gFxExp=null, gFxExp2d=null;
+let gFxTier='draft', gFxAcc=null, gFxAcc2d=null; // tier: draft(プレビュー)/rt(VIDEO)/final(PNG連番)。accはMB蓄積用
+let gFxFinalPrev=false, gFxPrevAcc=null, gFxPrevAcc2d=null; // FINAL PREVIEW: 停止中のみMB+DOFをコンポ解像度で確認
 function ensureFx(){ if(!gFx) gFx=SatsueiFX.createSatsueiFX(); return gFx; }
+function ensureFxExp(){
+  if(gFxExp) return;
+  gFxExp=document.createElement('canvas'); gFxExp.width=OUT_W; gFxExp.height=OUT_H;
+  gFxExp2d=gFxExp.getContext('2d'); gFxExp2d.imageSmoothingEnabled=false;
+}
 // 保存JSONの fx を既定チェーンにマージ（欠損補完・未知tは持ち回り＝apply側がスキップ）
 function normalizeFx(saved){
   const def=SatsueiFX.makeDefaultFx();
@@ -2444,15 +2489,40 @@ function normalizeFx(saved){
 // 書き出し1コマ描画（tier=rt: カメラ速度→方向ブラー近似）。FX無効なら従来経路のまま
 function fxRenderExport(dst2d,i){
   if(!(state.fx&&state.fx.enabled&&ensureFx().available)){ drawFrame(dst2d,OUT_W,OUT_H,i); return; }
-  if(!gFxExp){
-    gFxExp=document.createElement('canvas'); gFxExp.width=OUT_W; gFxExp.height=OUT_H;
-    gFxExp2d=gFxExp.getContext('2d'); gFxExp2d.imageSmoothingEnabled=false;
-  }
+  ensureFxExp();
   drawFrame(gFxExp2d,OUT_W,OUT_H,i);
   const c0=getCamAt(Math.max(0,i-1)), c1=getCamAt(i);
   const out=gFx.apply(gFxExp,state.fx,{ t:i/state.fps,
     velX:(c1&&c0)?(c1.x-c0.x)/state.width:0,   // コンポpx → uv/フレーム
     velY:(c1&&c0)?(c1.y-c0.y)/state.height:0 });
+  dst2d.drawImage(out,0,0,OUT_W,OUT_H);
+}
+// tier=final（EXPORT PNG連番・SPEC_06 §6.2）: MB=シャッター角準拠のサブフレーム蓄積 →
+// frame型fx（velを渡さない＝rt近似mbは不発）。DOFは drawOneTrack 側のlayerフック（gFxTier経由）
+function fxRenderFinal(dst2d,i){
+  if(!(state.fx&&state.fx.enabled&&ensureFx().available)){ drawFrame(dst2d,OUT_W,OUT_H,i); return; }
+  ensureFxExp();
+  const mb=state.fx.chain.find(e=>e.t==='mb'&&e.on);
+  const win=mb?(mb.p.shutter==null?180:mb.p.shutter)/360:0;   // シャッター角→フレーム窓
+  let src=gFxExp;
+  if(mb&&win>0){
+    const N=Math.max(2,Math.round(mb.p.samples)||8);
+    if(!gFxAcc){
+      gFxAcc=document.createElement('canvas'); gFxAcc.width=OUT_W; gFxAcc.height=OUT_H;
+      gFxAcc2d=gFxAcc.getContext('2d'); gFxAcc2d.imageSmoothingEnabled=false;
+    }
+    for(let k=0;k<N;k++){
+      const sub=i-win/2+win*(k+0.5)/N;              // iを中心に前後へ開く
+      drawFrame(gFxExp2d,OUT_W,OUT_H,Math.max(0,sub));
+      gFxAcc2d.globalAlpha=1/(k+1);                 // 逐次平均（k=0は全面上書き）
+      gFxAcc2d.drawImage(gFxExp,0,0);
+    }
+    gFxAcc2d.globalAlpha=1;
+    src=gFxAcc;
+  } else {
+    drawFrame(gFxExp2d,OUT_W,OUT_H,i);
+  }
+  const out=gFx.apply(src,state.fx,{t:i/state.fps});
   dst2d.drawImage(out,0,0,OUT_W,OUT_H);
 }
 // FXモーダル: FX_DEFS の ui/colors 配列から自動生成（エフェクト追加でUI改修ゼロ）
@@ -2463,6 +2533,11 @@ function buildSfxUI(){
   master.innerHTML='<input type="checkbox"'+(fx.enabled?' checked':'')+'><span>SATSUEI FX ENABLED</span>';
   master.querySelector('input').addEventListener('change',e=>{fx.enabled=e.target.checked;sfxChanged();});
   root.appendChild(master);
+  const fin=document.createElement('label'); fin.className='sfx-master sfx-final';
+  fin.title='停止中の現在フレームをfinal品質（MBサブフレーム蓄積＋DOF）で表示。再生中は自動でdraftに戻ります';
+  fin.innerHTML='<input type="checkbox"'+(gFxFinalPrev?' checked':'')+'><span>FINAL PREVIEW（MB+DOF・停止中のみ）</span>';
+  fin.querySelector('input').addEventListener('change',e=>{gFxFinalPrev=e.target.checked;sfxChanged();});
+  root.appendChild(fin);
   for(const ent of fx.chain){
     const def=SatsueiFX.FX_DEFS[ent.t]; if(!def) continue; // 未知tはUIにも出さない
     const box=document.createElement('div'); box.className='sfx-ent'+(ent.on?'':' off');
