@@ -239,6 +239,28 @@ input[type=number]{-moz-appearance:textfield;}
 #webx-go{border-color:rgba(255,79,168,0.5) !important;color:var(--acid) !important;}
 .webx-row.disabled label{color:rgba(255,255,255,0.22);}
 
+/* SATSUEI FX MODAL (SPEC_06) — 既存 #fx-hud(トランスフォーム)とは別物なので sfx- プレフィックス */
+#sfx-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:110;align-items:center;justify-content:center;}
+#sfx-modal.show{display:flex;}
+#sfx-panel{background:#0a0a0c;border:1px solid rgba(255,79,168,0.45);width:410px;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.7);}
+#sfx-head{padding:8px 14px;border-bottom:1px solid rgba(255,79,168,0.18);color:var(--acid);font-size:9px;letter-spacing:0.32em;background:linear-gradient(90deg,rgba(255,79,168,0.08),transparent);display:flex;justify-content:space-between;align-items:center;}
+#sfx-close{cursor:pointer;color:rgba(255,255,255,0.4);font-size:12px;line-height:1;padding:0 2px;}
+#sfx-close:hover{color:var(--acid);}
+#sfx-body{padding:10px 14px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;font-family:var(--mono);}
+#sfx-body::-webkit-scrollbar{width:4px;}
+#sfx-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,0.3);}
+.sfx-master{display:flex;align-items:center;gap:8px;color:var(--acid);font-size:10px;letter-spacing:0.2em;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);cursor:pointer;user-select:none;}
+.sfx-master input,.sfx-ent-head input{accent-color:var(--acid);}
+.sfx-ent{border:1px solid rgba(255,255,255,0.08);padding:6px 8px;}
+.sfx-ent.off .sfx-rows{display:none;}
+.sfx-ent-head{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,0.75);font-size:9px;letter-spacing:0.12em;cursor:pointer;user-select:none;}
+.sfx-tier{margin-left:auto;color:rgba(255,255,255,0.25);font-size:8px;letter-spacing:0.1em;}
+.sfx-row{display:flex;align-items:center;gap:6px;padding:2px 0;}
+.sfx-row .k{color:rgba(255,255,255,0.4);font-size:8px;letter-spacing:0.08em;width:100px;flex-shrink:0;}
+.sfx-row input[type=range]{flex:1;accent-color:var(--acid);height:14px;min-width:0;}
+.sfx-row .v{color:var(--white);font-size:9px;width:46px;text-align:right;font-variant-numeric:tabular-nums;}
+.sfx-row input[type=color]{width:44px;height:18px;border:1px solid var(--border);background:transparent;padding:0;cursor:pointer;}
+
 #file-input{display:none;}
 
 /* FX HUD */
@@ -356,6 +378,8 @@ input[type=number]{-moz-appearance:textfield;}
       <button id="btn-camera" title="カメラトラックを追加（1つまで）。X/Y=パン, Z=ドリー(パララックス), ROT=回転, SCL=ズーム">+ CAMERA</button>
       <button id="btn-export-project" disabled>EXPORT PROJECT</button>
       <button id="btn-export" disabled>EXPORT 4K PNG</button>
+      <button id="btn-fx" title="撮影処理（SATSUEI FX）チェーンを編集">FX</button>
+      <button id="btn-fx-preview" title="プレビューに撮影処理を適用（draft品質: MB/DOFなし）">FX PREVIEW</button>
       <button id="btn-export-video" disabled title="全体を動画で書き出し（Safari=MP4 / Chrome=WebM・実時間レンダリング）">EXPORT VIDEO</button>
       <button id="btn-export-web" disabled title="スクロール駆動のモーションコミックHTMLを書き出し（単一ファイル・依存ゼロ）">EXPORT WEB</button>
       <button id="btn-load-audio" title="BGM/SE音声ファイルを読み込む">♪ AUDIO</button>
@@ -570,12 +594,363 @@ input[type=number]{-moz-appearance:textfield;}
   </div>
 </div>
 
+<div id="sfx-modal">
+  <div id="sfx-panel">
+    <div id="sfx-head"><span>SATSUEI FX — 撮影処理チェーン</span><span id="sfx-close" title="閉じる (Esc)">✕</span></div>
+    <div id="sfx-body"></div>
+  </div>
+</div>
+
 <div id="export-overlay">
   <div class="emsg" id="export-msg">EXPORTING 4K PNG SEQUENCE</div>
   <div id="export-bar-wrap"><div id="export-bar"></div></div>
   <div class="eprog" id="export-prog">0 / 0</div>
   <button id="export-cancel">キャンセル</button>
 </div>
+
+<script id="satsuei-core">
+/* ===== SATSUEI FX CORE (satsuei-fx-kit) ===== */
+/* ============================================================
+ * SATSUEI FX CORE — 撮影処理キット 正準参照実装 (v1)
+ * ------------------------------------------------------------
+ * 単一HTMLに <script> としてそのまま複製して使う（共有ライブラリ化しない方針）。
+ * 依存ゼロ / WebGL1（ほぼ全ブラウザ対応）/ WebGL不可なら available=false で素通し。
+ *
+ * 使い方（ホスト側の最小コード）:
+ *   const fx = createSatsueiFX();
+ *   // 毎フレーム or 書き出しループ内:
+ *   //   src = 合成済みの 2D canvas（シーン全体）
+ *   //   info = {t:秒, velX, velY} ← rtモーションブラー用（uv/フレーム単位・省略可）
+ *   const out = fx.available ? fx.apply(srcCanvas, fxParams, info) : srcCanvas;
+ *   ctx.drawImage(out, 0, 0, w, h);   // 表示 or 書き出し先へ
+ *
+ * fxParams のスキーマ（SPEC_06_SATSUEI_KIT.md §2 が正）:
+ *   { version:1, enabled:true, chain:[ {t:'diffusion', on:true, p:{...}}, ... ] }
+ *   chain の順序 = パス実行順。未知の t は警告してスキップ（前方互換）。
+ *
+ * エフェクトは3型（SPEC §3）:
+ *   frame    … フルフレームGPUパス。本ファイルの FX_DEFS に登録（追加が一番簡単）
+ *   layer    … 合成前にレイヤー単位で処理（DOF）。ホスト側 drawOneTrack 等で
+ *              dofBlurPx() を使って ctx.filter='blur(Npx)' を掛ける
+ *   temporal … 時間軸サンプリング（final モーションブラー）。ホストの書き出し
+ *              ループでサブフレーム蓄積（本ファイルは関与しない。SPEC §6.2）
+ * ============================================================ */
+'use strict';
+
+/* ---------- 既定パラメータ（新規プロジェクトの初期値） ---------- */
+function makeDefaultFx(){
+  return {
+    version: 1,
+    enabled: false,
+    chain: [
+      { t:'mb',        on:false, p:{ shutter:180, samples:8, rtStrength:1.0 } },
+      { t:'dof',       on:false, p:{ focusZ:0, range:400, maxBlur:12 } },
+      { t:'diffusion', on:true,  p:{ threshold:0.55, radius:1.0, gain:0.8, mode:0 } },
+      { t:'para',      on:false, p:{ angle:120, c1:'#ffc890', a1:0.30, c2:'#281866', a2:0.25, mid:0.5, soft:0.45 } },
+      { t:'grade',     on:true,  p:{ lift:0.0, gamma:1.0, gain:1.0, sat:1.0, temp:0.0 } },
+      { t:'vignette',  on:true,  p:{ amount:0.25, soft:0.55 } },
+      { t:'grain',     on:true,  p:{ amount:0.06, size:1.5, mono:1 } },
+      { t:'glitch',    on:false, p:{ amount:0.15, bands:24, rgb:0.5, speed:8 } }
+    ]
+  };
+}
+
+/* ---------- FX定義レジストリ ----------
+ * 新エフェクト追加手順（frame型）:
+ *  1. ここに {label, tier, ui:[...]} を足す
+ *  2. FRAG に同名のフラグメントシェーダを足す
+ *  3. api.apply の switch に uniform 設定を足す
+ *  4. makeDefaultFx の chain に既定エントリを足す（on:false 推奨）
+ * UI はホストが FX_DEFS から自動生成するので、ホスト側UIの改修は不要。 */
+const FX_DEFS = {
+  mb:        { label:'MOTION BLUR', tier:'temporal+frame',
+               ui:[ {k:'shutter',label:'SHUTTER°',min:0,max:360,step:5},
+                    {k:'samples',label:'SAMPLES(final)',min:2,max:32,step:1},
+                    {k:'rtStrength',label:'RT STRENGTH',min:0,max:2,step:0.05} ] },
+  dof:       { label:'DEPTH OF FIELD', tier:'layer',
+               ui:[ {k:'focusZ',label:'FOCUS Z',min:-800,max:2000,step:10},
+                    {k:'range',label:'RANGE',min:50,max:2000,step:10},
+                    {k:'maxBlur',label:'MAX BLUR px',min:0,max:40,step:1} ] },
+  diffusion: { label:'DIFFUSION / GLOW', tier:'frame',
+               ui:[ {k:'threshold',label:'THRESHOLD',min:0,max:1,step:0.01},
+                    {k:'radius',label:'RADIUS',min:0.2,max:3,step:0.05},
+                    {k:'gain',label:'GAIN',min:0,max:2,step:0.05},
+                    {k:'mode',label:'MODE 0=SCREEN 1=ADD',min:0,max:1,step:1} ] },
+  para:      { label:'PARA (パラフィン)', tier:'frame',
+               ui:[ {k:'angle',label:'ANGLE°',min:0,max:360,step:5},
+                    {k:'a1',label:'ALPHA 1',min:0,max:1,step:0.01},
+                    {k:'a2',label:'ALPHA 2',min:0,max:1,step:0.01},
+                    {k:'mid',label:'MID',min:0,max:1,step:0.01},
+                    {k:'soft',label:'SOFT',min:0.02,max:1,step:0.01} ],
+               colors:['c1','c2'] },
+  grade:     { label:'GRADE (色調)', tier:'frame',
+               ui:[ {k:'lift',label:'LIFT',min:-0.3,max:0.3,step:0.005},
+                    {k:'gamma',label:'GAMMA',min:0.3,max:2.4,step:0.01},
+                    {k:'gain',label:'GAIN',min:0.3,max:2,step:0.01},
+                    {k:'sat',label:'SAT',min:0,max:2,step:0.01},
+                    {k:'temp',label:'TEMP',min:-1,max:1,step:0.01} ] },
+  vignette:  { label:'VIGNETTE', tier:'frame',
+               ui:[ {k:'amount',label:'AMOUNT',min:0,max:1,step:0.01},
+                    {k:'soft',label:'SOFT',min:0.05,max:1,step:0.01} ] },
+  grain:     { label:'GRAIN', tier:'frame',
+               ui:[ {k:'amount',label:'AMOUNT',min:0,max:0.4,step:0.005},
+                    {k:'size',label:'SIZE',min:1,max:4,step:0.5},
+                    {k:'mono',label:'MONO 0/1',min:0,max:1,step:1} ] },
+  glitch:    { label:'GLITCH', tier:'frame',
+               ui:[ {k:'amount',label:'AMOUNT',min:0,max:1,step:0.01},
+                    {k:'bands',label:'BANDS',min:4,max:64,step:1},
+                    {k:'rgb',label:'RGB SHIFT',min:0,max:2,step:0.05},
+                    {k:'speed',label:'SPEED',min:0,max:30,step:0.5} ] }
+};
+
+/* ---------- layer型ヘルパ: DOF ----------
+ * z: レイヤーの深度（composer=トラックZ / OBAN=depthをZへ写像した値）
+ * p: dof エントリの p。戻り値 = ctx.filter に渡す blur 半径 px（0なら filter 不要） */
+function dofBlurPx(z, p){
+  const d = Math.abs((z||0) - (p.focusZ||0));
+  const r = d / Math.max(1, p.range||400);
+  return Math.min(p.maxBlur||12, r * (p.maxBlur||12));
+}
+
+/* ---------- 本体 ---------- */
+function createSatsueiFX(opts){
+  opts = opts || {};
+  const cvs = document.createElement('canvas');
+  const glOpts = { premultipliedAlpha:false, preserveDrawingBuffer:true, antialias:false };
+  const gl = cvs.getContext('webgl', glOpts) || cvs.getContext('experimental-webgl', glOpts);
+  const api = { available: !!gl, canvas: cvs, defs: FX_DEFS, apply: null, destroy: null };
+  if(!gl){ api.apply = (src)=>src; api.destroy = ()=>{}; return api; }
+
+  /* --- 共通頂点シェーダ + フルスクリーン三角形 --- */
+  const VERT = 'attribute vec2 aP;varying vec2 vUv;void main(){vUv=aP*0.5+0.5;gl_Position=vec4(aP,0.,1.);}';
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+
+  function compile(fsrc){
+    const p = gl.createProgram();
+    const mk = (type, src)=>{
+      const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('[SatsueiFX] shader: '+gl.getShaderInfoLog(s)+'\n'+src);
+      gl.attachShader(p, s); return s;
+    };
+    mk(gl.VERTEX_SHADER, VERT); mk(gl.FRAGMENT_SHADER, 'precision mediump float;varying vec2 vUv;'+fsrc);
+    gl.bindAttribLocation(p, 0, 'aP'); gl.linkProgram(p);
+    if(!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('[SatsueiFX] link: '+gl.getProgramInfoLog(p));
+    return p;
+  }
+
+  /* --- フラグメントシェーダ群 ---
+   * 座標系: アップロード時に UNPACK_FLIP_Y_WEBGL=true。
+   * デザイン空間（y下向き）で計算するものは pd=vec2(vUv.x, 1.0-vUv.y) を使う。 */
+  const FRAG = {
+    copy: 'uniform sampler2D uT;void main(){gl_FragColor=texture2D(uT,vUv);}',
+    bright: 'uniform sampler2D uT;uniform float uTh;\n'+
+      'void main(){vec3 c=texture2D(uT,vUv).rgb;float l=dot(c,vec3(.299,.587,.114));\n'+
+      'gl_FragColor=vec4(c*smoothstep(uTh,uTh+.25,l),1.);}',
+    blur: 'uniform sampler2D uT;uniform vec2 uDir;\n'+
+      'void main(){vec3 c=texture2D(uT,vUv).rgb*.2270270270;\n'+
+      'c+=texture2D(uT,vUv+uDir*1.3846153846).rgb*.3162162162;\n'+
+      'c+=texture2D(uT,vUv-uDir*1.3846153846).rgb*.3162162162;\n'+
+      'c+=texture2D(uT,vUv+uDir*3.2307692308).rgb*.0702702703;\n'+
+      'c+=texture2D(uT,vUv-uDir*3.2307692308).rgb*.0702702703;\n'+
+      'gl_FragColor=vec4(c,1.);}',
+    mixglow: 'uniform sampler2D uT;uniform sampler2D uG;uniform float uGain;uniform float uMode;\n'+
+      'void main(){vec3 b=texture2D(uT,vUv).rgb;vec3 g=texture2D(uG,vUv).rgb*uGain;\n'+
+      'vec3 scr=1.-(1.-b)*(1.-clamp(g,0.,1.));\n'+
+      'gl_FragColor=vec4(mix(scr,b+g,uMode),1.);}',
+    dirblur: 'uniform sampler2D uT;uniform vec2 uVel;\n'+
+      'void main(){vec3 c=vec3(0.);\n'+
+      'for(int i=0;i<8;i++){float t=(float(i)+.5)/8.-.5;c+=texture2D(uT,vUv+uVel*t).rgb;}\n'+
+      'gl_FragColor=vec4(c/8.,1.);}',
+    para: 'uniform sampler2D uT;uniform vec2 uDirG;uniform vec3 uC1;uniform vec3 uC2;\n'+
+      'uniform float uA1;uniform float uA2;uniform float uMid;uniform float uSoft;\n'+
+      'void main(){vec3 b=texture2D(uT,vUv).rgb;vec2 pd=vec2(vUv.x,1.-vUv.y);\n'+
+      'float t=dot(pd-.5,uDirG)+.5;float m=smoothstep(uMid-uSoft*.5,uMid+uSoft*.5,t);\n'+
+      'vec3 ov=mix(uC1,uC2,m);float a=mix(uA1,uA2,m);\n'+
+      'gl_FragColor=vec4(1.-(1.-b)*(1.-ov*a),1.);}',
+    grade: 'uniform sampler2D uT;uniform float uLift;uniform float uGamma;uniform float uGain;\n'+
+      'uniform float uSat;uniform float uTemp;\n'+
+      'void main(){vec3 c=texture2D(uT,vUv).rgb;\n'+
+      'c=pow(max(c*uGain+uLift,0.),vec3(1./uGamma));\n'+
+      'c.r+=uTemp*.08;c.b-=uTemp*.08;\n'+
+      'float l=dot(c,vec3(.299,.587,.114));c=mix(vec3(l),c,uSat);\n'+
+      'gl_FragColor=vec4(clamp(c,0.,1.),1.);}',
+    finish: 'uniform sampler2D uT;uniform vec2 uRes;uniform float uTime;\n'+
+      'uniform float uVigA;uniform float uVigS;uniform float uGrA;uniform float uGrS;uniform float uMono;\n'+
+      'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7))+uTime*57.)*43758.5453);}\n'+
+      'void main(){vec3 c=texture2D(uT,vUv).rgb;\n'+
+      'float d=distance(vUv,vec2(.5))*1.41421356;\n'+
+      'c*=1.-uVigA*smoothstep(1.-uVigS,1.,d);\n'+
+      'vec2 gp=floor(vUv*uRes/max(uGrS,1.));\n'+
+      'vec3 n=vec3(h(gp),h(gp+7.1),h(gp+13.7))*2.-1.;\n'+
+      'n=mix(n,vec3(n.x),uMono);c+=n*uGrA;\n'+
+      'gl_FragColor=vec4(clamp(c,0.,1.),1.);}',
+    glitch: 'uniform sampler2D uT;uniform float uTime;uniform float uAmt;uniform float uBands;\n'+
+      'uniform float uRgb;uniform vec2 uRes;\n'+
+      'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}\n'+
+      'void main(){float band=floor(vUv.y*uBands);\n'+
+      'float r=h(vec2(band,floor(uTime)));\n'+
+      'float on=step(1.-uAmt*.35,r);\n'+
+      'float off=(h(vec2(band,floor(uTime)+.5))-.5)*.2*uAmt*on;\n'+
+      'vec2 uv=vec2(vUv.x+off,vUv.y);\n'+
+      'float sh=uRgb*2./uRes.x*(1.+on*6.);\n'+
+      'gl_FragColor=vec4(texture2D(uT,uv+vec2(sh,0.)).r,texture2D(uT,uv).g,texture2D(uT,uv-vec2(sh,0.)).b,1.);}'
+  };
+  const PROG = {}; for(const k in FRAG) PROG[k] = compile(FRAG[k]);
+  const U = (p,n)=>gl.getUniformLocation(p,n);
+
+  /* --- ターゲット（フル解像度 ping-pong ×2 + 1/4解像度 ×2） --- */
+  function makeTarget(w,h){
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    return { tex, fbo, w, h };
+  }
+  let W=0, H=0, srcTex=null, ping=null, pong=null, q1=null, q2=null;
+  function resize(w,h){
+    if(w===W && h===H) return;
+    W=w; H=h; cvs.width=w; cvs.height=h;
+    [ping,pong,q1,q2].forEach(t=>{ if(t){ gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); } });
+    ping=makeTarget(w,h); pong=makeTarget(w,h);
+    const qw=Math.max(2,w>>2), qh=Math.max(2,h>>2);
+    q1=makeTarget(qw,qh); q2=makeTarget(qw,qh);
+    if(srcTex) gl.deleteTexture(srcTex);
+    srcTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, srcTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
+
+  function bindDraw(prog, srcT, target){ /* target=null → 自canvas(既定FB) */
+    gl.useProgram(prog);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target ? target.fbo : null);
+    gl.viewport(0, 0, target?target.w:W, target?target.h:H);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, srcT);
+    gl.uniform1i(U(prog,'uT'), 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  const hex2rgb = s=>{ const n=parseInt(String(s).replace('#',''),16)||0;
+    return [ ((n>>16)&255)/255, ((n>>8)&255)/255, (n&255)/255 ]; };
+
+  /* --- チェーン実行 --- */
+  api.apply = function(src, fx, info){
+    if(!fx || !fx.enabled) return src;
+    const w = src.width, h = src.height;
+    resize(w, h);
+    info = info || {};
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.bindTexture(gl.TEXTURE_2D, srcTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+    let cur = srcTex, curIsPing = false;
+    const next = ()=>{ curIsPing = !curIsPing; return curIsPing ? ping : pong; };
+    const active = (fx.chain||[]).filter(e=>e && e.on && FX_DEFS[e.t]);
+    (fx.chain||[]).forEach(e=>{ if(e && e.on && !FX_DEFS[e.t]) console.warn('[SatsueiFX] unknown effect:', e.t); });
+    /* frame型のみここで処理。dof=layer / mb final=temporal はホスト側（SPEC §3） */
+    for(const e of active){
+      const p = e.p || {};
+      let t;
+      switch(e.t){
+        case 'mb': { /* rt近似: カメラ速度の方向ブラー。info.velX/velY 無指定なら素通し */
+          const k = (p.rtStrength==null?1:p.rtStrength);
+          const vx=(info.velX||0)*k, vy=(info.velY||0)*k;
+          if(Math.abs(vx)<1e-5 && Math.abs(vy)<1e-5) break;
+          t = next(); gl.useProgram(PROG.dirblur);
+          gl.uniform2f(U(PROG.dirblur,'uVel'), vx, -vy);  /* FLIP_Y分 yは反転 */
+          bindDraw(PROG.dirblur, cur, t); cur = t.tex; break; }
+        case 'diffusion': {
+          gl.useProgram(PROG.bright);
+          gl.uniform1f(U(PROG.bright,'uTh'), p.threshold==null?0.55:p.threshold);
+          bindDraw(PROG.bright, cur, q1);
+          const rad = (p.radius==null?1:p.radius);
+          for(let i=0;i<2;i++){
+            gl.useProgram(PROG.blur);
+            gl.uniform2f(U(PROG.blur,'uDir'), rad*(i+1)/q1.w, 0);
+            bindDraw(PROG.blur, q1.tex, q2);
+            gl.useProgram(PROG.blur);
+            gl.uniform2f(U(PROG.blur,'uDir'), 0, rad*(i+1)/q1.h);
+            bindDraw(PROG.blur, q2.tex, q1);
+          }
+          t = next(); gl.useProgram(PROG.mixglow);
+          gl.activeTexture(gl.TEXTURE1);
+          gl.bindTexture(gl.TEXTURE_2D, q1.tex);
+          gl.uniform1i(U(PROG.mixglow,'uG'), 1);
+          gl.uniform1f(U(PROG.mixglow,'uGain'), p.gain==null?0.8:p.gain);
+          gl.uniform1f(U(PROG.mixglow,'uMode'), p.mode||0);
+          gl.activeTexture(gl.TEXTURE0);
+          bindDraw(PROG.mixglow, cur, t); cur = t.tex; break; }
+        case 'para': {
+          t = next(); gl.useProgram(PROG.para);
+          const a=(p.angle||0)*Math.PI/180;
+          gl.uniform2f(U(PROG.para,'uDirG'), Math.cos(a), Math.sin(a));
+          gl.uniform3fv(U(PROG.para,'uC1'), hex2rgb(p.c1||'#ffc890'));
+          gl.uniform3fv(U(PROG.para,'uC2'), hex2rgb(p.c2||'#281866'));
+          gl.uniform1f(U(PROG.para,'uA1'), p.a1==null?0.3:p.a1);
+          gl.uniform1f(U(PROG.para,'uA2'), p.a2==null?0.25:p.a2);
+          gl.uniform1f(U(PROG.para,'uMid'), p.mid==null?0.5:p.mid);
+          gl.uniform1f(U(PROG.para,'uSoft'), Math.max(0.02,p.soft==null?0.45:p.soft));
+          bindDraw(PROG.para, cur, t); cur = t.tex; break; }
+        case 'grade': {
+          t = next(); gl.useProgram(PROG.grade);
+          gl.uniform1f(U(PROG.grade,'uLift'), p.lift||0);
+          gl.uniform1f(U(PROG.grade,'uGamma'), Math.max(0.05,p.gamma==null?1:p.gamma));
+          gl.uniform1f(U(PROG.grade,'uGain'), p.gain==null?1:p.gain);
+          gl.uniform1f(U(PROG.grade,'uSat'), p.sat==null?1:p.sat);
+          gl.uniform1f(U(PROG.grade,'uTemp'), p.temp||0);
+          bindDraw(PROG.grade, cur, t); cur = t.tex; break; }
+        case 'glitch': {
+          t = next(); gl.useProgram(PROG.glitch);
+          gl.uniform1f(U(PROG.glitch,'uTime'), (info.t||0)*(p.speed==null?8:p.speed));
+          gl.uniform1f(U(PROG.glitch,'uAmt'), p.amount==null?0.15:p.amount);
+          gl.uniform1f(U(PROG.glitch,'uBands'), Math.max(1,p.bands||24));
+          gl.uniform1f(U(PROG.glitch,'uRgb'), p.rgb==null?0.5:p.rgb);
+          gl.uniform2f(U(PROG.glitch,'uRes'), W, H);
+          bindDraw(PROG.glitch, cur, t); cur = t.tex; break; }
+        /* vignette / grain は最後の finish パスでまとめて処理（下） */
+      }
+    }
+    /* finish（vignette+grain 統合パス）— 自canvasへ出力 */
+    const vig = active.find(e=>e.t==='vignette'), grn = active.find(e=>e.t==='grain');
+    gl.useProgram(PROG.finish);
+    gl.uniform2f(U(PROG.finish,'uRes'), W, H);
+    gl.uniform1f(U(PROG.finish,'uTime'), (info.t||0)%97);
+    gl.uniform1f(U(PROG.finish,'uVigA'), vig ? (vig.p.amount==null?0.25:vig.p.amount) : 0);
+    gl.uniform1f(U(PROG.finish,'uVigS'), vig ? Math.max(0.05,vig.p.soft==null?0.55:vig.p.soft) : 0.5);
+    gl.uniform1f(U(PROG.finish,'uGrA'), grn ? (grn.p.amount==null?0.06:grn.p.amount) : 0);
+    gl.uniform1f(U(PROG.finish,'uGrS'), grn ? (grn.p.size||1.5) : 1.5);
+    gl.uniform1f(U(PROG.finish,'uMono'), grn ? (grn.p.mono==null?1:grn.p.mono) : 1);
+    bindDraw(PROG.finish, cur, null);
+    return cvs;
+  };
+
+  api.destroy = function(){
+    [ping,pong,q1,q2].forEach(t=>{ if(t){ gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); } });
+    if(srcTex) gl.deleteTexture(srcTex);
+    for(const k in PROG) gl.deleteProgram(PROG[k]);
+    gl.deleteBuffer(buf);
+  };
+  return api;
+}
+
+/* ---------- ブラウザグローバル公開（単一HTML運用） ---------- */
+if(typeof window !== 'undefined'){
+  window.SatsueiFX = { createSatsueiFX, makeDefaultFx, dofBlurPx, FX_DEFS };
+}
+/* ===== /SATSUEI FX CORE ===== */
+</script>
 
 <script>
 const LABEL_W = 154;
@@ -604,6 +979,7 @@ const state = {
   fps: 24, width: 0, height: 0, bgBright: 100,
   isPlaying: false, loop: true, lastTimestamp: 0, frameAccumulator: 0,
   workArea: null,
+  fx: SatsueiFX.makeDefaultFx(), // 撮影処理チェーン（SPEC_06 SATSUEI KIT）
   markers: [],         // グローバル(ワークエリア)マーカー [{frame,label}]
   vpDragging: false, vpDragStart: null, vpDragKfStart: null,
   history: [], historyIdx: -1,
@@ -992,6 +1368,7 @@ function loadJSON(json){
     state.workArea={startFrame:0,endFrame:state.totalFrames};
   }
   state.markers = Array.isArray(json.markers) ? json.markers.filter(m=>typeof m.frame==='number').map(m=>({frame:m.frame|0,label:String(m.label||'')})) : [];
+  state.fx = normalizeFx(json.fx); // fx欠損は makeDefaultFx で補完（SPEC_06 §2）
   dedupeCameras(); sanitizeParents();
   kfSel=[];
   state.selectedTrack=state.tracks.length-1; // top layer selected by default
@@ -1744,7 +2121,18 @@ function drawFrame(tCtx, tw, th, frameIdx){
 }
 function drawCurrentFrame(){
   if(!state.width) return;
-  drawFrame(ctx,state.width,state.height,state.currentFrame);
+  if(gFxPreview&&state.fx&&state.fx.enabled&&ensureFx().available){
+    // draft品質: velを渡さない＝mb素通し / DOFなし（SPEC_06 §1）
+    if(!gFxSrc) gFxSrc=document.createElement('canvas');
+    if(gFxSrc.width!==state.width||gFxSrc.height!==state.height){ gFxSrc.width=state.width; gFxSrc.height=state.height; }
+    const s2d=gFxSrc.getContext('2d'); s2d.imageSmoothingEnabled=false;
+    drawFrame(s2d,state.width,state.height,state.currentFrame);
+    const out=gFx.apply(gFxSrc,state.fx,{t:state.currentFrame/state.fps});
+    ctx.clearRect(0,0,state.width,state.height);
+    ctx.drawImage(out,0,0,state.width,state.height);
+  } else {
+    drawFrame(ctx,state.width,state.height,state.currentFrame);
+  }
   const t=selTrack();
   const kfs=t?t.keyframes:makeEmptyKfs();
   const tr=getTransform(state.currentFrame,kfs);
@@ -1909,6 +2297,7 @@ function buildProjectPayload(){
     fps:state.fps, width:state.width, height:state.height,
     bgBright:state.bgBright,
     workArea:state.workArea||{startFrame:0,endFrame:state.totalFrames},
+    fx:state.fx, // 撮影処理チェーン（スキーマ共通・変換なしで持ち回る）
     markers:state.markers.map(m=>({frame:m.frame,label:m.label||''})),
     tracks:state.tracks.map(t=>{
       const cells=serializeTrackCells(t);
@@ -1998,7 +2387,7 @@ async function exportVideoComposer(){
   const chunks=[];
   rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
   const recStopped=new Promise(res=>{rec.onstop=res;});
-  drawFrame(c2d,OUT_W,OUT_H,0);
+  fxRenderExport(c2d,0); // tier=rt: FX有効時のみ撮影処理を適用（無効なら従来drawFrame）
   rec.start(1000);
   const t0=performance.now(), tickMs=1000/state.fps, totalMs=total*tickMs;
   let canceled=false;
@@ -2007,7 +2396,7 @@ async function exportVideoComposer(){
       if(gExportCancel){canceled=true;res();return;}
       const elapsed=performance.now()-t0;
       const i=Math.min(total-1,Math.floor(elapsed/tickMs));
-      drawFrame(c2d,OUT_W,OUT_H,i);
+      fxRenderExport(c2d,i);
       const pct=((i+1)/total*100).toFixed(1);
       bar.style.width=pct+'%'; prog.textContent=`${i+1} / ${total} — ${pct}%`;
       if(elapsed>=totalMs){res();return;}
@@ -2027,8 +2416,87 @@ async function exportVideoComposer(){
 $('#btn-export-video').addEventListener('click',exportVideoComposer);
 async function exportPNG(){
   if(!state.totalFrames) return;
-  await exportZipPNG(state.totalFrames,'composer_4k.zip',(ctx,i)=>drawFrame(ctx,OUT_W,OUT_H,i));
+  await exportZipPNG(state.totalFrames,'composer_4k.zip',(ctx,i)=>fxRenderExport(ctx,i));
 }
+
+// ── SATSUEI FX（撮影処理・SPEC_06 P0）──
+// enabled:false は fx.apply を呼ばない経路（従来出力とピクセル一致＝後方互換の要）
+let gFx=null, gFxSrc=null, gFxPreview=false, gFxExp=null, gFxExp2d=null;
+function ensureFx(){ if(!gFx) gFx=SatsueiFX.createSatsueiFX(); return gFx; }
+// 保存JSONの fx を既定チェーンにマージ（欠損補完・未知tは持ち回り＝apply側がスキップ）
+function normalizeFx(saved){
+  const def=SatsueiFX.makeDefaultFx();
+  if(!saved||typeof saved!=='object'||!Array.isArray(saved.chain)) return def;
+  const byT=new Map(saved.chain.filter(e=>e&&e.t).map(e=>[e.t,e]));
+  def.enabled=!!saved.enabled;
+  def.chain=def.chain.map(d=>{
+    const s=byT.get(d.t); if(!s) return d;
+    byT.delete(d.t);
+    return {t:d.t,on:!!s.on,p:Object.assign({},d.p,s.p||{})};
+  });
+  byT.forEach(s=>def.chain.push({t:s.t,on:!!s.on,p:Object.assign({},s.p||{})}));
+  return def;
+}
+// 書き出し1コマ描画（tier=rt: カメラ速度→方向ブラー近似）。FX無効なら従来経路のまま
+function fxRenderExport(dst2d,i){
+  if(!(state.fx&&state.fx.enabled&&ensureFx().available)){ drawFrame(dst2d,OUT_W,OUT_H,i); return; }
+  if(!gFxExp){
+    gFxExp=document.createElement('canvas'); gFxExp.width=OUT_W; gFxExp.height=OUT_H;
+    gFxExp2d=gFxExp.getContext('2d'); gFxExp2d.imageSmoothingEnabled=false;
+  }
+  drawFrame(gFxExp2d,OUT_W,OUT_H,i);
+  const c0=getCamAt(Math.max(0,i-1)), c1=getCamAt(i);
+  const out=gFx.apply(gFxExp,state.fx,{ t:i/state.fps,
+    velX:(c1&&c0)?(c1.x-c0.x)/state.width:0,   // コンポpx → uv/フレーム
+    velY:(c1&&c0)?(c1.y-c0.y)/state.height:0 });
+  dst2d.drawImage(out,0,0,OUT_W,OUT_H);
+}
+// FXモーダル: FX_DEFS の ui/colors 配列から自動生成（エフェクト追加でUI改修ゼロ）
+function buildSfxUI(){
+  const root=$('#sfx-body'); root.innerHTML='';
+  const fx=state.fx||(state.fx=SatsueiFX.makeDefaultFx());
+  const master=document.createElement('label'); master.className='sfx-master';
+  master.innerHTML='<input type="checkbox"'+(fx.enabled?' checked':'')+'><span>SATSUEI FX ENABLED</span>';
+  master.querySelector('input').addEventListener('change',e=>{fx.enabled=e.target.checked;sfxChanged();});
+  root.appendChild(master);
+  for(const ent of fx.chain){
+    const def=SatsueiFX.FX_DEFS[ent.t]; if(!def) continue; // 未知tはUIにも出さない
+    const box=document.createElement('div'); box.className='sfx-ent'+(ent.on?'':' off');
+    const head=document.createElement('label'); head.className='sfx-ent-head';
+    head.innerHTML='<input type="checkbox"'+(ent.on?' checked':'')+'><span>'+def.label+'</span><span class="sfx-tier">'+def.tier+'</span>';
+    head.querySelector('input').addEventListener('change',e=>{ent.on=e.target.checked;box.classList.toggle('off',!ent.on);sfxChanged();});
+    box.appendChild(head);
+    const rows=document.createElement('div'); rows.className='sfx-rows';
+    for(const u of (def.ui||[])){
+      const row=document.createElement('div'); row.className='sfx-row';
+      const val=ent.p[u.k];
+      row.innerHTML='<span class="k">'+u.label+'</span>'
+        +'<input type="range" min="'+u.min+'" max="'+u.max+'" step="'+u.step+'" value="'+val+'">'
+        +'<span class="v">'+val+'</span>';
+      const inp=row.querySelector('input'), out=row.querySelector('.v');
+      inp.addEventListener('input',()=>{ent.p[u.k]=parseFloat(inp.value);out.textContent=inp.value;sfxChanged();});
+      rows.appendChild(row);
+    }
+    for(const ck of (def.colors||[])){
+      const row=document.createElement('div'); row.className='sfx-row';
+      row.innerHTML='<span class="k">'+ck.toUpperCase()+'</span><input type="color" value="'+(ent.p[ck]||'#ffffff')+'">';
+      row.querySelector('input').addEventListener('input',e=>{ent.p[ck]=e.target.value;sfxChanged();});
+      rows.appendChild(row);
+    }
+    box.appendChild(rows);
+    root.appendChild(box);
+  }
+}
+function sfxChanged(){ if(gFxPreview) drawCurrentFrame(); } // undo対象外（SPEC_06 v1）
+function closeSfxModal(){ $('#sfx-modal').classList.remove('show'); }
+$('#btn-fx').addEventListener('click',()=>{ buildSfxUI(); $('#sfx-modal').classList.add('show'); });
+$('#sfx-close').addEventListener('click',closeSfxModal);
+$('#sfx-modal').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeSfxModal(); });
+$('#btn-fx-preview').addEventListener('click',()=>{
+  gFxPreview=!gFxPreview;
+  $('#btn-fx-preview').classList.toggle('primary',gFxPreview);
+  drawCurrentFrame();
+});
 
 // ── EXPORT WEB（モーションコミック HTML ビューア）── 仕様: EXPORT_WEB_SPEC.md
 function webRange(){
@@ -2891,7 +3359,7 @@ loadKeymap();
 window.addEventListener('keydown',e=>{
   if(e.ctrlKey&&e.code==='KeyZ'){e.preventDefault();e.shiftKey?redo():undo();return;}
   if(handleShortcutCapture(e)) return;
-  if(e.code==='Escape'){ closeEaseMenu(); kfSelClear(); hideFxHud(); toggleSettingsPanel(false); return; }
+  if(e.code==='Escape'){ closeEaseMenu(); kfSelClear(); hideFxHud(); toggleSettingsPanel(false); closeSfxModal(); return; }
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyC'&&e.target.tagName!=='INPUT'){ e.preventDefault(); copyKeyframes(); return; }
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'&&e.target.tagName!=='INPUT'){ e.preventDefault(); pasteKeyframes(); return; }
   if(e.target.tagName==='INPUT') return;

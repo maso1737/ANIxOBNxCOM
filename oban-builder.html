@@ -590,6 +590,7 @@ function migrate(p){
     if(f.par===undefined)f.par=0.6;
     if(!f.fx)f.fx={in:'none',drift:'none',amt:0.12,kf:null};   // V2-C: IN演出/ドリフト
     if(f.wipe===undefined)f.wipe=null;                          // V2-C: カバーワイプ
+    if(!f.line)f.line={on:false,w:10};                          // SPEC_09 P4: コマ枠線（quad準拠・ONで書き出し対象）
   });
   if(!p.take)p.take={version:1,name:'take-A',kf:[]};
   if(!p.take.fx)p.take.fx=(typeof window!=='undefined'&&window.SatsueiFX)   // SPEC_06: fxスキーマv1
@@ -874,7 +875,13 @@ function renderWorld(cam,tS,P){
         if(mode==='place'&&sel===c){cx.strokeStyle='#FF4FA8';cx.lineWidth=2*DPR;cx.strokeRect(r.x,r.y,r.w,r.h);}
       }
       cx.restore();
-      /* 枠線（ビルダーのみ・書き出さない） */
+      /* SPEC_09 P4: コマ枠線（コンテンツ＝書き出し対象。ビューアと同式: w はフレーム高1000px基準） */
+      if(o.line&&o.line.on){
+        cx.save();if(dim)cx.globalAlpha=0.35;
+        cx.strokeStyle='#000';cx.lineJoin='miter';cx.lineWidth=Math.max(1,o.line.w*R.h/1000);
+        quadPath(o,R);cx.stroke();cx.restore();
+      }
+      /* 選択枠線（ビルダーのみ・書き出さない） */
       cx.save();cx.globalAlpha=dim?0.25:(sel===o?0.95:0.45);
       cx.strokeStyle=sel===o?'#FF4FA8':'rgba(242,238,252,.55)';cx.lineWidth=(sel===o?2:1)*DPR;
       quadPath(o,R);cx.stroke();
@@ -1044,7 +1051,8 @@ function renderChip(){
    DEPTH <input type="range" data-act="depth" min="0" max="1" step="0.05" value="${o.depth??0.5}"><span id="chip-dv">${(o.depth??0.5).toFixed(2)}</span>`;
   if(isFrame(o)){
     s+=` PAR <input type="range" data-act="par" min="0" max="1" step="0.05" value="${o.par??0.6}">
-   <button class="btn" data-act="mask">MASK [M]${maskEdit.on&&maskEdit.f===o?' ●':''}</button>`;
+   <button class="btn" data-act="mask">MASK [M]${maskEdit.on&&maskEdit.f===o?' ●':''}</button>
+   <button class="btn" data-act="fline">LINE${o.line&&o.line.on?' ●':''}</button>${o.line&&o.line.on?` <input type="range" data-act="flw" min="2" max="40" step="1" value="${o.line.w??10}"><span id="chip-lw">${o.line.w??10}</span>`:''}`;
     const fx=o.fx||{in:'none',drift:'none',amt:0.12,kf:null};
     s+=`<br>IN <select data-act="fin">${['none','slide-l','slide-r','slide-t','slide-b'].map(m=>`<option${fx.in===m?' selected':''}>${m}</option>`).join('')}</select>
      DRIFT <select data-act="fdrift">${['none','push-in','pull-out'].map(m=>`<option${fx.drift===m?' selected':''}>${m}</option>`).join('')}</select>
@@ -1085,6 +1093,7 @@ chip.addEventListener('click',e=>{
   else if(act==='minus'){sel.h=clamp(sel.h*0.88,0.05,4);commitD();}
   else if(act==='plus'){sel.h=clamp(sel.h*1.14,0.05,4);commitD();}
   else if(act==='mask')toggleMask();
+  else if(act==='fline'&&isFrame(sel)){if(!sel.line)sel.line={on:false,w:10};sel.line.on=!sel.line.on;renderChip();commit();}   // SPEC_09 P4
   else if(act==='eject')ejectPanel(sel);
   else if(act==='del')deleteSel();
 });
@@ -1092,6 +1101,7 @@ chip.addEventListener('input',e=>{
   const t=e.target,act=t&&t.dataset&&t.dataset.act;if(!act||!sel)return;
   if(act==='depth'){sel.depth=parseFloat(t.value);const d=$('#chip-dv');if(d)d.textContent=sel.depth.toFixed(2);commitD();}
   else if(act==='par'&&isFrame(sel)){sel.par=parseFloat(t.value);commitD();}
+  else if(act==='flw'&&isFrame(sel)&&sel.line){sel.line.w=parseInt(t.value)||10;const d=$('#chip-lw');if(d)d.textContent=sel.line.w;commitD();}   // SPEC_09 P4
   else if(act==='fps'&&sel.seq){sel.seq.fps=parseInt(t.value)||12;const d=$('#chip-fps');if(d)d.textContent=sel.seq.fps;commitD();}
   else if(act==='famt'&&isFrame(sel)){sel.fx.amt=parseFloat(t.value);computeWipeP();commitD();}   // V2-C
 });
@@ -1237,7 +1247,7 @@ $('#b-frame').addEventListener('click',()=>{
   const f={id:'f'+(pid++),name:'FRAME '+String(PROJECT.frames.length+1).padStart(2,'0'),
     x:+VC.x.toFixed(3),y:+VC.y.toFixed(3),h:0.8,depth:0.5,ord:maxOrd+1,ar:1.777,
     quad:[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}],par:0.6,
-    fx:{in:'none',drift:'none',amt:0.12,kf:null},wipe:null};
+    fx:{in:'none',drift:'none',amt:0.12,kf:null},wipe:null,line:{on:false,w:10}};
   PROJECT.frames.push(f);
   sel=f;renderChip();commit();
   toast(f.name+' を追加 — パネルを重ねて離すと格納/ダブルクリックで中へ');
@@ -1362,7 +1372,7 @@ $('#b-clear').addEventListener('click',()=>{
 function viewerHTML(){
   const proj=JSON.stringify({
     panels:PROJECT.panels.map(p=>({name:p.name,x:p.x,y:p.y,h:p.h,depth:p.depth??0.5,ord:p.ord??0,ar:p.ar||1.414,parent:p.parent||null,seq:p.seq||null})),
-    frames:PROJECT.frames.map(f=>({id:f.id,name:f.name,x:f.x,y:f.y,h:f.h,depth:f.depth??0.5,ord:f.ord??0,ar:f.ar||1.777,quad:f.quad,par:f.par??0.6,fx:f.fx||null,wipe:f.wipe||null})),
+    frames:PROJECT.frames.map(f=>({id:f.id,name:f.name,x:f.x,y:f.y,h:f.h,depth:f.depth??0.5,ord:f.ord??0,ar:f.ar||1.777,quad:f.quad,par:f.par??0.6,fx:f.fx||null,wipe:f.wipe||null,line:f.line||null})),
     take:PROJECT.take});
   const spacer=clamp(Math.round(TT.total*130),900,12000);
   const S='<'+'/script>';
@@ -1578,6 +1588,12 @@ function frame(nowMs){
         const kids=PROJ.panels.filter(p=>p.parent===o.id).sort(bySort);
         for(const c of kids)drawP(c,childRect(c,o,R,cam),tS,W,H);
         cx.restore();
+        if(o.line&&o.line.on){   // SPEC_09 P4: コマ枠線（ビルダーと同式・w=フレーム高1000px基準）
+          cx.save();cx.strokeStyle='#000';cx.lineJoin='miter';cx.lineWidth=Math.max(1,o.line.w*R.h/1000);
+          cx.beginPath();
+          o.quad.forEach(function(q,i){const px=R.x+q.x*R.w,py=R.y+q.y*R.h;i?cx.lineTo(px,py):cx.moveTo(px,py);});
+          cx.closePath();cx.stroke();cx.restore();
+        }
       }else drawP(o,R,tS,W,H);
     }
     /* V2-C: SATSUEI FX (rt) — enabled:false は apply を呼ばない（後方互換の要） */
