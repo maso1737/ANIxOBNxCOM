@@ -41,6 +41,7 @@ fx = {
   chain: [                   // 順序 = パス実行順。エフェクト追加 = エントリ追加
     { t:'mb',        on:false, p:{ shutter:180, samples:8, rtStrength:1.0 } },
     { t:'dof',       on:false, p:{ focusZ:0, range:400, maxBlur:12 } },
+    { t:'olm',       on:false, p:{ threshold:0.10, radius:1.2, strength:0.8 } },  // 2026-07追加: OLMスムーザー風
     { t:'diffusion', on:true,  p:{ threshold:0.55, radius:1.0, gain:0.8, mode:0 } },
     { t:'para',      on:false, p:{ angle:120, c1:'#ffc890', a1:0.30, c2:'#281866', a2:0.25, mid:0.5, soft:0.45 } },
     { t:'grade',     on:true,  p:{ lift:0, gamma:1, gain:1, sat:1, temp:0 } },
@@ -61,7 +62,7 @@ fx = {
 
 | 型 | 実行場所 | 該当 | 追加のしやすさ |
 |---|---|---|---|
-| `frame` | GPUフルフレームパス（コア内） | diffusion / para / grade / vignette / grain / glitch / mb(rt) | ◎ シェーダ1個＋switch1ケース |
+| `frame` | GPUフルフレームパス（コア内） | diffusion / para / grade / vignette / grain / glitch / mb(rt) / olm | ◎ シェーダ1個＋switch1ケース |
 | `layer` | 合成前・レイヤー単位（ホスト側） | dof | ○ `dofBlurPx()` ヘルパで `ctx.filter` |
 | `temporal` | 書き出しループ（ホスト側） | mb(final) | △ ループ改修（§6.2、1回だけ） |
 
@@ -71,6 +72,10 @@ fx = {
 3. `api.apply` の switch に uniform 設定ケースを追加
 4. `makeDefaultFx().chain` に既定エントリ追加（`on:false`）
 → **FXモーダルUIは FX_DEFS から自動生成なのでUI改修ゼロ**。将来: zoomblur / chromatic aberration / posterize / halftone など
+→ 実装例: `olm`（SMOOTHER・OLMスムーザー風、2026-07）— 輝度勾配でエッジ検出→エッジ**接線方向**のみ5tapブラー
+  （線の断面は保持しジャギだけなめす）。p={threshold:エッジ検出しきい値, radius:なめし幅px, strength:適用量}。
+  チェーン位置は dof直後・diffusion前（グロー/色調の前になめすのが撮順として自然）。
+  既存プロジェクトへの追補: composerは`normalizeFx`、OBANは`migrate()`が既定チェーン順でマージする
 
 ## 4. コアAPI（satsuei_fx_core.js）
 

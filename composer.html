@@ -648,6 +648,7 @@ function makeDefaultFx(){
     chain: [
       { t:'mb',        on:false, p:{ shutter:180, samples:8, rtStrength:1.0 } },
       { t:'dof',       on:false, p:{ focusZ:0, range:400, maxBlur:12 } },
+      { t:'olm',       on:false, p:{ threshold:0.10, radius:1.2, strength:0.8 } },
       { t:'diffusion', on:true,  p:{ threshold:0.55, radius:1.0, gain:0.8, mode:0 } },
       { t:'para',      on:false, p:{ angle:120, c1:'#ffc890', a1:0.30, c2:'#281866', a2:0.25, mid:0.5, soft:0.45 } },
       { t:'grade',     on:true,  p:{ lift:0.0, gamma:1.0, gain:1.0, sat:1.0, temp:0.0 } },
@@ -674,6 +675,10 @@ const FX_DEFS = {
                ui:[ {k:'focusZ',label:'FOCUS Z',min:-800,max:2000,step:10},
                     {k:'range',label:'RANGE',min:50,max:2000,step:10},
                     {k:'maxBlur',label:'MAX BLUR px',min:0,max:40,step:1} ] },
+  olm:       { label:'SMOOTHER (OLM風・線なめし)', tier:'frame',
+               ui:[ {k:'threshold',label:'EDGE TH',min:0.01,max:0.5,step:0.01},
+                    {k:'radius',label:'RADIUS px',min:0.5,max:3,step:0.1},
+                    {k:'strength',label:'STRENGTH',min:0,max:1,step:0.05} ] },
   diffusion: { label:'DIFFUSION / GLOW', tier:'frame',
                ui:[ {k:'threshold',label:'THRESHOLD',min:0,max:1,step:0.01},
                     {k:'radius',label:'RADIUS',min:0.2,max:3,step:0.05},
@@ -766,6 +771,20 @@ function createSatsueiFX(opts){
       'void main(){vec3 c=vec3(0.);\n'+
       'for(int i=0;i<8;i++){float t=(float(i)+.5)/8.-.5;c+=texture2D(uT,vUv+uVel*t).rgb;}\n'+
       'gl_FragColor=vec4(c/8.,1.);}',
+    olm: 'uniform sampler2D uT;uniform vec2 uRes;uniform float uTh;uniform float uRad;uniform float uStr;\n'+
+      'float lm(vec2 p){return dot(texture2D(uT,p).rgb,vec3(.299,.587,.114));}\n'+
+      'void main(){vec2 px=uRad/uRes;\n'+
+      'float lN=lm(vUv+vec2(0.,px.y));float lS=lm(vUv-vec2(0.,px.y));\n'+
+      'float lE=lm(vUv+vec2(px.x,0.));float lW=lm(vUv-vec2(px.x,0.));\n'+
+      'vec2 g=vec2(lE-lW,lN-lS);float gm=length(g);\n'+
+      'vec3 base=texture2D(uT,vUv).rgb;\n'+
+      'if(gm<uTh){gl_FragColor=vec4(base,1.);return;}\n'+
+      'vec2 dir=normalize(vec2(-g.y,g.x))*px;\n'+
+      'vec3 c=base*.34;\n'+
+      'c+=texture2D(uT,vUv+dir).rgb*.245;c+=texture2D(uT,vUv-dir).rgb*.245;\n'+
+      'c+=texture2D(uT,vUv+dir*2.).rgb*.085;c+=texture2D(uT,vUv-dir*2.).rgb*.085;\n'+
+      'float w=uStr*smoothstep(uTh,uTh*2.,gm);\n'+
+      'gl_FragColor=vec4(mix(base,c,w),1.);}',
     para: 'uniform sampler2D uT;uniform vec2 uDirG;uniform vec3 uC1;uniform vec3 uC2;\n'+
       'uniform float uA1;uniform float uA2;uniform float uMid;uniform float uSoft;\n'+
       'void main(){vec3 b=texture2D(uT,vUv).rgb;vec2 pd=vec2(vUv.x,1.-vUv.y);\n'+
@@ -898,6 +917,13 @@ function createSatsueiFX(opts){
           gl.uniform1f(U(PROG.mixglow,'uMode'), p.mode||0);
           gl.activeTexture(gl.TEXTURE0);
           bindDraw(PROG.mixglow, cur, t); cur = t.tex; break; }
+        case 'olm': { /* エッジ接線方向のなめし＝線の断面を保ちつつジャギを取る（OLMスムーザー風） */
+          t = next(); gl.useProgram(PROG.olm);
+          gl.uniform2f(U(PROG.olm,'uRes'), W, H);
+          gl.uniform1f(U(PROG.olm,'uTh'), Math.max(0.005,p.threshold==null?0.1:p.threshold));
+          gl.uniform1f(U(PROG.olm,'uRad'), Math.max(0.1,p.radius==null?1.2:p.radius));
+          gl.uniform1f(U(PROG.olm,'uStr'), p.strength==null?0.8:p.strength);
+          bindDraw(PROG.olm, cur, t); cur = t.tex; break; }
         case 'para': {
           t = next(); gl.useProgram(PROG.para);
           const a=(p.angle||0)*Math.PI/180;
