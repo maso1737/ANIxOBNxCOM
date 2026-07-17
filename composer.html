@@ -378,6 +378,7 @@ input[type=number]{-moz-appearance:textfield;}
     </div>
     <div class="g">
       <button id="btn-import" class="primary" title="JSON / 画像(PNG等)を読み込み（既存トラックに追加。複数回で重ねられます）">IMPORT</button>
+      <button id="btn-paste-json" title="クリップボードのJSONを直接読み込み（OBANの COPY FOR COMPOSER / COPY PROJ 用）">PASTE JSON</button>
       <button id="btn-camera" title="カメラトラックを追加（1つまで）。X/Y=パン, Z=ドリー(パララックス), ROT=回転, SCL=ズーム">+ CAMERA</button>
       <button id="btn-export-project" disabled>EXPORT PROJECT</button>
       <button id="btn-export" disabled>EXPORT 4K PNG</button>
@@ -3151,6 +3152,15 @@ async function exCleanup(maxAgeMs=24*60*60*1000){
 
 // ── EVENTS ──
 $('#btn-import').addEventListener('click',()=>{ $('#file-input').click(); });
+// SPEC_06 P3: クリップボードから直接IMPORT（OBANの COPY FOR COMPOSER → ワンクリック貼り付け）
+$('#btn-paste-json').addEventListener('click',async()=>{
+  let j='';
+  try{ j=await navigator.clipboard.readText(); }
+  catch(e){ j=prompt('PASTE PROJECT JSON:')||''; } // クリップボード不許可環境のフォールバック
+  if(!j.trim()){ flashLive('クリップボードが空です'); return; }
+  try{ importJSON(JSON.parse(j)); flashLive('📋 JSON PASTED'); }
+  catch(err){ alert('JSON error: '+err.message); }
+});
 // JSON / 画像 共通のファイル取り込み（D&Dとinputで共用）
 async function importFiles(files){
   for(const file of files){

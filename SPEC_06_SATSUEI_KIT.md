@@ -189,6 +189,7 @@ tCtx.drawImage(...); tCtx.filter='none';
 4. **値の写像**（OBAN cam → composer CAMERAプロパティ）:
    - `X = oban.x * Wc`、`Y = oban.y * Hc`（Wc/Hc=コンポ解像度。OBANのx/yは画面幅/高さ比）
    - **ズームは案A採用: `SCL = oban.z`**（光学ズーム）。OBANの depth別ズーム視差（`zi=1+(z-1)*lerp(0.55,1.25,depth)`）は失われるが構図とタイミングは保たれる。視差が欲しいカットは composer 側で Z ドリーに手動で振り直す（`Z ≒ PERSP_FOCAL*(1-1/oban.z)` が出発点）
+   - **2026-07追補: 案Bを選択式で実装**（モーダルの ZOOM変換 セレクタ。既定=案A）。案B: `Z = 1000·(1−1/z)`＋パン相殺 `X = x·Wc/z, Y = y·Hc/z`（composerはcam.x·perspでパンするため、dwell時の狙い構図が案Aと一致する）。パネル側トラックにZを振れば多層視差。composerはtr.xをperspで拡大しないため、パネル間の間隔はズームで開かない＝完全一致ではなく「視差優先の近似」
    - パネルを composer に持ち込む場合のレイヤーZ写像（参考値）: `z = PERSP_FOCAL*(1/lerp(0.7,1.2,depth) - 1)` → depth 0→+428.6 / 0.5→+52.6 / 1→-166.7
    - `take.fx` はそのまま `fx:` へコピー（スキーマ共通なので変換不要）
 5. **検証**: OBANのPREVIEWとcomposerの再生を並べて目視。dwell位置のフレーム一致を数点確認

@@ -56,7 +56,10 @@
 ### COPY FOR COMPOSER（SPEC_06 P3 — TAKE→composer CAMERAトラック変換・2026-07実装済み）
 - バーの `COPY FOR COMPOSER` ボタン→ice配色モーダル（FPS/尺秒/COMP W/H）→ PROJECT_v2互換JSONをクリップボードへ → composerの IMPORT JSON に貼る。**MVP=カメラだけ変換**（絵はcomposer側で別途IMPORT。全自動化はP3b検討）
 - 実装: `buildComposerJSON()` / `toggleCvtModal()` / `copyForComposer()`。尺の既定値=`TT.total`（dwell/travel重み合計≒秒）
-- 写像（SPEC_06 §8）: `X=x*Wc / Y=y*Hc / SCL=z（案A: 光学ズーム。depth別視差は落ちる）`。dwell=同値キー2枚ホールド、travel=終端キーに `ez`（linear→0/smooth→0.5/inout→1/in・outCubic→0.5）。P∈[0,1]→f=round(P*(fps*秒-1))。同一フレーム衝突は先勝ち＝travel終端のezを保持
+- 写像（SPEC_06 §8）: dwell=同値キー2枚ホールド、travel=終端キーに `ez`（linear→0/smooth→0.5/inout→1/in・outCubic→0.5）。P∈[0,1]→f=round(P*(fps*秒-1))。同一フレーム衝突は先勝ち＝travel終端のezを保持
+- ズーム変換は選択式（モーダル ZOOM変換 セレクタ・既定=案A）:
+  - **案A SCL（光学・構図優先）**: `X=x*Wc / Y=y*Hc / SCL=z`。構図とタイミング完全一致・視差なし
+  - **案B Zドリー（視差優先）**: `Z=1000·(1−1/z) / X=x*Wc/z / Y=y*Hc/z`（パン相殺→dwell時の狙い構図は案Aと一致。実機検証: ズレ0.05px）。パネル側トラックにZを振ると多層視差が出る。ただしcomposerはtr.xをperspで拡大しないのでパネル間隔はズームで開かない＝近似
 - `take.fx` はトップレベル `fx:` にそのまま同梱（スキーマ共通・無変換）
 - composer側の受け（P3対応で追加）: ①カメラだけのJSONでもKF範囲から `totalFrames` が立つ ②既存トラックへの追加IMPORTでも `fx:` があれば `normalizeFx` で引き継ぐ。**composerに既にCAMERAがあると貼ったカメラは捨てられる**（カメラは1つまで＝既存優先）ので、先にCAMERAを消してから貼る
 
