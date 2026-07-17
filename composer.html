@@ -2685,6 +2685,7 @@ async function exportWeb(){
     totalFrames:len,
     markers:state.markers.filter(m=>m.frame>=start&&m.frame<start+len).map(m=>({f:m.frame-start,label:m.label||''})),
     camera:(camT&&camT.visible)?{keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:camT.keyframes[p].map(k=>({f:k.f,v:k.v,ez:k.ez||0}))}),{})}:null,
+    fx:state.fx, // SPEC_06 P2b: fxスキーマv1をそのまま同梱（ビューアはrt実行・?fx=0でOFF）
     tracks:tracksOut,
     cfg
   };
@@ -2702,6 +2703,9 @@ async function exportWeb(){
 }
 function buildViewerHTML(data){
   const json=JSON.stringify(data).replace(/</g,'\\u003c');
+  // SPEC_06 P2b: fx有効時のみsatsueiコアをビューアへ注入（無効なら容量節約でスキップ＝完全素通し）
+  // コアはバッククォート/閉じscriptタグの生文字列を含まない前提（satsuei-fx-kitの規約）
+  const CORE=(data.fx&&data.fx.enabled)?document.getElementById('satsuei-core').textContent:'';
   return `<!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MOTION COMIC</title>
@@ -2730,6 +2734,7 @@ html,body{margin:0;padding:0;background:#000;}
 <div id="hint">SCROLL ▼</div>
 <div id="loader"><div>LOADING</div><div id="lbar-w"><div id="lbar"></div></div><div id="lprog">0 / 0</div></div>
 <script type="application/json" id="mcdata">${json}<\/script>
+<script>${CORE}<\/script>
 <script>
 var DATA=JSON.parse(document.getElementById('mcdata').textContent);
 var CFG=DATA.cfg, START=CFG.startFrame||0, TOTAL=DATA.totalFrames;
@@ -2805,7 +2810,14 @@ function drawOneTrack(tCtx,tw,th,lf,track,cam){
   var tr=applyTrackChain(tCtx,tw,th,lf+START,track,sx,sy,cam,0);
   if(!tr){tCtx.restore();return;}
   tCtx.globalAlpha=Math.max(0,Math.min(1,tr.op));
+  // DOF軽量版（SPEC_06 §7-4）: layer型＝canvas2dのみでWebGL不要。root層のみ（子は親の面に乗る）
+  // ctx.filter未対応ブラウザでは代入が無視され素通し（グレースフルデグラデーション）
+  if(FXDOF&&!track.parent){
+    var dr=window.SatsueiFX.dofBlurPx(tr.z||0,FXDOF.p);
+    if(dr>0.3)tCtx.filter='blur('+(dr*(tw/DATA.width)).toFixed(1)+'px)';
+  }
   tCtx.drawImage(img,-drawW/2-tr.ax*sx,-drawH/2-tr.ay*sy,drawW,drawH);
+  tCtx.filter='none';
   tCtx.restore();
 }
 function drawFrame(tCtx,tw,th,lf,cam){
@@ -2821,6 +2833,24 @@ function drawFrame(tCtx,tw,th,lf,cam){
 var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 cv.width=DATA.width;cv.height=DATA.height;
 ctx.imageSmoothingEnabled=false;
+// ── SATSUEI FX（rt・SPEC_06 P2b）── ?fx=0 で強制OFF / WebGL不可・コア未注入なら素通し
+var FXQ=null;try{FXQ=new URLSearchParams(location.search);}catch(e){}
+var FXP=(FXQ&&FXQ.get('fx')==='0')?null:(DATA.fx||null);
+var gfx=(FXP&&FXP.enabled&&window.SatsueiFX)?window.SatsueiFX.createSatsueiFX():null;
+var FXOK=!!(gfx&&gfx.available);
+// DOFエントリ抽出（layer型・WebGL不要なのでFXOKとは独立。?fx=0ならFXP=nullで無効）
+var FXDOF=null;
+if(FXP&&FXP.enabled&&window.SatsueiFX){
+  for(var di=0;di<(FXP.chain||[]).length;di++){
+    var de=FXP.chain[di];
+    if(de&&de.t==='dof'&&de.on){FXDOF=de;break;}
+  }
+}
+var fsc=null,fscx=null,pcamx=0,pcamy=0;
+if(FXOK){
+  fsc=document.createElement('canvas');fsc.width=DATA.width;fsc.height=DATA.height;
+  fscx=fsc.getContext('2d');fscx.imageSmoothingEnabled=false;
+}
 var spacer=document.getElementById('spacer');
 function layout(){
   spacer.style.height=(TOTAL*CFG.pxPerFrame+window.innerHeight)+'px';
@@ -2841,7 +2871,20 @@ function camAt(af){
   c.y+=smy*CFG.parallax;
   return c;
 }
-function render(lf){drawFrame(ctx,DATA.width,DATA.height,lf,camAt(lf+START));}
+function render(lf){
+  var cam=camAt(lf+START);
+  if(FXOK){ // シーン→オフスクリーン→fx→可視。velはカメラ速度（コンポpx→uv、±0.05クランプ）
+    drawFrame(fscx,DATA.width,DATA.height,lf,cam);
+    var vx=Math.max(-0.05,Math.min(0.05,(cam.x-pcamx)/DATA.width));
+    var vy=Math.max(-0.05,Math.min(0.05,(cam.y-pcamy)/DATA.height));
+    var out=gfx.apply(fsc,FXP,{t:performance.now()/1000,velX:vx,velY:vy});
+    ctx.clearRect(0,0,DATA.width,DATA.height);
+    ctx.drawImage(out,0,0,DATA.width,DATA.height);
+  } else {
+    drawFrame(ctx,DATA.width,DATA.height,lf,cam); // 従来経路（enabled:falseはapply未呼び出し）
+  }
+  pcamx=cam.x;pcamy=cam.y;
+}
 function tick(){
   var tgt=Math.max(0,Math.min(TOTAL-1,window.scrollY/CFG.pxPerFrame));
   smoothF+=(tgt-smoothF)*0.15;

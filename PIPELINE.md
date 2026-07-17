@@ -9,7 +9,7 @@
 | ツール | 入口（読めるもの） | 出口（書き出すもの） | 撮影処理 |
 |---|---|---|---|
 | **animator.html** | 画像(REF/下絵) / プロジェクトJSON(IndexedDB) | ANIMATOR_v1 JSON / ライブ連携(BroadcastChannel `tdr_live`) | なし（作画に専念） |
-| **composer.html** | PROJECT_v2 / PROJECT_v1 / ANIMATOR_v1 / IMAGE_v1(PNG·JPEG·WebP) / audio / ライブ連携 | 4K連番PNG(zip) / 動画(MP4·WebM) / EXPORT WEB(スクロールビューアHTML) / PROJECT_v2 JSON | **P0〜: fxチェーン**（VIDEO=rt / PNG=final） |
+| **composer.html** | PROJECT_v2 / PROJECT_v1 / ANIMATOR_v1 / IMAGE_v1(PNG·JPEG·WebP) / audio / ライブ連携 | 4K連番PNG(zip) / 動画(MP4·WebM) / EXPORT WEB(スクロールビューアHTML) / PROJECT_v2 JSON | **P0〜: fxチェーン**（VIDEO=rt / PNG=final / EXPORT WEB=rt・P2b〜） |
 | **OBAN_BUILDER** | 画像D&D(単品/連番seq・**MANGA PLATEのPNG含む**) / プロジェクトJSON(クリップボード) | oban-viewer.html(単一HTML・画像は同フォルダ参照・**SPEC_09 P4: FRAME枠線含む**) / プロジェクトJSON / **P3: COPY FOR COMPOSER(PROJECT_v2)** | **P2〜: take.fx→ビューアrt** |
 | **manga-plate.html** | REF画像(下敷き・表示のみ) / PLATE_v1 JSON(クリップボード) | 透過PNG(elem別/全体/×4 SEEDS連番) / PLATE_v1 JSON | なし（素材生成に専念） |
 | **oban-viewer.html** | 同フォルダの画像ファイル | （最終出力・スクロールLP） | rt実行時（`?fx=0`でOFF） |
@@ -29,7 +29,7 @@
 2. animator → composer →（fx final）→ 動画/連番 …AE不要ルート(P0〜)
 3. animator → OBAN_BUILDER → oban-viewer(LP) …スクロールコンテンツ(fxはP2〜)
 4. animator → OBAN_BUILDER →（P3変換）→ composer →（fx final）→ 動画
-5. animator → composer → EXPORT WEB(LP)
+5. animator → composer → EXPORT WEB(LP) …fx rt実行(P2b〜)。fx有効時のみコア同梱・`?fx=0`でOFF
 6. manga-plate →（透過PNG）→ OBAN（コマ内=FRAME子/飛び出し=ルート）/ composer …トーン・スピード線・枠の板（SPEC_09）
 7. manga-plate →（×4 SEEDS連番）→ OBAN seqパネル（loop）…集中線がバタつく演出
 
