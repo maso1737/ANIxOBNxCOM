@@ -9,6 +9,7 @@
 - `oban-builder.html` — OBAN BUILDER。モーションコミック製造機（画像→PLACE→TAKE→単一HTMLビューア書き出し）。パイプライン上は animator と composer の間
 - `composer.html` — マルチトラック合成（カメラ/キーフレーム/書き出し）
 - `manga-plate.html` — パラメトリック漫画素材（コマ枠/トーン/集中線/流線→透過PNG。SPEC_09）
+- `econte.html` — ECONTE。プリプロ（紙ネーム写真→BOARD切り出し→SHEET絵コンテ→加筆。SPEC_10。パイプライン上は animator の前）
 - `index.html` — ランディングページ（**OBAN 追加予定**）
 - `inbetween_lab.html` / `inbetween_warp_lab.html` — 中割り実験ラボ
 - `tools/check.js` — 依存ゼロのスモークチェック（構文/配線/ID重複/デッドコード）
@@ -24,6 +25,7 @@
 - `SPEC_06_SATSUEI_KIT.md` — 撮影処理キット（fx共通スキーマ・composer/OBAN統合）
 - `SPEC_07_ANIMATOR_OBAN_BRIDGE.md` — animator⇄OBAN 連番往復ブリッジ仕様
 - `SPEC_09_MANGA_PLATE.md` — パラメトリック漫画素材ツール仕様（P4=OBANコマ枠線含む）
+- `SPEC_10_ECONTE.md` — プリプロツール仕様（cuts[]単一データ・3ビュー設計。P1=TIMELINE/WebM、P2=animator連携/カラースクリプト）
 
 GitHub: https://github.com/maso1737/animation-paint
 Pages: https://maso1737.github.io/animation-paint/
@@ -32,7 +34,7 @@ Pages: https://maso1737.github.io/animation-paint/
 ```
 node tools/check.js
 ```
-5ファイル（animator / oban-builder / composer / index / manga-plate）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※type属性の無い `<script>` のみJS扱い（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。
+6ファイル（animator / oban-builder / composer / index / manga-plate / econte）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※type属性の無い `<script>` のみJS扱い（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。
 
 ## デプロイ
 - `animator.html` / `composer.html` を直接編集 → 構文チェック → **明示依頼があったときのみ** master に commit & push。

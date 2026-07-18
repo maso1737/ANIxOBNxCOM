@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
-const FILES = ['animator.html', 'oban-builder.html', 'composer.html', 'index.html', 'manga-plate.html'];
+const FILES = ['animator.html', 'oban-builder.html', 'composer.html', 'index.html', 'manga-plate.html', 'econte.html'];
 
 // type属性を持たない <script> だけを対象にする（id付きJSは拾い、
 // type="application/json" 等のデータブロック＝EXPORT WEBのビューアテンプレ等は除外）。

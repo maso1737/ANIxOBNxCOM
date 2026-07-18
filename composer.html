@@ -73,6 +73,12 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
 #inspector-body{padding:10px 12px;overflow-y:auto;}
 #inspector-body::-webkit-scrollbar{width:4px;}
 #inspector-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,0.3);}
+#inspector-resize{height:11px;flex-shrink:0;cursor:row-resize;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--border);background:rgba(255,255,255,0.02);}
+#inspector-resize::after{content:'';width:42px;height:2px;background:rgba(255,255,255,0.2);border-radius:2px;transition:background .1s;}
+#inspector-resize:hover::after,#inspector-resize.active::after{background:var(--acid);box-shadow:0 0 6px rgba(255,79,168,0.5);}
+#inspector.collapsed #inspector-resize{display:none;}
+/* ペン/タッチでドラッグ中にブラウザのパンに奪われてpointercancelになる（バーが張り付く）のを防止 */
+#tl-resize,#settings-resize,#inspector-resize,#tl-ruler,.tl-kf-d,.tl-marker,.tl-gmarker,.tl-wa-handle,#inspector-head,#settings-panel-head,#fx-hud-head,#sfx-head{touch-action:none;}
 .insp-section{margin-bottom:14px;}
 .insp-h{font-size:8px;letter-spacing:0.3em;color:rgba(255,79,168,0.6);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
 .insp-row{display:flex;justify-content:space-between;padding:2px 0;}
@@ -456,6 +462,7 @@ input[type=number]{-moz-appearance:textfield;}
       <div class="insp-row"><span class="k">CELL</span><span class="v" id="i-cell">—</span></div>
     </div>
     </div><!-- /#inspector-body -->
+    <div id="inspector-resize" title="ドラッグで高さ調整（セクション境目でスナップ）"></div>
   </div>
 
   <div id="timeline">
@@ -1176,6 +1183,28 @@ function gatherKfFrames(t){ const s=new Set(); ALL_PROPS.forEach(p=>t.keyframes[
 function seekPrevKey(){ const t=selTrack(); if(!t) return; const fs=gatherKfFrames(t); let best=null; for(const f of fs) if(f<state.currentFrame) best=f; if(best!=null){ pause(); seek(best); } }
 function seekNextKey(){ const t=selTrack(); if(!t) return; const fs=gatherKfFrames(t); const nx=fs.find(f=>f>state.currentFrame); if(nx!=null){ pause(); seek(nx); } }
 
+// ── Shiftスナップ（スクラブ/マーカー移動をKF・マーカー・WA端へ吸着） ──
+function gatherSnapFrames(exclMarker){
+  const s=new Set();
+  state.tracks.forEach(t=>{
+    ALL_PROPS.forEach(p=>t.keyframes[p].forEach(k=>s.add(k.f)));
+    t.markers.forEach(m=>{ if(m!==exclMarker) s.add(m.frame); });
+  });
+  state.markers.forEach(m=>{ if(m!==exclMarker) s.add(m.frame); });
+  if(state.workArea){ s.add(state.workArea.startFrame); s.add(Math.min(state.workArea.endFrame,Math.max(0,state.totalFrames-1))); }
+  return s;
+}
+// f: 生フレーム, pxPerFrame: 1コマあたりの画面px（吸着範囲≒10pxをコマ数に換算）
+// exclMarker: ドラッグ中マーカー自身（自己吸着で動けなくなるのを防ぐ）, includePlayhead: 現在フレームも吸着対象に
+function snapFrame(f,pxPerFrame,exclMarker,includePlayhead){
+  const th=Math.max(1,Math.round(10/Math.max(pxPerFrame,0.001)));
+  const cands=gatherSnapFrames(exclMarker);
+  if(includePlayhead) cands.add(state.currentFrame);
+  let best=f,bd=th+0.5;
+  cands.forEach(sf=>{ const d=Math.abs(sf-f); if(d<bd){bd=d;best=sf;} });
+  return best;
+}
+
 // ── グローバル(ワークエリア)マーカー ──
 function toggleGlobalMarker(){
   if(!state.totalFrames) return;
@@ -1198,14 +1227,21 @@ function renderGlobalMarkers(){
     let dragActive=false, wasDragged=false, ctrlStart=false;
     el.addEventListener('pointerdown',e=>{ dragActive=true; wasDragged=false; ctrlStart=e.ctrlKey||e.metaKey; el.setPointerCapture(e.pointerId); e.stopPropagation(); e.preventDefault(); });
     el.addEventListener('pointermove',e=>{
-      if(!dragActive||ctrlStart) return; wasDragged=true;
-      const f=Math.round(Math.max(0,Math.min(total-1,(e.clientX-$('#tl-ruler').getBoundingClientRect().left-LABEL_W)/aw*total)));
+      if(!dragActive||ctrlStart) return;
+      if(!e.buttons){ dragActive=false; return; } // ペン等でpointerupを取り逃した場合の保険
+      wasDragged=true;
+      let f=Math.round(Math.max(0,Math.min(total-1,(e.clientX-$('#tl-ruler').getBoundingClientRect().left-LABEL_W)/aw*total)));
+      if(e.shiftKey) f=snapFrame(f,aw/total,m,true);
       m.frame=f; el.style.left=(LABEL_W+f/total*aw)+'px';
     });
     el.addEventListener('pointerup',()=>{
       if(!dragActive) return; dragActive=false;
       if(ctrlStart){ const i=state.markers.indexOf(m); if(i>=0) state.markers.splice(i,1); recordHistory(); renderGlobalMarkers(); flashLive('✕ MARKER DELETED'); return; } // Ctrl+クリックで削除(AE準拠)
       if(wasDragged){ state.markers.sort((a,b)=>a.frame-b.frame); recordHistory(); renderGlobalMarkers(); } else seek(m.frame);
+    });
+    el.addEventListener('pointercancel',()=>{
+      if(!dragActive) return; dragActive=false;
+      if(wasDragged){ state.markers.sort((a,b)=>a.frame-b.frame); recordHistory(); renderGlobalMarkers(); }
     });
     el.addEventListener('dblclick',e=>{ e.stopPropagation(); const v=prompt('マーカーのメモ', m.label||''); if(v!==null){ m.label=v; recordHistory(); renderGlobalMarkers(); } });
     cont.appendChild(el);
@@ -1408,6 +1444,7 @@ function loadJSON(json){
   state.markers = Array.isArray(json.markers) ? json.markers.filter(m=>typeof m.frame==='number').map(m=>({frame:m.frame|0,label:String(m.label||'')})) : [];
   state.fx = normalizeFx(json.fx); // fx欠損は makeDefaultFx で補完（SPEC_06 §2）
   dedupeCameras(); sanitizeParents();
+  if(Array.isArray(json.obanPanels)) applyObanPlacements(json.obanPanels); // P3b（通常は追加IMPORT側で効く）
   kfSel=[];
   state.selectedTrack=state.tracks.length-1; // top layer selected by default
   state.currentFrame=0;
@@ -1417,6 +1454,37 @@ function loadJSON(json){
   updateExportButtons();
   state.history=[cloneEditState()]; state.historyIdx=0; updateUndoButtons();
   announceLive(); // 読み込んだprojectIdの最新をANIMATORへ要求＝以後の編集が自動反映
+}
+
+// SPEC_06 P3b: OBAN配置の流し込み — obanPanels:[{name,x,y,h,depth,ord}] を
+// IMPORT済み画像トラックへファイル名一致で適用（位置/サイズ/Z/重ね順。絵の実体は運ばない）
+// depth→Z は SPEC_06 §8 の写像 Z=F·(1/lerp(0.7,1.2,depth)−1)。これで案Aカメラのパン視差係数が
+// OBANのpfと厳密一致する。SCLはperspで割って初期見た目のサイズを補償（AEのマルチプレーン段取りと同じ）
+function applyObanPlacements(panels){
+  if(!state.width) return 0;
+  const norm=s=>String(s||'').replace(/\.[^.]+$/,'').toUpperCase();
+  const matched=[];
+  for(const p of panels){
+    if(!p||typeof p.name!=='string') continue;
+    const t=state.tracks.find(tr=>tr.type!=='camera'&&norm(tr.name)===norm(p.name));
+    if(!t) continue;
+    const d=Math.max(0,Math.min(1,p.depth??0.5));
+    const Z=+(PERSP_FOCAL*(1/(0.7+0.5*d)-1)).toFixed(1);      // 手前(d=1)=−166.7 / 奥(d=0)=+428.6
+    const persp=PERSP_FOCAL/(PERSP_FOCAL+Z);
+    const trH=t.height||state.height;
+    t.keyframes.x=[{f:0,v:+(p.x*state.width).toFixed(2),ez:0}];
+    t.keyframes.y=[{f:0,v:+(p.y*state.height).toFixed(2),ez:0}];
+    t.keyframes.z=[{f:0,v:Z,ez:0}];
+    t.keyframes.s=[{f:0,v:+(((p.h||0.8)*state.height/trH)/persp).toFixed(4),ez:0}];
+    matched.push({t,d,ord:p.ord??0});
+  }
+  // 重ね順: OBANの描画順 bySort（depth昇順→ord昇順）= 奥→手前 を、マッチしたトラックのスロット内で再現
+  if(matched.length>1){
+    const slots=state.tracks.map((t,i)=>matched.some(m=>m.t===t)?i:-1).filter(i=>i>=0);
+    matched.sort((a,b)=>(a.d-b.d)||(a.ord-b.ord));
+    matched.forEach((m,k)=>{state.tracks[slots[k]]=m.t;});
+  }
+  return matched.length;
 }
 
 // インポート統一：既存トラックがあれば「追加」、空なら新規読込（IMPORT JSON で2つ3つと重ねられる）
@@ -1429,7 +1497,9 @@ function importJSON(json){
     if(!state.width){ state.fps=24; state.width=json.width||json.tracks[0].width; state.height=json.height||json.tracks[0].height; state.bgBright=json.bgBright??100; }
     if(json.fx) state.fx=normalizeFx(json.fx); // SPEC_06 P3: fx付きJSON（OBAN take.fx等）の追加IMPORTで撮設定を引き継ぐ
     parsed.forEach(t=>state.tracks.push(t));
+    const nOban=Array.isArray(json.obanPanels)?applyObanPlacements(json.obanPanels):0; // P3b
     finishImport();
+    if(nOban) flashLive(`🧷 OBAN配置 ${nOban}/${json.obanPanels.length} トラックに適用`);
     return;
   }
   // 単一トラック(PROJECT_v1 / ANIMATOR_v1)
@@ -1874,6 +1944,7 @@ function renderKfDiamonds(trackIdx){
     });
     d.addEventListener('pointermove',e=>{
       if(!dragActive) return;
+      if(!e.buttons){ dragActive=false; if(wasDragged) endKfDrag(); return; } // ペン等の保険
       const rect=strip.getBoundingClientRect();
       const newF=Math.round(Math.max(0,Math.min(total-1,(e.clientX-rect.left)/rect.width*total)));
       if(!wasDragged){ if(Math.abs(e.clientX-(rect.left+origF/total*rect.width))<3) return; wasDragged=true; }
@@ -1895,17 +1966,19 @@ function renderKfDiamonds(trackIdx){
         drawCurrentFrame(); updateKfUI();
       }
     });
+    function endKfDrag(){ // ドラッグ確定処理（pointerup／ペンでupを取り逃した際の保険から共用）
+      if(groupMode){ kfSel=groupSnap.map(it=>({t:it.t,f:it.f+lastDelta})); const tracksInv=new Set(groupSnap.map(it=>it.t)); recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); }
+      else if(shiftStart){ kfSel=[{t:trackIdx,f:copyF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); } // 複製→新キーを選択
+      else { kfSel=[{t:trackIdx,f:origF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); seek(origF); } // 移動後も選択（直後に削除可）
+    }
     d.addEventListener('pointerup',()=>{
       if(!dragActive) return; dragActive=false;
-      if(wasDragged){
-        if(groupMode){ kfSel=groupSnap.map(it=>({t:it.t,f:it.f+lastDelta})); const tracksInv=new Set(groupSnap.map(it=>it.t)); recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); }
-        else if(shiftStart){ kfSel=[{t:trackIdx,f:copyF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); } // 複製→新キーを選択
-        else { kfSel=[{t:trackIdx,f:origF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); seek(origF); } // 移動後も選択（直後に削除可）
-      }
+      if(wasDragged){ endKfDrag(); }
       else if(ctrlStart){ cycleEase(trackIdx,origF); } // Ctrl+クリックでイーズ順送り(AE準拠)
       else if(shiftStart){ kfSelToggle(trackIdx,origF); }
       else { kfSelSet(trackIdx,origF); seek(origF); }
     });
+    d.addEventListener('pointercancel',()=>{ if(!dragActive) return; dragActive=false; if(wasDragged) endKfDrag(); });
     d.addEventListener('dblclick',e=>{ e.stopPropagation(); cycleEase(trackIdx,origF); }); // iPad用ダブルタップでも切替
     row.appendChild(d);
   }
@@ -1939,15 +2012,22 @@ function renderMarkers(trackIdx){
       e.stopPropagation(); e.preventDefault();
     });
     el.addEventListener('pointermove',e=>{
-      if(!dragActive) return; wasDragged=true;
+      if(!dragActive) return;
+      if(!e.buttons){ dragActive=false; return; } // ペン等でpointerupを取り逃した場合の保険
+      wasDragged=true;
       const rect=strip.getBoundingClientRect();
-      const newF=Math.round(Math.max(0,Math.min(total-1,(e.clientX-rect.left)/rect.width*total)));
+      let newF=Math.round(Math.max(0,Math.min(total-1,(e.clientX-rect.left)/rect.width*total)));
+      if(e.shiftKey) newF=snapFrame(newF,rect.width/total,m,true);
       m.frame=newF; el.style.left=(newF/total*100)+'%';
     });
     el.addEventListener('pointerup',()=>{
       if(!dragActive) return; dragActive=false;
       if(wasDragged){track.markers.sort((a,b)=>a.frame-b.frame);recordHistory();renderMarkers(trackIdx);}
       else seek(m.frame);
+    });
+    el.addEventListener('pointercancel',()=>{
+      if(!dragActive) return; dragActive=false;
+      if(wasDragged){track.markers.sort((a,b)=>a.frame-b.frame);recordHistory();renderMarkers(trackIdx);}
     });
     row.appendChild(el);
   }
@@ -3556,12 +3636,14 @@ function makeFloatDrag(panel, head, skip){
   });
   head.addEventListener('pointermove',e=>{
     if(!dragging) return;
+    if(!e.buttons){ dragging=false; return; } // ペン等でpointerupを取り逃した場合の保険
     // ヘッダが必ず掴める位置にクランプ
     const nx=Math.max(-panel.offsetWidth+60,Math.min(window.innerWidth-60,ox+e.clientX-sx));
     const ny=Math.max(0,Math.min(window.innerHeight-30,oy+e.clientY-sy));
     panel.style.left=nx+'px'; panel.style.top=ny+'px';
   });
   head.addEventListener('pointerup',()=>{dragging=false;});
+  head.addEventListener('pointercancel',()=>{dragging=false;});
 }
 makeFloatDrag($('#fx-hud'), $('#fx-hud-head'), t=>t.id==='fx-hud-close');
 
@@ -3573,11 +3655,14 @@ let scrubbing=false;
 function rulerScrub(e){
   const rect=$('#tl-ruler').getBoundingClientRect();
   const x=e.clientX-rect.left-LABEL_W, aw=rect.width-LABEL_W;
-  pause(); seek(Math.floor(Math.max(0,Math.min(1,x/aw))*state.totalFrames));
+  let f=Math.floor(Math.max(0,Math.min(1,x/aw))*state.totalFrames);
+  if(e.shiftKey&&state.totalFrames) f=snapFrame(Math.min(f,state.totalFrames-1),aw/state.totalFrames);
+  pause(); seek(f);
 }
 $('#tl-ruler').addEventListener('pointerdown',e=>{scrubbing=true;rulerScrub(e);});
-window.addEventListener('pointermove',e=>{if(scrubbing)rulerScrub(e);});
+window.addEventListener('pointermove',e=>{if(scrubbing){ if(!e.buttons){scrubbing=false;return;} rulerScrub(e);} });
 window.addEventListener('pointerup',()=>{scrubbing=false;});
+window.addEventListener('pointercancel',()=>{scrubbing=false;});
 
 // Work area handle drag
 (function(){
@@ -3595,8 +3680,9 @@ window.addEventListener('pointerup',()=>{scrubbing=false;});
       waDrag=side; el.setPointerCapture(e.pointerId);
       e.stopPropagation(); e.preventDefault();
     });
-    el.addEventListener('pointermove',waMove);
+    el.addEventListener('pointermove',e=>{ if(waDrag&&!e.buttons){waDrag=null;return;} waMove(e); });
     el.addEventListener('pointerup',()=>{waDrag=null;});
+    el.addEventListener('pointercancel',()=>{waDrag=null;});
   });
 })();
 
@@ -3663,13 +3749,16 @@ window.addEventListener('resize',()=>{if(state.width)setupViewport();drawRuler()
     startH=parseInt(cur,10)||$('#timeline').clientHeight;
     handle.classList.add('active'); handle.setPointerCapture(e.pointerId); e.preventDefault();
   });
+  function endDrag(){ if(!active) return; active=false; handle.classList.remove('active'); if(state.width) setupViewport(); }
   handle.addEventListener('pointermove',e=>{
     if(!active) return;
+    if(!e.buttons){ endDrag(); return; } // ペンのhover移動等でpointerupを取り逃した場合の保険
     const h=Math.max(120,Math.min(window.innerHeight-160,startH+(startY-e.clientY)));
     app.style.setProperty('--tl-h',h+'px');
     drawRuler(); updatePlayhead(); updateWorkArea(); updateTrackHeights(); renderAudioWaveform(); renderGlobalMarkers();
   });
-  handle.addEventListener('pointerup',()=>{ active=false; handle.classList.remove('active'); if(state.width) setupViewport(); });
+  handle.addEventListener('pointerup',endDrag);
+  handle.addEventListener('pointercancel',endDrag);
 })();
 drawRuler();
 
@@ -3708,6 +3797,7 @@ drawRuler();
         if(onInput){ const blk=ev=>{ev.stopPropagation();ev.preventDefault();}; inputEl.addEventListener('click',blk,{once:true,capture:true}); }
       }
     });
+    el.addEventListener('pointercancel',()=>{ if(!active) return; active=false; if(moved&&committed) recordHistory(); });
   }
   ALL_PROPS.forEach(prop=>{
     const fxRow=document.querySelector(`#fx-hud .fx-row[data-prop="${prop}"]`);
@@ -3781,9 +3871,11 @@ document.querySelectorAll('#settings-panel .sg-preset[data-gw]').forEach(b=>{
   });
   head.addEventListener('pointermove',e=>{
     if(!dragging) return;
+    if(!e.buttons){ dragging=false; return; } // ペン等でpointerupを取り逃した場合の保険
     panel.style.left=(ox+e.clientX-sx)+'px'; panel.style.top=(oy+e.clientY-sy)+'px';
   });
   head.addEventListener('pointerup',()=>{dragging=false;});
+  head.addEventListener('pointercancel',()=>{dragging=false;});
 })();
 // 設定パネル下端リサイズ（項目境目でスナップ。下のセクションを隠せる）
 (function(){
@@ -3804,6 +3896,7 @@ document.querySelectorAll('#settings-panel .sg-preset[data-gw]').forEach(b=>{
   });
   handle.addEventListener('pointermove',e=>{
     if(!active) return;
+    if(!e.buttons){ active=false; handle.classList.remove('active'); return; } // ペン等の保険
     let h=startH+(e.clientY-startY);
     const targets=snapTargets();
     for(const tg of targets){ if(Math.abs(h-tg)<14){ h=tg; break; } }
@@ -3811,6 +3904,7 @@ document.querySelectorAll('#settings-panel .sg-preset[data-gw]').forEach(b=>{
     body.style.height=h+'px';
   });
   handle.addEventListener('pointerup',()=>{ active=false; handle.classList.remove('active'); });
+  handle.addEventListener('pointercancel',()=>{ active=false; handle.classList.remove('active'); });
 })();
 
 // インスペクタ（フローティング）のドラッグ移動＋折りたたみ
@@ -3819,6 +3913,34 @@ document.querySelectorAll('#settings-panel .sg-preset[data-gw]').forEach(b=>{
   if(!panel) return;
   makeFloatDrag(panel, $('#inspector-head'), t=>t===collapse);
   collapse.addEventListener('click',e=>{ e.stopPropagation(); panel.classList.toggle('collapsed'); });
+  // 下端リサイズ（設定パネルと同方式・セクション境目でスナップ）
+  const handle=$('#inspector-resize'), body=$('#inspector-body');
+  let active=false, startY=0, startH=0;
+  function snapTargets(){
+    const t=[]; const bodyTop=body.getBoundingClientRect().top;
+    body.querySelectorAll('.insp-section').forEach(s=>{
+      const r=s.getBoundingClientRect();
+      t.push(r.bottom-bodyTop+10); // セクション末尾でスナップ
+    });
+    return t;
+  }
+  function endResize(){ active=false; handle.classList.remove('active'); }
+  handle.addEventListener('pointerdown',e=>{
+    active=true; startY=e.clientY; startH=body.clientHeight;
+    panel.style.maxHeight='none';
+    handle.classList.add('active'); handle.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  handle.addEventListener('pointermove',e=>{
+    if(!active) return;
+    if(!e.buttons){ endResize(); return; } // ペン等の保険
+    let h=startH+(e.clientY-startY);
+    const targets=snapTargets();
+    for(const tg of targets){ if(Math.abs(h-tg)<14){ h=tg; break; } }
+    h=Math.max(40,Math.min(window.innerHeight-120,h));
+    body.style.height=h+'px';
+  });
+  handle.addEventListener('pointerup',endResize);
+  handle.addEventListener('pointercancel',endResize);
 })();
 </script>
 </body>

@@ -231,6 +231,20 @@ body.apopen #ap-modal{display:flex;flex-direction:column}
 #ap-body .ap-meta{opacity:.6;text-align:right}
 #ap-body .ap-empty{font-family:var(--jp);letter-spacing:.03em;opacity:.55;line-height:1.8;padding:6px 0}
 
+/* ---------- V2-D: 縦書きテキスト編集 / EN字幕 / クリックFX ---------- */
+#text-ed{
+  position:fixed;z-index:80;writing-mode:vertical-rl;text-orientation:mixed;
+  font-family:'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;font-weight:700;
+  white-space:pre;line-height:1.18;letter-spacing:.08em;
+  background:rgba(12,6,29,.5);outline:1px dashed var(--acid);outline-offset:2px;
+  caret-color:var(--acid);padding:1px 2px;min-height:1.1em;min-width:1.1em;
+}
+body.textarm #cv{cursor:crosshair}
+.edc .subin{width:58%;background:var(--panel2);color:var(--white);border:1px solid var(--border);font-family:var(--mono);font-size:10px;padding:2px 5px;letter-spacing:.05em;vertical-align:middle}
+#fx-body select{background:#100722;color:var(--amber);border:1px solid rgba(255,201,79,.4);font-family:var(--mono);font-size:10px;padding:1px 4px}
+#fx-body .btn{border-color:rgba(255,201,79,.45);color:var(--amber);padding:3px 8px;margin-left:6px}
+#fx-body .btn:hover{background:rgba(255,201,79,.14);border-color:var(--amber);color:var(--amber)}
+
 </style>
 </head>
 <body class="place">
@@ -251,9 +265,10 @@ body.apopen #ap-modal{display:flex;flex-direction:column}
   <button class="btn" id="b-clear">CLEAR</button>
   <button class="btn" id="b-guide">GUIDE [G]</button>
   <button class="btn mode" id="b-frame">+ FRAME</button>
+  <button class="btn mode" id="b-text">+ TEXT [T]</button>
   <button class="btn fx" id="b-fx">FX 撮影 [F]</button>
   <span id="crumb"></span>
-  <span id="hint">画像をD&D（連番4枚以上は自動でシーケンス化）。PLACE: ドラッグ=移動 / [ ]=前後 / フレームに重ねて離す=格納 / ダブルクリック=フレーム内へ / M=マスク編集。TAKE: C=CAPTURE / ↑↓=KF移動 / SPACE=PREVIEW。G=ガイド / Ctrl+Z・Ctrl+Shift+Z。</span>
+  <span id="hint">画像をD&D（連番4枚以上は自動でシーケンス化）。PLACE: ドラッグ=移動 / [ ]=前後 / フレームに重ねて離す=格納 / ダブルクリック=フレーム内へ / M=マスク編集 / T=縦書きテキスト。TAKE: C=CAPTURE / ↑↓=KF移動 / SUB=カードで入力 / SPACE=PREVIEW。G=ガイド / Ctrl+Z・Ctrl+Shift+Z。</span>
 </div>
 
 <div id="cards"></div>
@@ -287,8 +302,8 @@ body.apopen #ap-modal{display:flex;flex-direction:column}
       <option value="scl">案A: SCL（光学・構図優先）</option>
       <option value="z">案B: Zドリー（視差優先）</option>
     </select></div>
-    <div class="cvt-note">W/H は composer のコンポ解像度に合わせる（カメラ位置を px に換算するため）。take.fx も一緒にコピーされる。<br>
-    案B はズームを Z ドリーに写像（Z=1000·(1−1/z)）。パネル側トラックにも Z を振ると多層視差が出る（depth→Z の目安: 手前=負/奥=正）。構図の完全一致は案A。</div>
+    <div class="cvt-note">W/H は composer のコンポ解像度に合わせる（カメラ位置を px に換算するため）。take.fx と<b>ルートパネルの配置情報</b>も同梱——composer 側に同名の画像を先に IMPORT しておくと、貼った時に位置/サイズ/Z/重ね順が自動で乗る（FRAME・コマ内の子は対象外）。<br>
+    案B はズームを Z ドリーに写像（Z=1000·(1−1/z)）。パネルに Z が付くので多層視差が出る。構図の完全一致は案A。</div>
     <button class="btn" id="cvt-copy">COPY JSON</button>
   </div>
 </div>
@@ -652,6 +667,7 @@ const lerp=(a,b,t)=>a+(b-a)*t;
 const map=(v,a,b,c=0,d=1)=>c+(d-c)*clamp((v-a)/(b-a),0,1);
 const E={linear:t=>t,inout:t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,smooth:t=>t*t*(3-2*t),outCubic:t=>1-Math.pow(1-t,3),inCubic:t=>t*t*t};
 const pad=(n,l=2)=>String(n).padStart(l,'0');
+const escH=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');   // V2-D: ユーザー文字列をUIへ出す時のエスケープ
 
 let VW=innerWidth,VH=innerHeight,DPR=Math.min(devicePixelRatio||1,2);
 const cv=$('#cv');
@@ -696,6 +712,18 @@ function migrate(p){
     if(f.wipe===undefined)f.wipe=null;                          // V2-C: カバーワイプ
     if(!f.line)f.line={on:false,w:10};                          // SPEC_09 P4: コマ枠線（quad準拠・ONで書き出し対象）
   });
+  if(!Array.isArray(p.texts))p.texts=[];                        // V2-D: 縦書きテキスト/EN字幕
+  p.texts.forEach(t=>{
+    if(t.type==null)t.type='v';
+    if(t.str==null)t.str='';
+    if(typeof t.x!=='number'||!isFinite(t.x))t.x=0;
+    if(typeof t.y!=='number'||!isFinite(t.y))t.y=0;
+    if(typeof t.size!=='number'||!isFinite(t.size))t.size=24;
+    if(t.col==null)t.col='#fff';
+    if(t.parent===undefined)t.parent=null;
+    if(t.kf===undefined)t.kf=null;
+  });
+  if(p.clickFx===undefined)p.clickFx='invert';                  // V2-D: ビューアのクリックFX
   if(!p.take)p.take={version:1,name:'take-A',kf:[]};
   if(!p.take.fx)p.take.fx=(typeof window!=='undefined'&&window.SatsueiFX)   // SPEC_06: fxスキーマv1
     ?window.SatsueiFX.makeDefaultFx():{version:1,enabled:false,chain:[]};
@@ -720,6 +748,9 @@ const rootItems=()=>[...PROJECT.panels.filter(p=>!p.parent),...PROJECT.frames];
 const childrenOf=f=>PROJECT.panels.filter(p=>p.parent===f.id);
 const frameById=id=>PROJECT.frames.find(f=>f.id===id);
 const bySort=(a,b)=>((a.depth??0.5)-(b.depth??0.5))||((a.ord??0)-(b.ord??0));
+/* ---------- V2-D: テキスト参照ヘルパ ---------- */
+const isText=o=>!!(o&&(o.type==='v'||o.type==='sub'));
+const textsOf=f=>PROJECT.texts.filter(t=>t.type==='v'&&t.parent===f.id);
 /* ---------- V2-B: シーケンス再生 ---------- */
 const seqFile=(s,i)=>s.pre+String(s.start+i).padStart(s.pad,'0')+'.'+s.ext;
 function seqIdx(p,tS,vis){
@@ -1090,6 +1121,62 @@ function drawImgPanel(p,r,tS,dim){
   }
   cx.restore();
 }
+/* ---------- V2-D: 縦書きテキスト（読み文字）＋EN字幕 ----------
+ * 1文字ずつ縦積みfillText。色は白/黒トグルのみ（にじみ縁取り=4方向シャドウ）。
+ * ルートテキストは pf=1 / zi=cam.z（深度なしのオーバーレイ扱い）。ビューアにも同式を複製 */
+const VT_ROT='ーｰ―－‐〜~…‥()（）「」『』[]【】<>＜＞=＝';   // 縦書きで90°回転する字（長音ほか）
+function drawVText(t,sx,sy,fs,alpha){
+  if(alpha<=0.01||!t.str)return;
+  const cols=String(t.str).split('\n');
+  const adv=fs*1.08,colAdv=fs*1.18;
+  const fg=t.col==='#000'?'#000':'#fff',bg=fg==='#000'?'#fff':'#000';
+  const o=Math.max(1,fs/24);   // size24でほぼ1px（仕様の4方向1pxシャドウ相当・大サイズは比例）
+  cx.save();cx.globalAlpha*=alpha;
+  cx.font='bold '+fs+'px "Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
+  cx.textAlign='center';cx.textBaseline='middle';
+  for(let ci=0;ci<cols.length;ci++){
+    const chars=[...cols[ci]],x=sx-fs/2-ci*colAdv;   // アンカー=1列目の右上。列は右→左
+    for(let k=0;k<chars.length;k++){
+      cx.save();cx.translate(x,sy+fs/2+k*adv);
+      if(VT_ROT.indexOf(chars[k])>=0)cx.rotate(Math.PI/2);
+      cx.fillStyle=bg;
+      cx.fillText(chars[k],-o,0);cx.fillText(chars[k],o,0);cx.fillText(chars[k],0,-o);cx.fillText(chars[k],0,o);
+      cx.fillStyle=fg;cx.fillText(chars[k],0,0);
+      cx.restore();
+    }
+  }
+  cx.restore();
+}
+function textBBox(t,sx,sy,fs){
+  const cols=String(t.str||'').split('\n');
+  const rows=cols.reduce((m,c)=>Math.max(m,[...c].length),1);
+  const w=cols.length*fs*1.18,h=Math.max(rows,1)*fs*1.08;
+  return{x:sx-w,y:sy,w,h};
+}
+function textAnchor(t,cam){
+  const fs=(t.size??24)/1000*cv.height*cam.z;
+  return{sx:cv.width/2+(t.x-cam.x)*cv.width*cam.z,sy:cv.height/2+(t.y-cam.y)*cv.height*cam.z,fs};
+}
+/* KFのdwell窓アルファ（sub / kf付きvテキスト共通）。最終KFは開いたら閉じない */
+function kfWinAlpha(ki,P){
+  const seg=TT.segs[2*ki];if(!seg||P==null)return 0;
+  const w=Math.max(seg.p1-seg.p0,1e-6);
+  const ain=map(P,seg.p0,seg.p0+w*0.2);
+  if(2*ki===TT.segs.length-1)return ain;
+  return ain*(1-map(P,seg.p1-w*0.2,seg.p1));
+}
+function vAlpha(t,P){return(t.kf==null||P==null)?1:kfWinAlpha(t.kf,P);}
+function drawSubs(g,P,W,H){   // 画面下部中央 mono 11px（ビューアと同表示・PREVIEW中のみ）
+  if(P==null)return;
+  for(const t of PROJECT.texts){
+    if(t.type!=='sub'||t.kf==null||!t.str)continue;
+    const a=kfWinAlpha(t.kf,P);if(a<=0.01)continue;
+    g.save();g.globalAlpha=a;g.font=(11*DPR)+'px monospace';g.textAlign='center';
+    g.fillStyle='rgba(0,0,0,.8)';g.fillText(t.str,W/2+1,H-H*0.055+1);
+    g.fillStyle='#f2eefc';g.fillText(t.str,W/2,H-H*0.055);
+    g.restore();
+  }
+}
 /* ---------- V2-C: FRAMEのIN演出・ドリフト・カバーワイプ ----------
  * fx.kf のKFに紐づく: 直前travel区間=IN演出の窓 / dwell区間=ドリフトの窓（Pの純関数=可逆）
  * builderのTAKEは単一シーンなので TT.segs = [dwell0,travel01,dwell1,...] → kf i の
@@ -1139,6 +1226,14 @@ function computeWipeP(){
   }
 }
 /* ワイプの見た目: invert=ステージ全体を明暗反転 / whiteout=覆った瞬間から白→次の絵 */
+/* V2-D: クリックFXフラッシュ（FXタブのTESTで発火。ビューアではpointerdownで発火・キュー1つ） */
+let gClick=0;
+function fireClickFx(){
+  const m=PROJECT.clickFx||'invert';
+  if(m==='none'){toast('CLICK FX: none（発火しません）');return;}
+  if(gClick&&performance.now()-gClick<180)return;   // 連打はキュー1つ
+  gClick=performance.now();
+}
 function applyWipeVisual(P){
   let inv=false,wa=0;
   if(P!=null)for(const f of PROJECT.frames){
@@ -1148,6 +1243,12 @@ function applyWipeVisual(P){
       const a=map(P,f._wipeP-0.01,f._wipeP)*(1-map(P,f._wipeP,f._wipeP+0.06));
       wa=Math.max(wa,a);
     }
+  }
+  if(gClick){   // V2-D: 0.18秒。invertはワイプ反転とXOR=重なっても破綻しない
+    const el=performance.now()-gClick;
+    if(el>=180)gClick=0;
+    else if((PROJECT.clickFx||'invert')==='invert')inv=!inv;
+    else if((PROJECT.clickFx||'invert')==='white')wa=Math.max(wa,0.85*(1-el/180));
   }
   cv.style.filter=inv?'invert(1) hue-rotate(180deg)':'';
   if(wa>0.01){cx0.save();cx0.globalAlpha=wa;cx0.fillStyle='#fff';cx0.fillRect(0,0,cv.width,cv.height);cx0.restore();}
@@ -1179,6 +1280,15 @@ function renderWorld(cam,tS,P){
         drawImgPanel(c,r,tS,false);
         if(mode==='place'&&sel===c){cx.strokeStyle='#FF4FA8';cx.lineWidth=2*DPR;cx.strokeRect(r.x,r.y,r.w,r.h);}
       }
+      for(const t of textsOf(o)){   // V2-D: フレーム内テキスト（フレームに固定・子の最前）
+        const fs=(t.size??24)/1000*R.h;
+        const sx=R.x+R.w/2+t.x*R.h,sy=R.y+R.h/2+t.y*R.h;
+        drawVText(t,sx,sy,fs,vAlpha(t,P));
+        if(mode==='place'&&sel===t){
+          const b=textBBox(t,sx,sy,fs);
+          cx.save();cx.strokeStyle='#FF4FA8';cx.setLineDash([5,4]);cx.lineWidth=1.5*DPR;cx.strokeRect(b.x,b.y,b.w,b.h);cx.setLineDash([]);cx.restore();
+        }
+      }
       cx.restore();
       /* SPEC_09 P4: コマ枠線（コンテンツ＝書き出し対象。ビューアと同式: w はフレーム高1000px基準） */
       if(o.line&&o.line.on){
@@ -1198,6 +1308,16 @@ function renderWorld(cam,tS,P){
     }else{
       drawImgPanel(o,R,tS,dim);
       if(mode==='place'&&sel===o){cx.save();cx.strokeStyle='#FF4FA8';cx.lineWidth=2*DPR;cx.strokeRect(R.x,R.y,R.w,R.h);cx.restore();}
+    }
+  }
+  /* V2-D: ルートの縦書きテキスト（常に最前グループ） */
+  for(const t of PROJECT.texts){
+    if(t.type!=='v'||t.parent)continue;
+    const a=textAnchor(t,cam);
+    drawVText(t,a.sx,a.sy,a.fs,(ctxFrame?0.35:1)*vAlpha(t,P));
+    if(mode==='place'&&sel===t&&!ctxFrame){
+      const b=textBBox(t,a.sx,a.sy,a.fs);
+      cx.save();cx.strokeStyle='#FF4FA8';cx.setLineDash([5,4]);cx.lineWidth=1.5*DPR;cx.strokeRect(b.x,b.y,b.w,b.h);cx.setLineDash([]);cx.restore();
     }
   }
 }
@@ -1275,8 +1395,10 @@ function renderCards(){
         ${['smooth','inout','linear','outCubic','inCubic'].map(e=>`<option value="${e}"${(k.ease||'smooth')===e?' selected':''}>${e}</option>`).join('')}
       </select></label>
       <label>DWELL <input type="range" data-i="${i}" data-act="dwell" min="0.05" max="3" step="0.05" value="${k.dwell??1}"> ${(k.dwell??1).toFixed(2)}</label>
+      <label>SUB <input type="text" class="subin" data-i="${i}" data-act="sub" value="${escH(subOf(i))}" placeholder="EN subtitle（空で削除）" spellcheck="false"></label>
     </div>`).join('');
 }
+function subOf(i){const t=PROJECT.texts.find(x=>x.type==='sub'&&x.kf===i);return t?t.str:'';}   // V2-D: KFごとに1本
 /* ---------- V2-A: undo/redoスタック（60段・スライダーは300ms合体） ---------- */
 let history=[],hIdx=-1,histT=null;
 function commit(){
@@ -1332,13 +1454,26 @@ cards.addEventListener('click',e=>{
   const i=+t.dataset.i,k=PROJECT.take.kf[i];if(!k)return;
   if(t.dataset.act==='go')selectKf(i,true);
   else if(t.dataset.act==='upd'){Object.assign(k,{x:+VC.x.toFixed(3),y:+VC.y.toFixed(3),z:+VC.z.toFixed(3)});selKf=i;rebuild();}
-  else if(t.dataset.act==='del'){PROJECT.take.kf.splice(i,1);if(selKf>=PROJECT.take.kf.length)selKf=PROJECT.take.kf.length-1;rebuild();}
+  else if(t.dataset.act==='del'){
+    PROJECT.take.kf.splice(i,1);
+    PROJECT.texts=PROJECT.texts.filter(x=>!(x.type==='sub'&&x.kf===i));   // V2-D: 字幕はKFと運命共同体
+    PROJECT.texts.forEach(x=>{if(x.kf!=null){if(x.kf===i)x.kf=null;else if(x.kf>i)x.kf--;}});   // vテキストは常時に戻し、後続KFは番号を詰める
+    if(selKf>=PROJECT.take.kf.length)selKf=PROJECT.take.kf.length-1;rebuild();
+  }
 });
 cards.addEventListener('input',e=>{
   const t=e.target;if(!t||!t.dataset)return;
   const i=+t.dataset.i,k=PROJECT.take.kf[i];if(!k)return;
   if(t.dataset.act==='dwell'){k.dwell=parseFloat(t.value)||1;TT=buildTake(PROJECT.take);commitD();}
   else if(t.dataset.act==='ease'){k.ease=t.value;TT=buildTake(PROJECT.take);commitD();}
+  else if(t.dataset.act==='sub'){   // V2-D: EN字幕トラック（KFに1本・空で削除）
+    const v=t.value;
+    const s=PROJECT.texts.find(x=>x.type==='sub'&&x.kf===i);
+    if(!v.trim()){if(s)PROJECT.texts=PROJECT.texts.filter(x=>x!==s);}
+    else if(s)s.str=v;
+    else PROJECT.texts.push({id:'t'+(pid++),type:'sub',str:v,x:0,y:0,size:11,col:'#fff',parent:null,kf:i});
+    commitD();
+  }
 });
 cards.addEventListener('change',e=>{
   const t=e.target;if(t&&t.dataset&&t.dataset.act==='dwell')renderCards();
@@ -1350,6 +1485,15 @@ function renderChip(){
   chip.classList.toggle('sel',!!sel);
   if(!sel){chip.innerHTML='';return;}
   const o=sel;
+  if(isText(o)){   // V2-D: テキストチップ（常に最前グループなのでORDERなし）
+    chip.innerHTML=`<span class="nm">T:${escH((o.str||'').split('\n')[0].slice(0,10)||'(空)')}</span>
+   COL <button class="btn" data-act="tcol">${o.col==='#000'?'黒':'白'}</button>
+   SIZE <button class="btn" data-act="minus">−</button><button class="btn" data-act="plus">＋</button><span id="chip-ts">${o.size??24}</span>
+   KF <select data-act="tkf"><option value=""${o.kf==null?' selected':''}>常時</option>${PROJECT.take.kf.map((k,i)=>`<option value="${i}"${o.kf===i?' selected':''}>#${pad(i)}</option>`).join('')}</select>
+   <button class="btn" data-act="tedit">EDIT</button>${o.parent?' <button class="btn" data-act="eject">EJECT</button>':''}
+   <button class="btn" data-act="del">DELETE</button>`;
+    return;
+  }
   let s=`<span class="nm">${o.name}</span>
    ORDER <button class="btn" data-act="back">◀</button><button class="btn" data-act="front">▶</button>
    SIZE <button class="btn" data-act="minus">−</button><button class="btn" data-act="plus">＋</button>
@@ -1382,10 +1526,17 @@ function ejectPanel(p){
   p.x=+(f.x+p.x*f.h).toFixed(3);p.y=+(f.y+p.y*f.h).toFixed(3);p.h=+(p.h*f.h).toFixed(3);
   p.parent=null;toast(p.name+' をルートへ戻しました');renderChip();commit();
 }
+function ejectText(t){   // V2-D
+  const f=frameById(t.parent);if(!f)return;
+  t.x=+(f.x+t.x*f.h).toFixed(3);t.y=+(f.y+t.y*f.h).toFixed(3);t.size=+((t.size??24)*f.h).toFixed(1);
+  t.parent=null;toast('テキストをルートへ戻しました');renderChip();commit();
+}
 function deleteSel(){
   if(!sel)return;
-  if(isFrame(sel)){
+  if(isText(sel)){PROJECT.texts=PROJECT.texts.filter(t=>t!==sel);}   // V2-D
+  else if(isFrame(sel)){
     childrenOf(sel).forEach(c=>{const f=sel;c.x=+(f.x+c.x*f.h).toFixed(3);c.y=+(f.y+c.y*f.h).toFixed(3);c.h=+(c.h*f.h).toFixed(3);c.parent=null;});
+    PROJECT.texts.forEach(t=>{if(t.parent===sel.id){const f=sel;t.x=+(f.x+t.x*f.h).toFixed(3);t.y=+(f.y+t.y*f.h).toFixed(3);t.size=+((t.size??24)*f.h).toFixed(1);t.parent=null;}});   // V2-D: 子テキストもルートへ放出
     PROJECT.frames=PROJECT.frames.filter(f=>f!==sel);
     if(ctxFrame===sel)exitFrame();
   }else PROJECT.panels=PROJECT.panels.filter(p=>p!==sel);
@@ -1399,13 +1550,15 @@ chip.addEventListener('click',e=>{
   const t=e.target,act=t&&t.dataset&&t.dataset.act;if(!act||!sel)return;
   if(act==='back')reorder(sel,-1);
   else if(act==='front')reorder(sel,+1);
-  else if(act==='minus'){sel.h=clamp(sel.h*0.88,0.05,4);commitD();}
-  else if(act==='plus'){sel.h=clamp(sel.h*1.14,0.05,4);commitD();}
+  else if(act==='minus'){if(isText(sel)){sel.size=+clamp((sel.size??24)*0.88,4,400).toFixed(1);const d=$('#chip-ts');if(d)d.textContent=sel.size;}else sel.h=clamp(sel.h*0.88,0.05,4);commitD();}
+  else if(act==='plus'){if(isText(sel)){sel.size=+clamp((sel.size??24)*1.14,4,400).toFixed(1);const d=$('#chip-ts');if(d)d.textContent=sel.size;}else sel.h=clamp(sel.h*1.14,0.05,4);commitD();}
+  else if(act==='tcol'&&isText(sel)){sel.col=sel.col==='#000'?'#fff':'#000';renderChip();commit();}   // V2-D
+  else if(act==='tedit'&&isText(sel))editTextAt(sel);                                                 // V2-D
   else if(act==='mask')toggleMask();
   else if(act==='fline'&&isFrame(sel)){if(!sel.line)sel.line={on:false,w:10};sel.line.on=!sel.line.on;renderChip();commit();}   // SPEC_09 P4
   else if(act==='apreload'&&sel.seq&&sel.seq.src==='ap')apReload(sel);   // SPEC_07
   else if(act==='apedit'&&sel.seq&&sel.seq.src==='ap')apEdit(sel);       // SPEC_07
-  else if(act==='eject')ejectPanel(sel);
+  else if(act==='eject'){if(isText(sel))ejectText(sel);else ejectPanel(sel);}   // V2-D: テキスト対応
   else if(act==='del')deleteSel();
 });
 chip.addEventListener('input',e=>{
@@ -1424,6 +1577,7 @@ chip.addEventListener('change',e=>{
   else if(isFrame(sel)&&act==='fdrift'){sel.fx.drift=t.value;computeWipeP();commit();}
   else if(isFrame(sel)&&act==='fkf'){sel.fx.kf=t.value===''?null:+t.value;computeWipeP();commit();renderChip();}
   else if(isFrame(sel)&&act==='fwipe'){sel.wipe=t.value==='none'?null:t.value;computeWipeP();commit();}
+  else if(isText(sel)&&act==='tkf'){sel.kf=t.value===''?null:+t.value;commit();}   // V2-D: 常時 or KFのdwell窓で表示
 });
 
 /* ---------- interactions ---------- */
@@ -1433,12 +1587,23 @@ function hitAt(cssX,cssY){
   const px=cssX*DPR,py=cssY*DPR;
   if(ctxFrame){
     const R=prect(ctxFrame,VC);
+    for(const t of [...textsOf(ctxFrame)].reverse()){   // V2-D: テキストは最前
+      const fs=(t.size??24)/1000*R.h;
+      const b=textBBox(t,R.x+R.w/2+t.x*R.h,R.y+R.h/2+t.y*R.h,fs);
+      if(px>=b.x&&px<=b.x+b.w&&py>=b.y&&py<=b.y+b.h)return{o:t,R};
+    }
     const kids=childrenOf(ctxFrame).sort(bySort).reverse();
     for(const c of kids){
       const r=childRect(c,ctxFrame,R,VC);
       if(px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h)return{o:c,R};
     }
     return null;
+  }
+  for(const t of [...PROJECT.texts].reverse()){   // V2-D: ルートテキスト（常に最前）
+    if(t.type!=='v'||t.parent)continue;
+    const a=textAnchor(t,VC);
+    const b=textBBox(t,a.sx,a.sy,a.fs);
+    if(px>=b.x&&px<=b.x+b.w&&py>=b.y&&py<=b.y+b.h)return{o:t,r:b};
   }
   const items=rootItems().sort(bySort).reverse();   // 手前から
   for(const o of items){
@@ -1458,6 +1623,12 @@ function enterFrame(f){ctxFrame=f;sel=null;maskEdit.on=false;renderChip();render
 
 cv.addEventListener('pointerdown',e=>{
   if(PV.on){stopPreview();return;}
+  if(textEd){closeTextEditor(true);return;}   // V2-D: 入力中に余白クリック=確定
+  if(textArm){                                 // V2-D: T待機中のクリック=その位置に入力開始
+    textArm=false;document.body.classList.remove('textarm');
+    openTextEditor(e.clientX,e.clientY,null);
+    return;
+  }
   /* マスク編集: 4隅ハンドルのドラッグ */
   if(maskEdit.on&&maskEdit.f){
     const R=prect(maskEdit.f,VC);
@@ -1475,7 +1646,7 @@ cv.addEventListener('pointerdown',e=>{
     if(ctxFrame&&!isFrame(hit.o)){   // 子パネル: ローカル単位ドラッグ
       drag={type:'child',p:hit.o,px:e.clientX,py:e.clientY,x:hit.o.x,y:hit.o.y,S:hit.R.h/DPR,fine:e.shiftKey?0.2:1};
     }else{
-      const r=prect(hit.o,VC);
+      const r=isText(hit.o)?{zi:VC.z}:prect(hit.o,VC);   // V2-D: テキストはzi=cam.z（深度なし）
       drag={type:'panel',p:hit.o,px:e.clientX,py:e.clientY,x:hit.o.x,y:hit.o.y,zi:r.zi,fine:e.shiftKey?0.2:1};
     }
   }else{
@@ -1486,6 +1657,7 @@ cv.addEventListener('pointerdown',e=>{
 cv.addEventListener('dblclick',e=>{
   if(mode!=='place')return;
   const hit=hitAt(e.clientX,e.clientY);
+  if(hit&&isText(hit.o)){editTextAt(hit.o);return;}   // V2-D: 既存テキストを再編集
   if(!ctxFrame&&hit&&isFrame(hit.o))enterFrame(hit.o);
   else if(ctxFrame&&!hit)exitFrame();
 });
@@ -1522,9 +1694,10 @@ addEventListener('pointerup',e=>{
           const p=drag.p;
           p.x=+((p.x-f.x)/f.h).toFixed(3);
           p.y=+((p.y-f.y)/f.h).toFixed(3);
-          p.h=+(p.h/f.h).toFixed(3);
+          if(isText(p))p.size=+((p.size??24)/f.h).toFixed(1);   // V2-D: テキストもフレームに格納できる
+          else p.h=+(p.h/f.h).toFixed(3);
           p.parent=f.id;
-          toast(p.name+' → '+f.name+' に格納（EJECTで戻せる）');
+          toast((isText(p)?'テキスト':p.name)+' → '+f.name+' に格納（EJECTで戻せる）');
           renderChip();
           break;
         }
@@ -1566,12 +1739,93 @@ $('#b-frame').addEventListener('click',()=>{
 $('#m-place').addEventListener('click',()=>setMode('place'));
 $('#m-take').addEventListener('click',()=>setMode('take'));
 
+/* ============================================================
+   V2-D: 縦書きテキスト — T→クリック位置で contenteditable 入力→確定でcanvas描画データ化
+   （writing-mode:vertical-rl でその場縦書き入力。IME不可環境は catch で prompt フォールバック）
+   ============================================================ */
+let textArm=false,textEd=null;
+function armText(){
+  if(textEd){closeTextEditor(true);return;}
+  textArm=!textArm;
+  document.body.classList.toggle('textarm',textArm);
+  if(textArm)toast('縦書きテキスト: 置きたい場所をクリック（Escで取消）');
+}
+function openTextEditor(cssX,cssY,t,fsCssOpt){
+  closeTextEditor(true);
+  const fsCss=fsCssOpt??((t?(t.size??24):24)/1000*VH*VC.z);
+  try{
+    const ed=document.createElement('div');
+    ed.id='text-ed';
+    try{ed.contentEditable='plaintext-only';}catch(err){}
+    if(ed.contentEditable!=='plaintext-only')ed.contentEditable='true';
+    ed.style.right=(innerWidth-cssX)+'px';   // アンカー=右上（縦書きは右→左へ育つ）
+    ed.style.top=cssY+'px';
+    ed.style.fontSize=Math.max(8,fsCss)+'px';
+    ed.style.color=(t&&t.col==='#000')?'#000':'#fff';
+    ed.textContent=t?t.str:'';
+    document.body.appendChild(ed);
+    textEd={el:ed,t:t||null,cssX,cssY};
+    ed.addEventListener('keydown',ev=>{
+      ev.stopPropagation();   // グローバルショートカット(T/Space等)に食われない
+      if(ev.key==='Escape'){ev.preventDefault();closeTextEditor(false);}
+      else if(ev.key==='Enter'&&(ev.ctrlKey||ev.metaKey)){ev.preventDefault();closeTextEditor(true);}
+    });
+    ed.addEventListener('blur',()=>closeTextEditor(true));
+    ed.focus();
+    toast('入力 → 余白クリック / Ctrl+Enter で確定。Enter=次の列 / Esc=取消');
+  }catch(err){   // DOM編集が使えない環境: promptフォールバック（改行は「/」区切り）
+    const s=window.prompt('縦書きテキスト（改行は / ）:',t?String(t.str).replace(/\n/g,'/'):'');
+    if(s!=null)commitText(t,s.replace(/\//g,'\n'),cssX,cssY);
+  }
+}
+function commitText(t,str,cssX,cssY){
+  str=String(str).replace(/\s+$/,'');
+  if(t){   // 既存の再編集: 位置は維持。空にしたら削除
+    if(!str){PROJECT.texts=PROJECT.texts.filter(x=>x!==t);if(sel===t){sel=null;renderChip();}}
+    else t.str=str;
+    commit();return;
+  }
+  if(!str)return;
+  const nt={id:'t'+(pid++),type:'v',str,
+    x:+(VC.x+(cssX/VW-0.5)/VC.z).toFixed(3),
+    y:+(VC.y+(cssY/VH-0.5)/VC.z).toFixed(3),
+    size:24,col:'#fff',parent:null,kf:null};
+  if(ctxFrame){   // フレーム内編集中ならそのフレームに格納（ローカル座標へ）
+    nt.x=+((nt.x-ctxFrame.x)/ctxFrame.h).toFixed(3);
+    nt.y=+((nt.y-ctxFrame.y)/ctxFrame.h).toFixed(3);
+    nt.size=+(24/ctxFrame.h).toFixed(1);
+    nt.parent=ctxFrame.id;
+  }
+  PROJECT.texts.push(nt);
+  if(mode==='place'){sel=nt;renderChip();}
+  commit();
+}
+function closeTextEditor(doCommit){
+  if(!textEd)return;
+  const{el,t,cssX,cssY}=textEd;textEd=null;   // blur再入防止のため先にnull
+  const str=el.innerText||'';
+  el.remove();
+  if(doCommit)commitText(t,str,cssX,cssY);
+}
+function editTextAt(t){   // 現在の画面位置にエディタを重ねて再編集
+  let sx,sy,fs;
+  if(t.parent){
+    const f=frameById(t.parent);if(!f)return;
+    const R=prect(f,VC);fs=(t.size??24)/1000*R.h;
+    sx=R.x+R.w/2+t.x*R.h;sy=R.y+R.h/2+t.y*R.h;
+  }else{
+    const a=textAnchor(t,VC);sx=a.sx;sy=a.sy;fs=a.fs;
+  }
+  openTextEditor(sx/DPR,sy/DPR,t,fs/DPR);
+}
+$('#b-text').addEventListener('click',armText);
+
 function startPreview(){if(!PROJECT.take.kf.length){toast('KFがまだありません — TAKEモードで C=CAPTURE');return;}PV.on=true;PV.p=0;}
 function stopPreview(){PV.on=false;}
 
 addEventListener('keydown',e=>{
   const tag=(e.target&&e.target.tagName)||'';
-  if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA')return;
+  if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||(e.target&&e.target.isContentEditable))return;   // V2-D: テキスト入力中も除外
   if((e.ctrlKey||e.metaKey)&&(e.key==='z'||e.key==='Z')){   // V2-A: undo/redo
     e.preventDefault();
     if(e.shiftKey)redo();else undo();
@@ -1583,14 +1837,17 @@ addEventListener('keydown',e=>{
   else if(e.key===' '){e.preventDefault();PV.on?stopPreview():startPreview();}
   else if(e.key==='ArrowUp'&&mode==='take'){e.preventDefault();selectKf(selKf<0?PROJECT.take.kf.length-1:selKf-1,true);}   // V2-A
   else if(e.key==='ArrowDown'&&mode==='take'){e.preventDefault();selectKf(selKf<0?0:selKf+1,true);}
-  else if(e.key==='['&&mode==='place'&&sel)reorder(sel,-1);   // V2-A: 背面へ
-  else if(e.key===']'&&mode==='place'&&sel)reorder(sel,+1);   // V2-A: 前面へ
+  else if(e.key==='['&&mode==='place'&&sel&&!isText(sel))reorder(sel,-1);   // V2-A: 背面へ（テキストは常に最前）
+  else if(e.key===']'&&mode==='place'&&sel&&!isText(sel))reorder(sel,+1);   // V2-A: 前面へ
   else if((e.key==='m'||e.key==='M')&&mode==='place')toggleMask();   // V2-B
+  else if(e.key==='t'||e.key==='T')armText();                        // V2-D: 縦書きテキスト
   else if(e.key==='f'||e.key==='F')toggleFxModal();                  // V2-C
   else if(e.key==='g'||e.key==='G')toggleGuides();
   else if((e.key==='Delete'||e.key==='Backspace')&&mode==='place'&&sel)deleteSel();
-  else if(e.key==='Escape'){   // カスケード APモーダル→コンバータ→FXモーダル→マスク→フレーム内→選択解除→プレビュー
-    if(document.body.classList.contains('apopen'))toggleApModal(false);
+  else if(e.key==='Escape'){   // カスケード テキスト待機→APモーダル→コンバータ→FXモーダル→マスク→フレーム内→選択解除→プレビュー
+    if(textEd)closeTextEditor(false);   // V2-D（入力フォーカス中はエディタ自身のEscが先に効く）
+    else if(textArm){textArm=false;document.body.classList.remove('textarm');}
+    else if(document.body.classList.contains('apopen'))toggleApModal(false);
     else if(document.body.classList.contains('cvtopen'))toggleCvtModal();
     else if(document.body.classList.contains('fxopen'))toggleFxModal();
     else if(maskEdit.on)toggleMask();
@@ -1612,8 +1869,13 @@ function buildFxUI(){
   const root=$('#fx-body');
   if(!root)return;
   const fxp=PROJECT.take.fx;
-  if(!SFX||!fxp||!fxp.chain){root.innerHTML='<span style="opacity:.6">SATSUEI CORE がありません（WebGL/コア読込を確認）</span>';return;}
   root.innerHTML='';
+  buildClickFxUI(root);   // V2-D: クリックFXはSATSUEIコアと独立に常時表示
+  if(!SFX||!fxp||!fxp.chain){
+    const w=document.createElement('div');
+    w.innerHTML='<span style="opacity:.6">SATSUEI CORE がありません（WebGL/コア読込を確認）</span>';
+    root.appendChild(w);return;
+  }
   const master=document.createElement('label');
   master.className='fx-master';
   master.innerHTML='<input type="checkbox" '+(fxp.enabled?'checked':'')+'> SATSUEI FX ENABLED';
@@ -1647,6 +1909,19 @@ function buildFxUI(){
     }
     root.appendChild(box);
   }
+}
+/* V2-D: クリックFX（ビューアのクリック反応。ATTRACT解除と共存・その場でテスト可） */
+function buildClickFxUI(root){
+  const cf=document.createElement('div');cf.className='fx-ent';
+  cf.innerHTML='<label style="color:var(--amber)">CLICK FX — ビューアのクリック反応</label>'
+    +'<div class="fx-row"><span class="k">TYPE</span><select id="fx-click">'
+    +['invert','white','none'].map(m=>'<option'+((PROJECT.clickFx||'invert')===m?' selected':'')+'>'+m+'</option>').join('')
+    +'</select><button class="btn" id="fx-clicktest">TEST</button></div>';
+  root.appendChild(cf);
+  const cs=cf.querySelector('#fx-click');
+  if(cs)cs.onchange=e=>{PROJECT.clickFx=e.target.value;commit();};
+  const ct=cf.querySelector('#fx-clicktest');
+  if(ct)ct.onclick=fireClickFx;
 }
 {
   const bf=$('#b-fx');if(bf)bf.addEventListener('click',toggleFxModal);
@@ -1688,9 +1963,14 @@ function buildComposerJSON(fps,secs,Wc,Hc,zoomMode){
     if(s.t==='dwell'){key(f0,s.a,0);if(f1>f0)key(f1,s.a,0);}   // 同値キー2枚=ホールド
     else key(f1,s.b,ezOfEase(s.ease));                          // travel: 終端キーにease写像
   }
+  // P3b: ルートパネルの配置情報を同梱（絵は運ばない=ヌル的）。composer側がファイル名一致で
+  // IMPORT済み画像トラックへ位置/サイズ/Z/重ね順を流し込む。FRAME・子パネルは対象外（マスク再現不可）
+  const panels=PROJECT.panels.filter(p=>!p.parent)
+    .map(p=>({name:p.name,x:p.x,y:p.y,h:p.h,depth:p.depth??0.5,ord:p.ord??0}));
   return {
     format:'PROJECT_v2',width:Wc,height:Hc,
     fx:PROJECT.take.fx||undefined,   // スキーマ共通なので変換不要（SPEC_06 §8-4）
+    obanPanels:panels.length?panels:undefined,
     tracks:[{type:'camera',name:(PROJECT.take.name||'OBAN CAM'),visible:true,
       composer:{keyframes:zoomMode==='z'?{x:kx,y:ky,z:kz}:{x:kx,y:ky,s:ks}}}]
   };
@@ -1776,6 +2056,8 @@ function viewerHTML(apBake){
   const proj=JSON.stringify({
     panels:PROJECT.panels.map(p=>({name:p.name,x:p.x,y:p.y,h:p.h,depth:p.depth??0.5,ord:p.ord??0,ar:p.ar||1.414,parent:p.parent||null,seq:p.seq||null})),
     frames:PROJECT.frames.map(f=>({id:f.id,name:f.name,x:f.x,y:f.y,h:f.h,depth:f.depth??0.5,ord:f.ord??0,ar:f.ar||1.777,quad:f.quad,par:f.par??0.6,fx:f.fx||null,wipe:f.wipe||null,line:f.line||null})),
+    texts:PROJECT.texts.map(t=>({type:t.type,str:t.str,x:t.x,y:t.y,size:t.size??24,col:t.col||'#fff',parent:t.parent||null,kf:t.kf??null})),   // V2-D
+    clickFx:PROJECT.clickFx||'invert',
     take:PROJECT.take});
   const spacer=clamp(Math.round(TT.total*130),900,12000);
   const S='<'+'/script>';
@@ -1792,6 +2074,8 @@ body{background:#0c061d;overflow-x:hidden}
 #stage{position:fixed;inset:0;overflow:hidden}
 canvas{position:absolute;inset:0;width:100%;height:100%}
 #bar{position:fixed;top:0;left:0;height:2px;width:0%;background:#5AE9FF;z-index:9}
+#sub-btn{position:fixed;right:10px;bottom:10px;z-index:9;display:none;font-family:monospace;font-size:9px;letter-spacing:.2em;color:#f2eefc;background:rgba(16,7,34,.7);border:1px solid rgba(242,238,252,.35);padding:4px 9px;cursor:pointer}
+body.nohud #sub-btn{display:none!important}
 #gate{position:fixed;inset:0;background:#0c061d;color:#f2eefc;display:flex;justify-content:center;align-items:center;font-family:monospace;font-size:11px;letter-spacing:.3em;z-index:99;transition:opacity .5s}
 #gate.done{opacity:0;pointer-events:none}
 body.nohud #bar{display:none}
@@ -1800,6 +2084,7 @@ body.nohud #bar{display:none}
 <div id="sp"></div>
 <div id="stage"><canvas id="cv"></canvas></div>
 <div id="bar"></div>
+<button id="sub-btn">SUB ON</button>
 <script>
 ${CORE}
 ${S}
@@ -1891,6 +2176,65 @@ function drawP(p,r,tS,W,H){
   const img=panelImg(p,tS,visFrac(r,W,H));
   if(img&&img.complete&&img.naturalWidth)cx.drawImage(img,r.x,r.y,r.w,r.h);
 }
+/* ---- V2-D: 縦書きテキスト / EN字幕（ビルダーと同式） ---- */
+const VT_ROT='ーｰ―－‐〜~…‥()（）「」『』[]【】<>＜＞=＝';
+function drawVText(t,sx,sy,fs,alpha){
+  if(alpha<=0.01||!t.str)return;
+  const cols=String(t.str).split('\\n');
+  const adv=fs*1.08,colAdv=fs*1.18;
+  const fg=t.col==='#000'?'#000':'#fff',bg=fg==='#000'?'#fff':'#000';
+  const o=Math.max(1,fs/24);
+  cx.save();cx.globalAlpha*=alpha;
+  cx.font='bold '+fs+'px "Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
+  cx.textAlign='center';cx.textBaseline='middle';
+  for(let ci=0;ci<cols.length;ci++){
+    const chars=Array.from(cols[ci]),x=sx-fs/2-ci*colAdv;
+    for(let k=0;k<chars.length;k++){
+      cx.save();cx.translate(x,sy+fs/2+k*adv);
+      if(VT_ROT.indexOf(chars[k])>=0)cx.rotate(Math.PI/2);
+      cx.fillStyle=bg;
+      cx.fillText(chars[k],-o,0);cx.fillText(chars[k],o,0);cx.fillText(chars[k],0,-o);cx.fillText(chars[k],0,o);
+      cx.fillStyle=fg;cx.fillText(chars[k],0,0);
+      cx.restore();
+    }
+  }
+  cx.restore();
+}
+function kfWinAlpha(ki,P){
+  const seg=TT.segs[2*ki];if(!seg||P==null)return 0;
+  const w=Math.max(seg.p1-seg.p0,1e-6);
+  const ain=map(P,seg.p0,seg.p0+w*0.2);
+  if(2*ki===TT.segs.length-1)return ain;
+  return ain*(1-map(P,seg.p1-w*0.2,seg.p1));
+}
+function vAlpha(t,P){return(t.kf==null||P==null)?1:kfWinAlpha(t.kf,P);}
+/* V2-D: EN字幕（?sub=0で非表示・右下ボタンで切替） */
+let subOn=Q.get('sub')!=='0';
+const subBtn=document.getElementById('sub-btn');
+if((PROJ.texts||[]).some(function(t){return t.type==='sub';})){
+  subBtn.style.display='block';subBtn.textContent=subOn?'SUB ON':'SUB OFF';
+  subBtn.addEventListener('click',function(){subOn=!subOn;subBtn.textContent=subOn?'SUB ON':'SUB OFF';});
+}
+function drawSubs(P,W,H){
+  for(const t of (PROJ.texts||[])){
+    if(t.type!=='sub'||t.kf==null||!t.str)continue;
+    const a=kfWinAlpha(t.kf,P);if(a<=0.01)continue;
+    vx.save();vx.globalAlpha=a;vx.font=(11*DPR)+'px monospace';vx.textAlign='center';
+    vx.fillStyle='rgba(0,0,0,.8)';vx.fillText(t.str,W/2+1,H-H*0.055+1);
+    vx.fillStyle='#f2eefc';vx.fillText(t.str,W/2,H-H*0.055);
+    vx.restore();
+  }
+}
+/* V2-D: クリックFX（0.18秒・連打キュー1つ・ATTRACT解除と共存） */
+const CLICKFX=PROJ.clickFx||'invert';
+let clickT=0;
+addEventListener('pointerdown',function(e){
+  if(CLICKFX==='none')return;
+  if(e.target&&e.target.id==='sub-btn')return;
+  const n=performance.now();
+  if(clickT&&n-clickT<180)return;
+  clickT=n;
+},{passive:true});
 /* ---- V2-C: SATSUEI FX (rt) + FRAME IN演出/ドリフト + カバーワイプ ---- */
 const FXP=(Q.get('fx')==='0')?null:((PROJ.take&&PROJ.take.fx)||null);   // ?fx=0 で強制OFF
 const gfx=(typeof window!=='undefined'&&window.SatsueiFX)
@@ -1951,6 +2295,12 @@ function applyWipeVisual(P){
       wa=Math.max(wa,a);
     }
   }
+  if(clickT){   // V2-D: クリックFX（invertはワイプ反転とXOR=重なっても破綻しない）
+    const el=performance.now()-clickT;
+    if(el>=180)clickT=0;
+    else if(CLICKFX==='invert')inv=!inv;
+    else if(CLICKFX==='white')wa=Math.max(wa,0.85*(1-el/180));
+  }
   cv.style.filter=inv?'invert(1) hue-rotate(180deg)':'';
   if(wa>0.01){vx.save();vx.globalAlpha=wa;vx.fillStyle='#fff';vx.fillRect(0,0,cv.width,cv.height);vx.restore();}
 }
@@ -1997,6 +2347,10 @@ function frame(nowMs){
         cx.closePath();cx.clip();
         const kids=PROJ.panels.filter(p=>p.parent===o.id).sort(bySort);
         for(const c of kids)drawP(c,childRect(c,o,R,cam),tS,W,H);
+        for(const t2 of (PROJ.texts||[])){   // V2-D: フレーム内テキスト（フレーム固定・子の最前）
+          if(t2.type!=='v'||t2.parent!==o.id)continue;
+          drawVText(t2,R.x+R.w/2+t2.x*R.h,R.y+R.h/2+t2.y*R.h,(t2.size||24)/1000*R.h,vAlpha(t2,Pd));
+        }
         cx.restore();
         if(o.line&&o.line.on){   // SPEC_09 P4: コマ枠線（ビルダーと同式・w=フレーム高1000px基準）
           cx.save();cx.strokeStyle='#000';cx.lineJoin='miter';cx.lineWidth=Math.max(1,o.line.w*R.h/1000);
@@ -2006,12 +2360,17 @@ function frame(nowMs){
         }
       }else drawP(o,R,tS,W,H);
     }
+    for(const t3 of (PROJ.texts||[])){   // V2-D: ルートの縦書きテキスト（常に最前・pf=1/zi=cam.z）
+      if(t3.type!=='v'||t3.parent)continue;
+      drawVText(t3,W/2+(t3.x-cam.x)*W*cam.z,H/2+(t3.y-cam.y)*H*cam.z,(t3.size||24)/1000*H*cam.z,vAlpha(t3,Pd));
+    }
     /* V2-C: SATSUEI FX (rt) — enabled:false は apply を呼ばない（後方互換の要） */
     const out=(FXP&&FXP.enabled&&gfx.available)
       ? gfx.apply(sc,FXP,{t:tS,velX:clamp(cam.x-pcx,-0.05,0.05),velY:clamp(cam.y-pcy,-0.05,0.05)})
       : sc;
     vx.clearRect(0,0,W,H);vx.drawImage(out,0,0,W,H);
     pcx=cam.x;pcy=cam.y;
+    if(subOn)drawSubs(Pd,W,H);   // V2-D: EN字幕（撮影FXの外・ワイプ白の下）
     applyWipeVisual(Pd);
     document.getElementById('bar').style.width=(Pd*100).toFixed(2)+'%';
   }
@@ -2062,6 +2421,7 @@ function frame(nowMs){
     const out=gFx.apply(gSc,fxp,{t:tS});   // draft: velなし=mbは素通し（実装済み挙動）
     cx=cx0;cx.clearRect(0,0,W,H);cx.drawImage(out,0,0,W,H);
   }
+  if(PV.on)drawSubs(cx0,P,W,H);             // V2-D: EN字幕（ビューアと同表示・ワイプ白の下）
   applyWipeVisual(P);                       // V2-C: invert/whiteout（PREVIEW時のみ発火）
   drawTakePath(cam);
   drawGuides();

@@ -62,6 +62,33 @@
   - **案B Zドリー（視差優先）**: `Z=1000·(1−1/z) / X=x*Wc/z / Y=y*Hc/z`（パン相殺→dwell時の狙い構図は案Aと一致。実機検証: ズレ0.05px）。パネル側トラックにZを振ると多層視差が出る。ただしcomposerはtr.xをperspで拡大しないのでパネル間隔はズームで開かない＝近似
 - `take.fx` はトップレベル `fx:` にそのまま同梱（スキーマ共通・無変換）
 - composer側の受け（P3対応で追加）: ①カメラだけのJSONでもKF範囲から `totalFrames` が立つ ②既存トラックへの追加IMPORTでも `fx:` があれば `normalizeFx` で引き継ぐ。**composerに既にCAMERAがあると貼ったカメラは捨てられる**（カメラは1つまで＝既存優先）ので、先にCAMERAを消してから貼る
+- **P3b（配置の流し込み・2026-07実装済み）**: JSONに `obanPanels:[{name,x,y,h,depth,ord}]`（ルートパネルのみ）を同梱。composerの `applyObanPlacements()` が**ファイル名一致**（拡張子無視・大文字化）でIMPORT済み画像トラックに位置/サイズ/Z/重ね順を流し込む（既存KFは上書き）。手順=①絵をIMPORT ②OBANでCOPY ③PASTE JSON。Z=depth写像でパン視差係数がOBAN pfと厳密一致・SCLはpersp補償。FRAME・子パネル・quadマスクは対象外
+
+## V2-D テキストと反応（2026-07 実装済み / SPEC_05 §5）
+
+### 縦書きテキスト（読み文字）
+- **`+ TEXT [T]`ボタン / `T`キー**→クリック位置に `#text-ed`（contenteditable・`writing-mode:vertical-rl`）でその場縦書き入力→確定（余白クリック/Ctrl+Enter）でcanvas描画データ化。Enter=次の列 / Esc=取消。DOM不可環境はprompt()フォールバック（改行は「/」）
+- **描画**: `drawVText()` — 1文字ずつ縦積みfillText（bold・和文スタック）。長音「ー」等は `VT_ROT` 集合で90°回転。色は白/黒トグルのみ＋4方向シャドウのにじみ縁取り（size24でほぼ1px・比例拡大）。**ルートテキストは pf=1 / zi=cam.z の深度なしオーバーレイ扱い**（`textAnchor()`。アンカー=1列目の右上、列は右→左）
+- **PLACE操作**: パネル同様に選択/ドラッグ/削除。**ヒット判定は常に最前**（`hitAt()`先頭）。`[`/`]`は対象外（常に最前グループ）。ダブルクリック or チップ`EDIT`で再編集。チップ= COL(白黒)/SIZE±/KF(常時 or #n)/EDIT/EJECT/DELETE
+- **FRAME格納可**: パネル同様ドラッグ格納（`size=size/f.h` でローカル化・内部パララックスなし=フレーム固定）。EJECT/フレーム削除時の放出も対応。ctxFrame内で新規作成するとそのフレームに直接入る
+- **KF紐づけ**: `kf:null`=常時表示 / KF指定=そのKFのdwell窓でフェードイン/アウト（`kfWinAlpha()`・最終KFは開いたら閉じない）。ビルダー編集中は常時表示、PREVIEW/ビューアで窓が効く
+
+### EN字幕トラック
+- TAKEカードに **SUB入力欄**（KFごとに1本・空で削除）→ `texts[]` に `{type:'sub',str,kf}`。KF削除時はsubも削除・後続kf参照は番号詰め（v-textは常時に戻す）
+- 表示: 画面下部中央 mono 11px・dwell窓フェード（`drawSubs()`）。ビルダーPREVIEWとビューアで同表示。ビューアは **`?sub=0`** で非表示・右下 `SUB ON/OFF` 小ボタン（subがある時のみ表示・`hud=0`では非表示）。**字幕は撮影FXの外**（UIレイヤー・v-textはFXの内側=コンテンツ）
+
+### ビューアのクリックFX
+- `PROJECT.clickFx`: `'invert'`（既定・0.18秒 filter:invert フラッシュ）/`'white'`（ホワイトパルス）/`'none'`。**fxスキーマv1とは別のトップレベルフィールド**（COPY FOR COMPOSERには乗らない）
+- ビューア: pointerdownで発火（SUBボタンは除外・ATTRACT解除と共存・連打はキュー1つ）。invertはワイプ反転と**XOR合成**（重なっても破綻しない）— 実装は `applyWipeVisual()` に統合
+- ビルダー: FXモーダル末尾の **CLICK FX**（SATSUEIコア無しでも表示）で選択+TESTボタンでその場発火
+
+### データモデル追加
+```js
+PROJECT.texts=[{id,type:'v'|'sub',str,x,y,size:24,col:'#fff'|'#000',parent:null|frameId,kf:null|kfIndex}]
+PROJECT.clickFx='invert'|'white'|'none'
+```
+- `migrate()`が欠損補完（x/y/sizeは非数値・非有限も0/24に矯正）。ビューアへは texts+clickFx をPROJに同梱
+- **注意（テンプレート内エスケープ）**: ビューアテンプレートはテンプレートリテラルなので、ビューア側コードの文字列 `'\n'` は **`'\\n'`** と書くこと（実改行に展開されて構文エラーになる）。バッククォート禁止は従来どおり
 
 ## SPEC_07 ANIMATOR⇄OBANブリッジ（2026-07 実装済み / B0〜B3）
 
@@ -83,6 +110,8 @@ PROJECT={version:2,name,
     seq:null|{pre,pad,start,n,ext,fps,mode,trigger}         // ファイル連番
        |{src:'ap',apId,n,fps,mode,trigger,apName,apAt}}],   // SPEC_07: ANIMATOR連番（参照のみ）
   frames:[{id,name,x,y,h,depth,ord,ar,quad:[4×{x,y}],par}],  // 子はフレームローカル座標(中心原点・フレーム高=1)
+  texts:[{id,type:'v'|'sub',str,x,y,size,col,parent,kf}],    // V2-D: 縦書き/EN字幕
+  clickFx:'invert',                                          // V2-D: ビューアのクリック反応
   take:{version:1,name,kf:[{x,y,z,dwell,ease}]}}       // SPEC_01のTAKE(単一シーン版)
 ```
 

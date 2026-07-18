@@ -86,6 +86,7 @@ COMPOSERと BroadcastChannel でリアルタイム連携。
 - 筆圧ペン（PEN ダブルクリック/ダブルタップで黄バッジ ON/OFF）＋ 筆圧カーブ `PRS`（LIN/SOFT/HARD）
 - Apple Pencil 高レート入力対応（`getCoalescedEvents()` 全点処理）
 - インクカラー 3色（主線黒・下書き水色・指示オレンジ。下書/指示はスポイトで色上書き可 `animator_ink_v1`）
+- **スクリーントーン**：下書/指示ボタンの Wクリックで T10(dot10%)/T40(dot40%) トーンインクにトグル。ペン/筆圧ペン/FILL 対応。網点は `TONE_PITCH=16` の45°格子で **キャンバス原点固定**（塗り足してもズレない）。トーン色もスポイトで変更可（`buildTone()` でパターン再生成）。FILL は `floodFill()` 内で visited 配列＋`toneOn()` 判定。モード/色は `animator_ink_v1` に保存。トーンインク選択中は FILL もトーンで塗る（パレット色は無視）
 - 消しゴム（サイズ独立記憶）
 - 塗りつぶし（スキャンラインフラッドフィル。FILL ダブルクリックで透明消しゴムモード）
 - ブラシ補正 STAB（OFF/AVG=指数移動平均/PULL=レイジーマウス、`animator_stab_v1`）

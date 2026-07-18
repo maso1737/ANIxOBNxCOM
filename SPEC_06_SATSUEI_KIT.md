@@ -180,6 +180,10 @@ tCtx.drawImage(...); tCtx.filter='none';
 ## 8. P3 — OBAN→COMPOSER コンバータ（TAKEのキー化）
 
 **MVP = カメラだけ変換**（パネルの絵はcomposer側で別途IMPORT。全自動化はP3bで検討）。
+**2026-07追補: P3b実装済み** — JSONに `obanPanels:[{name,x,y,h,depth,ord}]`（ルートパネルのみ・絵は運ばない）を同梱し、
+composer側がIMPORT済み画像トラックへ**ファイル名一致（拡張子無視・大文字化）**で位置/サイズ/Z/重ね順を流し込む。
+`Z=F·(1/lerp(0.7,1.2,depth)−1)`（→案Aカメラのパン視差係数がOBANのpfと厳密一致）、`SCL=(h·Hc/trackH)/persp`（persp補償で初期サイズ一致）、
+重ね順=OBANの描画ソート（depth昇順→ord昇順）をマッチしたトラックのスロット内で再現。FRAME・子パネルは対象外（マスク再現不可）。
 
 1. **入口**: OBAN_BUILDERに `COPY FOR COMPOSER` ボタン → PROJECT_v2 互換JSONをクリップボード → composerの IMPORT JSON に貼る（既存動線に乗る。ファイル授受なし）
 2. **時間軸**: モーダルで `fps`（既定24）と `尺（秒)` を指定 → `totalFrames = fps*秒`。`buildTake()` の各セグメント `p0/p1` を `f = round(p * totalFrames)` に展開
@@ -203,7 +207,7 @@ tCtx.drawImage(...); tCtx.filter='none';
 | P2 | OBAN: take.fx＋ビルダーFXモーダル＋ビューア注入(rt)＋`?fx=0` | 中 |
 | P2b(任意) | composer EXPORT WEB ビューアにも同じrt統合 | 小 |
 | P3 | COPY FOR COMPOSER（TAKE→CAMERAトラックJSON） | 小 |
-| P3b(検討) | パネル画像の自動トラック化（seq/quadマスクは対象外） | — |
+| P3b | パネル配置の自動流し込み（obanPanels同梱→名前一致で適用。quadマスク/子は対象外）**2026-07実装済み** | 小 |
 
 ## 10. 受け入れ基準
 

@@ -26,6 +26,7 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - PROJECT_v2=loadJSON（全置換 or 追加）、PROJECT_v1/ANIMATOR_v1=単一トラック追加
 - finishImport()が共通の後処理（totalFrames/workArea/UI再構築/announceLive）
 - SPEC_06 P3受け（OBANの COPY FOR COMPOSER 用）: ①カメラだけのPROJECT_v2でもKF最終フレームから totalFrames を確保（parseTrackFromJSON）②追加IMPORTでも `fx:` があれば normalizeFx で state.fx を引き継ぐ。既存CAMERAがある状態で貼るとカメラは捨てられる（dedupeCameras=既存優先）
+- SPEC_06 P3b受け: `obanPanels:` があれば applyObanPlacements() — 画像トラックへファイル名一致（拡張子無視）で x/y/z/s の単一KF流し込み＋重ね順再配置（depth昇順→ord昇順、マッチしたスロット内のみ）。既存KFは上書き。適用数は flashLive で表示
 - ドラッグ&ドロップ対応（JSON / audio両対応）
 
 ■ レンダリング（drawOneTrack）

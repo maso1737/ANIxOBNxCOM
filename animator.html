@@ -1296,8 +1296,8 @@ input[type=range]::-moz-range-thumb{
       <button id="btn-import-json" title="JSONファイルを読み込み（既存プロジェクトを置換）">IMPORT JSON</button>
       <input type="file" id="json-file-input" accept="application/json,.json" style="display:none;">
       <span class="sep">/</span>
-      <button id="btn-send-composer" title="COMPOSERを別ウィンドウで開く（ANIMATORは開いたまま・LIVE連携）">→ COMPOSER</button>
-      <button id="btn-live" title="COMPOSER未接続（COMPOSERを開くと自動でライブ連携）">LIVE ○</button>
+      <button id="btn-send-composer" title="COMPOSERを別ウィンドウで開く（ANIMATORは開いたまま・LIVE連携）／OBANへは OBAN側の + FROM ANIMATOR から">→ COMPOSER</button>
+      <button id="btn-live" title="LIVE連携（COMPOSER/OBANが開くと自動でライブ反映）。OBANへは OBAN側の + FROM ANIMATOR から">LIVE ○</button>
       <button id="btn-home" title="ランディングページに戻る">HOME</button>
     </div>
   </div>
@@ -1712,13 +1712,98 @@ const INK_LS = 'animator_ink_v1';
   }catch(e){}
 })();
 function saveInk(){
-  try{ localStorage.setItem(INK_LS, JSON.stringify({blue:INK.blue, orange:INK.orange})); }catch(e){}
+  try{ localStorage.setItem(INK_LS, JSON.stringify({
+    blue: INK.blue, orange: INK.orange,
+    tone1: TONE.tone1.color, tone2: TONE.tone2.color,
+    toneMode: { blue: toneMode.blue, orange: toneMode.orange },
+  })); }catch(e){}
 }
-// 下書/指示ボタンの背景を現在のインク色に同期（CSS既定色を上書き表示）
+
+// ── SCREEN TONE（下書/指示ボタンのWクリックで dot10%/dot40% トーンインクに切替）──
+// パターンはキャンバス原点固定＝塗り足しても網点がズレず繋がる（現実の貼りトーンと同じ）。
+// 描画結果は drawData に実ピクセルとして焼き込まれるため書き出し/連携は変更不要。
+const TONE_PITCH = 16;  // 網点タイル1辺px（45°配置・タイルあたりドット2個相当）
+const TONE = {
+  tone1: { cov: 0.10, color: '#000000', label: 'T10' },  // 下書スロット
+  tone2: { cov: 0.40, color: '#000000', label: 'T40' },  // 指示スロット
+};
+const toneMode = { blue: false, orange: false };
+function isToneInk(c){ return c === 'tone1' || c === 'tone2'; }
+// 下書/指示スロット名 → 現在有効なインク名（トーンモード中は tone1/tone2）
+function slotInk(c){
+  if(c === 'blue'   && toneMode.blue)   return 'tone1';
+  if(c === 'orange' && toneMode.orange) return 'tone2';
+  return c;
+}
+// 網点タイル生成: 被覆率から半径を決め1pxずつ判定（ペン用pattern と FILL用mask を同時に作る）
+function buildTone(key){
+  const t = TONE[key], T = TONE_PITCH;
+  const cv = document.createElement('canvas');
+  cv.width = T; cv.height = T;
+  const cx = cv.getContext('2d');
+  const img = cx.createImageData(T, T);
+  const rgb = hexToRgb(t.color);
+  const r2 = (t.cov * T * T) / (2 * Math.PI); // 半径² = 被覆率×タイル面積 ÷ ドット2個 ÷ π
+  const centers = [[0,0],[T,0],[0,T],[T,T],[T/2,T/2]];
+  const mask = new Uint8Array(T * T);
+  for(let y = 0; y < T; y++){
+    for(let x = 0; x < T; x++){
+      const px = x + 0.5, py = y + 0.5;
+      for(const [cx0, cy0] of centers){
+        const dx = px - cx0, dy = py - cy0;
+        if(dx*dx + dy*dy <= r2){ mask[y*T + x] = 1; break; }
+      }
+      if(mask[y*T + x]){
+        const i = (y*T + x) * 4;
+        img.data[i] = rgb.r; img.data[i+1] = rgb.g; img.data[i+2] = rgb.b; img.data[i+3] = 255;
+      }
+    }
+  }
+  cx.putImageData(img, 0, 0);
+  t.mask = mask;
+  t.tileURL = cv.toDataURL();
+  t.pattern = cx.createPattern(cv, 'repeat');
+}
+(function loadTone(){
+  try{
+    const o = JSON.parse(localStorage.getItem(INK_LS) || 'null');
+    if(o && typeof o === 'object'){
+      if(o.tone1) TONE.tone1.color = o.tone1;
+      if(o.tone2) TONE.tone2.color = o.tone2;
+      if(o.toneMode){ toneMode.blue = !!o.toneMode.blue; toneMode.orange = !!o.toneMode.orange; }
+    }
+  }catch(e){}
+})();
+buildTone('tone1'); buildTone('tone2');
+// FILL用の網点判定: キャンバス座標(x,y)がドット上か
+function toneOn(t, x, y){
+  const T = TONE_PITCH;
+  return t.mask[((y % T + T) % T) * T + ((x % T + T) % T)] === 1;
+}
+// ペンに渡すインクスタイル（トーン中は CanvasPattern、それ以外は単色hex）
+function inkStyle(){
+  const c = state.inkColor;
+  return isToneInk(c) ? TONE[c].pattern : INK[c];
+}
+
+// 下書/指示ボタンの背景を現在のインク色に同期（トーンモード中は網点タイル＋T10/T40表示）
 function updateInkSwatches(){
   document.querySelectorAll('.tb-ink, .ink-btn').forEach(b => {
     const c = b.dataset.c;
-    if(c && c !== 'black' && INK[c]) b.style.background = INK[c];
+    if(!c || c === 'black') return;
+    const ink = slotInk(c);
+    if(isToneInk(ink)){
+      const t = TONE[ink];
+      b.textContent = t.label;
+      b.style.background = '#FFF url(' + t.tileURL + ') repeat';
+      b.style.color = '#333';
+      b.title = 'スクリーントーン dot' + Math.round(t.cov * 100) + '%（Wクリックで' + (c === 'blue' ? '下書' : '指示') + 'に戻す）';
+    } else if(INK[c]){
+      b.textContent = (c === 'blue') ? '下書' : '指示';
+      b.style.background = INK[c];
+      b.style.color = '';
+      b.title = (c === 'blue' ? '下書' : '指示') + '（Wクリックでトーン切替）';
+    }
   });
 }
 
@@ -3082,16 +3167,21 @@ function floodFill(startX, startY, fillHex){
   const startI = idx(startX, startY);
   const tR = data[startI], tG = data[startI+1], tB = data[startI+2], tA = data[startI+3];
   const erase = !!state.fillErase;
+  // トーンインク選択中はFILLもトーンで塗る（トーン色・網点のドット位置のみ着色）
+  const tone = (!erase && isToneInk(state.inkColor)) ? TONE[state.inkColor] : null;
   // 塗る色（透明消し時は (0,0,0,0)）
-  const fc = erase ? {r:0,g:0,b:0} : hexToRgb(fillHex);
+  const fc = erase ? {r:0,g:0,b:0} : hexToRgb(tone ? tone.color : fillHex);
   const fA = erase ? 0 : 255;
   // 既に目的状態なら何もしない
   if(erase){ if(tA === 0) return; }
-  else if(tR === fc.r && tG === fc.g && tB === fc.b && tA === 255) return;
+  else if(!tone && tR === fc.r && tG === fc.g && tB === fc.b && tA === 255) return;
+  // トーン塗りは網点の隙間に書き込まないピクセルが残るため、走査済みを visited で管理
+  const visited = tone ? new Uint8Array(W * H) : null;
   // スキャンライン
   const stack = [[startX, startY]];
   const matches = (i) =>
-    data[i] === tR && data[i+1] === tG && data[i+2] === tB && data[i+3] === tA;
+    data[i] === tR && data[i+1] === tG && data[i+2] === tB && data[i+3] === tA &&
+    (!visited || !visited[i >> 2]);
   while(stack.length){
     const [x, y] = stack.pop();
     let lx = x;
@@ -3100,7 +3190,10 @@ function floodFill(startX, startY, fillHex){
     let spanAbove = false, spanBelow = false;
     while(lx < W && matches(idx(lx,y))){
       const i = idx(lx,y);
-      data[i] = fc.r; data[i+1] = fc.g; data[i+2] = fc.b; data[i+3] = fA;
+      if(visited) visited[i >> 2] = 1;
+      if(!tone || toneOn(tone, lx, y)){
+        data[i] = fc.r; data[i+1] = fc.g; data[i+2] = fc.b; data[i+3] = fA;
+      }
       if(y > 0){
         if(matches(idx(lx, y-1))){
           if(!spanAbove){ stack.push([lx, y-1]); spanAbove = true; }
@@ -3161,18 +3254,23 @@ function eyedropAt(clientX, clientY){
     renderPalette();
   }
 }
-// スポイト: 下書/指示インク（blue/orange）が選択中なら、そのインク色を取り込む
+// スポイト: 下書/指示/トーンインクが選択中なら、そのインク色を取り込む
 function eyedropInk(clientX, clientY){
   const {x, y} = toCanvasCoord(clientX, clientY);
   const hex = sampleCompositeColor(x, y);
   if(!hex) return;
-  INK[state.inkColor] = hex;
+  if(isToneInk(state.inkColor)){
+    TONE[state.inkColor].color = hex;
+    buildTone(state.inkColor);  // 色が変わったらパターン/タイル再生成
+  } else {
+    INK[state.inkColor] = hex;
+  }
   saveInk();
   updateInkSwatches();
 }
-// 下書/指示インクが選択中か（主線=blackは除外、ペン系ツール時のみ）
+// 下書/指示/トーンインクが選択中か（主線=blackは除外、ペン系ツール時のみ）
 function inkPickActive(){
-  return (state.inkColor === 'blue' || state.inkColor === 'orange') &&
+  return (state.inkColor === 'blue' || state.inkColor === 'orange' || isToneInk(state.inkColor)) &&
          (state.tool === 'pen' || state.tool === 'eyedrop');
 }
 
@@ -4554,11 +4652,11 @@ function startStroke(clientX, clientY, pressure){
   if(state.tool === 'pen'){
     if(usePressure){
       lastR = pressureRadius(pressure);
-      drawDotRadius(ctx, dc.x, dc.y, lastR, INK[state.inkColor]);
-      if(state.mirrorOn){ const m = mp(x, y); drawDotRadius(ctx, m.x, m.y, lastR, INK[state.inkColor]); }
+      drawDotRadius(ctx, dc.x, dc.y, lastR, inkStyle());
+      if(state.mirrorOn){ const m = mp(x, y); drawDotRadius(ctx, m.x, m.y, lastR, inkStyle()); }
     } else {
-      drawDot(ctx, dc.x, dc.y, currentToolSize(), INK[state.inkColor]);
-      if(state.mirrorOn){ const m = mp(x, y); drawDot(ctx, m.x, m.y, currentToolSize(), INK[state.inkColor]); }
+      drawDot(ctx, dc.x, dc.y, currentToolSize(), inkStyle());
+      if(state.mirrorOn){ const m = mp(x, y); drawDot(ctx, m.x, m.y, currentToolSize(), inkStyle()); }
     }
   } else if(state.tool === 'erase'){
     eraseDot(ctx, dc.x, dc.y, currentToolSize());
@@ -4584,12 +4682,12 @@ function continueStroke(clientX, clientY, pressure){
   if(state.tool === 'pen'){
     if(usePressure){
       const r = pressureRadius(pressure);
-      drawLineRadius(ctx, lastX, lastY, x, y, lastR, r, INK[state.inkColor]);
-      if(state.mirrorOn){ const [a,b] = mLine(); drawLineRadius(ctx, a.x, a.y, b.x, b.y, lastR, r, INK[state.inkColor]); }
+      drawLineRadius(ctx, lastX, lastY, x, y, lastR, r, inkStyle());
+      if(state.mirrorOn){ const [a,b] = mLine(); drawLineRadius(ctx, a.x, a.y, b.x, b.y, lastR, r, inkStyle()); }
       lastR = r;
     } else {
-      drawLine(ctx, lastX, lastY, x, y, currentToolSize(), INK[state.inkColor]);
-      if(state.mirrorOn){ const [a,b] = mLine(); drawLine(ctx, a.x, a.y, b.x, b.y, currentToolSize(), INK[state.inkColor]); }
+      drawLine(ctx, lastX, lastY, x, y, currentToolSize(), inkStyle());
+      if(state.mirrorOn){ const [a,b] = mLine(); drawLine(ctx, a.x, a.y, b.x, b.y, currentToolSize(), inkStyle()); }
     }
   } else if(state.tool === 'erase'){
     eraseLine(ctx, lastX, lastY, x, y, currentToolSize());
@@ -4690,7 +4788,7 @@ document.querySelectorAll('.tool').forEach(btn => {
 function applyInkUIForTool(){
   const erasing = state.tool === 'erase';
   document.querySelectorAll('.tb-ink').forEach(b => {
-    const active = erasing ? (b.dataset.c === 'black') : (b.dataset.c === state.inkColor);
+    const active = erasing ? (b.dataset.c === 'black') : (slotInk(b.dataset.c) === state.inkColor);
     b.classList.toggle('on', active);
   });
   updateInkSwatches();
@@ -4838,12 +4936,24 @@ function refreshPenSizeUI(){
 
 document.querySelectorAll('.tb-ink').forEach(btn => {
   btn.addEventListener('click', () => {
-    state.inkColor = btn.dataset.c;
+    state.inkColor = slotInk(btn.dataset.c);
     // ERASE中は主線フラグだけ更新してツールはERASEのまま。それ以外はPENへ自動切替
     if(state.tool !== 'erase'){
       const penBtn = document.querySelector('.tool[data-tool="pen"]');
       if(penBtn && state.tool !== 'pen') penBtn.click();
     }
+    applyInkUIForTool();
+  });
+});
+
+// 下書/指示ボタン Wクリック/Wタップ → スクリーントーンインク（T10/T40）⇔通常インクをトグル
+document.querySelectorAll('.tb-ink').forEach(btn => {
+  const c = btn.dataset.c;
+  if(c !== 'blue' && c !== 'orange') return;
+  onDoubleActivate(btn, () => {
+    toneMode[c] = !toneMode[c];
+    state.inkColor = slotInk(c);
+    saveInk();
     applyInkUIForTool();
   });
 });
@@ -5457,8 +5567,8 @@ function updateLiveUI(){
   b.classList.toggle('on', gLiveActive);
   b.textContent = gLiveActive ? 'LIVE ●' : 'LIVE ○';
   b.title = gLiveActive
-    ? 'COMPOSERとライブ連携中（クリックで手動再送）'
-    : 'COMPOSER未接続（COMPOSERを開くと自動でライブ連携）';
+    ? 'ライブ連携中（クリックで手動再送）。OBANへは OBAN側の + FROM ANIMATOR から'
+    : 'LIVE連携（COMPOSER/OBANが開くと自動でライブ反映）。OBANへは OBAN側の + FROM ANIMATOR から';
 }
 function setupLiveSync(){
   if(typeof BroadcastChannel === 'undefined') return;
