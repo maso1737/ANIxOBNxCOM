@@ -106,6 +106,10 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - ANIMATOR保存(autosave)→project-update。COMPOSERは projectId一致トラックの「絵だけ」差し替え（KF/transform/表示状態は保持, liveUpdateTrackがwidth/heightも追従）
 - announceLive()=composer-hello+requestSyncAll。setupLiveSync（起動+700ms遅延再通知+window focus時）と、loadJSON/finishImport完了時に呼ぶ＝LIVEボタンを押さなくても自動反映
 - ANIMATOR側は gLiveActive が立つと autosave毎に broadcast。composer-hello / request-sync / animator-hello で立つ
+- SPEC_07（トラックの往復ボタン `ANI` / `Re`）: `track.projectId` があるanim系トラックだけに表示（カメラ/画像トラックには出ない）
+  - `ANI`=editInAnimator() → `animator.html?open=<projectId>` を別ウィンドウで開く。ANIMATOR側が別プロジェクトを開いていれば**確認モーダル**を出してから切替（無断上書きしない）。ポップアップブロック時はトースト
+  - `Re`=reloadTrackFromAnimator() → request-sync を投げつつ EX_DB から取得し `onLiveProjectUpdate()` に流す＝**絵だけ差し替え**（KF/マーカー/tid/transform保持）。未登録なら「ANIMATORで LIVE を押してください」
+  - CSS: `.tl-tbtn.anm`（rouge）を再利用。6個並ぶとラベル幅128pxを超えて✕が見切れるため、`.tl-tbtn`のpaddingを`2px 3px`・gapを`2px`に詰めてある（**ボタンを増やすときは要再計測**）
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 【コードの注意点】
