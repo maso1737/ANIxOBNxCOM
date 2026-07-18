@@ -1625,6 +1625,7 @@ cv.addEventListener('pointerdown',e=>{
   if(PV.on){stopPreview();return;}
   if(textEd){closeTextEditor(true);return;}   // V2-D: 入力中に余白クリック=確定
   if(textArm){                                 // V2-D: T待機中のクリック=その位置に入力開始
+    e.preventDefault();   // 既定のフォーカス移動を止める（直後にエディタがblurで閉じるのを防ぐ）
     textArm=false;document.body.classList.remove('textarm');
     openTextEditor(e.clientX,e.clientY,null);
     return;
@@ -1767,11 +1768,18 @@ function openTextEditor(cssX,cssY,t,fsCssOpt){
     textEd={el:ed,t:t||null,cssX,cssY};
     ed.addEventListener('keydown',ev=>{
       ev.stopPropagation();   // グローバルショートカット(T/Space等)に食われない
-      if(ev.key==='Escape'){ev.preventDefault();closeTextEditor(false);}
-      else if(ev.key==='Enter'&&(ev.ctrlKey||ev.metaKey)){ev.preventDefault();closeTextEditor(true);}
+      if(ev.key==='Escape'||ev.key==='Esc'){ev.preventDefault();closeTextEditor(false);}
+      else if((ev.key==='Enter'||ev.key==='Return')&&(ev.ctrlKey||ev.metaKey)){ev.preventDefault();closeTextEditor(true);}
     });
-    ed.addEventListener('blur',()=>closeTextEditor(true));
     ed.focus();
+    // blur確定は1tick遅らせて登録する。クリック直後は既定のフォーカス移動でblurが飛びうるため、
+    // 即時に張ると「開いた瞬間に空で閉じる＝何も起きない」ように見える
+    setTimeout(()=>{
+      if(textEd&&textEd.el===ed){
+        if(document.activeElement!==ed)ed.focus();   // 取りこぼした場合の再フォーカス
+        ed.addEventListener('blur',()=>closeTextEditor(true));
+      }
+    },0);
     toast('入力 → 余白クリック / Ctrl+Enter で確定。Enter=次の列 / Esc=取消');
   }catch(err){   // DOM編集が使えない環境: promptフォールバック（改行は「/」区切り）
     const s=window.prompt('縦書きテキスト（改行は / ）:',t?String(t.str).replace(/\n/g,'/'):'');

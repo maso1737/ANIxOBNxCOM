@@ -27,10 +27,28 @@ cut = {
 
 ## フェーズ
 
-- **P0（本仕様・実装済み）**: BOARD＋SHEET＋EDIT（描画）＋IndexedDB保存
-- **P1**: TIMELINE（composer-timeline-kit 移植・クリップ尺⇔SHEET尺・再生・WebM書き出し）
+- **P0（実装済み）**: BOARD＋SHEET＋EDIT（描画）＋IndexedDB保存
+- **P1（実装済み）**: TIMELINE（composer-timeline-kit 移植・クリップ尺⇔SHEET尺・再生・動画書き出し）
 - **P2**: animator連携（SPEC_07 `tdr_live` 語彙参加・REF送り）＋カラースクリプト一覧PNG
 - **P3（構想）**: manga-plate FRAME接続・OBANコマ送り
+
+## P1 TIMELINE仕様
+
+- **第4のビューではなく第3のビュー**: cuts[] をそのまま時間軸に並べるだけ（クリップ＝カット）。
+  尺・画・番号は同一データなので、SHEETとの「同期処理」は存在しない。
+- クリップ右端ドラッグ＝尺変更（ドラッグ中はpx/フレーム固定でラバーバンド防止、離すと再レイアウト）。
+- 帯クリック/ドラッグ＝seek（スクラブ）。クリップをダブルクリック＝EDITへ（戻り先はTIMELINE）。
+- **プレビューに直接ペイント可**: PEN/ERASE/FILL/EYEがそのまま効き、プレイヘッド位置の
+  カットの drawC に入る（＝「動画コンテに描いて絵コンテに反映」。同一データなので自動）。
+- 再生: rAFベース `tick`（kit準拠）。LOOPトグル。24fps。
+- ショートカット（`econte_keymap_v1`・kit準拠レジストリ。TIMELINEビューで有効）:
+  Space=再生/停止 ／ ←→=±1コマ(Shift=10) ／ Home/End ／ J/K=前後カット頭 ／ L=ループ。
+  再割当UIはP2以降（localStorageの手書き編集は可能）。
+- **EXPORT VIDEO**: `canvas.captureStream(24)`＋MediaRecorder で**実時間再生を録画**
+  （WebM vp9→vp8→mp4の順でフォールバック。Safariはmp4になる想定）。
+  「C#/尺 焼き込み」チェックでプレビュー＝書き出しにオーバーレイ（WYSIWYG）。
+  書き出し中はSpaceで中断（ファイル破棄）。**タブを前面のままにすること**
+  （非表示タブはrAF停止のため録画が止まる）。
 
 ## P0 ビュー仕様
 
@@ -70,11 +88,11 @@ cut = {
 - store `meta`: BOARD視点(pan/zoom)・選択状態
 - debounce保存。ビットマップは dirty のカットのみ再エンコード。
 
-## 出口（P1/P2で実装）
+## 出口
 
-- 動画コンテ WebM（カット番号・尺 焼き込みON/OFF）
-- animator REF（PNG＋尺メタ、`tdr_live`ライブ渡し）
-- カラースクリプト一覧PNG（サムネ表形式グリッド）
+- **動画コンテ WebM/mp4（P1実装済み）**: カット番号・尺 焼き込みON/OFF・実時間録画
+- animator REF（PNG＋尺メタ、`tdr_live`ライブ渡し）… P2
+- カラースクリプト一覧PNG（サムネ表形式グリッド）… P2
 
 ## 検証
 
@@ -83,8 +101,10 @@ cut = {
 node tools/check.js
 ```
 
-## 制限（P0）
+## 制限（P0/P1）
 
 - EDITビューはズームなし（fit表示のみ）。
 - BOARDの写真は矩形配置のみ（回転なし）。
-- Undo は drawC（加筆）のみ対象。BASE破棄・写真移動は対象外。
+- Undo は drawC（加筆）のみ対象。BASE破棄・写真移動・尺変更は対象外。
+- 動画書き出しは実時間（2分のコンテなら2分かかる）。非表示タブでは進まない。
+- 音声（BGM/仮アフレコ）は未対応（欲しくなったら composer の audio 系を移植）。

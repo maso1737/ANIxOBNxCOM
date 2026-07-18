@@ -141,6 +141,38 @@ body{
   background:radial-gradient(ellipse 60% 60% at 50% 40%,rgba(184,80,255,0.07),transparent 70%);
 }
 #edit-cv{background:#888;box-shadow:0 0 30px rgba(0,0,0,.6);touch-action:none;cursor:crosshair}
+/* ---------- TIMELINE ---------- */
+#view-tl{display:none;flex-direction:column}
+#view-tl.on{display:flex}
+#tl-stage{
+  flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden;
+  background:radial-gradient(ellipse 60% 60% at 50% 40%,rgba(90,233,255,0.06),transparent 70%);
+}
+#tl-cv{background:#888;box-shadow:0 0 30px rgba(0,0,0,.6);touch-action:none;cursor:crosshair}
+#tl-empty{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:var(--grey);font-family:var(--jp);font-size:12px;pointer-events:none;
+}
+#tl-bottom{flex:none;background:var(--panel);border-top:1px solid var(--border);padding:8px 12px 6px;display:flex;flex-direction:column;gap:7px}
+#tl-transport{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+#tl-cutlabel{font-family:var(--bank);color:var(--ice);font-size:13px;letter-spacing:.12em;min-width:34px;text-align:center}
+#tl-time{color:var(--gold);font-size:11px;letter-spacing:.08em}
+#burnin-label{color:var(--grey);font-size:10px;font-family:var(--jp);display:flex;align-items:center;gap:5px;cursor:pointer}
+#burnin-label input{accent-color:var(--acid)}
+#tl-strip{position:relative;height:66px;touch-action:none;-webkit-user-select:none;user-select:none}
+#tl-ruler-cv{position:absolute;left:0;top:0;width:100%;height:18px;display:block}
+#tl-clips{position:absolute;left:0;top:18px;right:0;bottom:0}
+.tl-clip{
+  position:absolute;top:4px;bottom:4px;overflow:hidden;display:flex;align-items:center;gap:6px;padding:0 8px;
+  background:linear-gradient(180deg,rgba(255,79,168,.30),rgba(184,80,255,.16));
+  border:1px solid rgba(255,79,168,.5);cursor:pointer;
+}
+.tl-clip.empty{background:rgba(255,255,255,.05);border-color:var(--border)}
+.tl-clip-no{font-family:var(--bank);font-size:11px;color:var(--white);letter-spacing:.08em}
+.tl-clip-dur{font-size:9px;color:var(--gold)}
+.tl-clip-h{position:absolute;right:0;top:0;bottom:0;width:12px;cursor:ew-resize;background:linear-gradient(90deg,transparent,rgba(255,210,122,.55))}
+#tl-playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--ice);pointer-events:none;box-shadow:0 0 8px rgba(90,233,255,.8)}
+#tl-hint{color:var(--grey);font-size:9px;font-family:var(--jp);letter-spacing:.04em}
 /* ---------- toast / modal ---------- */
 #toast{
   position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:200;
@@ -167,6 +199,7 @@ body{
   <span class="title">E<b>CONTE</b></span>
   <button class="btn mode on" id="btn-view-board">BOARD</button>
   <button class="btn mode" id="btn-view-sheet">SHEET</button>
+  <button class="btn mode" id="btn-view-tl">TIMELINE</button>
   <button class="btn ex" id="btn-import">+ IMPORT PHOTO</button>
   <input type="file" id="file-input" accept="image/*" multiple style="display:none;">
   <span id="bar-total">0 CUTS</span>
@@ -269,6 +302,35 @@ body{
   </div>
 </div>
 
+<!-- ================= TIMELINE ================= -->
+<div class="view" id="view-tl">
+  <div id="tl-stage">
+    <canvas id="tl-cv" width="1280" height="720"></canvas>
+    <div id="tl-empty">カットがありません（BOARDで矩形ドラッグ、またはSHEETで空コマ追加）</div>
+  </div>
+  <div id="tl-bottom">
+    <div id="tl-transport">
+      <button class="btn" id="btn-tl-first" title="先頭 (Home)">&#9198;</button>
+      <button class="btn" id="btn-tl-prevcut" title="前のカット頭 (J)">&#9664;&#10072;</button>
+      <button class="btn mode" id="btn-play" title="再生 / 停止 (Space)">▶</button>
+      <button class="btn" id="btn-tl-nextcut" title="次のカット頭 (K)">&#10072;&#9654;</button>
+      <button class="btn" id="btn-tl-last" title="末尾 (End)">&#9197;</button>
+      <span id="tl-cutlabel">—</span>
+      <span id="tl-time">0+00 / 0+00</span>
+      <button class="btn mode on" id="btn-loop" title="ループ切替 (L)">LOOP</button>
+      <span style="flex:1"></span>
+      <label id="burnin-label"><input type="checkbox" id="chk-burnin"> C#/尺 焼き込み</label>
+      <button class="btn ex" id="btn-export" title="実時間で再生しながら録画します（タブを前面のまま待つ）">EXPORT VIDEO</button>
+    </div>
+    <div id="tl-strip">
+      <canvas id="tl-ruler-cv"></canvas>
+      <div id="tl-clips"></div>
+      <div id="tl-playhead"></div>
+    </div>
+    <div id="tl-hint">クリップ右端ドラッグ=尺変更（SHEETに即反映）／ 帯クリック=seek ／ クリップをダブルクリック=加筆EDIT ／ プレビューに直接ペイント可（そのカットの加筆レイヤーに入る）／ Space=再生 ←→=コマ送り J/K=カット頭 L=ループ</div>
+  </div>
+</div>
+
 <div id="toast"></div>
 <div id="modal-ovl">
   <div id="modal-box">
@@ -307,6 +369,8 @@ const state = {
   brush: 6,
   curCut: -1,
   selPhoto: null,
+  backView: 'sheet',
+  tl: { frame: 0, playing: false, loop: true, lastTs: 0, acc: 0 },
   board: { x: -800, y: -450, z: 0.5 }
 };
 let photos = [];   // {id,name,img,blob,x,y,w,h} — BOARD座標
@@ -465,15 +529,20 @@ async function loadAll(){
 
 /* ---------------- view switching ---------------- */
 function setView(v){
+  if(state.view === 'tl' && v !== 'tl') pause();
   state.view = v;
   $('#view-board').classList.toggle('on', v === 'board');
   $('#view-sheet').classList.toggle('on', v === 'sheet');
   $('#view-edit').classList.toggle('on', v === 'edit');
-  $('#btn-view-board').classList.toggle('on', v === 'board');
-  $('#btn-view-sheet').classList.toggle('on', v !== 'board');
+  $('#view-tl').classList.toggle('on', v === 'tl');
+  const barHi = (v === 'edit') ? (state.backView === 'tl' ? 'tl' : 'sheet') : v;
+  $('#btn-view-board').classList.toggle('on', barHi === 'board');
+  $('#btn-view-sheet').classList.toggle('on', barHi === 'sheet');
+  $('#btn-view-tl').classList.toggle('on', barHi === 'tl');
   if(v === 'board'){ resizeBoard(); renderBoard(); }
   if(v === 'sheet'){ renderSheet(); }
   if(v === 'edit'){ fitEditCanvas(); renderEditCanvas(); }
+  if(v === 'tl'){ fitTLCanvas(); layoutTL(); renderTL(); }
 }
 
 /* ---------------- BOARD ---------------- */
@@ -788,7 +857,7 @@ function makeSheetRow(cut, i){
   thumb.className = 'cut-thumb';
   thumb.src = cutThumb(cut);
   thumb.title = 'クリックで加筆（EDIT）';
-  thumb.addEventListener('click', () => openEdit(i));
+  thumb.addEventListener('click', () => { state.backView = 'sheet'; openEdit(i); });
   row.appendChild(thumb);
 
   const mid = document.createElement('div');
@@ -834,7 +903,7 @@ function makeSheetRow(cut, i){
     bt.addEventListener('click', fn);
     btns.appendChild(bt);
   };
-  mk('✎', '加筆（EDIT）', () => openEdit(i));
+  mk('✎', '加筆（EDIT）', () => { state.backView = 'sheet'; openEdit(i); });
   mk('▲', '上へ', () => moveCut(i, -1));
   mk('▼', '下へ', () => moveCut(i, 1));
   mk('⟳', 'BOARDの切り出し元から再ベイク', () => rebakeCut(i));
@@ -878,6 +947,7 @@ function openEdit(i){
   $('#edit-dur-f').textContent = cut.durF + 'f';
   $('#bg-slider').value = cut.bg;
   $('#bg-val').textContent = cut.bg;
+  $('#btn-edit-back').innerHTML = '&#9666; ' + (state.backView === 'tl' ? 'TIMELINE' : 'SHEET');
   setView('edit');
 }
 function setETool(t){
@@ -896,8 +966,8 @@ function setCutBg(v){
   renderEditCanvas();
   scheduleSave();
 }
-function toCanvasCoord(clientX, clientY){
-  const r = editCv.getBoundingClientRect();
+function toCanvasCoord(clientX, clientY, cv){
+  const r = (cv || editCv).getBoundingClientRect();
   return { x: (clientX - r.left) / r.width * CONTE_W, y: (clientY - r.top) / r.height * CONTE_H };
 }
 function pushUndo(){
@@ -914,7 +984,7 @@ function doUndo(){
   redoStack.push(ctx.getImageData(0, 0, CONTE_W, CONTE_H));
   ctx.putImageData(undoStack.pop(), 0, 0);
   cut.dirtyDraw = true;
-  renderEditCanvas();
+  renderPaintViews();
   scheduleSave();
 }
 function doRedo(){
@@ -924,7 +994,7 @@ function doRedo(){
   undoStack.push(ctx.getImageData(0, 0, CONTE_W, CONTE_H));
   ctx.putImageData(redoStack.pop(), 0, 0);
   cut.dirtyDraw = true;
-  renderEditCanvas();
+  renderPaintViews();
   scheduleSave();
 }
 function strokeSeg(a, b){
@@ -1035,8 +1105,8 @@ function sampleCompositeColor(cx, cy){
   }
   return rgbToHex(cut.bg, cut.bg, cut.bg);
 }
-function eyedropAt(clientX, clientY){
-  const { x, y } = toCanvasCoord(clientX, clientY);
+function eyedropAt(clientX, clientY, cv){
+  const { x, y } = toCanvasCoord(clientX, clientY, cv);
   const hex = sampleCompositeColor(x, y);
   if(!hex) return;
   state.fillColor = hex;
@@ -1048,15 +1118,20 @@ function eyedropAt(clientX, clientY){
   }
 }
 
-/* --- edit pointers --- */
-let stroking = false, strokeLast = null;
-function eDown(e){
+/* --- paint pointers（EDITキャンバスとTIMELINEプレビューで共用） --- */
+let stroking = false, strokeLast = null, paintCv = null;
+function renderPaintViews(){
+  if(state.view === 'tl') renderTL();
+  else renderEditCanvas();
+}
+function paintDown(e, cv){
   if(e.pointerType === 'mouse' && e.button !== 0) return;
   e.preventDefault();
-  editCv.setPointerCapture(e.pointerId);
-  const p = toCanvasCoord(e.clientX, e.clientY);
+  cv.setPointerCapture(e.pointerId);
+  paintCv = cv;
+  const p = toCanvasCoord(e.clientX, e.clientY, cv);
   if(state.etool === 'eyedrop' || e.altKey){
-    eyedropAt(e.clientX, e.clientY);
+    eyedropAt(e.clientX, e.clientY, cv);
     return;
   }
   if(state.etool === 'fill'){
@@ -1064,7 +1139,7 @@ function eDown(e){
     floodFill(p.x, p.y);
     const cut = cuts[state.curCut];
     if(cut) cut.dirtyDraw = true;
-    renderEditCanvas();
+    renderPaintViews();
     scheduleSave();
     return;
   }
@@ -1072,16 +1147,17 @@ function eDown(e){
   stroking = true;
   strokeLast = p;
   strokeSeg(p, p);
-  renderEditCanvas();
+  renderPaintViews();
 }
-function eMove(e){
-  if(!stroking) return;
-  const p = toCanvasCoord(e.clientX, e.clientY);
+function paintMove(e){
+  if(!stroking || !paintCv) return;
+  const p = toCanvasCoord(e.clientX, e.clientY, paintCv);
   strokeSeg(strokeLast, p);
   strokeLast = p;
-  renderEditCanvas();
+  renderPaintViews();
 }
-function eUp(){
+function paintUp(){
+  paintCv = null;
   if(!stroking) return;
   stroking = false;
   scheduleSave();
@@ -1107,12 +1183,322 @@ function clearDraw(){
   scheduleSave();
 }
 
+/* ---------------- TIMELINE（SPEC_10 P1 / composer-timeline-kit準拠） ---------------- */
+const tlCv = $('#tl-cv');
+const tlCtx = ctx2d(tlCv);
+let gClipDrag = null, gScrub = false;
+let gExporting = false, gExportAbort = false, gRec = null, gRecChunks = [];
+
+function totalFrames(){ return cuts.reduce((a, c) => a + c.durF, 0); }
+function cutIndexAt(f){
+  if(!cuts.length) return null;
+  let acc = 0;
+  for(let i = 0; i < cuts.length; i++){
+    if(f < acc + cuts[i].durF) return { i, local: f - acc, start: acc };
+    acc += cuts[i].durF;
+  }
+  const last = cuts.length - 1;
+  return { i: last, local: cuts[last].durF - 1, start: acc - cuts[last].durF };
+}
+function cutStartFrame(i){ let acc = 0; for(let k = 0; k < i; k++) acc += cuts[k].durF; return acc; }
+function fitTLCanvas(){
+  const st = $('#tl-stage');
+  const s = Math.min((st.clientWidth - 24) / CONTE_W, (st.clientHeight - 24) / CONTE_H);
+  tlCv.style.width = Math.max(80, CONTE_W * s) + 'px';
+  tlCv.style.height = Math.max(45, CONTE_H * s) + 'px';
+}
+function renderTL(){
+  const T = totalFrames();
+  $('#tl-empty').style.display = T ? 'none' : 'flex';
+  if(!T){
+    tlCtx.fillStyle = '#1a1a22';
+    tlCtx.fillRect(0, 0, CONTE_W, CONTE_H);
+    updateTLHud();
+    return;
+  }
+  const ca = cutIndexAt(state.tl.frame);
+  compositeTo(tlCtx, cuts[ca.i]);
+  if($('#chk-burnin').checked) drawBurnin(ca);
+  updateTLHud();
+}
+function drawBurnin(ca){
+  const cut = cuts[ca.i];
+  tlCtx.save();
+  tlCtx.fillStyle = 'rgba(0,0,0,0.5)';
+  tlCtx.fillRect(20, 20, 302, 62);
+  tlCtx.fillStyle = '#ffffff';
+  tlCtx.font = 'bold 36px monospace';
+  tlCtx.fillText('C' + (ca.i + 1) + '  ' + fmtDur(cut.durF), 36, 64);
+  tlCtx.restore();
+}
+function updateTLHud(){
+  const T = totalFrames();
+  $('#tl-time').textContent = fmtDur(T ? Math.min(state.tl.frame, T - 1) : 0) + ' / ' + fmtDur(T);
+  const ca = cutIndexAt(state.tl.frame);
+  $('#tl-cutlabel').textContent = ca ? 'C' + (ca.i + 1) : '—';
+  updatePlayhead();
+}
+function updatePlayhead(){
+  const T = totalFrames();
+  const aw = $('#tl-clips').clientWidth;
+  $('#tl-playhead').style.left = (T ? state.tl.frame / T * aw : 0) + 'px';
+}
+function drawTLRuler(T){
+  const cv = $('#tl-ruler-cv');
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if(!w) return;
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if(!T) return;
+  const px = w / T;
+  const secs = T / FPS;
+  const step = secs > 90 ? 10 : (secs > 30 ? 5 : 1);
+  ctx.strokeStyle = 'rgba(255,210,122,0.35)';
+  ctx.fillStyle = 'rgba(248,239,255,0.55)';
+  ctx.font = '8px monospace';
+  ctx.beginPath();
+  for(let s = 0; s * FPS <= T; s++){
+    const x = Math.round(s * FPS * px) + 0.5;
+    const major = s % step === 0;
+    ctx.moveTo(x, major ? 4 : 11);
+    ctx.lineTo(x, h);
+    if(major) ctx.fillText(s + 's', x + 2, 9);
+  }
+  ctx.stroke();
+}
+function layoutTL(){
+  const T = totalFrames();
+  drawTLRuler(T);
+  const cont = $('#tl-clips');
+  cont.innerHTML = '';
+  if(!T){ updateTLHud(); return; }
+  const aw = cont.clientWidth;
+  let acc = 0;
+  cuts.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'tl-clip' + (c.baseC ? '' : ' empty');
+    el.style.left = (acc / T * 100) + '%';
+    el.style.width = (c.durF / T * 100) + '%';
+    el.title = 'C' + (i + 1) + '（ダブルクリックで加筆EDIT）';
+    const no = document.createElement('span'); no.className = 'tl-clip-no'; no.textContent = 'C' + (i + 1);
+    const du = document.createElement('span'); du.className = 'tl-clip-dur'; du.textContent = fmtDur(c.durF);
+    const h = document.createElement('div'); h.className = 'tl-clip-h'; h.title = 'ドラッグで尺を変更（SHEETに即反映）';
+    el.appendChild(no); el.appendChild(du); el.appendChild(h);
+    el.addEventListener('dblclick', () => { pause(); state.backView = 'tl'; openEdit(i); });
+    h.addEventListener('pointerdown', ev => {
+      ev.stopPropagation(); ev.preventDefault();
+      h.setPointerCapture(ev.pointerId);
+      gClipDrag = { i, px: aw / T, startX: ev.clientX, origDur: c.durF };
+    });
+    h.addEventListener('pointermove', clipDragMove);
+    h.addEventListener('pointerup', clipDragEnd);
+    h.addEventListener('pointercancel', clipDragEnd);
+    cont.appendChild(el);
+    acc += c.durF;
+  });
+  updateTLHud();
+}
+function clipDragMove(ev){
+  if(!gClipDrag) return;
+  const g = gClipDrag;
+  const nd = clamp(Math.round(g.origDur + (ev.clientX - g.startX) / g.px), 2, FPS * 600);
+  if(nd !== cuts[g.i].durF){
+    cuts[g.i].durF = nd;
+    liveClipWidths(g.px);
+  }
+}
+function liveClipWidths(px){
+  const cont = $('#tl-clips');
+  let acc = 0;
+  [...cont.children].forEach((el, i) => {
+    const c = cuts[i];
+    if(!c) return;
+    el.style.left = (acc * px) + 'px';
+    el.style.width = (c.durF * px) + 'px';
+    const du = el.querySelector('.tl-clip-dur');
+    if(du) du.textContent = fmtDur(c.durF);
+    acc += c.durF;
+  });
+  updateTotals();
+  updateTLHud();
+}
+function clipDragEnd(){
+  if(!gClipDrag) return;
+  gClipDrag = null;
+  layoutTL();
+  renderTL();
+  scheduleSave();
+}
+function stripSeek(ev){
+  const T = totalFrames();
+  if(!T) return;
+  const r = $('#tl-clips').getBoundingClientRect();
+  pause();
+  seek(clamp(Math.round((ev.clientX - r.left) / r.width * T), 0, T - 1));
+}
+function seek(f){
+  const T = totalFrames();
+  if(!T){ state.tl.frame = 0; renderTL(); return; }
+  state.tl.frame = clamp(f, 0, T - 1);
+  renderTL();
+}
+function play(){
+  const T = totalFrames();
+  if(!T) return;
+  if(state.tl.frame >= T - 1 && !state.tl.loop) state.tl.frame = 0;
+  state.tl.playing = true;
+  state.tl.lastTs = 0;
+  state.tl.acc = 0;
+  $('#btn-play').textContent = '❙❙';
+  requestAnimationFrame(tick);
+}
+function pause(){
+  state.tl.playing = false;
+  $('#btn-play').textContent = '▶';
+}
+function togglePlay(){
+  if(gExporting){ cancelExport(); return; }
+  if(state.tl.playing) pause(); else play();
+}
+function tick(ts){
+  if(!state.tl.playing) return;
+  if(!state.tl.lastTs) state.tl.lastTs = ts;
+  const dt = (ts - state.tl.lastTs) / 1000;
+  state.tl.lastTs = ts;
+  state.tl.acc += dt * FPS;
+  const T = totalFrames();
+  let ended = false;
+  while(state.tl.acc >= 1){
+    state.tl.frame++;
+    state.tl.acc--;
+    if(state.tl.frame >= T){
+      if(state.tl.loop && !gExporting){ state.tl.frame = 0; }
+      else { state.tl.frame = T - 1; ended = true; }
+    }
+  }
+  renderTL();
+  if(ended){ pause(); if(gExporting) finishExport(); }
+  else requestAnimationFrame(tick);
+}
+function seekCut(d){
+  const ca = cutIndexAt(state.tl.frame);
+  if(!ca) return;
+  pause();
+  let ti;
+  if(d < 0) ti = (ca.local > 2) ? ca.i : Math.max(0, ca.i - 1);
+  else ti = Math.min(cuts.length - 1, ca.i + 1);
+  seek(cutStartFrame(ti));
+}
+function toggleLoop(){
+  state.tl.loop = !state.tl.loop;
+  $('#btn-loop').classList.toggle('on', state.tl.loop);
+}
+/* --- 動画コンテ書き出し（実時間再生を録画。書き出し中はタブを前面のままにする） --- */
+function pickMime(){
+  if(!window.MediaRecorder) return '';
+  const list = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+  for(const m of list){ if(MediaRecorder.isTypeSupported(m)) return m; }
+  return '';
+}
+function exportVideo(){
+  if(gExporting) return;
+  const T = totalFrames();
+  if(!T){ toast('カットがありません'); return; }
+  const mime = pickMime();
+  if(!mime){ toast('このブラウザは録画に未対応です'); return; }
+  pause();
+  seek(0);
+  gRecChunks = [];
+  gExportAbort = false;
+  const stream = tlCv.captureStream(FPS);
+  gRec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+  gRec.ondataavailable = e => { if(e.data && e.data.size) gRecChunks.push(e.data); };
+  gRec.onstop = saveExportBlob;
+  gExporting = true;
+  $('#btn-export').disabled = true;
+  $('#btn-export').textContent = 'REC…（実時間・Spaceで中断）';
+  gRec.start(250);
+  play();
+}
+function finishExport(){
+  if(!gExporting && !(gRec && gRec.state === 'recording')) return;
+  gExporting = false;
+  $('#btn-export').disabled = false;
+  $('#btn-export').textContent = 'EXPORT VIDEO';
+  if(gRec && gRec.state !== 'inactive') gRec.stop();
+}
+function cancelExport(){
+  gExportAbort = true;
+  pause();
+  finishExport();
+  toast('書き出しを中断しました（ファイルは保存されません）');
+}
+function saveExportBlob(){
+  if(gExportAbort){ gRecChunks = []; return; }
+  const mime = (gRec && gRec.mimeType) || 'video/webm';
+  const ext = mime.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
+  const blob = new Blob(gRecChunks, { type: mime });
+  gRecChunks = [];
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  a.href = url;
+  a.download = 'econte_' + ts + '.' + ext;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('動画コンテを書き出しました（' + ext.toUpperCase() + '）');
+}
+function tlPaintDown(e){
+  if(gExporting) return;
+  const T = totalFrames();
+  if(!T) return;
+  pause();
+  const ca = cutIndexAt(state.tl.frame);
+  if(!ca) return;
+  if(state.curCut !== ca.i){ state.curCut = ca.i; undoStack = []; redoStack = []; }
+  paintDown(e, tlCv);
+}
+/* --- ショートカット（composer-timeline-kit 準拠・TIMELINEビューで有効） --- */
+const KEYMAP_LS = 'econte_keymap_v1';
+const SHORTCUT_ACTIONS = [
+  { id: 'play',      label: '再生 / 停止',          def: 'Space',      prevent: true, run: () => togglePlay() },
+  { id: 'prevFrame', label: '1コマ戻る (Shift=10)', def: 'ArrowLeft',  prevent: true, run: e => { pause(); seek(state.tl.frame - (e && e.shiftKey ? 10 : 1)); } },
+  { id: 'nextFrame', label: '1コマ進む (Shift=10)', def: 'ArrowRight', prevent: true, run: e => { pause(); seek(state.tl.frame + (e && e.shiftKey ? 10 : 1)); } },
+  { id: 'first',     label: '先頭',                 def: 'Home',       prevent: true, run: () => { pause(); seek(0); } },
+  { id: 'last',      label: '末尾',                 def: 'End',        prevent: true, run: () => { pause(); seek(totalFrames() - 1); } },
+  { id: 'prevCut',   label: '前のカット頭',         def: 'J',          run: () => seekCut(-1) },
+  { id: 'nextCut',   label: '次のカット頭',         def: 'K',          run: () => seekCut(1) },
+  { id: 'loop',      label: 'ループ切替',           def: 'L',          run: () => toggleLoop() }
+];
+let gKeymap = {};
+function defaultKeymap(){ const m = {}; SHORTCUT_ACTIONS.forEach(a => m[a.id] = a.def); return m; }
+function loadKeymap(){
+  gKeymap = defaultKeymap();
+  try{
+    const raw = localStorage.getItem(KEYMAP_LS);
+    if(raw){
+      const o = JSON.parse(raw);
+      for(const a of SHORTCUT_ACTIONS){ if(typeof o[a.id] === 'string') gKeymap[a.id] = o[a.id]; }
+    }
+  }catch(e){}
+}
+function normKey(e){
+  const k = e.key;
+  if(k === ' ' || k === 'Spacebar') return 'Space';
+  if(k.length === 1) return k.toUpperCase();
+  return k;
+}
+
 /* ---------------- keyboard ---------------- */
 function onKey(e){
   if($('#modal-ovl').classList.contains('on')) return;
   const tag = (e.target && e.target.tagName) || '';
   if(tag === 'INPUT' || tag === 'TEXTAREA') return;
-  if(e.code === 'Space'){ spaceHeld = true; if(state.view === 'board') e.preventDefault(); return; }
+  if(e.code === 'Space' && state.view === 'board'){ spaceHeld = true; e.preventDefault(); return; }
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
     e.preventDefault();
     if(e.shiftKey) doRedo(); else doUndo();
@@ -1130,6 +1516,15 @@ function onKey(e){
   }else if(state.view === 'board'){
     if(e.key === 'Delete' || e.key === 'Backspace'){
       if(state.selPhoto) deleteSelPhoto();
+    }
+  }else if(state.view === 'tl'){
+    const k = normKey(e);
+    for(const a of SHORTCUT_ACTIONS){
+      if(gKeymap[a.id] && gKeymap[a.id] === k){
+        if(a.prevent) e.preventDefault();
+        a.run(e);
+        return;
+      }
     }
   }
 }
@@ -1175,7 +1570,7 @@ function wire(){
   // SHEET
   $('#btn-add-empty').addEventListener('click', addEmptyCut);
   // EDIT
-  $('#btn-edit-back').addEventListener('click', () => setView('sheet'));
+  $('#btn-edit-back').addEventListener('click', () => setView(state.backView === 'tl' ? 'tl' : 'sheet'));
   $('#btn-cut-prev').addEventListener('click', () => openEdit(state.curCut - 1));
   $('#btn-cut-next').addEventListener('click', () => openEdit(state.curCut + 1));
   $('#edit-dur').addEventListener('change', () => {
@@ -1204,10 +1599,34 @@ function wire(){
   $('#btn-bg-white').addEventListener('click', () => setCutBg(255));
   $('#btn-bg-gray').addEventListener('click', () => setCutBg(160));
   $('#btn-bg-black').addEventListener('click', () => setCutBg(24));
-  editCv.addEventListener('pointerdown', eDown);
-  editCv.addEventListener('pointermove', eMove);
-  editCv.addEventListener('pointerup', eUp);
-  editCv.addEventListener('pointercancel', eUp);
+  editCv.addEventListener('pointerdown', e => paintDown(e, editCv));
+  editCv.addEventListener('pointermove', paintMove);
+  editCv.addEventListener('pointerup', paintUp);
+  editCv.addEventListener('pointercancel', paintUp);
+  // TIMELINE
+  $('#btn-view-tl').addEventListener('click', () => setView('tl'));
+  $('#btn-play').addEventListener('click', togglePlay);
+  $('#btn-tl-first').addEventListener('click', () => { pause(); seek(0); });
+  $('#btn-tl-last').addEventListener('click', () => { pause(); seek(totalFrames() - 1); });
+  $('#btn-tl-prevcut').addEventListener('click', () => seekCut(-1));
+  $('#btn-tl-nextcut').addEventListener('click', () => seekCut(1));
+  $('#btn-loop').addEventListener('click', toggleLoop);
+  $('#chk-burnin').addEventListener('change', renderTL);
+  $('#btn-export').addEventListener('click', exportVideo);
+  const strip = $('#tl-strip');
+  strip.addEventListener('pointerdown', e => {
+    if(gClipDrag) return;
+    gScrub = true;
+    try{ strip.setPointerCapture(e.pointerId); }catch(err){}
+    stripSeek(e);
+  });
+  strip.addEventListener('pointermove', e => { if(gScrub && !gClipDrag) stripSeek(e); });
+  strip.addEventListener('pointerup', () => { gScrub = false; });
+  strip.addEventListener('pointercancel', () => { gScrub = false; });
+  tlCv.addEventListener('pointerdown', tlPaintDown);
+  tlCv.addEventListener('pointermove', paintMove);
+  tlCv.addEventListener('pointerup', paintUp);
+  tlCv.addEventListener('pointercancel', paintUp);
   // palette buttons (canon)
   $('#btn-pal-add').addEventListener('click', () => {
     gPalette.push('#808080');
@@ -1261,11 +1680,13 @@ function wire(){
   window.addEventListener('resize', () => {
     if(state.view === 'board'){ resizeBoard(); renderBoard(); }
     if(state.view === 'edit'){ fitEditCanvas(); }
+    if(state.view === 'tl'){ fitTLCanvas(); layoutTL(); renderTL(); }
   });
 }
 
 async function init(){
   wire();
+  loadKeymap();
   loadPalette();
   state.fillColor = gPalette[gPalSlot] || '#000000';
   updateSwatch();
@@ -1288,7 +1709,9 @@ window.__ECONTE__ = {
   state, photos, cuts,
   addPhotoFromImage, createCutFromRect, addEmptyCut, bakeCut,
   renderBoard, renderSheet, renderEditCanvas, openEdit, setView, setETool,
-  fmtDur, parseDur, floodFill, sampleCompositeColor, saveAll, boardFit, updateTotals
+  fmtDur, parseDur, floodFill, sampleCompositeColor, saveAll, boardFit, updateTotals,
+  totalFrames, cutIndexAt, cutStartFrame, seek, play, pause, togglePlay, seekCut, toggleLoop,
+  layoutTL, renderTL, fitTLCanvas, exportVideo, finishExport, cancelExport, loadKeymap
 };
 </script>
 </body>
