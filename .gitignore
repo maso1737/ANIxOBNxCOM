@@ -9,3 +9,6 @@ _済/
 oban-builder_Design/
 *_Design/
 Design_*/
+
+# 確認用テストデータ（Gitでは管理しない）
+OP_pose_book1/
