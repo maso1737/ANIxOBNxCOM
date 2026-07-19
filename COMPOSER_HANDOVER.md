@@ -1,5 +1,21 @@
 COMPOSER v0.7（単一HTML）の続き開発用ハンドオフ。
 
+【2026-07 追加（SPEC_11 P0/P1/P1b）】
+- 座標規約: フレームf左端= LABEL_W + frameFrac(f)*幅（frameFrac=f/total）。**total-1を分母にしない**。全UI（ルーラー/PH/WA/ダイヤ/ブロック/グラフ）統一
+- 自動保存: IndexedDB `composer_autosave_v1`（cells=絵・import/LIVE時のみ ／ meta=cells抜きpayload・recordHistory毎debounce 2s）。起動時に復元バー（復元=置き換え/破棄/✕=温存）。LIVE自動ロードが先行してもバーは出す。⚙パネルにCLEARボタン。音声本体は対象外
+- undo v2: cloneEditState={trackRefs(参照配列),perTrack(tidで深コピー),gmarkers,selectedTrack,workArea}。applyHistoryはtrackRefs差し替え→tid引き当てで書き戻し→rebuildAllTrackUI。**トラック削除/並び替え/◉/SOLOもundo対象**。適用時に再クローンするので履歴とstateの配列共有なし
+- #kf-parent変更時のUI更新は refreshTrackChainMarks()（軽量。rebuildはしない）
+
+【2026-07 追加（MOTION_COMIC_SPEC.md Phase 5/6）】
+- influence%イーズ: KFに任意 `ei`/`eo`(0-100)。区間にどちらかあれば bezierEaseT（cubic-bezierタイミング）、無ければ従来ez smoothstep。INF IN/OUT欄（インスペクター）で適用/解除（空欄=解除）。直列化・コピペ・ドラッグ・undoすべて持ち回り（putKeys/groupSnap/copy/pasteにei,eo追加済み。**KF複製系を触るときは ei/eo の持ち回りを忘れない**）
+- ミニグラフ: #tl-graph（∿ボタン/Gキー）。renderGraph()はupdatePlayhead()から毎回呼ばれる（非表示時は即return）。VAL/SPD切替=#tl-graph-mode
+- NULLトラック: type:'null'（+ NULLボタン, addNullTrack）。frames空・描画されない親専用。projectId=null。アイコン◇
+- カメラの親: PRNT行がカメラでも表示（選択肢はNULLトラックのみ）。getCamAt()が親チェーンを加算合成(x/y/z/rot加算, s乗算)。WEBビューアのcamAtも同ロジック（DATA.camera.parent）
+- 子のZ有効化: applyTrackChain子分岐で persp=1000/(1000+z) をローカル適用（カメラZは掛けない）。**本体とWEBビューアテンプレの2箇所**を常に同期すること
+- FX HUD: PRNT readonly行(#fx-parent-row) / カメラ選択中はAX/AY/OP行をprop-hiddenに
+- undo⛓: refreshTrackChainMarks()（ラベルのみ更新）をapplyHistoryから呼ぶ
+- AE JSX書き出し: exportAeJsx()（トップバーAE JSX、カメラありで有効）。親NULL合成込みKFをベイクし、AEでヌル+一節点カメラを生成する.jsxをダウンロード
+
 【v0.7 MOTION COMIC — 詳細は MOTION_COMIC_SPEC.md】
 - track.type: 'anim'|'image'|'camera'、track.tid（恒久ID）、track.parent（親のtid）
 - 画像インポート: PNG/JPEG/WebP→cells1枚の擬似JSON（IMAGE_v1）→importJSON。importFiles()でJSON/画像/audio混在D&D

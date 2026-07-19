@@ -109,6 +109,7 @@ input[type=number]{-moz-appearance:textfield;}
 #tl-ruler-canvas{display:block;width:100%;height:100%;}
 /* スクロールバーは非表示（幅を取るとストリップがルーラーより狭くなりKF/セルが左へずれるため。ホイール/タッチでスクロール可） */
 #tl-tracks{position:relative;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;}
+#tl-tracks::-webkit-scrollbar{display:none;} /* スクロールバーが幅を食うとstrip幅≠ルーラー幅で座標がずれる（SPEC_11 P0） */
 #tl-tracks::-webkit-scrollbar{display:none;}
 .tl-track{position:relative;height:var(--track-h,54px);border-bottom:1px solid rgba(255,255,255,0.16);display:flex;align-items:center;padding-left:14px;cursor:pointer;transition:background 0.1s;}
 .tl-track:first-child{border-top:1px solid rgba(255,255,255,0.16);}
@@ -372,6 +373,15 @@ input[type=number]{-moz-appearance:textfield;}
 #kf-parent{flex:1;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--ice);font-family:var(--mono);font-size:9px;padding:2px 4px;outline:none;min-width:0;}
 #kf-parent option{background:#000;color:var(--ice);}
 .tl-parent-mark{color:var(--ice);margin-left:4px;font-size:8px;}
+/* ── ミニグラフ（値/速度カーブ）── */
+#tl-graph{position:relative;height:74px;flex-shrink:0;border-top:1px solid var(--border);background:rgba(0,0,0,0.35);display:none;}
+#tl-graph.show{display:block;}
+#tl-graph-canvas{position:absolute;inset:0;width:100%;height:100%;}
+#tl-graph-mode{position:absolute;top:3px;left:8px;font-size:8px;letter-spacing:0.2em;color:var(--acid);cursor:pointer;user-select:none;padding:1px 4px;border:1px solid var(--border);}
+/* ── 自動保存の復元バー（SPEC_11 P1）── */
+#autosave-bar{position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:200;background:rgba(8,8,8,0.96);border:1px solid var(--border-bright);padding:8px 14px;display:flex;gap:10px;align-items:center;font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.8);box-shadow:0 8px 30px rgba(0,0,0,0.6);}
+#autosave-bar button{background:transparent;border:1px solid var(--border);color:var(--acid);font-family:var(--mono);font-size:9px;padding:4px 12px;cursor:pointer;letter-spacing:0.1em;}
+#autosave-bar button:hover{border-color:var(--acid);}
 </style>
 </head>
 <body>
@@ -390,12 +400,14 @@ input[type=number]{-moz-appearance:textfield;}
       <button id="btn-import" class="primary" title="JSON / 画像(PNG等)を読み込み（既存トラックに追加。複数回で重ねられます）">IMPORT</button>
       <button id="btn-paste-json" title="クリップボードのJSONを直接読み込み（OBANの COPY FOR COMPOSER / COPY PROJ 用）">PASTE JSON</button>
       <button id="btn-camera" title="カメラトラックを追加（1つまで）。X/Y=パン, Z=ドリー(パララックス), ROT=回転, SCL=ズーム">+ CAMERA</button>
+      <button id="btn-null" title="ヌルトラックを追加（描画されない親専用トラック）。カメラや複数トラックの親にして丸ごと調整">+ NULL</button>
       <button id="btn-export-project" disabled>EXPORT PROJECT</button>
       <button id="btn-export" disabled>EXPORT 4K PNG</button>
       <button id="btn-fx" title="撮影処理（SATSUEI FX）チェーンを編集">FX</button>
       <button id="btn-fx-preview" title="プレビューに撮影処理を適用（draft品質: MB/DOFなし）">FX PREVIEW</button>
       <button id="btn-export-video" disabled title="全体を動画で書き出し（Safari=MP4 / Chrome=WebM・実時間レンダリング）">EXPORT VIDEO</button>
       <button id="btn-export-web" disabled title="スクロール駆動のモーションコミックHTMLを書き出し（単一ファイル・依存ゼロ）">EXPORT WEB</button>
+      <button id="btn-export-jsx" disabled title="カメラKF（親NULL合成込み）をAfter Effects用.jsxとして書き出し。AEでコンポを開いた状態で File > Scripts > Run Script File">AE JSX</button>
       <button id="btn-load-audio" title="BGM/SE音声ファイルを読み込む">♪ AUDIO</button>
       <button id="btn-live" class="primary" title="ANIMATORの編集をライブ反映中（クリックでOFF）">LIVE ●</button>
       <button id="btn-settings" title="設定（ガイド/ショートカット）">⚙</button>
@@ -459,6 +471,7 @@ input[type=number]{-moz-appearance:textfield;}
       <button class="kf-btn" id="btn-kf-copy">⧉ COPY KEYFRAMES</button>
       <button class="kf-btn" id="btn-kf-paste">⮃ PASTE TO TRACK</button>
       <button class="kf-btn" id="btn-kf-ease">∿ EASE (中) / SHIFT=最大</button>
+      <div class="kf-row" id="inf-row" style="margin-top:4px" title="AE風イーズ影響度（%・0〜100）。IN=キーに入る側 / OUT=キーから出る側。選択KF（無ければ現フレームのキー）に適用。空欄=ezイーズに戻す"><span class="k">INF</span><input class="kf-val" id="kf-inf-in" type="number" min="0" max="100" step="1" placeholder="IN"><input class="kf-val" id="kf-inf-out" type="number" min="0" max="100" step="1" placeholder="OUT"></div>
     </div>
     <div class="insp-section">
       <div class="insp-h">CURRENT FRAME</div>
@@ -495,6 +508,10 @@ input[type=number]{-moz-appearance:textfield;}
         </div>
       </div>
     </div>
+    <div id="tl-graph">
+      <canvas id="tl-graph-canvas"></canvas>
+      <div id="tl-graph-mode" title="クリックで 値カーブ ⇔ 速度カーブ 切替">VAL</div>
+    </div>
   </div>
 
   <div id="transport">
@@ -506,6 +523,7 @@ input[type=number]{-moz-appearance:textfield;}
       <button id="btn-play">▶</button>
       <button id="btn-last">▶|</button>
       <button id="btn-loop" class="on">⟲</button>
+      <button id="btn-graph" title="ミニグラフ 値/速度カーブ (G)">∿</button>
     </div>
     <div class="g">
       <span class="tc-dim">FRAME</span>
@@ -525,6 +543,7 @@ input[type=number]{-moz-appearance:textfield;}
     <button id="fx-kf-clear" title="このトラックの全キーを削除">✕ CLEAR ALL KF</button>
   </div>
   <div id="fx-hud-body">
+    <div class="fx-row" id="fx-parent-row" style="display:none" title="親トラック（編集はインスペクターのPRNTで）"><span class="k">PRNT</span><span id="fx-parent" style="flex:1;text-align:right;color:var(--ice,#7fd4ff);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span></div>
     <div class="fx-row" data-prop="ax"><span class="k">AX</span><button class="num-step" data-fxstep="ax" data-dir="-1">◀</button><input id="fx-ax" type="number" step="1"><button class="num-step" data-fxstep="ax" data-dir="1">▶</button><div class="dot" id="fx-dot-ax"></div></div>
     <div class="fx-row" data-prop="ay"><span class="k">AY</span><button class="num-step" data-fxstep="ay" data-dir="-1">◀</button><input id="fx-ay" type="number" step="1"><button class="num-step" data-fxstep="ay" data-dir="1">▶</button><div class="dot" id="fx-dot-ay"></div></div>
     <div class="fx-row" data-prop="x"><span class="k">X</span><button class="num-step" data-fxstep="x" data-dir="-1">◀</button><input id="fx-x" type="number" step="1"><button class="num-step" data-fxstep="x" data-dir="1">▶</button><div class="dot" id="fx-dot-x"></div></div>
@@ -564,6 +583,10 @@ input[type=number]{-moz-appearance:textfield;}
         <input type="number" id="guide-safe-b" class="sg-num" min="1" max="100" step="1" title="タイトルセーフ(%)">
         <span class="sg-x">%</span>
       </div>
+    </div>
+    <div class="set-sect">
+      <div class="set-sect-h">AUTOSAVE</div>
+      <button class="set-btn" id="btn-as-clear" title="IndexedDBの自動保存データ（絵＋編集）を消去">自動保存データを消去</button>
     </div>
     <div class="set-sect">
       <div class="set-sect-h">KEYBOARD SHORTCUTS</div>
@@ -998,6 +1021,9 @@ if(typeof window !== 'undefined'){
 
 <script>
 const LABEL_W = 154;
+// タイムラインX座標規約（SPEC_11 P0）: フレーム f の左端 = LABEL_W + frameFrac(f)*描画幅。
+// ルーラー/プレイヘッド/WAバンド/KFダイヤ/コマブロック/ミニグラフの全UIでこれに統一（分母は total。total-1 は使わない）
+const frameFrac = f => state.totalFrames ? f/state.totalFrames : 0;
 const OUT_W = 3840, OUT_H = 2160;
 const ALL_PROPS = ['x','y','z','s','ax','ay','rot','op'];
 const PROP_STEP = {x:1,y:1,z:1,s:0.01,ax:1,ay:1,rot:0.5,op:0.01};
@@ -1061,6 +1087,25 @@ function kfsNow(){
 }
 
 // ── KF INTERPOLATION (explicit kfs param) ──
+// AE風influence（%）: k.eo=このキーから出る側 / k.ei=このキーに入る側（0〜100）
+// どちらかが設定された区間は cubic-bezier(x1=eo/100, 0, 1-ei/100, 1) のタイミング曲線。
+// 未設定区間は従来の ez smoothstepブレンド（後方互換）。
+function bezierEaseT(t, x1, x2){
+  if(t<=0) return 0; if(t>=1) return 1;
+  // x(u)=3(1-u)²u·x1+3(1-u)u²·x2+u³ を u について解く（Newton→二分法フォールバック）
+  let u=t;
+  for(let i=0;i<8;i++){
+    const iu=1-u;
+    const x=3*iu*iu*u*x1+3*iu*u*u*x2+u*u*u;
+    const dx=3*iu*iu*x1+6*iu*u*(x2-x1)+3*u*u*(1-x2);
+    if(Math.abs(x-t)<1e-5) break;
+    if(dx>1e-6) u-=(x-t)/dx;
+    else break;
+    u=Math.max(0,Math.min(1,u));
+  }
+  // y制御点は(…,0)(…,1)固定 → y(u)=u²(3-2u)
+  return u*u*(3-2*u);
+}
 function getKfValue(prop, frame, kfs){
   const arr = kfs[prop];
   const def = prop==='s'||prop==='op' ? 1 : 0;
@@ -1071,9 +1116,14 @@ function getKfValue(prop, frame, kfs){
   for(let i=0;i<arr.length-1;i++){
     if(frame>=arr[i].f&&frame<=arr[i+1].f){
       let t=(frame-arr[i].f)/(arr[i+1].f-arr[i].f);
-      // イーズ（ez:0=リニア / 0.5=中 / 1=最大）。smoothstepへ ez 量だけブレンド
-      const ez=Math.max(arr[i].ez||0,arr[i+1].ez||0);
-      if(ez>0){ const s=t*t*(3-2*t); t=t+(s-t)*ez; }
+      const eo=arr[i].eo, ei=arr[i+1].ei;
+      if(eo!=null||ei!=null){
+        t=bezierEaseT(t,(eo!=null?eo:(arr[i].ez||0)*33.3)/100,1-(ei!=null?ei:(arr[i+1].ez||0)*33.3)/100);
+      } else {
+        // イーズ（ez:0=リニア / 0.5=中 / 1=最大）。smoothstepへ ez 量だけブレンド
+        const ez=Math.max(arr[i].ez||0,arr[i+1].ez||0);
+        if(ez>0){ const s=t*t*(3-2*t); t=t+(s-t)*ez; }
+      }
       return arr[i].v+(arr[i+1].v-arr[i].v)*t;
     }
   }
@@ -1124,19 +1174,19 @@ let kfClipboard=null; // {items:[{rel,prop,v,ez}]}
 function copyKeyframes(){
   let items=[], min=Infinity;
   if(kfSel.length){
-    kfSel.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k){ items.push({f:s.f,prop:p,v:k.v,ez:k.ez||0}); min=Math.min(min,s.f); } }); });
+    kfSel.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k){ items.push({f:s.f,prop:p,v:k.v,ez:k.ez||0,ei:k.ei,eo:k.eo}); min=Math.min(min,s.f); } }); });
   } else {
     const t=selTrack(); if(!t){ flashLive('トラック未選択'); return; }
-    ALL_PROPS.forEach(p=>t.keyframes[p].forEach(k=>{ items.push({f:k.f,prop:p,v:k.v,ez:k.ez||0}); min=Math.min(min,k.f); }));
+    ALL_PROPS.forEach(p=>t.keyframes[p].forEach(k=>{ items.push({f:k.f,prop:p,v:k.v,ez:k.ez||0,ei:k.ei,eo:k.eo}); min=Math.min(min,k.f); }));
   }
   if(!items.length){ flashLive('コピー対象なし'); return; }
-  kfClipboard={ items: items.map(it=>({rel:it.f-min, prop:it.prop, v:it.v, ez:it.ez})) };
+  kfClipboard={ items: items.map(it=>({rel:it.f-min, prop:it.prop, v:it.v, ez:it.ez, ei:it.ei, eo:it.eo})) };
   flashLive('⧉ KF COPIED ('+items.length+')');
 }
 function pasteKeyframes(){
   const t=selTrack(); if(!t||!kfClipboard||!kfClipboard.items.length){ flashLive('クリップボードが空です'); return; }
   const pf=state.currentFrame;
-  kfClipboard.items.forEach(it=>{ const f=pf+it.rel; setKf(it.prop,f,it.v,t.keyframes); const k=t.keyframes[it.prop].find(k=>k.f===f); if(k) k.ez=it.ez; });
+  kfClipboard.items.forEach(it=>{ const f=pf+it.rel; setKf(it.prop,f,it.v,t.keyframes); const k=t.keyframes[it.prop].find(k=>k.f===f); if(k){ k.ez=it.ez; if(it.ei!=null)k.ei=it.ei; else delete k.ei; if(it.eo!=null)k.eo=it.eo; else delete k.eo; } });
   recordHistory(); renderKfDiamonds(state.selectedTrack); drawCurrentFrame(); updateKfUI();
   flashLive('⮃ KF PASTED → '+(t.name||'TRACK'));
 }
@@ -1174,6 +1224,41 @@ function applyEaseToFrame(trackIdx,f,amount){
     const t=state.tracks[trackIdx]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===f); if(k) k.ez=amount; });
   }
   recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); drawCurrentFrame();
+}
+// ── INFLUENCE（AE風 influence%）──
+// field='ei'|'eo'。val=null で解除（ez smoothstepへ戻る）。対象=選択KF、無ければ現フレームのキー
+function applyInfluence(field,val){
+  const targets = kfSel.length ? kfSel.slice()
+    : (selTrack() ? [{t:state.selectedTrack,f:state.currentFrame}] : []);
+  if(!targets.length){ flashLive('対象キーがありません'); return; }
+  const tracksInv=new Set(); let n=0;
+  targets.forEach(s=>{
+    const t=state.tracks[s.t]; if(!t) return;
+    ALL_PROPS.forEach(p=>{
+      const k=t.keyframes[p].find(k=>k.f===s.f); if(!k) return;
+      if(val==null) delete k[field]; else k[field]=Math.max(0,Math.min(100,val));
+      n++;
+    });
+    tracksInv.add(s.t);
+  });
+  if(!n){ flashLive('対象キーがありません'); return; }
+  recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses();
+  drawCurrentFrame(); renderGraph();
+  flashLive('∿ INF '+(field==='ei'?'IN':'OUT')+(val==null?' CLEAR':'='+Math.round(val)+'%'));
+}
+// INF欄の現在値表示（単一選択KF or 現フレームのキー）
+function updateInfluenceUI(){
+  const inEl=$('#kf-inf-in'), outEl=$('#kf-inf-out'); if(!inEl||!outEl) return;
+  let src=null;
+  if(kfSel.length===1) src=kfSel[0];
+  else if(!kfSel.length && selTrack()) src={t:state.selectedTrack,f:state.currentFrame};
+  let ei=null,eo=null;
+  if(src){
+    const t=state.tracks[src.t];
+    if(t) for(const p of ALL_PROPS){ const k=t.keyframes[p].find(k=>k.f===src.f); if(k){ ei=k.ei!=null?k.ei:null; eo=k.eo!=null?k.eo:null; break; } }
+  }
+  if(document.activeElement!==inEl)  inEl.value = ei==null?'':Math.round(ei);
+  if(document.activeElement!==outEl) outEl.value= eo==null?'':Math.round(eo);
 }
 // 現フレーム(grabbed)のイーズ量を取得（メニューの現在値表示用）
 function getFrameEz(trackIdx,f){
@@ -1253,15 +1338,23 @@ function renderGlobalMarkers(){
 }
 
 // ── UNDO / REDO ──
+// SPEC_11 P1b: トラック構成（追加/削除/並び替え/表示/SOLO）もundo対象。
+// trackRefs=トラックオブジェクトへの参照配列（絵は共有なので軽い。削除されても参照が生きていて絵ごと戻せる）
+// perTrack=編集データの深コピー（tidで引き当て。適用時にも再クローンし、履歴とstateの配列共有を避ける）
 function cloneEditState(){
   return {
-    tracks: state.tracks.map(t=>({
+    trackRefs: state.tracks.slice(),
+    perTrack: state.tracks.map(t=>({
+      tid: t.tid,
       keyframes: ALL_PROPS.reduce((o,p)=>({...o,[p]:t.keyframes[p].map(k=>({...k}))}),{}),
       markers: t.markers.map(m=>({...m})),
       parent: t.parent||null,
+      visible: t.visible!==false,
+      solo: !!t.solo,
     })),
     gmarkers: state.markers.map(m=>({...m})),
     selectedTrack: state.selectedTrack,
+    workArea: state.workArea?{...state.workArea}:null,
   };
 }
 function recordHistory(){
@@ -1270,22 +1363,125 @@ function recordHistory(){
   if(state.history.length>51) state.history.shift();
   state.historyIdx = state.history.length-1;
   updateUndoButtons();
+  scheduleAutosave(); // SPEC_11 P1: 編集のたびdebounce保存
 }
+
+// ── AUTOSAVE（IndexedDB・SPEC_11 P1）──
+// 「絵」(cellsストア・import/LIVE更新時のみ全書き) と「編集」(metaストア=cells抜きpayload・recordHistory毎にdebounce) を分離。
+// 音声ファイル本体は対象外（オフセット等の数値も現状metaに含まれない）。失敗は握ってflashLiveのみ＝アプリ動作は継続。
+const AS_DB='composer_autosave_v1', AS_VER=1;
+let gAsDb=null, gAsTimer=null;
+function asOpen(){
+  return new Promise((res,rej)=>{
+    if(gAsDb) return res(gAsDb);
+    const r=indexedDB.open(AS_DB,AS_VER);
+    r.onupgradeneeded=()=>{ const db=r.result;
+      if(!db.objectStoreNames.contains('cells')) db.createObjectStore('cells');
+      if(!db.objectStoreNames.contains('meta'))  db.createObjectStore('meta');
+    };
+    r.onsuccess=()=>{ gAsDb=r.result; res(gAsDb); };
+    r.onerror=()=>rej(r.error);
+  });
+}
+function asTx(store,fn){
+  return asOpen().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(store,'readwrite');
+    fn(tx.objectStore(store));
+    tx.oncomplete=()=>res();
+    tx.onerror=()=>rej(tx.error);
+  }));
+}
+function asGet(store,key){
+  return asOpen().then(db=>new Promise((res,rej)=>{
+    const rq=db.transaction(store).objectStore(store).get(key);
+    rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error);
+  }));
+}
+function asClearAll(){ return Promise.all([asTx('cells',st=>st.clear()),asTx('meta',st=>st.clear())]); }
+function saveAutosaveCells(){ // 絵の保存（重いのでimport/LIVE更新時のみ。クリア後に全トラック分put）
+  if(!state.tracks.length) return;
+  asTx('cells',st=>{
+    st.clear();
+    state.tracks.forEach(t=>st.put({tid:t.tid,cells:serializeTrackCells(t)},t.tid));
+  }).catch(()=>flashLive('AUTOSAVE FAILED (絵の保存)'));
+}
+function buildAutosaveMeta(){ // buildProjectPayloadから各トラックのcellsを抜き cellsRef=tid に置換
+  const out=buildProjectPayload(); if(!out) return null;
+  if(out.format==='PROJECT_v1'){ delete out.cells; out.cellsRef=out.tid; }
+  else out.tracks.forEach(t=>{ delete t.cells; t.cellsRef=t.tid; });
+  out.savedAt=Date.now();
+  return out;
+}
+function scheduleAutosave(){
+  clearTimeout(gAsTimer);
+  gAsTimer=setTimeout(()=>{
+    const meta=buildAutosaveMeta(); if(!meta) return;
+    asTx('meta',st=>st.put(meta,'current')).catch(()=>flashLive('AUTOSAVE FAILED (容量?)'));
+  },2000);
+}
+async function checkAutosaveRestore(){ // 起動時: 保存があれば復元バーを出す
+  let meta=null;
+  try{ meta=await asGet('meta','current'); }catch(e){ return; }
+  if(!meta) return;
+  // 注: LIVE自動ロードや ?id= 読込が先行してもバーは出す（自動保存＝KF/親/カメラ入りの方が情報が多いため。
+  //     復元は「置き換え」セマンティクス。要らなければ✕/破棄）
+  const bar=document.createElement('div');
+  bar.id='autosave-bar';
+  const dt=new Date(meta.savedAt||0), pad=n=>String(n).padStart(2,'0');
+  bar.innerHTML=`<span>前回の作業（${dt.getMonth()+1}/${dt.getDate()} ${pad(dt.getHours())}:${pad(dt.getMinutes())}）が残っています</span>`;
+  const bR=document.createElement('button'); bR.textContent='復元'; bR.title='自動保存を読み込みます（現在の内容がある場合は置き換え）';
+  const bD=document.createElement('button'); bD.textContent='破棄'; bD.title='自動保存データを消去';
+  const bX=document.createElement('button'); bX.textContent='✕'; bX.title='閉じる（データは残す）';
+  bar.appendChild(bR); bar.appendChild(bD); bar.appendChild(bX);
+  document.body.appendChild(bar);
+  bR.addEventListener('click',async()=>{
+    bar.remove();
+    try{
+      const fill=async o=>{ const rec=await asGet('cells',o.cellsRef); o.cells=(rec&&rec.cells)||[]; delete o.cellsRef; };
+      if(meta.format==='PROJECT_v1') await fill(meta);
+      else for(const t of meta.tracks) await fill(t);
+      state.tracks=[]; // 置き換え（importJSONは空なら新規読込＝loadJSON経路）
+      importJSON(meta);
+      flashLive('⟲ AUTOSAVE RESTORED');
+    }catch(e){ flashLive('復元に失敗しました'); }
+  });
+  bD.addEventListener('click',()=>{ bar.remove(); asClearAll().then(()=>flashLive('AUTOSAVE CLEARED')).catch(()=>{}); });
+  bX.addEventListener('click',()=>bar.remove());
+}
+checkAutosaveRestore();
 function applyHistory(snap){
-  snap.tracks.forEach((ts,i)=>{
-    if(!state.tracks[i]) return;
-    state.tracks[i].keyframes = ts.keyframes;
-    state.tracks[i].markers   = ts.markers;
-    if('parent' in ts) state.tracks[i].parent = ts.parent;
+  // 1) トラック構成の復元（参照差し替え＝追加/削除/並び替えが戻る）
+  state.tracks = snap.trackRefs.slice();
+  // 2) 編集データを深コピーで書き戻し（履歴スナップショットとの配列共有を避ける）
+  const byTid = new Map(snap.perTrack.map(pt=>[pt.tid,pt]));
+  state.tracks.forEach(t=>{
+    const pt=byTid.get(t.tid); if(!pt) return;
+    t.keyframes = ALL_PROPS.reduce((o,p)=>({...o,[p]:pt.keyframes[p].map(k=>({...k}))}),{});
+    t.markers = pt.markers.map(m=>({...m}));
+    t.parent = pt.parent; t.visible = pt.visible; t.solo = pt.solo;
   });
   sanitizeParents();
   if(snap.gmarkers) state.markers = snap.gmarkers.map(m=>({...m}));
+  state.totalFrames = state.tracks.length?Math.max(...state.tracks.map(t=>t.totalFrames)):0;
+  if(state.currentFrame>=state.totalFrames) state.currentFrame=Math.max(0,state.totalFrames-1);
+  if(snap.workArea) state.workArea={...snap.workArea};
   state.selectedTrack = Math.min(snap.selectedTrack, state.tracks.length-1);
-  state.tracks.forEach((_,i)=>{ renderKfDiamonds(i); renderMarkers(i); });
-  renderGlobalMarkers();
-  drawCurrentFrame(); updateKfUI(); updateUndoButtons();
+  // 3) トラック構成が変わりうるため全再構築（undo/redoはショートカット/ボタン起点＝KFドラッグ中には発火しない）
+  rebuildAllTrackUI();
+  drawCurrentFrame(); updateKfUI(); updateUndoButtons(); updateExportButtons();
+}
+// undo/parent変更後に行ラベルの⛓だけ差し替える（DOM全再構築なしの安全策）
+function refreshTrackChainMarks(){
   document.querySelectorAll('.tl-track').forEach(el=>{
-    el.classList.toggle('selected', parseInt(el.dataset.track)===state.selectedTrack);
+    const t=state.tracks[parseInt(el.dataset.track)]; if(!t) return;
+    const nameEl=el.querySelector('.tl-track-name'); if(!nameEl) return;
+    if(nameEl.querySelector('input')) return; // 名前編集中は触らない
+    const mark=nameEl.querySelector('.tl-parent-mark');
+    if(t.parent&&!mark){
+      const s=document.createElement('span');
+      s.className='tl-parent-mark'; s.title='親トラックあり'; s.textContent='⛓';
+      nameEl.appendChild(s);
+    } else if(!t.parent&&mark) mark.remove();
   });
 }
 function undo(){
@@ -1348,26 +1544,36 @@ function updateFxHud(){
     const el=$(`#fx-${p}`); if(el && document.activeElement!==el) el.value=fmtProp(p,tr[p]);
     const dot=$(`#fx-dot-${p}`); if(dot) dot.classList.toggle('active',hasKfAt(p,f,kfs));
   });
+  // カメラ選択中はAX/AY/OP行を隠す（インスペクターと同じ条件）
+  const selT=selTrack(), isCam=!!(selT&&selT.type==='camera');
   document.querySelectorAll('#fx-hud .fx-row[data-prop]').forEach(el=>{
-    el.classList.toggle('prop-hidden',!state.propVisible[el.dataset.prop]);
+    const p=el.dataset.prop;
+    el.classList.toggle('prop-hidden',!state.propVisible[p]||(isCam&&(p==='ax'||p==='ay'||p==='op')));
   });
+  // PRNT表示（readonly。編集はインスペクターのみ）
+  const pRow=$('#fx-parent-row');
+  if(pRow){
+    const p=selT&&selT.parent?state.tracks.find(x=>x.tid===selT.parent):null;
+    pRow.style.display=p?'':'none';
+    if(p) $('#fx-parent').textContent='⛓ '+(p.name||'TRACK').toUpperCase();
+  }
   $('#fx-hud-frame').textContent = 'F'+String(f+1).padStart(4,'0');
 }
 
 // ── PARSE TRACK FROM JSON ──
 function newTid(){ return 't_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function parseTrackFromJSON(json){
-  const isCam = json.type==='camera';
+  const isCam = json.type==='camera', isNull = json.type==='null';
   const cellList = Array.isArray(json.cells)?json.cells:Array.isArray(json.frames)?json.frames:null;
-  if(!isCam&&(!cellList||!cellList.length)) return null;
+  if(!isCam&&!isNull&&(!cellList||!cellList.length)) return null;
   const track = {
     projectId: json.projectId||null,
     tid: (typeof json.tid==='string'&&json.tid) ? json.tid : newTid(), // 親子参照用の恒久ID
-    type: isCam ? 'camera' : (json.type==='image'?'image':'anim'),
+    type: isCam ? 'camera' : isNull ? 'null' : (json.type==='image'?'image':'anim'),
     parent: (typeof json.parent==='string'&&json.parent) ? json.parent : null, // 親トラックのtid
-    name: (json.scene||json.name||(isCam?'CAMERA':'TRACK')).toUpperCase(),
+    name: (json.scene||json.name||(isCam?'CAMERA':isNull?'NULL':'TRACK')).toUpperCase(),
     width: json.width||0, height: json.height||0, // トラック固有の解像度（基点ずれ対策）
-    cellsRaw: isCam?[]:cellList.slice(),
+    cellsRaw: (isCam||isNull)?[]:cellList.slice(),
     cellInfos: [],
     frames: [],
     totalFrames: 0,
@@ -1403,7 +1609,7 @@ function parseTrackFromJSON(json){
       if(Array.isArray(kf[p])){
         track.keyframes[p]=kf[p]
           .filter(k=>typeof k.frame==='number'&&typeof k.v==='number')
-          .map(k=>({f:k.frame|0,v:k.v,ez:typeof k.ez==='number'?k.ez:0}))
+          .map(k=>({f:k.frame|0,v:k.v,ez:typeof k.ez==='number'?k.ez:0,...(typeof k.ei==='number'?{ei:k.ei}:{}),...(typeof k.eo==='number'?{eo:k.eo}:{})}))
           .sort((a,b)=>a.f-b.f);
       }
     }
@@ -1537,6 +1743,7 @@ function finishImport(){
   $('#empty-state').style.display='none';
   updateExportButtons();
   recordHistory();
+  saveAutosaveCells(); // SPEC_11 P1: 絵はimport完了時に保存（metaはrecordHistory経由）
   announceLive();
 }
 
@@ -1551,9 +1758,25 @@ function addCameraTrack(){
   });
   state.selectedTrack=state.tracks.length-1;
   rebuildAllTrackUI();
-  updateInspector(); updateKfUI(); drawCurrentFrame();
+  updateInspector(); updateKfUI(); drawCurrentFrame(); updateExportButtons();
   recordHistory();
   flashLive('🎥 CAMERA ADDED');
+}
+// ヌルトラック：描画されない親専用トラック（AEのヌルレイヤー相当）
+// カメラの親にすると OBAN 由来のカメラKFを丸ごとオフセット/回転/ズーム調整できる
+function addNullTrack(){
+  if(!state.tracks.length){ flashLive('先にプロジェクトを読み込んでください'); return; }
+  state.tracks.push({
+    projectId:null, tid:newTid(), type:'null', parent:null,
+    name:'NULL '+(state.tracks.filter(t=>t.type==='null').length+1),
+    width:0, height:0, cellsRaw:[], cellInfos:[], frames:[], totalFrames:0,
+    keyframes:makeEmptyKfs(), markers:[], visible:true, solo:false,
+  });
+  state.selectedTrack=state.tracks.length-1;
+  rebuildAllTrackUI();
+  updateInspector(); updateKfUI(); drawCurrentFrame();
+  recordHistory();
+  flashLive('◇ NULL ADDED');
 }
 // PNG/JPEG/WebP を静止画トラックとして読み込み（cells 1枚のトラックに変換して既存パイプラインへ）
 function importImageFile(file){
@@ -1586,12 +1809,13 @@ function isDescendantOf(t, anc){
 function updateParentSelect(){
   const row=$('#parent-row'), sel=$('#kf-parent'); if(!row||!sel) return;
   const t=selTrack();
-  if(!t||t.type==='camera'){ row.style.display='none'; return; }
+  if(!t){ row.style.display='none'; return; }
   row.style.display='';
   if(document.activeElement===sel) return; // 操作中は再構築しない
   const opts=[['NONE','']];
   state.tracks.forEach(tr2=>{
     if(tr2===t||tr2.type==='camera') return;
+    if(t.type==='camera'&&tr2.type!=='null') return; // カメラの親はNULLトラックのみ（加算合成のため）
     if(isDescendantOf(tr2,t)) return; // 自分の子孫は親にできない（循環防止）
     opts.push([(tr2.name||'TRACK').toUpperCase(),tr2.tid]);
   });
@@ -1626,6 +1850,7 @@ function toggleTrackVis(idx){
     btn.classList.toggle('vis-off',!t.visible);
   }
   drawCurrentFrame();
+  recordHistory(); // SPEC_11 P1b: 表示切替もundo対象
 }
 
 function removeTrack(idx){
@@ -1643,6 +1868,7 @@ function toggleTrackSolo(idx){
   const t=state.tracks[idx]; if(!t) return;
   t.solo=!t.solo;
   updateTrackHeights(); drawCurrentFrame();
+  recordHistory(); // SPEC_11 P1b: SOLOもundo対象
   // update solo button visual
   document.querySelectorAll('.tl-track').forEach(el=>{
     const i=parseInt(el.dataset.track);
@@ -1768,7 +1994,7 @@ function buildTrackElement(idx){
   const nameEl=document.createElement('div');
   nameEl.className='tl-track-name';
   const parentMark=track.parent?'<span class="tl-parent-mark" title="親トラックあり">⛓</span>':'';
-  nameEl.innerHTML=`<span class="num">${track.type==='camera'?'🎥':String(idx+1).padStart(2,'0')}</span>${(track.name||'TRACK').toUpperCase()}${parentMark}`;
+  nameEl.innerHTML=`<span class="num">${track.type==='camera'?'🎥':track.type==='null'?'◇':String(idx+1).padStart(2,'0')}</span>${(track.name||'TRACK').toUpperCase()}${parentMark}`;
   // Inline name editing on double-click
   nameEl.addEventListener('dblclick',e=>{
     e.stopPropagation();
@@ -1777,7 +2003,7 @@ function buildTrackElement(idx){
     inp.style.cssText='background:transparent;border:none;border-bottom:1px solid var(--acid);color:var(--acid);font-family:var(--mono);font-size:9px;width:86px;padding:0;outline:none;letter-spacing:.1em;';
     nameEl.innerHTML=''; nameEl.appendChild(inp);
     inp.focus(); inp.select();
-    const nameHTML=v=>`<span class="num">${track.type==='camera'?'🎥':String(idx+1).padStart(2,'0')}</span>${v}${track.parent?'<span class="tl-parent-mark" title="親トラックあり">⛓</span>':''}`;
+    const nameHTML=v=>`<span class="num">${track.type==='camera'?'🎥':track.type==='null'?'◇':String(idx+1).padStart(2,'0')}</span>${v}${track.parent?'<span class="tl-parent-mark" title="親トラックあり">⛓</span>':''}`;
     const commit=()=>{
       const v=inp.value.trim().toUpperCase()||'TRACK';
       track.name=v;
@@ -1921,13 +2147,13 @@ function renderKfDiamonds(trackIdx){
     const d=document.createElement('div'); d.className='tl-kf-d';
     d.dataset.track=trackIdx; d.dataset.f=f;
     if(kfSelHas(trackIdx,f)) d.classList.add('sel');
-    // この frame のイーズ量に応じて形を変える（リニア=菱形 / 中=角丸 / 最大=円）
-    let ezAmt=0; ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k)ezAmt=Math.max(ezAmt,k.ez||0);});
+    // この frame のイーズ量に応じて形を変える（リニア=菱形 / 中=角丸 / 最大=円）。influence付きは中扱い
+    let ezAmt=0; ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k)ezAmt=Math.max(ezAmt,k.ez||0,(k.ei!=null||k.eo!=null)?0.5:0);});
     if(ezAmt>=0.99) d.classList.add('ez-max'); else if(ezAmt>0) d.classList.add('ez-mid');
     d.style.left=(f/total*100)+'%'; d.title=`F${f+1}`+(ezAmt>=0.99?' (EASE最大)':ezAmt>0?' (EASE中)':'')+'  Ctrl+クリックでイーズ切替';
     // この frame の各プロパティ値（単一移動/複製で持ち回る）
-    const kfVals={}, kfEz={};
-    ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k){kfVals[p]=k.v;kfEz[p]=k.ez||0;}});
+    const kfVals={}, kfEz={}, kfInf={};
+    ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k){kfVals[p]=k.v;kfEz[p]=k.ez||0;kfInf[p]={ei:k.ei,eo:k.eo};}});
     let dragActive=false, wasDragged=false, origF=f, shiftStart=false, ctrlStart=false, copyF=f;
     let groupMode=false, groupSnap=null, lastDelta=0, gMin=0, gMax=total-1;
     function putKeys(targetF,removeF){
@@ -1935,7 +2161,9 @@ function renderKfDiamonds(trackIdx){
         if(!(p in kfVals)) return;
         if(removeF!=null) track.keyframes[p]=track.keyframes[p].filter(k=>k.f!==removeF);
         if(!track.keyframes[p].some(k=>k.f===targetF)){
-          track.keyframes[p].push({f:targetF,v:kfVals[p],ez:kfEz[p]});
+          const nk={f:targetF,v:kfVals[p],ez:kfEz[p]};
+          if(kfInf[p]){ if(kfInf[p].ei!=null)nk.ei=kfInf[p].ei; if(kfInf[p].eo!=null)nk.eo=kfInf[p].eo; }
+          track.keyframes[p].push(nk);
           track.keyframes[p].sort((a,b)=>a.f-b.f);
         }
       });
@@ -1945,7 +2173,7 @@ function renderKfDiamonds(trackIdx){
       if(delta===lastDelta) return;
       // 2パス：旧位置から除去 → 新位置へ配置（グループ内衝突回避）
       groupSnap.forEach(it=>{ const t=state.tracks[it.t]; const from=it.f+lastDelta; it.props.forEach(pr=>{ t.keyframes[pr.p]=t.keyframes[pr.p].filter(k=>k.f!==from); }); });
-      groupSnap.forEach(it=>{ const t=state.tracks[it.t]; const to=it.f+delta; it.props.forEach(pr=>{ if(!t.keyframes[pr.p].some(k=>k.f===to)){ t.keyframes[pr.p].push({f:to,v:pr.v,ez:pr.ez}); t.keyframes[pr.p].sort((a,b)=>a.f-b.f);} }); });
+      groupSnap.forEach(it=>{ const t=state.tracks[it.t]; const to=it.f+delta; it.props.forEach(pr=>{ if(!t.keyframes[pr.p].some(k=>k.f===to)){ const nk={f:to,v:pr.v,ez:pr.ez}; if(pr.ei!=null)nk.ei=pr.ei; if(pr.eo!=null)nk.eo=pr.eo; t.keyframes[pr.p].push(nk); t.keyframes[pr.p].sort((a,b)=>a.f-b.f);} }); });
       lastDelta=delta;
     }
     d.addEventListener('pointerdown',e=>{
@@ -1954,7 +2182,7 @@ function renderKfDiamonds(trackIdx){
       // 複数選択中のキーを掴んだ場合はグループ移動
       groupMode = !shiftStart && kfSel.length>1 && kfSelHas(trackIdx,f);
       if(groupMode){
-        groupSnap=kfSel.map(s=>{ const t=state.tracks[s.t]; const it={t:s.t,f:s.f,props:[]}; ALL_PROPS.forEach(p=>{const k=t.keyframes[p].find(k=>k.f===s.f);if(k)it.props.push({p,v:k.v,ez:k.ez||0});}); return it; });
+        groupSnap=kfSel.map(s=>{ const t=state.tracks[s.t]; const it={t:s.t,f:s.f,props:[]}; ALL_PROPS.forEach(p=>{const k=t.keyframes[p].find(k=>k.f===s.f);if(k)it.props.push({p,v:k.v,ez:k.ez||0,ei:k.ei,eo:k.eo});}); return it; });
         gMin=Math.min(...groupSnap.map(it=>it.f)); gMax=Math.max(...groupSnap.map(it=>it.f));
       }
       d.setPointerCapture(e.pointerId);
@@ -2191,7 +2419,16 @@ function getCameraTrack(){ return state.tracks.find(t=>t.type==='camera')||null;
 function getCamAt(frameIdx){
   const c=getCameraTrack();
   if(!c||!c.visible) return null; // ◉トグル＝カメラON/OFF
-  return getTransform(frameIdx,c.keyframes);
+  const tr=getTransform(frameIdx,c.keyframes);
+  // カメラの親（NULLチェーン）を加算合成：x/y/z/rot=加算, s=乗算
+  // → OBAN から流し込んだカメラKFを NULL 側のキーで丸ごとオフセット調整できる
+  let p=c.parent?state.tracks.find(t=>t.tid===c.parent&&t.type!=='camera'):null, n=0;
+  while(p&&n++<8){
+    const pt=getTransform(frameIdx,p.keyframes);
+    tr.x+=pt.x; tr.y+=pt.y; tr.z+=pt.z; tr.rot+=pt.rot; tr.s*=pt.s;
+    p=p.parent?state.tracks.find(t=>t.tid===p.parent&&t.type!=='camera'):null;
+  }
+  return tr;
 }
 // カメラの回転/ズームは全レイヤー共通（コンポ中央基準）。パン/ドリーはレイヤー深度別に drawOneTrack 側で適用
 function applyCamWrap(tCtx, tw, th, cam){
@@ -2203,16 +2440,20 @@ function applyCamWrap(tCtx, tw, th, cam){
   tCtx.translate(-tw/2,-th/2);
 }
 // 親子チェーンを ctx に適用（root→self の順）。戻り値=自トラックのtransform（描画不可ならnull）
-// ルール: 子のZは無効（親の深度平面に乗る）／OPは継承しない（AE準拠）／カメラのパン・ドリーはrootのみに適用
+// ルール: 子のZ＝親平面上のローカル透視スケール（カメラドリーは掛からない）／OPは継承しない（AE準拠）／カメラのパン・ドリーはrootのみに適用
 function applyTrackChain(tCtx, tw, th, frameIdx, track, sx, sy, cam, depth){
   if(depth>8) return null; // 循環・過深の安全弁（UI側でも循環は防止）
   const tr=getTransform(frameIdx,track.keyframes);
   const p = track.parent ? state.tracks.find(t=>t.tid===track.parent&&t.type!=='camera') : null;
   if(p){
     if(!applyTrackChain(tCtx,tw,th,frameIdx,p,sx,sy,cam,depth+1)) return null;
+    // 子のZ：親の深度平面を基準にローカル透視（カメラZは親側で消化済みのため二重適用しない）
+    const cDepth=PERSP_FOCAL+(tr.z||0);
+    if(cDepth<1) return null;
+    const cPersp=PERSP_FOCAL/cDepth;
     tCtx.translate((tr.x+tr.ax)*sx,(tr.y+tr.ay)*sy);
     tCtx.rotate(tr.rot*Math.PI/180);
-    tCtx.scale(tr.s,tr.s);
+    tCtx.scale(tr.s*cPersp,tr.s*cPersp);
   } else {
     // Z軸疑似3D：透視投影スケール（scaleプロパティとは独立に乗算。混在OK）
     const camZ=cam?(cam.z||0):0;
@@ -2323,11 +2564,80 @@ function drawCurrentFrame(){
   updatePlayhead(); updateKfUI(); updateInspectorCurrent(); updateTransport();
 }
 
+// ── ミニグラフ（選択トラックの値/速度カーブ。AEグラフエディタの簡易版）──
+const GRAPH_COLORS={x:'#36FF00',y:'#F9FF47',z:'#4FC3F7',s:'#FF4FA8',rot:'#FF8A4F',ax:'#8AFFB0',ay:'#B08AFF',op:'#999999'};
+let gGraphMode='val'; // 'val'=値カーブ / 'spd'=速度カーブ（|Δv|/frame）
+function toggleGraph(){
+  const g=$('#tl-graph'); g.classList.toggle('show');
+  const btn=$('#btn-graph'); if(btn) btn.classList.toggle('on',g.classList.contains('show'));
+  if(g.classList.contains('show')) renderGraph();
+}
+function renderGraph(){
+  const g=$('#tl-graph'); if(!g||!g.classList.contains('show')) return;
+  const cv=$('#tl-graph-canvas');
+  const W=g.clientWidth, H=g.clientHeight;
+  if(!W||!H) return;
+  if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
+  const c=cv.getContext('2d');
+  c.clearRect(0,0,W,H);
+  const t=selTrack(), total=state.totalFrames;
+  const sw=W-LABEL_W, x0=LABEL_W, pad=6;
+  // 凡例エリア（左）
+  c.font='8px monospace';
+  if(t&&total>1){
+    let ly=24;
+    for(const p of ALL_PROPS){
+      if(t.keyframes[p].length<2) continue;
+      c.fillStyle=GRAPH_COLORS[p]; c.fillText(p.toUpperCase(),8,ly); ly+=10;
+      if(ly>H-4) break;
+    }
+    // 各プロパティのカーブ（プロパティごとに min-max 正規化）
+    for(const p of ALL_PROPS){
+      const arr=t.keyframes[p]; if(arr.length<2) continue;
+      const vals=new Float32Array(total);
+      for(let f=0;f<total;f++) vals[f]=getKfValue(p,f,t.keyframes);
+      let series=vals;
+      if(gGraphMode==='spd'){
+        series=new Float32Array(total);
+        for(let f=0;f<total-1;f++) series[f]=Math.abs(vals[f+1]-vals[f]);
+        series[total-1]=series[total-2]||0;
+      }
+      let mn=Infinity,mx=-Infinity;
+      for(let f=0;f<total;f++){ if(series[f]<mn)mn=series[f]; if(series[f]>mx)mx=series[f]; }
+      const rng=(mx-mn)||1;
+      c.strokeStyle=GRAPH_COLORS[p]; c.lineWidth=1; c.globalAlpha=0.9;
+      c.beginPath();
+      for(let f=0;f<total;f++){
+        const px=x0+frameFrac(f)*sw;
+        const py=H-pad-(series[f]-mn)/rng*(H-pad*2);
+        if(f===0)c.moveTo(px,py);else c.lineTo(px,py);
+      }
+      c.stroke();
+      // キー位置に点
+      c.fillStyle=GRAPH_COLORS[p];
+      for(const k of arr){
+        const f=Math.min(k.f,total-1);
+        const px=x0+frameFrac(f)*sw;
+        const py=H-pad-(series[f]-mn)/rng*(H-pad*2);
+        c.fillRect(px-2,py-2,4,4);
+      }
+      c.globalAlpha=1;
+    }
+  } else {
+    c.fillStyle='rgba(255,255,255,0.25)';
+    c.fillText('NO TRACK / NO KF',x0+10,H/2);
+  }
+  // プレイヘッド
+  const px=x0+frameFrac(state.currentFrame)*sw;
+  c.strokeStyle='rgba(255,255,255,0.6)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(px,0); c.lineTo(px,H); c.stroke();
+}
 // ── PLAYBACK ──
 function updatePlayhead(){
   const total=state.totalFrames||1;
   const rw=$('#tl-ruler').clientWidth, sw=rw-LABEL_W;
   $('#tl-playhead').style.left=(LABEL_W+state.currentFrame/total*sw)+'px';
+  renderGraph();
 }
 function tick(ts){
   if(!state.isPlaying) return;
@@ -2418,6 +2728,7 @@ function updateKfUI(){
     const p=el.dataset.prop;
     el.style.display=(isCam&&(p==='ax'||p==='ay'||p==='op'))?'none':'';
   });
+  updateInfluenceUI();
   updateParentSelect();
   updateFxHud();
 }
@@ -2432,6 +2743,7 @@ function updateExportButtons(){
   $('#btn-export-project').disabled=!has;
   $('#btn-export-video').disabled=!has;
   $('#btn-export-web').disabled=!has;
+  $('#btn-export-jsx').disabled=!getCameraTrack();
 }
 
 // ── PAYLOAD / EXPORT ──
@@ -2453,7 +2765,7 @@ function buildTrackPayload(track){
     bgBright:state.bgBright,
     cellCount:cells.length, cells,
     composer:{
-      keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:track.keyframes[p].map(k=>({frame:k.f,v:k.v,ez:k.ez||0}))}),{}),
+      keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:track.keyframes[p].map(k=>({frame:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{})}))}),{}),
       markers:track.markers.map(m=>({frame:m.frame,label:m.label||''})),
     },
   };
@@ -2474,12 +2786,12 @@ function buildProjectPayload(){
       const cells=serializeTrackCells(t);
       return {
         name:t.name,
-        projectId:t.type==='camera'?null:(t.projectId||('p_'+Date.now().toString(36))),
+        projectId:(t.type==='camera'||t.type==='null')?null:(t.projectId||('p_'+Date.now().toString(36))),
         tid:t.tid, type:t.type||'anim', parent:t.parent||null, visible:t.visible!==false,
         width:t.width||state.width, height:t.height||state.height, // トラック固有解像度を保持
         cellCount:cells.length, cells,
         composer:{
-          keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:t.keyframes[p].map(k=>({frame:k.f,v:k.v,ez:k.ez||0}))}),{}),
+          keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:t.keyframes[p].map(k=>({frame:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{})}))}),{}),
           markers:t.markers.map(m=>({frame:m.frame,label:m.label||''})),
         },
       };
@@ -2494,6 +2806,87 @@ function exportProject(){
   const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
   a.href=url; a.download=`project_${ts}.json`; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── AEカメラ書き出し（.jsx）── MOTION_COMIC_SPEC Phase 5-4
+// カメラKF（親NULLチェーン合成込み）を「AEでヌル＋一節点カメラを生成するスクリプト」として書き出す。
+// マッピング: x/y/z→ヌルPosition（コンポ中央基準・コンポ解像度へスケール）/ rot→ヌルZ回転 /
+// s→カメラZoom乗算（applyCamWrapのパララックス無しズームと等価）/ 焦点距離1000px=Zoom基準
+function exportAeJsx(){
+  const camT=getCameraTrack();
+  if(!camT){ flashLive('CAMERAトラックがありません'); return; }
+  const fps=state.fps;
+  // 親NULLチェーン収集（getCamAtと同じ順）
+  const chain=[camT];
+  let p=camT.parent?state.tracks.find(t=>t.tid===camT.parent&&t.type!=='camera'):null, n=0;
+  while(p&&n++<8){ chain.push(p); p=p.parent?state.tracks.find(t=>t.tid===p.parent&&t.type!=='camera'):null; }
+  const unionFrames=props=>{ const s=new Set(); chain.forEach(t=>props.forEach(pr=>t.keyframes[pr].forEach(k=>s.add(k.f)))); return [...s].sort((a,b)=>a-b); };
+  const composedAt=f=>{
+    const tr=getTransform(f,camT.keyframes);
+    for(let i=1;i<chain.length;i++){ const pt=getTransform(f,chain[i].keyframes); tr.x+=pt.x;tr.y+=pt.y;tr.z+=pt.z;tr.rot+=pt.rot;tr.s*=pt.s; }
+    return tr;
+  };
+  const easeInf=(f,pr)=>{ // ez/influence → AE influence%（近似）
+    for(const t of chain){ const k=t.keyframes[pr].find(k=>k.f===f); if(!k) continue;
+      if(k.ei!=null||k.eo!=null) return Math.max(k.ei||0.1,k.eo||0.1);
+      return (k.ez||0)>=0.99?75:(k.ez||0)>0?33.33:0; }
+    return 0;
+  };
+  const bake=(props,pick)=>unionFrames(props).map(f=>({t:+(f/fps).toFixed(5),v:pick(composedAt(f)),inf:easeInf(f,props[0])}));
+  const data={
+    fps, W:state.width, H:state.height, focal:PERSP_FOCAL,
+    pos: bake(['x','y','z'],tr=>[tr.x,tr.y,tr.z]),
+    rot: bake(['rot'],tr=>tr.rot),
+    zoom: bake(['s'],tr=>tr.s),
+  };
+  const jsx=[
+'// COMPOSER camera export — After Effects用スクリプト',
+'// 使い方: 同サイズ（または任意サイズ）のコンポを開いた状態で File > Scripts > Run Script File...',
+'// 生成物: COMPOSER_CAM_NULL（親ヌル・Position/Z回転キー）+ COMPOSER_CAM（一節点カメラ・Zoomキー）',
+'var D='+JSON.stringify(data)+';',
+'(function(){',
+'  var comp=app.project.activeItem;',
+'  if(!comp||!(comp instanceof CompItem)){alert("コンポをアクティブにして実行してください");return;}',
+'  app.beginUndoGroup("COMPOSER CAMERA IMPORT");',
+'  var sx=comp.width/D.W;',
+'  var Z0=D.focal*sx;',
+'  var nul=comp.layers.addNull(comp.duration);',
+'  nul.name="COMPOSER_CAM_NULL"; nul.threeDLayer=true;',
+'  var nT=nul.property("ADBE Transform Group");',
+'  nT.property("ADBE Anchor Point").setValue([50,50,0]);',
+'  nT.property("ADBE Position").setValue([comp.width/2,comp.height/2,0]);',
+'  var cam=comp.layers.addCamera("COMPOSER_CAM",[comp.width/2,comp.height/2]);',
+'  cam.autoOrient=AutoOrientType.NO_AUTO_ORIENT; // 一節点カメラ化（親ヌルで動かすため）',
+'  var cT=cam.property("ADBE Transform Group");',
+'  cT.property("ADBE Position").setValue([comp.width/2,comp.height/2,-Z0]);',
+'  var zoomProp=cam.property("ADBE Camera Options Group").property("ADBE Camera Zoom");',
+'  zoomProp.setValue(Z0);',
+'  cam.parent=nul;',
+'  function keys(prop,arr,mk){',
+'    if(!arr.length)return;',
+'    if(arr.length===1){prop.setValue(mk(arr[0]));return;}',
+'    for(var i=0;i<arr.length;i++)prop.setValueAtTime(arr[i].t,mk(arr[i]));',
+'    for(var j=0;j<arr.length;j++){',
+'      if(arr[j].inf>0){',
+'        var e=new KeyframeEase(0,Math.max(0.1,Math.min(100,arr[j].inf)));',
+'        try{prop.setTemporalEaseAtKey(j+1,[e],[e]);}catch(err){}',
+'      }',
+'    }',
+'  }',
+'  keys(nT.property("ADBE Position"),D.pos,function(k){return [comp.width/2+k.v[0]*sx,comp.height/2+k.v[1]*sx,k.v[2]*sx];});',
+'  keys(nT.property("ADBE Rotate Z"),D.rot,function(k){return k.v;});',
+'  keys(zoomProp,D.zoom,function(k){return Z0*k.v;});',
+'  app.endUndoGroup();',
+'  alert("COMPOSER CAMERA IMPORTED\\nPOS:"+D.pos.length+"  ROT:"+D.rot.length+"  ZOOM:"+D.zoom.length+" keys");',
+'})();',
+  ].join('\n');
+  const blob=new Blob([jsx],{type:'application/javascript'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  a.href=url; a.download=`composer_camera_${ts}.jsx`; a.click();
+  URL.revokeObjectURL(url);
+  flashLive('🎥 AE JSX EXPORTED');
 }
 
 // ── 4K EXPORT ──
@@ -2723,7 +3116,7 @@ function webCollectTracks(start,len){
     const rec={
       name:t.name, tid:t.tid, parent:t.parent||null,
       width:t.width||state.width, height:t.height||state.height,
-      keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:t.keyframes[p].map(k=>({f:k.f,v:k.v,ez:k.ez||0}))}),{}),
+      keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:t.keyframes[p].map(k=>({f:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{})}))}),{}),
       frameMap:[], images:[]
     };
     if(t.visible&&t.frames.length){
@@ -2815,7 +3208,7 @@ async function exportWeb(){
     width:state.width, height:state.height, bgBright:state.bgBright, fps:state.fps,
     totalFrames:len,
     markers:state.markers.filter(m=>m.frame>=start&&m.frame<start+len).map(m=>({f:m.frame-start,label:m.label||''})),
-    camera:(camT&&camT.visible)?{keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:camT.keyframes[p].map(k=>({f:k.f,v:k.v,ez:k.ez||0}))}),{})}:null,
+    camera:(camT&&camT.visible)?{parent:camT.parent||null,keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:camT.keyframes[p].map(k=>({f:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{})}))}),{})}:null,
     fx:state.fx, // SPEC_06 P2b: fxスキーマv1をそのまま同梱（ビューアはrt実行・?fx=0でOFF）
     tracks:tracksOut,
     cfg
@@ -2871,7 +3264,20 @@ var DATA=JSON.parse(document.getElementById('mcdata').textContent);
 var CFG=DATA.cfg, START=CFG.startFrame||0, TOTAL=DATA.totalFrames;
 var ALL_PROPS=['x','y','z','s','ax','ay','rot','op'];
 var PERSP_FOCAL=1000;
-// ── KF補間（COMPOSERのgetKfValue/getTransformと同一ロジック）──
+// ── KF補間（COMPOSERのgetKfValue/getTransformと同一ロジック。influence対応）──
+function bezierEaseT(t,x1,x2){
+  if(t<=0)return 0;if(t>=1)return 1;
+  var u=t;
+  for(var i=0;i<8;i++){
+    var iu=1-u;
+    var x=3*iu*iu*u*x1+3*iu*u*u*x2+u*u*u;
+    var dx=3*iu*iu*x1+6*iu*u*(x2-x1)+3*u*u*(1-x2);
+    if(Math.abs(x-t)<1e-5)break;
+    if(dx>1e-6)u-=(x-t)/dx;else break;
+    u=Math.max(0,Math.min(1,u));
+  }
+  return u*u*(3-2*u);
+}
 function getKfValue(prop,frame,kfs){
   var arr=kfs[prop];
   var def=(prop==='s'||prop==='op')?1:0;
@@ -2882,8 +3288,13 @@ function getKfValue(prop,frame,kfs){
   for(var i=0;i<arr.length-1;i++){
     if(frame>=arr[i].f&&frame<=arr[i+1].f){
       var t=(frame-arr[i].f)/(arr[i+1].f-arr[i].f);
-      var ez=Math.max(arr[i].ez||0,arr[i+1].ez||0);
-      if(ez>0){var s=t*t*(3-2*t);t=t+(s-t)*ez;}
+      var eo=arr[i].eo,ei=arr[i+1].ei;
+      if(eo!=null||ei!=null){
+        t=bezierEaseT(t,(eo!=null?eo:(arr[i].ez||0)*33.3)/100,1-(ei!=null?ei:(arr[i+1].ez||0)*33.3)/100);
+      }else{
+        var ez=Math.max(arr[i].ez||0,arr[i+1].ez||0);
+        if(ez>0){var s=t*t*(3-2*t);t=t+(s-t)*ez;}
+      }
       return arr[i].v+(arr[i+1].v-arr[i].v)*t;
     }
   }
@@ -2911,9 +3322,12 @@ function applyTrackChain(tCtx,tw,th,af,track,sx,sy,cam,depth){
   var p=track.parent?findTrack(track.parent):null;
   if(p){
     if(!applyTrackChain(tCtx,tw,th,af,p,sx,sy,cam,depth+1))return null;
+    var cDepth=PERSP_FOCAL+(tr.z||0);
+    if(cDepth<1)return null;
+    var cPersp=PERSP_FOCAL/cDepth;
     tCtx.translate((tr.x+tr.ax)*sx,(tr.y+tr.ay)*sy);
     tCtx.rotate(tr.rot*Math.PI/180);
-    tCtx.scale(tr.s,tr.s);
+    tCtx.scale(tr.s*cPersp,tr.s*cPersp);
   }else{
     var camZ=cam?(cam.z||0):0;
     var depthPx=PERSP_FOCAL+(tr.z||0)-camZ;
@@ -2998,6 +3412,13 @@ window.addEventListener('mousemove',function(e){
 });
 function camAt(af){
   var c=DATA.camera?getTransform(af,DATA.camera.keyframes):{x:0,y:0,z:0,s:1,ax:0,ay:0,rot:0,op:1};
+  // カメラの親（NULLチェーン）加算合成：COMPOSERのgetCamAtと同一ロジック
+  var p=(DATA.camera&&DATA.camera.parent)?findTrack(DATA.camera.parent):null,n=0;
+  while(p&&n++<8){
+    var pt=getTransform(af,p.keyframes);
+    c.x+=pt.x;c.y+=pt.y;c.z+=pt.z;c.rot+=pt.rot;c.s*=pt.s;
+    p=p.parent?findTrack(p.parent):null;
+  }
   c.x+=smx*CFG.parallax;
   c.y+=smy*CFG.parallax;
   return c;
@@ -3275,10 +3696,21 @@ $('#file-input').addEventListener('change',async e=>{
   e.target.value='';
 });
 $('#btn-camera').addEventListener('click',addCameraTrack);
+$('#btn-null').addEventListener('click',addNullTrack);
+$('#kf-inf-in').addEventListener('change',()=>{ const v=$('#kf-inf-in').value.trim(); applyInfluence('ei', v===''?null:parseFloat(v)); });
+$('#kf-inf-out').addEventListener('change',()=>{ const v=$('#kf-inf-out').value.trim(); applyInfluence('eo', v===''?null:parseFloat(v)); });
+$('#btn-graph').addEventListener('click',toggleGraph);
+$('#btn-export-jsx').addEventListener('click',exportAeJsx);
+$('#btn-as-clear').addEventListener('click',()=>{ asClearAll().then(()=>flashLive('AUTOSAVE CLEARED')).catch(()=>{}); });
+$('#tl-graph-mode').addEventListener('click',()=>{
+  gGraphMode=gGraphMode==='val'?'spd':'val';
+  $('#tl-graph-mode').textContent=gGraphMode==='val'?'VAL':'SPD';
+  renderGraph();
+});
 $('#kf-parent').addEventListener('change',()=>{
   const t=selTrack(); if(!t||t.type==='camera') return;
   t.parent=$('#kf-parent').value||null;
-  rebuildAllTrackUI(); // ⛓マーク更新
+  refreshTrackChainMarks(); // ⛓マーク更新（ラベルのみ。全再構築は不要）
   drawCurrentFrame(); recordHistory();
   const p=t.parent?state.tracks.find(x=>x.tid===t.parent):null;
   flashLive(p?('⛓ PARENT → '+(p.name||'TRACK')):'⛓ PARENT NONE');
@@ -3318,6 +3750,7 @@ function onLiveProjectUpdate(json){
     if(state.workArea) state.workArea.endFrame=Math.max(state.workArea.endFrame,state.totalFrames);
     if(state.currentFrame>=state.totalFrames) state.currentFrame=Math.max(0,state.totalFrames-1);
     rebuildAllTrackUI(); updateTransport(); updateInspector(); drawCurrentFrame();
+    saveAutosaveCells(); scheduleAutosave(); // SPEC_11 P1: LIVEで絵が差し替わったら自動保存も更新
     flashLive('● SYNCED '+String(json.scene||json.name||json.projectId).slice(0,16).toUpperCase());
   } else if(state.tracks.length===0){
     loadJSON(json); flashLive('● LIVE LOADED');
@@ -3607,6 +4040,7 @@ const SHORTCUT_ACTIONS=[
   {id:'propT',    label:'HUD 不透明度 (T)',     def:'T',         run:()=>{togglePropGroup(['op']);showFxHud();}},
   {id:'propU',    label:'HUD KFありのみ (U)',   def:'U',         run:()=>{toggleUProp();showFxHud();}},
   {id:'fxHud',    label:'FX HUD 表示/非表示',   def:'X',         run:()=>toggleFxHud()},
+  {id:'graph',    label:'ミニグラフ (G)',       def:'G',         run:()=>toggleGraph()},
   {id:'settings', label:'設定パネル',           def:',',         run:()=>toggleSettingsPanel()},
 ];
 const KEYMAP_LS='composer_keymap_v1';

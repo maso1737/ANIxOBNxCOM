@@ -153,6 +153,17 @@ body{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   color:var(--grey);font-family:var(--jp);font-size:12px;pointer-events:none;
 }
+#tl-minitools{
+  position:absolute;left:10px;top:10px;z-index:6;width:150px;
+  background:rgba(16,7,34,0.82);border:1px solid var(--border);padding:8px;
+  display:flex;flex-direction:column;gap:7px;backdrop-filter:blur(3px);
+}
+#tl-minitools.hidden{display:none}
+#tl-minitools .etool{padding:5px 7px;font-size:8px}
+#tl-minitools .palette{grid-template-columns:repeat(8,1fr);gap:2px}
+#tl-minitools .pal-cell{border-width:1px}
+#tl-mini-swatch{width:100%;height:16px;border:1px solid var(--border)}
+#btn-tl-tools{position:absolute;left:10px;top:10px;z-index:6}
 #tl-bottom{flex:none;background:var(--panel);border-top:1px solid var(--border);padding:8px 12px 6px;display:flex;flex-direction:column;gap:7px}
 #tl-transport{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 #tl-cutlabel{font-family:var(--bank);color:var(--ice);font-size:13px;letter-spacing:.12em;min-width:34px;text-align:center}
@@ -307,6 +318,22 @@ body{
   <div id="tl-stage">
     <canvas id="tl-cv" width="1280" height="720"></canvas>
     <div id="tl-empty">カットがありません（BOARDで矩形ドラッグ、またはSHEETで空コマ追加）</div>
+    <div id="tl-minitools">
+      <div class="etools">
+        <div class="etool on" data-tool="pen" title="ペン (B)">PEN</div>
+        <div class="etool" data-tool="eraser" title="消しゴム (E)">ERASE</div>
+        <div class="etool" data-tool="fill" title="塗りつぶし (G)">FILL</div>
+        <div class="etool" data-tool="eyedrop" title="スポイト (I / Alt+クリック)">EYE</div>
+      </div>
+      <div class="sld-row">
+        <input type="range" id="tl-brush" min="1" max="64" value="6" title="ブラシサイズ">
+        <span class="sld-val" id="tl-brush-val">6</span>
+      </div>
+      <div id="tl-mini-swatch" title="現在色（スポイトで選択スロットに上書き）"></div>
+      <div class="palette" id="tl-palette"></div>
+      <button class="btn" id="btn-tl-tools-hide" title="ツールバーを隠す" style="padding:3px 6px;font-size:8px">HIDE ▲</button>
+    </div>
+    <button class="btn" id="btn-tl-tools" title="ペイントツールを表示" style="display:none;padding:4px 8px;font-size:8px">✎ TOOLS</button>
   </div>
   <div id="tl-bottom">
     <div id="tl-transport">
@@ -327,7 +354,7 @@ body{
       <div id="tl-clips"></div>
       <div id="tl-playhead"></div>
     </div>
-    <div id="tl-hint">クリップ右端ドラッグ=尺変更（SHEETに即反映）／ 帯クリック=seek ／ クリップをダブルクリック=加筆EDIT ／ プレビューに直接ペイント可（そのカットの加筆レイヤーに入る）／ Space=再生 ←→=コマ送り J/K=カット頭 L=ループ</div>
+    <div id="tl-hint">左上ツールバーで PEN/ERASE/FILL/EYE・色・太さを選び、プレビューに直接ペイント（そのカットの加筆へ＝絵コンテに反映）／ クリップ右端ドラッグ=尺変更 ／ 帯クリック=seek ／ クリップをダブルクリック=加筆EDIT ／ Space=再生 ←→=コマ送り J/K=カット頭 L=ループ</div>
   </div>
 </div>
 
@@ -955,7 +982,15 @@ function setETool(t){
   document.querySelectorAll('.etool').forEach(el => el.classList.toggle('on', el.dataset.tool === t));
 }
 function updateSwatch(){
-  $('#color-swatch').style.background = state.fillColor;
+  ['#color-swatch', '#tl-mini-swatch'].forEach(id => {
+    const el = $(id);
+    if(el) el.style.background = state.fillColor;
+  });
+}
+function setBrush(v){
+  state.brush = clamp(Math.round(v), 1, 64);
+  ['#brush-size', '#tl-brush'].forEach(id => { const el = $(id); if(el) el.value = state.brush; });
+  ['#brush-size-val', '#tl-brush-val'].forEach(id => { const el = $(id); if(el) el.textContent = state.brush; });
 }
 function setCutBg(v){
   const cut = cuts[state.curCut];
@@ -1079,15 +1114,18 @@ function selectPalSlot(i){
   setETool('fill');
 }
 function renderPalette(){
-  const palEl = $('#palette');
-  palEl.innerHTML = '';
-  gPalette.forEach((c, i) => {
-    const cell = document.createElement('div');
-    cell.className = 'pal-cell' + (i === gPalSlot ? ' on' : '');
-    cell.style.background = c;
-    cell.title = c + '（クリックで選択／スポイトでこのスロットに上書き）';
-    cell.addEventListener('click', () => selectPalSlot(i));
-    palEl.appendChild(cell);
+  ['#palette', '#tl-palette'].forEach(pid => {
+    const palEl = $(pid);
+    if(!palEl) return;
+    palEl.innerHTML = '';
+    gPalette.forEach((c, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'pal-cell' + (i === gPalSlot ? ' on' : '');
+      cell.style.background = c;
+      cell.title = c + '（クリックで選択／スポイトでこのスロットに上書き）';
+      cell.addEventListener('click', () => selectPalSlot(i));
+      palEl.appendChild(cell);
+    });
   });
 }
 function sampleCompositeColor(cx, cy){
@@ -1505,26 +1543,27 @@ function onKey(e){
     return;
   }
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){ e.preventDefault(); doRedo(); return; }
-  if(state.view === 'edit'){
+  if(state.view === 'tl'){
+    const nk = normKey(e);
+    for(const a of SHORTCUT_ACTIONS){
+      if(gKeymap[a.id] && gKeymap[a.id] === nk){
+        if(a.prevent) e.preventDefault();
+        a.run(e);
+        return;
+      }
+    }
+  }
+  if(state.view === 'edit' || state.view === 'tl'){
     const k = e.key.toLowerCase();
     if(k === 'b') setETool('pen');
     else if(k === 'e') setETool('eraser');
     else if(k === 'g') setETool('fill');
     else if(k === 'i') setETool('eyedrop');
-    else if(k === '['){ state.brush = clamp(state.brush - 2, 1, 64); $('#brush-size').value = state.brush; $('#brush-size-val').textContent = state.brush; }
-    else if(k === ']'){ state.brush = clamp(state.brush + 2, 1, 64); $('#brush-size').value = state.brush; $('#brush-size-val').textContent = state.brush; }
+    else if(k === '['){ setBrush(state.brush - 2); }
+    else if(k === ']'){ setBrush(state.brush + 2); }
   }else if(state.view === 'board'){
     if(e.key === 'Delete' || e.key === 'Backspace'){
       if(state.selPhoto) deleteSelPhoto();
-    }
-  }else if(state.view === 'tl'){
-    const k = normKey(e);
-    for(const a of SHORTCUT_ACTIONS){
-      if(gKeymap[a.id] && gKeymap[a.id] === k){
-        if(a.prevent) e.preventDefault();
-        a.run(e);
-        return;
-      }
     }
   }
 }
@@ -1591,10 +1630,7 @@ function wire(){
   document.querySelectorAll('.etool').forEach(el => {
     el.addEventListener('click', () => setETool(el.dataset.tool));
   });
-  $('#brush-size').addEventListener('input', e => {
-    state.brush = +e.target.value;
-    $('#brush-size-val').textContent = state.brush;
-  });
+  $('#brush-size').addEventListener('input', e => setBrush(+e.target.value));
   $('#bg-slider').addEventListener('input', e => setCutBg(+e.target.value));
   $('#btn-bg-white').addEventListener('click', () => setCutBg(255));
   $('#btn-bg-gray').addEventListener('click', () => setCutBg(160));
@@ -1614,15 +1650,26 @@ function wire(){
   $('#chk-burnin').addEventListener('change', renderTL);
   $('#btn-export').addEventListener('click', exportVideo);
   const strip = $('#tl-strip');
+  // setPointerCapture は使わない（クリップの dblclick=EDIT を殺さないため）。
+  // 追従は window の move/up で拾う（gScrub フラグで判定）。
   strip.addEventListener('pointerdown', e => {
     if(gClipDrag) return;
+    if(e.target.classList.contains('tl-clip-h')) return;  // 尺ハンドルはスクラブしない
     gScrub = true;
-    try{ strip.setPointerCapture(e.pointerId); }catch(err){}
     stripSeek(e);
   });
-  strip.addEventListener('pointermove', e => { if(gScrub && !gClipDrag) stripSeek(e); });
-  strip.addEventListener('pointerup', () => { gScrub = false; });
-  strip.addEventListener('pointercancel', () => { gScrub = false; });
+  window.addEventListener('pointermove', e => { if(gScrub && !gClipDrag) stripSeek(e); });
+  window.addEventListener('pointerup', () => { gScrub = false; });
+  // TIMELINE ミニツールバー
+  $('#tl-brush').addEventListener('input', e => setBrush(+e.target.value));
+  $('#btn-tl-tools-hide').addEventListener('click', () => {
+    $('#tl-minitools').classList.add('hidden');
+    $('#btn-tl-tools').style.display = 'inline-block';
+  });
+  $('#btn-tl-tools').addEventListener('click', () => {
+    $('#tl-minitools').classList.remove('hidden');
+    $('#btn-tl-tools').style.display = 'none';
+  });
   tlCv.addEventListener('pointerdown', tlPaintDown);
   tlCv.addEventListener('pointermove', paintMove);
   tlCv.addEventListener('pointerup', paintUp);

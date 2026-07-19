@@ -22,7 +22,7 @@
 
 - **fxスキーマ v1**（SPEC_06 §2）— 全ツール共通・無変換で持ち回り。未知エフェクトはスキップ（前方互換）
 - **TAKE**（SPEC_01）— `{kf:[{x,y,z,dwell,ease}]}`。OBAN / LP_Model_CR 系で共通。P3でcomposer CAMERAトラックへ変換可
-- **PROJECT_v2** — composerの保存形式。IMPORT JSONは複数回で追加合成できる。**P0〜: トップレベル `fx:`（fxスキーマv1）を同梱**（欠損時は composer 側で `makeDefaultFx()` 補完。PROJECT_v1 単一トラック保存には乗らない）
+- **PROJECT_v2** — composerの保存形式。IMPORT JSONは複数回で追加合成できる。**P0〜: トップレベル `fx:`（fxスキーマv1）を同梱**（欠損時は composer 側で `makeDefaultFx()` 補完。PROJECT_v1 単一トラック保存には乗らない）。**2026-07〜: トラック `type:'null'`（描画されない親専用ヌル）、カメラトラックの `parent`（NULLのtid）、KFの任意 `ei`/`eo`（influence% 0-100）を追加**（いずれも旧リーダーでは無視されるだけの後方互換フィールド）
 
 ## 成立している制作ルート
 
@@ -45,9 +45,9 @@
 
 - **PARALLAX_LAB**（`LP_motion-graphics/PARALLAX_LAB/parallax-lab.html`）— 「寄り」の3流儀（①撮影台マルチプレーン／②3Dドリー／③スケール）比較教材ラボ。
   係数は本リポジトリの実機値と同一（`k(depth)=lerp(0.55,1.25,depth)` / `persp=F/(F+Z−camZ), F=1000` ≒ composerの`PERSP_FOCAL`）。
-  **未着手の拡張アイデア**: OBAN_BUILDERの**TAKE JSON**（SPEC_01 §2 `PROJECT.take`、COPY PROJで取得可）を貼ると、
-  同じカメラワークを3流儀で並べて再生できる＝**実プロジェクトの差分検証機**になる構想
-  （出典: `PARALLAX_LAB/CLAUDE.md` 拡張アイデア／`LP_motion-graphics/PIPELINE.md` PARALLAX_LAB行）。
-  実装するならPARALLAX_LAB側の対応で、本リポジトリ側は**TAKE JSON形式（`kf:[{x,y,z,dwell,ease}]`）を変えるときに互換性を意識**すれば足りる。
+  **TAKEブリッジ**: OBAN_BUILDERの**TAKE JSON**（SPEC_01 §2 `PROJECT.take`、COPY PROJで取得可）を貼ると、
+  同じカメラワークを3流儀で並べて再生できる＝**実プロジェクトの差分検証機**。
+  **設計・仕様は `SPEC_12_PARALLAX_TAKE_BRIDGE.md`（P0/P1/P2未着手）**。
+  実装はPARALLAX_LAB側の対応で、本リポジトリ側は**TAKE JSON形式（`kf:[{x,y,z,dwell,ease}]`）を変えるときにSPEC_12との互換性を意識**すれば足りる。
 - 上記以外、`LP_motion-graphics/CLAUDE.md`のSPEC_06に関する記述（「composer P0/P1・P3は未着手」）は古い
   （本リポジトリでは両方とも実装済み）。あちらのドキュメントなので本リポジトリからは編集しない。
