@@ -199,9 +199,6 @@ input[type=number]{-moz-appearance:textfield;}
 #tl-audio-strip{flex:1;position:relative;height:36px;overflow:hidden;cursor:ew-resize;}
 #tl-audio-canvas{display:block;width:100%;height:100%;}
 #tl-audio-offset{position:absolute;top:2px;right:4px;font-size:7px;letter-spacing:.08em;color:rgba(255,210,122,0.45);pointer-events:none;}
-#btn-load-audio{border-color:rgba(255,210,122,0.35);color:rgba(255,210,122,0.6);}
-#btn-load-audio:hover{border-color:var(--neon);color:var(--neon);background:rgba(255,210,122,0.05);}
-#audio-file-input{display:none;}
 
 /* TRANSPORT */
 #transport{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:var(--panel);border-top:1px solid var(--border);font-size:9px;letter-spacing:0.2em;}
@@ -397,23 +394,27 @@ input[type=number]{-moz-appearance:textfield;}
       <span class="meta" id="proj-meta">— NO PROJECT —</span>
     </div>
     <div class="g">
-      <button id="btn-import" class="primary" title="JSON / 画像(PNG等)を読み込み（既存トラックに追加。複数回で重ねられます）">IMPORT</button>
-      <button id="btn-paste-json" title="クリップボードのJSONを直接読み込み（OBANの COPY FOR COMPOSER / COPY PROJ 用）">PASTE JSON</button>
+      <!-- 読み込み系 -->
+      <button id="btn-import" class="primary" title="JSON / 画像(PNG等) / 音声を読み込み（既存トラックに追加。複数回で重ねられます）。連番PNGを4枚以上まとめて選ぶと1トラックのシーケンス、音声ファイルはBGM/SEトラックになります">IMPORT</button>
+      <button id="btn-paste-json" title="クリップボードのJSONを読み込み（OBANの COPY FOR COMPOSER / EXPORT JSON をそのまま貼り付け）">+ FROM OBAN</button>
+      <span style="color:var(--dim)">/</span>
+      <!-- トラック追加・設定 -->
       <button id="btn-camera" title="カメラトラックを追加（1つまで）。X/Y=パン, Z=ドリー(パララックス), ROT=回転, SCL=ズーム">+ CAMERA</button>
       <button id="btn-null" title="ヌルトラックを追加（描画されない親専用トラック）。カメラや複数トラックの親にして丸ごと調整">+ NULL</button>
-      <button id="btn-export-project" disabled>EXPORT PROJECT</button>
-      <button id="btn-export" disabled>EXPORT 4K PNG</button>
       <button id="btn-fx" title="撮影処理（SATSUEI FX）チェーンを編集">FX</button>
       <button id="btn-fx-preview" title="プレビューに撮影処理を適用（draft品質: MB/DOFなし）">FX PREVIEW</button>
-      <button id="btn-export-video" disabled title="全体を動画で書き出し（Safari=MP4 / Chrome=WebM・実時間レンダリング）">EXPORT VIDEO</button>
+      <button id="btn-settings" title="設定（ガイド/ショートカット）">⚙</button>
+      <span style="color:var(--dim)">/</span>
+      <!-- 書き出し系 -->
+      <button id="btn-export-project" disabled title="プロジェクト全体をJSONで書き出し（トラック・KF・カメラ込み）">EXPORT PROJECT</button>
+      <button id="btn-export" disabled title="全フレームをBG透過の連番PNGでZIP書き出し（AE合成用）">SEQ PNG</button>
+      <button id="btn-export-video" disabled title="全体をmp4で書き出し（実時間）">EXPORT VIDEO</button>
       <button id="btn-export-web" disabled title="スクロール駆動のモーションコミックHTMLを書き出し（単一ファイル・依存ゼロ）">EXPORT WEB</button>
       <button id="btn-export-jsx" disabled title="カメラKF（親NULL合成込み）をAfter Effects用.jsxとして書き出し。AEでコンポを開いた状態で File > Scripts > Run Script File">AE JSX</button>
-      <button id="btn-load-audio" title="BGM/SE音声ファイルを読み込む">♪ AUDIO</button>
+      <span style="color:var(--dim)">/</span>
       <button id="btn-live" class="primary" title="ANIMATORの編集をライブ反映中（クリックでOFF）">LIVE ●</button>
-      <button id="btn-settings" title="設定（ガイド/ショートカット）">⚙</button>
       <button id="btn-home" title="ランディングページに戻る">HOME</button>
-      <input type="file" id="file-input" accept=".json,image/png,image/jpeg,image/webp" multiple>
-      <input type="file" id="audio-file-input" accept="audio/*">
+      <input type="file" id="file-input" accept=".json,image/png,image/jpeg,image/webp,audio/*" multiple>
     </div>
   </div>
 
@@ -433,7 +434,7 @@ input[type=number]{-moz-appearance:textfield;}
     <div id="empty-state">
       <div class="glyph">+</div>
       <div class="hint">TAP HERE TO LOAD</div>
-      <div class="hint" style="opacity:0.6">DRAG JSON・PNG / [IMPORT]</div>
+      <div class="hint" style="opacity:0.6">DRAG JSON・PNG（連番4枚以上は自動でシーケンス化） / [IMPORT]</div>
       <div class="sub">[ PROJECT_v1 / 24FPS / NEAREST / 4K_OUTPUT ]</div>
     </div>
     <div id="drop-overlay"><div class="msg">+ DROP TO LOAD +</div></div>
@@ -640,7 +641,7 @@ input[type=number]{-moz-appearance:textfield;}
 </div>
 
 <div id="export-overlay">
-  <div class="emsg" id="export-msg">EXPORTING 4K PNG SEQUENCE</div>
+  <div class="emsg" id="export-msg">EXPORTING PNG SEQUENCE</div>
   <div id="export-bar-wrap"><div id="export-bar"></div></div>
   <div class="eprog" id="export-prog">0 / 0</div>
   <button id="export-cancel">キャンセル</button>
@@ -1779,23 +1780,28 @@ function addNullTrack(){
   flashLive('◇ NULL ADDED');
 }
 // PNG/JPEG/WebP を静止画トラックとして読み込み（cells 1枚のトラックに変換して既存パイプラインへ）
+// 複数枚を順番どおりに積むため Promise を返す（呼び出し側は await する）
 function importImageFile(file){
-  const rd=new FileReader();
-  rd.onload=()=>{
-    const img=new Image();
-    img.onload=()=>{
-      importJSON({
-        format:'IMAGE_v1', type:'image',
-        name:(file.name.replace(/\.[^.]+$/,'')||'IMAGE'),
-        width:img.naturalWidth, height:img.naturalHeight,
-        cells:[{kind:'draw',duration:1,image:rd.result}], // 1コマ＝全編表示（描画時に末尾クランプ）
-      });
-      flashLive('🖼 IMAGE TRACK: '+file.name.slice(0,20).toUpperCase());
+  return new Promise(resolve=>{
+    const rd=new FileReader();
+    rd.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        importJSON({
+          format:'IMAGE_v1', type:'image',
+          name:(file.name.replace(/\.[^.]+$/,'')||'IMAGE'),
+          width:img.naturalWidth, height:img.naturalHeight,
+          cells:[{kind:'draw',duration:1,image:rd.result}], // 1コマ＝全編表示（描画時に末尾クランプ）
+        });
+        flashLive('🖼 IMAGE TRACK: '+file.name.slice(0,20).toUpperCase());
+        resolve();
+      };
+      img.onerror=()=>{ alert('画像を読み込めません: '+file.name); resolve(); };
+      img.src=rd.result;
     };
-    img.onerror=()=>alert('画像を読み込めません: '+file.name);
-    img.src=rd.result;
-  };
-  rd.readAsDataURL(file);
+    rd.onerror=()=>resolve();
+    rd.readAsDataURL(file);
+  });
 }
 // 親子（PARENT）: tid参照。循環はUI（選択肢から除外）＋描画側の深度上限で防止
 function isDescendantOf(t, anc){
@@ -1960,10 +1966,11 @@ function buildTrackElement(idx){
   dragHandle.className='tl-drag-handle';
   dragHandle.title='ドラッグで並び替え';
   dragHandle.textContent='⠿';
-  let dhActive=false, dhStartY=0, dhOrigR=null, dhGhost=null;
-  dragHandle.addEventListener('pointerdown',e=>{
-    e.stopPropagation(); e.preventDefault();
-    dhActive=true; dhStartY=e.clientY;
+  // 並び替えドラッグ。⠿ハンドルは即開始、ラベル(「01 TRACK」やその余白)は
+  // 4px動かしてから開始＝クリック選択やダブルクリック改名と両立させる。
+  let dhActive=false, dhPending=false, dhStartY=0, dhOrigR=null, dhGhost=null;
+  function dhBegin(){
+    dhActive=true; dhPending=false;
     dhOrigR=el.getBoundingClientRect();
     dhGhost=document.createElement('div');
     dhGhost.className='tl-drag-ghost';
@@ -1973,19 +1980,44 @@ function buildTrackElement(idx){
     document.body.appendChild(dhGhost);
     el.style.opacity='0.3';
     getOrCreateDropIndicator().style.display='block';
-    dragHandle.setPointerCapture(e.pointerId);
-  });
-  dragHandle.addEventListener('pointermove',e=>{
-    if(!dhActive) return;
-    dhGhost.style.top=(dhOrigR.top+e.clientY-dhStartY)+'px';
-    updateDropIndicator(e.clientY,idx);
-  });
-  dragHandle.addEventListener('pointerup',e=>{
-    if(!dhActive) return; dhActive=false;
-    dhGhost.remove(); dhGhost=null; el.style.opacity='';
+  }
+  function dhCleanup(){
+    if(dhGhost){ dhGhost.remove(); dhGhost=null; }
+    el.style.opacity='';
     const ind=$('#tl-drop-indicator'); if(ind) ind.style.display='none';
-    doTrackReorder(e.clientY,idx);
-  });
+  }
+  function attachTrackDrag(node, immediate){
+    node.addEventListener('pointerdown',e=>{
+      if(e.button!==0&&e.pointerType==='mouse') return;
+      if(!immediate){
+        // ボタン群や改名中の入力欄からはドラッグを始めない
+        if(e.target.closest('.tl-track-btns')||e.target.tagName==='INPUT') return;
+      }
+      dhStartY=e.clientY;
+      if(immediate){ e.stopPropagation(); e.preventDefault(); dhBegin(); }
+      else dhPending=true;   // 動き出すまでは通常のクリック扱い
+      // ポインタキャプチャは失敗しても致命的でないので状態確定の後に
+      try{ node.setPointerCapture(e.pointerId); }catch(err){}
+    });
+    node.addEventListener('pointermove',e=>{
+      if(dhPending&&Math.abs(e.clientY-dhStartY)>4) dhBegin();
+      if(!dhActive) return;
+      dhGhost.style.top=(dhOrigR.top+e.clientY-dhStartY)+'px';
+      updateDropIndicator(e.clientY,idx);
+    });
+    node.addEventListener('pointerup',e=>{
+      dhPending=false;
+      if(!dhActive) return;
+      dhActive=false; dhCleanup();
+      doTrackReorder(e.clientY,idx);
+    });
+    node.addEventListener('pointercancel',()=>{
+      dhPending=false;
+      if(!dhActive) return;
+      dhActive=false; dhCleanup();
+    });
+  }
+  attachTrackDrag(dragHandle,true);
 
   // Label
   const label=document.createElement('div');
@@ -2034,7 +2066,7 @@ function buildTrackElement(idx){
   const pngBtn=document.createElement('button');
   pngBtn.className='tl-tbtn';
   pngBtn.textContent='PNG';
-  pngBtn.title='このトラック単体を4K PNG書き出し';
+  pngBtn.title='このトラック単体を連番PNGで書き出し';
   pngBtn.addEventListener('click',e=>{e.stopPropagation();exportTrackPNG(idx);});
 
   // SPEC_07: ANIMATOR由来トラック（projectIdあり）だけに往復ボタン
@@ -2061,6 +2093,10 @@ function buildTrackElement(idx){
   if(track.type!=='camera'&&track.projectId){ btns.appendChild(aniBtn); btns.appendChild(reBtn); } // SPEC_07
   btns.appendChild(delBtn);
   label.appendChild(nameEl); label.appendChild(btns);
+  // 「01 TRACK」やラベルの余白を掴んでも並び替えできる（⠿は細くて掴みにくいため）
+  label.title='ドラッグで並び替え（ダブルクリックで名前変更）';
+  label.style.cursor='grab';
+  attachTrackDrag(label,false);
 
   // Strip
   const strip=document.createElement('div');
@@ -2804,7 +2840,7 @@ function exportProject(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-  a.href=url; a.download=`project_${ts}.json`; a.click();
+  a.href=url; a.download=`composer_${ts}.json`; a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -2896,7 +2932,7 @@ $('#export-cancel').addEventListener('click',()=>{gExportCancel=true;});
 async function exportZipPNG(total, zipName, drawAt){
   pause();
   gExportCancel=false;
-  $('#export-msg').textContent='EXPORTING 4K PNG SEQUENCE';
+  $('#export-msg').textContent='EXPORTING PNG SEQUENCE';
   const ov=$('#export-overlay'); ov.classList.add('show');
   const bar=$('#export-bar'), prog=$('#export-prog');
   const oc=document.createElement('canvas'); oc.width=OUT_W; oc.height=OUT_H;
@@ -3636,11 +3672,7 @@ $('#btn-audio-mute').addEventListener('click',()=>{
   renderAudioWaveform();
 });
 $('#btn-audio-remove').addEventListener('click',removeAudio);
-$('#btn-load-audio').addEventListener('click',()=>$('#audio-file-input').click());
-$('#audio-file-input').addEventListener('change',async e=>{
-  const f=e.target.files[0]; if(!f) return;
-  await loadAudioFile(f); e.target.value='';
-});
+// 音声は IMPORT（file-input / D&D）から importFiles 経由で loadAudioFile に流れる
 
 // ── EXCHANGE DB ──
 const EX_DB='tdr_exchange', EX_STORE='projects', EX_VERSION=1;
@@ -3680,16 +3712,52 @@ $('#btn-paste-json').addEventListener('click',async()=>{
   try{ importJSON(JSON.parse(j)); flashLive('📋 JSON PASTED'); }
   catch(err){ alert('JSON error: '+err.message); }
 });
-// JSON / 画像 共通のファイル取り込み（D&Dとinputで共用）
+// 連番画像グループ → 1トラックのシーケンス（1画像=1コマ）。OBANの addFiles と同じ判定。
+function fileToDataURL(f){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error); r.readAsDataURL(f); });
+}
+async function importImageSeq(items, name){
+  const cells=[]; let w=0,h=0;
+  for(const it of items){
+    const src=await fileToDataURL(it.f);
+    if(!w){
+      const sz=await new Promise(res=>{ const im=new Image(); im.onload=()=>res({w:im.naturalWidth,h:im.naturalHeight}); im.onerror=()=>res({w:0,h:0}); im.src=src; });
+      w=sz.w; h=sz.h;
+    }
+    cells.push({kind:'draw',duration:1,image:src});
+  }
+  if(!w){ alert('画像を読み込めません: '+name); return; }
+  importJSON({ format:'IMAGE_v1', type:'image', name:name.toUpperCase(), width:w, height:h, cells });
+  flashLive('🎞 SEQ TRACK: '+name.slice(0,18).toUpperCase()+' ('+cells.length+'枚)');
+}
+// JSON / 画像 / 音声 共通のファイル取り込み（D&Dとinputで共用）
+// 画像は先に「連番グループ(4枚以上)」と「単品」に仕分けてから処理する。
 async function importFiles(files){
-  for(const file of files){
+  const list=[...files];
+  const imgs=list.filter(f=>f.type&&f.type.startsWith('image/'));
+  const rest=list.filter(f=>!imgs.includes(f));
+  // 先に JSON / 音声
+  for(const file of rest){
     if(file.type.startsWith('audio/')){ await loadAudioFile(file); }
-    else if(file.type.startsWith('image/')){ importImageFile(file); }
     else{
       try{ importJSON(JSON.parse(await file.text())); }
       catch(err){ alert('JSON error: '+err.message); }
     }
   }
+  // 画像を連番グループに仕分け（OBANと同一ルール: 3〜5桁の連番で終わる同名グループ）
+  const re=/^(.*?)(\d{3,5})\.(png|webp|jpe?g)$/i;
+  const groups={}, singles=[];
+  for(const f of imgs){
+    const m=f.name.match(re);
+    if(m){ const k=m[1]+'|'+m[3].toLowerCase(); (groups[k]??(groups[k]=[])).push({f,num:+m[2],pre:m[1],ext:m[3]}); }
+    else singles.push(f);
+  }
+  for(const key of Object.keys(groups)){
+    const g=groups[key].sort((a,b)=>a.num-b.num);
+    if(g.length>=4) await importImageSeq(g, (g[0].pre.replace(/[_\-. ]+$/,'')||'SEQ'));
+    else singles.push(...g.map(x=>x.f));
+  }
+  for(const f of singles) await importImageFile(f);
 }
 $('#file-input').addEventListener('change',async e=>{
   await importFiles([...e.target.files]);

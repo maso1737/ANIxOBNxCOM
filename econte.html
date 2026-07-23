@@ -215,6 +215,7 @@ body{
   <input type="file" id="file-input" accept="image/*" multiple style="display:none;">
   <span id="bar-total">0 CUTS</span>
   <span id="save-dot"></span>
+  <button class="btn" id="btn-home" title="ランディングページに戻る">HOME</button>
 </div>
 
 <!-- ================= BOARD ================= -->
@@ -1572,6 +1573,7 @@ function onKey(e){
 function wire(){
   $('#btn-view-board').addEventListener('click', () => setView('board'));
   $('#btn-view-sheet').addEventListener('click', () => setView('sheet'));
+  $('#btn-home').addEventListener('click', () => { location.href = 'index.html'; });
   $('#btn-import').addEventListener('click', () => $('#file-input').click());
   $('#file-input').addEventListener('change', e => {
     importFiles([...e.target.files], null);

@@ -77,7 +77,9 @@ html,body{
   color:rgba(255,79,168,0.6);
 }
 #topbar .left,#topbar .right{display:flex;gap:8px;align-items:center;}
-#topbar .title{color:var(--acid);font-weight:700;}
+#topbar .title{color:var(--acid);font-weight:700;cursor:pointer;}
+#topbar .title:hover{text-decoration:underline;text-underline-offset:3px;}
+#topbar .title.on{background:rgba(255,79,168,0.14);box-shadow:0 0 0 1px rgba(255,79,168,0.5);border-radius:2px;}
 #topbar .sep{color:var(--dim);}
 #topbar button{
   background:transparent;border:1px solid var(--border);
@@ -367,6 +369,12 @@ html,body{
 .ref-op-val{font-size:8px;color:rgba(255,255,255,0.5);min-width:30px;text-align:right;letter-spacing:0.05em;}
 /* REFパネル内セクション */
 .ref-sect{margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+/* MOVE/中央 の対象になっているセクションを、REF ANIMATOR行と同じピンク枠で囲う */
+.ref-sect.sel-sect{
+  border:1px solid var(--acid);box-shadow:0 0 0 1px rgba(255,79,168,0.4) inset;
+  padding:7px 8px;margin:0 -9px 12px;
+}
+.ref-sect.sel-sect > .ref-sect-h{color:var(--acid);}
 .ref-sect:last-of-type{border-bottom:none;margin-bottom:0;padding-bottom:0;}
 .ref-sect-h{font-size:8px;letter-spacing:0.22em;color:rgba(255,79,168,0.55);margin-bottom:7px;}
 .ref-frame-row{display:flex;gap:5px;}
@@ -1277,7 +1285,7 @@ input[type=range]::-moz-range-thumb{
   <!-- TOP -->
   <div id="topbar">
     <div class="left">
-      <span class="title">ANIMATOR</span>
+      <span class="title" id="btn-proj" title="クリックでプロジェクト保存箱（スナップショットの一覧・復元・複製）">ANIMATOR</span>
       <span class="sep">/</span>
       <span>EDIT MODE</span>
     </div>
@@ -1286,18 +1294,18 @@ input[type=range]::-moz-range-thumb{
       <button id="btn-mirror" title="左右ミラー描画（M）">MIRROR</button>
       <span class="sep">/</span>
       <button id="btn-ref-panel" title="REF ANIMATORS / FRAMEレイヤー（R）">REF</button>
-      <button id="btn-proj" title="プロジェクト保存箱（スナップショットの一覧・復元・複製）">PROJ</button>
       <button id="btn-settings" title="設定（ショートカット変更）">⚙</button>
       <span class="sep">/</span>
-      <button id="btn-export" title="クリック: 4K書き出し / Shift+クリック: BG透明で書き出し">EXPORT 4K</button>
-      <button id="btn-export-seq" title="全コマを4K BG透過の連番PNGでZIP書き出し（AE合成用）">SEQ PNG</button>
-      <button id="btn-export-mov" title="ワークエリアを動画で書き出し（Safari=MP4 / Chrome=WebM・実時間レンダリング）">VIDEO</button>
+      <button id="btn-export" title="現在のコマを1枚PNGで書き出し / Shift+クリック: BG透明で書き出し">PNG</button>
+      <button id="btn-export-seq" title="全コマをBG透過の連番PNGでZIP書き出し（AE合成用）">SEQ PNG</button>
+      <button id="btn-export-mov" title="全体をmp4で書き出し（実時間）">VIDEO</button>
       <button id="btn-export-json" title="全フレームをJSONで書き出し（COMPOSER連携用）">EXPORT JSON</button>
       <button id="btn-import-json" title="JSONファイルを読み込み（既存プロジェクトを置換）">IMPORT JSON</button>
       <input type="file" id="json-file-input" accept="application/json,.json" style="display:none;">
       <span class="sep">/</span>
       <button id="btn-send-composer" title="COMPOSERを別ウィンドウで開く（ANIMATORは開いたまま・LIVE連携）／OBANへは OBAN側の + FROM ANIMATOR から">→ COMPOSER</button>
       <button id="btn-live" title="LIVE連携（COMPOSER/OBANが開くと自動でライブ反映）。OBANへは OBAN側の + FROM ANIMATOR から">LIVE ○</button>
+      <button id="btn-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
       <button id="btn-home" title="ランディングページに戻る">HOME</button>
     </div>
   </div>
@@ -1339,9 +1347,9 @@ input[type=range]::-moz-range-thumb{
         <span class="dot" style="width:4px;height:4px;"></span>
         <span>2px</span>
       </button>
-      <button class="tb-pen on" data-size="20">
-        <span class="dot" style="width:10px;height:10px;"></span>
-        <span>20</span>
+      <button class="tb-pen on" id="tb-pen-big" data-size="20" title="太ブラシ（右ドラッグで 3〜50px に可変）">
+        <span class="dot" id="tb-pen-big-dot" style="width:10px;height:10px;"></span>
+        <span id="tb-pen-big-label">20</span>
       </button>
     </div>
 
@@ -1415,7 +1423,7 @@ input[type=range]::-moz-range-thumb{
       <button id="zoom-out">−</button>
       <span class="zval" id="zoom-val">41%</span>
       <button id="zoom-in">+</button>
-      <button id="zoom-fit">FIT</button>
+      <button id="zoom-fit" title="画面に合わせる（F）／Wクリックで100%表示">FIT</button>
     </div>
   </div>
 
@@ -1530,7 +1538,7 @@ input[type=range]::-moz-range-thumb{
     </div>
     <!-- 参照画像（原寸・中央・ドラッグ移動/拡縮） -->
     <div class="ref-sect">
-      <div class="ref-sect-h">REF IMAGE（複数・原寸・移動）</div>
+      <div class="ref-sect-h" id="refimg-sect-h" style="cursor:pointer;" title="クリックで参照画像を選択（MOVE/中央の対象に）">REF IMAGE（複数・原寸・移動）</div>
       <div class="ref-frame-row">
         <button id="btn-refimg-load" class="ref-btn" title="参照画像を読み込み（複数可・原寸・中央）">LOAD</button>
         <button id="btn-refimg-clear" class="ref-btn del" title="選択中の参照画像を消去">× IMG</button>
@@ -1547,12 +1555,12 @@ input[type=range]::-moz-range-thumb{
     <div class="ref-sect">
       <div class="ref-sect-h">REF ANIMATORS（コマ同期参照）</div>
       <div class="ref-add-row">
-        <button id="ref-add-json" title="JSONファイルから参照を追加">+ JSON FILE</button>
+        <button id="ref-add-json" title="ファイルから参照を追加。JSON=プロジェクト／PNG等の画像を複数選ぶと連番シーケンスとして1つの参照になります（ファイル名の番号順）">+ JSON / SEQ</button>
         <button id="ref-add-saved" title="共有DBの保存済みプロジェクトから追加">+ FROM SAVED</button>
       </div>
       <div id="ref-list"></div>
     </div>
-    <input type="file" id="ref-json-input" accept="application/json,.json" multiple style="display:none;">
+    <input type="file" id="ref-json-input" accept="application/json,.json,image/*" multiple style="display:none;">
   </div>
   <div id="ref-resize" title="ドラッグで高さ調整（下のセクションを隠せます）"></div>
 </div>
@@ -1722,10 +1730,11 @@ function saveInk(){
 // ── SCREEN TONE（下書/指示ボタンのWクリックで dot10%/dot40% トーンインクに切替）──
 // パターンはキャンバス原点固定＝塗り足しても網点がズレず繋がる（現実の貼りトーンと同じ）。
 // 描画結果は drawData に実ピクセルとして焼き込まれるため書き出し/連携は変更不要。
-const TONE_PITCH = 16;  // 網点タイル1辺px（45°配置・タイルあたりドット2個相当）
+const TONE_PITCH = 26;  // 網点タイル1辺px の既定（45°配置・タイルあたりドット2個相当）
+// pitch はスロットごとに持たせる（CLIP STUDIO のトーン見本に寄せた粗さ）
 const TONE = {
-  tone1: { cov: 0.10, color: '#000000', label: 'T10' },  // 下書スロット
-  tone2: { cov: 0.40, color: '#000000', label: 'T40' },  // 指示スロット
+  tone1: { cov: 0.10, pitch: 26, color: '#000000' },  // 下書スロット: 細かめの疎ドット
+  tone2: { cov: 0.40, pitch: 26, color: '#000000' },  // 指示スロット: 同ピッチで大きいドット
 };
 const toneMode = { blue: false, orange: false };
 function isToneInk(c){ return c === 'tone1' || c === 'tone2'; }
@@ -1737,7 +1746,7 @@ function slotInk(c){
 }
 // 網点タイル生成: 被覆率から半径を決め1pxずつ判定（ペン用pattern と FILL用mask を同時に作る）
 function buildTone(key){
-  const t = TONE[key], T = TONE_PITCH;
+  const t = TONE[key], T = t.pitch || TONE_PITCH;
   const cv = document.createElement('canvas');
   cv.width = T; cv.height = T;
   const cx = cv.getContext('2d');
@@ -1777,7 +1786,7 @@ function buildTone(key){
 buildTone('tone1'); buildTone('tone2');
 // FILL用の網点判定: キャンバス座標(x,y)がドット上か
 function toneOn(t, x, y){
-  const T = TONE_PITCH;
+  const T = t.pitch || TONE_PITCH;
   return t.mask[((y % T + T) % T) * T + ((x % T + T) % T)] === 1;
 }
 // ペンに渡すインクスタイル（トーン中は CanvasPattern、それ以外は単色hex）
@@ -1785,8 +1794,24 @@ function inkStyle(){
   const c = state.inkColor;
   return isToneInk(c) ? TONE[c].pattern : INK[c];
 }
+// FILLで塗る色。下書/指示が選択中はそのインク色で塗る（主線=黒のときだけパレット色）。
+// ※トーンインク時の網点塗りは floodFill 側が state.inkColor から直接扱う。
+function currentFillHex(){
+  const c = state.inkColor;
+  return (c === 'blue' || c === 'orange') ? INK[c] : state.fillColor;
+}
+// 下書/指示/トーンが選択中なら、その色を hex で差し替える（パレット選択・スポイト共通）
+function setActiveInkColor(hex){
+  const c = state.inkColor;
+  if(isToneInk(c)){ TONE[c].color = hex; buildTone(c); }
+  else if(c === 'blue' || c === 'orange'){ INK[c] = hex; }
+  else return false;   // 主線(黒)は固定なので同期しない
+  saveInk();
+  updateInkSwatches();
+  return true;
+}
 
-// 下書/指示ボタンの背景を現在のインク色に同期（トーンモード中は網点タイル＋T10/T40表示）
+// 下書/指示ボタンの背景を現在のインク色に同期（トーンモード中は網点タイルを表示）
 function updateInkSwatches(){
   document.querySelectorAll('.tb-ink, .ink-btn').forEach(b => {
     const c = b.dataset.c;
@@ -1794,7 +1819,7 @@ function updateInkSwatches(){
     const ink = slotInk(c);
     if(isToneInk(ink)){
       const t = TONE[ink];
-      b.textContent = t.label;
+      b.textContent = '';   // 網点タイルだけで判別（T10/T40の文字は読みづらいので出さない）
       b.style.background = '#FFF url(' + t.tileURL + ') repeat';
       b.style.color = '#333';
       b.title = 'スクリーントーン dot' + Math.round(t.cov * 100) + '%（Wクリックで' + (c === 'blue' ? '下書' : '指示') + 'に戻す）';
@@ -1854,7 +1879,13 @@ async function modalAlert(msg){
 const state = {
   tool: 'pen',          // 'pen'|'erase'|'fill'
   // ツールごとに独立したサイズ記憶
-  penSize: 2,           // 1|2|20
+  penSize: 2,           // 1 | 2 | 太ブラシスロット(penBig)
+  // 太ブラシスロットの太さ。3〜50pxで右ドラッグ可変（1px/2pxは固定スロット）
+  penBig: (() => {
+    try{ const v = parseInt(localStorage.getItem('animator_penbig_v1'), 10);
+      if(v >= 3 && v <= 50) return v; }catch(e){}
+    return 20;
+  })(),
   eraseSize: 20,        // 1|2|20
   inkColor: 'black',    // 'black'|'blue'|'orange'
   fillColor: '#000000',
@@ -1903,10 +1934,11 @@ const state = {
   smoothing: 3,
   // ブラシ補正: mode='off'|'avg'(プロクリエイト的 指数移動平均)|'pull'(ZBrushレイジー的)
   //  avg/pull は 0..1 の強度を個別保持。localStorageから復元。
+  //  既定は OFF（トーンインク描画時に補正が入ると重くなるため）。widgetで任意にON可。
   stab: (() => {
-    try{ const s = JSON.parse(localStorage.getItem('animator_stab_v1'));
-      if(s && typeof s==='object') return {mode:s.mode||'avg', avg:s.avg??0.5, pull:s.pull??0.4}; }catch(e){}
-    return { mode:'avg', avg:0.5, pull:0.4 };
+    try{ const s = JSON.parse(localStorage.getItem('animator_stab_v2'));
+      if(s && typeof s==='object') return {mode:s.mode||'off', avg:s.avg??0.5, pull:s.pull??0.4}; }catch(e){}
+    return { mode:'off', avg:0.5, pull:0.4 };
   })(),
   // 筆圧カーブ: 'linear' | 'soft'(軽い筆圧が細く出る=入り抜き強調) | 'hard'(軽くても太い)
   pressureCurve: (() => {
@@ -2342,14 +2374,38 @@ document.getElementById('ref-panel-close').addEventListener('click', () => toggl
 document.getElementById('ref-add-json').addEventListener('click', () => {
   document.getElementById('ref-json-input').click();
 });
+// 連番ファイル名の並べ替え: 末尾の数字を数値として比較（_001 と _10 が正しく並ぶ）
+function seqNameCompare(a, b){
+  const na = (a.match(/(\d+)\D*$/) || [])[1];
+  const nb = (b.match(/(\d+)\D*$/) || [])[1];
+  if(na !== undefined && nb !== undefined && +na !== +nb) return +na - +nb;
+  return a.localeCompare(b, undefined, { numeric:true });
+}
+// 連番画像ファイル群 → REF ANIMATOR 1件（1画像=1コマ）
+async function addRefAnimatorFromSeq(imgFiles){
+  imgFiles.sort((a, b) => seqNameCompare(a.name, b.name));
+  const cells = [];
+  for(const f of imgFiles){
+    cells.push({ kind:'draw', duration:1, image: await fileToDataURL(f) });
+  }
+  // 連番部分を除いたベース名を参照名にする
+  const base = imgFiles[0].name.replace(/\.[^.]+$/,'').replace(/[_\-. ]*\d+$/,'') || 'SEQ';
+  await addRefAnimator({ name: base, fps: 24, cells }, base);
+}
 document.getElementById('ref-json-input').addEventListener('change', async e => {
   const files = Array.from(e.target.files || []);
   e.target.value = '';
-  for(const f of files){
+  const imgs  = files.filter(f => /^image\//.test(f.type) || /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name));
+  const jsons = files.filter(f => !imgs.includes(f));
+  for(const f of jsons){
     try{
       const json = JSON.parse(await f.text());
       await addRefAnimator(json, f.name.replace(/\.[^.]+$/,''));
     }catch(err){ modalAlert('JSON読み込み失敗: ' + (err.message||err)); }
+  }
+  if(imgs.length){
+    try{ await addRefAnimatorFromSeq(imgs); }
+    catch(err){ modalAlert('連番PNG読み込み失敗: ' + (err.message||err)); }
   }
 });
 document.getElementById('ref-add-saved').addEventListener('click', async () => {
@@ -2606,6 +2662,22 @@ function fitToStage(){
   state.panX = 0;
   state.panY = 0;
   applyZoom();
+}
+// 等倍(100%)表示。パンはリセットして中央に戻す
+function zoomActual(){
+  state.zoom = 1;
+  state.fitMode = false;
+  state.panX = 0;
+  state.panY = 0;
+  applyZoom();
+}
+// FITを続けて2回（FITボタンWクリック / Fキー2回）で 100% 表示へ
+let _lastFitAt = -1e9;
+function fitAction(){
+  const now = performance.now();
+  if(now - _lastFitAt < 500){ _lastFitAt = -1e9; zoomActual(); return; }
+  _lastFitAt = now;
+  fitToStage();
 }
 function applyZoom(){
   const w = CFG.WORK_W * state.zoom;
@@ -3090,16 +3162,11 @@ function fillCircleRows(x, y, r, row){
     if(x1 >= x0) row(x + x0, y + dy, x1 - x0 + 1);
   }
 }
-// 20pxドット（円形、ピクセル単位）
-function drawDot20(ctx, x, y, color){
-  ctx.fillStyle = color;
-  fillCircleRows(x, y, 10, (px, py, w) => ctx.fillRect(px, py, w, 1));
-}
-
+// 1px/2px は専用の固定ドット。3px以上は size を直径とする円ドット（可変・最大50px）
 function drawDot(ctx, x, y, size, color){
   if(size === 1) drawDot1(ctx, x, y, color);
   else if(size === 2) drawDot2(ctx, x, y, color);
-  else drawDot20(ctx, x, y, color);
+  else drawDotRadius(ctx, x, y, size / 2, color);
 }
 
 // 任意半径の塗り円ドット（筆圧ペン用）
@@ -3145,7 +3212,7 @@ function eraseDot(ctx, x, y, size){
   } else if(size === 2){
     ctx.clearRect(x, y, 2, 2);
   } else {
-    fillCircleRows(x, y, 10, (px, py, w) => ctx.clearRect(px, py, w, 1));
+    fillCircleRows(x, y, size / 2, (px, py, w) => ctx.clearRect(px, py, w, 1));
   }
 }
 function eraseLine(ctx, x0, y0, x1, y1, size){
@@ -3259,19 +3326,13 @@ function eyedropInk(clientX, clientY){
   const {x, y} = toCanvasCoord(clientX, clientY);
   const hex = sampleCompositeColor(x, y);
   if(!hex) return;
-  if(isToneInk(state.inkColor)){
-    TONE[state.inkColor].color = hex;
-    buildTone(state.inkColor);  // 色が変わったらパターン/タイル再生成
-  } else {
-    INK[state.inkColor] = hex;
-  }
-  saveInk();
-  updateInkSwatches();
+  setActiveInkColor(hex);
 }
-// 下書/指示/トーンインクが選択中か（主線=blackは除外、ペン系ツール時のみ）
+// 下書/指示/トーンインクが選択中か（主線=blackは除外）。
+// FILLでもAltスポイトでインク色を取れるよう fill を含める。
 function inkPickActive(){
   return (state.inkColor === 'blue' || state.inkColor === 'orange' || isToneInk(state.inkColor)) &&
-         (state.tool === 'pen' || state.tool === 'eyedrop');
+         (state.tool === 'pen' || state.tool === 'fill' || state.tool === 'eyedrop');
 }
 
 // ============================================================
@@ -4631,7 +4692,7 @@ function applyPressureCurve(p){
 }
 // 筆圧 → 半径（現在のペンサイズを最大半径とする）
 function pressureRadius(pressure){
-  const maxR = state.penSize === 1 ? 3 : state.penSize === 2 ? 6 : 16;
+  const maxR = state.penSize === 1 ? 3 : state.penSize === 2 ? 6 : state.penSize * 0.8;
   const p = Math.max(0.08, Math.min(1, pressure || 0.5));
   return Math.max(0.7, maxR * applyPressureCurve(p));
 }
@@ -4715,7 +4776,9 @@ function endStroke(){
 // ============================================================
 drawCanvas.addEventListener('pointerdown', e => {
   if(e.pointerType === 'touch') return; // stage側で処理
-  if(e.pointerType === 'mouse' && e.button !== 0) return;
+  // 主ボタン以外（右ボタン＝ペンのバレルボタン含む）では描き始めない
+  //  ＝右ドラッグはブラシサイズ変更に使う（CLIP STUDIO風）
+  if(e.button !== 0) return;
   e.preventDefault();
   drawCanvas.setPointerCapture(e.pointerId);
   drawingPointerId = e.pointerId;
@@ -4727,7 +4790,7 @@ drawCanvas.addEventListener('pointerdown', e => {
     if(state.frameLayer.editMode) ensureFlBaseline();
     let {x, y} = toCanvasCoord(e.clientX, e.clientY);
     if(state.frameLayer.editMode){ const fc = toFrameLocal(x, y); x = fc.x; y = fc.y; }
-    floodFill(x, y, state.fillColor);
+    floodFill(x, y, currentFillHex());
     if(state.frameLayer.editMode) pushFrameLayerHistory();
     else pushHistory();
   } else {
@@ -4926,27 +4989,39 @@ document.querySelectorAll('.tb-pen').forEach(btn => {
   });
 });
 
+// 太ブラシスロットの現在値（3〜50px 可変。1px/2px は固定スロット）
+const PEN_BIG_MIN = 3, PEN_BIG_MAX = 50;
+function savePenBig(){ try{ localStorage.setItem('animator_penbig_v1', String(state.penBig)); }catch(e){} }
 // 現在のツールのサイズに合わせてペンサイズUIを更新
 function refreshPenSizeUI(){
   const size = currentToolSize();
+  const big = document.getElementById('tb-pen-big');
+  big.dataset.size = String(state.penBig);
+  document.getElementById('tb-pen-big-label').textContent = String(state.penBig);
+  // ボタン内プレビュー丸は最大12pxに丸めて表示（ボタンをはみ出さないように）
+  const d = Math.max(4, Math.round(state.penBig * 12 / PEN_BIG_MAX));
+  const dot = document.getElementById('tb-pen-big-dot');
+  dot.style.width = d + 'px'; dot.style.height = d + 'px';
   document.querySelectorAll('.tb-pen').forEach(b => {
     b.classList.toggle('on', parseInt(b.dataset.size) === size);
   });
 }
+refreshPenSizeUI();  // 保存済みの太ブラシ値をボタンに反映
 
 document.querySelectorAll('.tb-ink').forEach(btn => {
   btn.addEventListener('click', () => {
     state.inkColor = slotInk(btn.dataset.c);
-    // ERASE中は主線フラグだけ更新してツールはERASEのまま。それ以外はPENへ自動切替
-    if(state.tool !== 'erase'){
+    // ERASE / FILL 中はインクだけ差し替えてツールは維持（うっかりブラシで塗るのを防ぐ）。
+    // それ以外（＝ツール未確定状態）のときだけPENへ自動切替。
+    if(state.tool !== 'erase' && state.tool !== 'fill' && state.tool !== 'pen'){
       const penBtn = document.querySelector('.tool[data-tool="pen"]');
-      if(penBtn && state.tool !== 'pen') penBtn.click();
+      if(penBtn) penBtn.click();
     }
     applyInkUIForTool();
   });
 });
 
-// 下書/指示ボタン Wクリック/Wタップ → スクリーントーンインク（T10/T40）⇔通常インクをトグル
+// 下書/指示ボタン Wクリック/Wタップ → スクリーントーンインク（網点）⇔通常インクをトグル
 document.querySelectorAll('.tb-ink').forEach(btn => {
   const c = btn.dataset.c;
   if(c !== 'blue' && c !== 'orange') return;
@@ -4982,8 +5057,15 @@ function savePalette(){ try{ localStorage.setItem(PAL_LS, JSON.stringify({format
 function selectPalSlot(i){
   gPalSlot = i;
   state.fillColor = gPalette[i];
+  // 下書/指示（トーン含む）が選択中なら、そのインク色もパレット色に同期。
+  // ブラシ・FILLどちらでも「選んだ色＝いま描ける色」になる。主線は黒固定なので対象外。
+  setActiveInkColor(gPalette[i]);
   renderPalette();
-  const fb = document.querySelector('.tool[data-tool="fill"]'); if(fb) fb.click();
+  // ブラシ系（PEN/ERASE）を使っている最中は色を選んでもツールを奪わない。
+  // それ以外（選択/スポイト等）のときだけ FILL へ自動切替。
+  if(state.tool !== 'pen' && state.tool !== 'erase'){
+    const fb = document.querySelector('.tool[data-tool="fill"]'); if(fb) fb.click();
+  }
 }
 function renderPalette(){
   palEl.innerHTML = '';
@@ -5131,7 +5213,7 @@ document.getElementById('zoom-out').addEventListener('click', () => {
   const { x, y } = getZoomFocal();
   zoomAt(x, y, state.zoom / 1.25);
 });
-document.getElementById('zoom-fit').addEventListener('click', fitToStage);
+document.getElementById('zoom-fit').addEventListener('click', fitAction);
 
 // ホイールズーム（Ctrl不要、Altは予約）
 stage.addEventListener('wheel', e => {
@@ -5173,6 +5255,49 @@ stage.addEventListener('pointercancel', endMidPan);
 stage.addEventListener('auxclick', e => { if(e.button === 1) e.preventDefault(); });
 stage.addEventListener('mousedown', e => { if(e.button === 1) e.preventDefault(); });
 
+// ===== 右ドラッグでブラシサイズ変更（CLIP STUDIO風）=====
+//   ペンを浮かせたまま（＝描画に入らない）右ボタンドラッグ。右=太く / 左=細く。
+//   1px / 2px は固定スロット、その上は 3〜50px を1pxずつ可変。
+(function(){
+  // サイズのはしご: 1px → 2px → 3..50px（1/2は固定スロット、その上が可変の太ブラシ）
+  const STEP_PX = 10;            // 1段送るのに必要な横移動量
+  let sizing = false, startX = 0, startIdx = 0;
+  function sizeToIdx(s){
+    if(s <= 1) return 0;
+    if(s === 2) return 1;
+    return Math.max(2, Math.min(PEN_BIG_MAX - 1, s - 1)); // 3px→idx2 … 50px→idx49
+  }
+  function idxToSize(i){
+    i = Math.max(0, Math.min(PEN_BIG_MAX - 1, i));
+    return (i === 0) ? 1 : (i === 1) ? 2 : i + 1;
+  }
+  function applyIdx(i){
+    const size = idxToSize(i);
+    if(size >= PEN_BIG_MIN){ state.penBig = size; savePenBig(); }
+    if(state.tool === 'erase') state.eraseSize = size; else state.penSize = size;
+    refreshPenSizeUI();
+  }
+  stage.addEventListener('pointerdown', e => {
+    if(e.button !== 2) return;                 // 右ボタンのみ（ペンのバレルボタン含む）
+    if(state.refMoveMode) return;              // REF移動中は触らない
+    startIdx = sizeToIdx(currentToolSize());
+    startX = e.clientX;
+    sizing = true;
+    e.preventDefault();
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener('pointermove', e => {
+    if(!sizing) return;
+    e.preventDefault();
+    applyIdx(startIdx + Math.round((e.clientX - startX) / STEP_PX));
+  });
+  function end(){ sizing = false; }
+  stage.addEventListener('pointerup', end);
+  stage.addEventListener('pointercancel', end);
+  // 右ドラッグ中にコンテキストメニューが出ないように
+  stage.addEventListener('contextmenu', e => e.preventDefault());
+})();
+
 // 指定スクリーン座標を基点にズーム（ステージ中心基準で逆算 → カーソル下が動かない）
 function zoomAt(screenX, screenY, newZoom){
   newZoom = Math.max(0.05, Math.min(8, newZoom));
@@ -5199,7 +5324,7 @@ function zoomAt(screenX, screenY, newZoom){
 // ImageDataを4Kにnearest-neighborアップスケール
 // ============================================================
 document.getElementById('btn-export').addEventListener('click', e => exportPNG({ transparentBG: e.shiftKey }));
-document.getElementById('btn-export').title = 'クリック: 4K書き出し / Shift+クリック: BG透明で書き出し';
+document.getElementById('btn-export').title = '現在のコマを1枚PNGで書き出し / Shift+クリック: BG透明で書き出し';
 
 // ============================================================
 // JSON EXPORT / IMPORT (COMPOSER 連携)
@@ -5289,7 +5414,7 @@ function exportJSON(){
   const a = document.createElement('a');
   const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
   a.href = url;
-  a.download = `project_${ts}.json`;
+  a.download = `animator_${ts}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -5544,6 +5669,38 @@ document.getElementById('btn-send-composer').addEventListener('click', async () 
 document.getElementById('btn-home').addEventListener('click', () => {
   location.href = 'index.html';
 });
+
+// ===== 全画面表示（PCのF11相当。iPad Safariは webkit プレフィクスAPI）=====
+// iPhone Safari は Fullscreen API 非対応のため、その場合はボタンを隠す。
+(function(){
+  const btn = document.getElementById('btn-fullscreen');
+  const root = document.documentElement;
+  const canFS = !!(root.requestFullscreen || root.webkitRequestFullscreen ||
+                   document.body.webkitRequestFullscreen);
+  if(!canFS){ btn.style.display = 'none'; return; }
+  function isFS(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function syncFS(){
+    const on = isFS();
+    btn.classList.toggle('on', on);
+    btn.title = on ? '全画面を解除（Escでも解除）' : '全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）';
+    // 全画面切替でstageサイズが変わるのでFIT中は再フィット
+    setTimeout(() => { if(state.fitMode) fitToStage(); }, 120);
+  }
+  btn.addEventListener('click', async () => {
+    try{
+      if(isFS()){
+        if(document.exitFullscreen) await document.exitFullscreen();
+        else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else {
+        if(root.requestFullscreen) await root.requestFullscreen({ navigationUI:'hide' });
+        else if(root.webkitRequestFullscreen) root.webkitRequestFullscreen();
+        else if(document.body.webkitRequestFullscreen) document.body.webkitRequestFullscreen();
+      }
+    }catch(e){ /* ユーザー操作外/非対応時は無視 */ }
+  });
+  document.addEventListener('fullscreenchange', syncFS);
+  document.addEventListener('webkitfullscreenchange', syncFS);
+})();
 
 // ============================================================
 // LIVE SYNC（ANIMATOR → COMPOSER リアルタイム連携 / BroadcastChannel）
@@ -6529,7 +6686,7 @@ const stabModeB = document.getElementById('tb-stab-mode');
 const stabRange = document.getElementById('tb-stab-range');
 const stabValEl = document.getElementById('tb-stab-val');
 function saveStab(){
-  try{ localStorage.setItem('animator_stab_v1', JSON.stringify(state.stab)); }catch(e){}
+  try{ localStorage.setItem('animator_stab_v2', JSON.stringify(state.stab)); }catch(e){}
 }
 function renderStab(){
   const s = state.stab, on = s.mode !== 'off';
@@ -6679,7 +6836,9 @@ function applyRefImgUI(){
   if(mv) mv.classList.toggle('on', state.refMoveMode);
   const e = refFindSel();
   // REF IMAGE 濃度スライダーは「画像/アニメ選択時」のみ（FRAMEは専用スライダー）
-  const useObj = (e && e.type !== 'frame') ? e.obj : null;
+  // ※ REF ANIMATOR は各行に専用スライダーがあるので、ここでは扱わない
+  //   （扱うと「REF ANIMATOR最上段の濃度」と「REF IMAGEの濃度」が連動して見える）
+  const useObj = (e && e.type === 'img') ? e.obj : null;
   const op = document.getElementById('refimg-opacity');
   const ov = document.getElementById('refimg-opacity-val');
   const val = useObj ? Math.round(useObj.opacity*100) : 60;
@@ -6689,8 +6848,41 @@ function applyRefImgUI(){
   if(info) info.textContent = state.refImages.length ? (state.refImages.length + '枚') : '—';
   const sinfo = document.getElementById('ref-sel-info');
   if(sinfo) sinfo.textContent = e ? (({img:'IMG', anim:'ANM', frame:'FRAME'})[e.type] + ' 選択中') : '未選択';
+  // 選択中セクションをピンク枠で囲う（REF ANIMATOR行の sel-ref と見た目を揃える）
+  const t = state.refSel && state.refSel.type;
   const fsh = document.getElementById('frame-sect-h');
-  if(fsh) fsh.style.color = (state.refSel && state.refSel.type === 'frame') ? 'var(--acid)' : '';
+  if(fsh) fsh.closest('.ref-sect').classList.toggle('sel-sect', t === 'frame');
+  const ish = document.getElementById('refimg-sect-h');
+  if(ish) ish.closest('.ref-sect').classList.toggle('sel-sect', t === 'img');
+}
+// ── REFパネルの選択候補を1本のリストに並べる（↑↓キーで送る順番）──
+//    FRAME LAYER → REF IMAGE(手前から) → REF ANIMATORS(リスト順)
+function refSelCandidates(){
+  const out = [{ type:'frame' }];
+  for(let i = state.refImages.length - 1; i >= 0; i--) out.push({ type:'img', id: state.refImages[i].id });
+  for(const r of state.refAnimators) out.push({ type:'anim', id: r.id });
+  return out;
+}
+function refSelStep(dir){
+  const list = refSelCandidates();
+  if(!list.length) return;
+  const cur = list.findIndex(c => c.type === (state.refSel && state.refSel.type) &&
+                                 (c.id || null) === ((state.refSel && state.refSel.id) || null));
+  const next = list[((cur < 0 ? 0 : cur + dir) % list.length + list.length) % list.length];
+  state.refSel = next.id ? { type: next.type, id: next.id } : { type: next.type };
+  renderRefImg(); renderRefLayer(); buildRefList(); applyRefImgUI();
+  // 選択された行が隠れていたらパネル内でスクロールして見せる
+  const el = document.querySelector('#ref-panel .ref-item.sel-ref, #ref-panel .ref-sect.sel-sect');
+  if(el) el.scrollIntoView({ block:'nearest' });
+}
+// REF IMAGE 見出しクリック → 参照画像を MOVE/中央 の対象に選択（最前面＝配列末尾を優先）
+function selectRefImageSection(){
+  if(!state.refImages.length){ modalAlert('参照画像がありません（LOADで読み込んでください）'); return; }
+  const cur = (state.refSel && state.refSel.type === 'img')
+    ? state.refImages.findIndex(o => o.id === state.refSel.id) : -1;
+  const o = (cur >= 0) ? state.refImages[cur] : state.refImages[state.refImages.length - 1];
+  state.refSel = { type:'img', id:o.id };
+  renderRefImg(); renderRefLayer(); buildRefList(); applyRefImgUI();
 }
 function fileToDataURL(file){
   return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=()=>rej(fr.error); fr.readAsDataURL(file); });
@@ -6713,6 +6905,7 @@ document.getElementById('frame-sect-h').addEventListener('click', () => {
   state.refSel = { type:'frame' };
   applyRefImgUI(); buildRefList(); renderRefImg(); renderRefLayer();
 });
+document.getElementById('refimg-sect-h').addEventListener('click', selectRefImageSection);
 document.getElementById('btn-refimg-load').addEventListener('click', () => document.getElementById('refimg-input').click());
 document.getElementById('refimg-input').addEventListener('change', async e => {
   const files = Array.from(e.target.files || []); e.target.value='';
@@ -6735,11 +6928,10 @@ document.getElementById('btn-refimg-clear').addEventListener('click', () => {
   renderRefImg(); applyRefImgUI(); markMetaDirty(); scheduleSave();
 });
 document.getElementById('refimg-opacity').addEventListener('input', e => {
-  const sel = refFindSel(); if(!sel || sel.type === 'frame') return;
+  const sel = refFindSel(); if(!sel || sel.type !== 'img') return;  // 画像のみ（ANM/FRAMEは専用スライダー）
   sel.obj.opacity = Math.max(0, Math.min(1, (parseInt(e.target.value,10)||0)/100));
   document.getElementById('refimg-opacity-val').textContent = Math.round(sel.obj.opacity*100)+'%';
-  renderRefImg(); renderRefLayer();
-  if(sel.type === 'anim') buildRefList();
+  renderRefImg();
 });
 document.getElementById('refimg-opacity').addEventListener('change', () => { markMetaDirty(); scheduleSave(); });
 document.getElementById('btn-add-frame').addEventListener('click', () => addFrame(false));
@@ -6885,7 +7077,7 @@ const SHORTCUT_ACTIONS = [
   { id:'prevFrame', label:'前のコマ',           def:'ArrowLeft',  prevent:true, run:()=>document.getElementById('strip-prev')?.click() },
   { id:'nextFrame', label:'次のコマ',           def:'ArrowRight', prevent:true, run:()=>document.getElementById('strip-next')?.click() },
   { id:'delFrame',  label:'フレーム削除',       def:'Delete',     prevent:true, run:()=>{ if(state.selectedFrameIds && state.selectedFrameIds.size>0) deleteSelectedFrames(); else deleteCurrentFrame(); } },
-  { id:'fit',       label:'FIT（ズーム合わせ）',def:'F',          run:()=>fitToStage() },
+  { id:'fit',       label:'FIT（ズーム合わせ／2回で100%）',def:'F', run:()=>fitAction() },
   { id:'mirror',    label:'MIRROR',             def:'M',          run:()=>document.getElementById('btn-mirror')?.click() },
   { id:'flip',      label:'FLIP',               def:'X',          run:()=>document.getElementById('btn-flip')?.click() },
   { id:'refPanel',  label:'REFパネル',          def:'R',          run:()=>toggleRefPanel() },
@@ -7227,6 +7419,18 @@ loadKeymap(); // 起動時にキーマップを復元（localStorage）
 
 window.addEventListener('keydown', e => {
   if(handleShortcutCapture(e)) return; // キー取得モード優先
+  // REFパネルを開いている間の ↑↓ は「参照の選択送り」を最優先。
+  // 濃度スライダー（range）にフォーカスが残っていると値が動いてしまうため、
+  // INPUT早期returnより前に処理し、スライダーのフォーカスも外す。
+  if((e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
+     document.getElementById('ref-panel').classList.contains('show') &&
+     !(e.ctrlKey || e.metaKey || e.altKey) &&
+     (e.target.tagName !== 'INPUT' || e.target.type === 'range')){
+    e.preventDefault();
+    if(e.target.tagName === 'INPUT') e.target.blur();
+    refSelStep(e.key === 'ArrowDown' ? 1 : -1);
+    return;
+  }
   if(e.target.tagName === 'INPUT') return;
   // Ctrl/Cmd 系（固定）
   if((e.ctrlKey||e.metaKey) && e.key === 'z'){ e.preventDefault(); undo(); return; }
