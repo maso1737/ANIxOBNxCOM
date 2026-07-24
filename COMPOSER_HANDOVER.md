@@ -140,6 +140,12 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - CAMERAは常に state.tracks 末尾＝タイムライン最上段に固定（`pinCameraTop()`、rebuildAllTrackUI冒頭で強制）。合成順は getCamAt が別管理なので配列位置は表示専用。camera はドラッグ並び替え不可
 - カメラの親(NULL)は行内 `.tl-parent-sel`（削除ボタン左）とインスペクタ #kf-parent の両方から設定可。両者は `refreshTrackChainMarks` で同期
 - undo対象のトラック編集データ(cloneEditState/applyHistory の perTrack)は keyframes/markers/parent/visible/solo/**name**。トラック行の新プロパティを undo させたいときはこの2箇所に追加
+- ビュー: `F`=FIT(resetView)、500ms以内に2回目=100%(`zoomActual100`=width/baseW倍)。両方 `fitAction()` 経由。zoom=1 はビューにフィット(baseW)であって実寸ではない点に注意
+- 全画面: `#btn-fullscreen`(HOME右)。`fullscreenchange`→`setupViewport()`で再フィット。iPhone非対応時はボタン自動非表示
+- INSPECTOR: 左右ドック(`dockInspector`/localStorage 'composer_insp_side')。`Tab`=左右入替(`toggleInspectorSide`)、ヘッダ⇄で再ドック。フローティングは makeFloatDrag（left/top上書き）なので再ドックで解除
+- 矢印↑↓=トラック選択送り(`selectTrackStep`。↑=前面/state末尾方向、Shift=端)。SHORTCUT_ACTIONS の run は e を受け取れる（Shift分岐可）
+- Ctrl(⌘)+↑↓=トラック上下移動(`moveTrack`。Shift=端)。keydownで `ctrl||meta||alt` 早期returnの前に割り込み処理（SHORTCUT_ACTIONS はCtrl系を受けないため）。CAMERA不動・pinCameraTop維持・recordHistoryでundo可
+- INSPECTORヘッダのボタン群は `.insp-head-btns` に入れる（makeFloatDragのskipが `.insp-head-btns` 全体を除外＝クリックがドラッグ開始で潰れない）
 
 【未実装 / 将来候補】
 - FRAME参照画像（複数ANIMATOR参照）

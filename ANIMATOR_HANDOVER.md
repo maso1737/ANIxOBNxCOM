@@ -246,6 +246,13 @@ let gKeymap = {};
 
 ---
 
+## 投げ縄塗り（LASSO FILL）について
+FILLツールには2方式があり `state.fillMode`（`'flood'`|`'lasso'`）で切替。**FILLボタン長押し(500ms)** でトグル（`onLongPress`）。lasso時はラベルが `LASSO`・左上に紫バッジ(`.lasso-on::before`)・カーソル crosshair。
+- **狙い**: ブラシで網点(トーン)を1点ずつ塗ると重いので、囲って一括塗りに逃がして軽量化。
+- **実体**: `lassoFillPolygon(pts)` がスキャンライン(偶奇規則)で多角形内を塗る。色/トーン/透明消しの規則は `floodFill` と完全共通（`currentFillHex` / `isToneInk`+`toneOn` / `state.fillErase`）。**ドット塗りは下書/指示のWクリックでトーン選択中に自動的に網点で塗られる**（切替UIは従来のまま）。
+- **操作経路**: `drawCanvas` の pointerdown で `fillMode==='lasso'` なら `lassoBegin/Move/End`。輪郭プレビューは `guideCtx`（ガイド層）に破線描画→離すと `renderGuides()` で消去。Undoは塗り確定時に1手 push。FRAMEレイヤー編集中は頂点を `toFrameLocal()` 経由で写像。
+- **入力**: pen/mouse は `drawCanvas` 経由（＝iPadは Apple Pencil で囲う）。指はパン維持（従来設計どおり）。ミラーは floodFill 同様に非適用。
+
 ## FROM SAVED について
 `+ FROM SAVED` は、**同じブラウザ内で → COMPOSER 等を経由して送信した共有DB（`tdr_exchange`）に残っているプロジェクト一覧**から参照を追加する機能。
 - 最初は空で分かりにくい（同ブラウザ内でプロジェクトを → COMPOSER 送信して初めて候補に出る）

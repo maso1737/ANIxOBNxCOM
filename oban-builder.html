@@ -98,6 +98,7 @@ canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
   width:100%;opacity:.5;font-family:var(--jp);letter-spacing:.03em;font-size:9px;margin-top:6px;
   line-height:1.75;color:rgba(255,255,255,.6);
 }
+#bar-right{display:flex;gap:7px;align-items:center;margin-left:auto}
 #crumb{color:var(--gold);letter-spacing:.2em;font-family:var(--bank)}
 #crumb b{font-weight:400;color:var(--ice)}
 #crumb .btn{margin-left:6px}
@@ -255,6 +256,28 @@ body.textarm #cv{cursor:crosshair}
 #fx-body select{background:#100722;color:var(--amber);border:1px solid rgba(255,201,79,.4);font-family:var(--mono);font-size:10px;padding:1px 4px}
 #fx-body .btn{border-color:rgba(255,201,79,.45);color:var(--amber);padding:3px 8px;margin-left:6px}
 #fx-body .btn:hover{background:rgba(255,201,79,.14);border-color:var(--amber);color:var(--amber)}
+/* SETTINGS / SHORTCUTS モーダル（FXモーダルと同じフローティング作法） */
+#set-modal{position:fixed;right:14px;top:88px;width:min(420px,42vw);z-index:70;display:none;
+  border:1px solid var(--border-bright);background:rgba(16,7,34,.97);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 8px 40px rgba(0,0,0,.6);font-size:10px;letter-spacing:.06em;overflow:hidden}
+body.setopen #set-modal{display:flex;flex-direction:column}
+#set-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);
+  color:var(--white);font-family:var(--bank);letter-spacing:.2em;cursor:move;user-select:none}
+#set-head .btn{padding:3px 8px}
+#set-body{max-height:60vh;overflow-y:auto;padding:10px 12px}
+#set-body::-webkit-scrollbar{width:4px}
+#set-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,.35)}
+#set-body .set-sect-h{color:var(--acid);letter-spacing:.22em;font-family:var(--bank);margin-bottom:8px}
+#sc-table{width:100%;border-collapse:collapse}
+#sc-table td{padding:4px 6px;border-bottom:1px dashed rgba(255,255,255,.08);vertical-align:top;line-height:1.5}
+#sc-table td:first-child{color:var(--ice);white-space:nowrap;width:34%;font-family:var(--mono)}
+#set-body .set-note{margin-top:10px;opacity:.5;font-family:var(--jp);line-height:1.6}
+#set-resize{height:11px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--border);background:rgba(255,255,255,.02)}
+#set-resize::after{content:'';width:28px;height:2px;background:rgba(255,255,255,.25)}
+/* クリーン表示（H）: 編集UIを全部隠して絵だけ全面に（OBS等のキャプチャ用） */
+body.cleanview #bar,body.cleanview #cards,body.cleanview #chip,body.cleanview #ticks,body.cleanview #fx-modal,body.cleanview #set-modal{display:none!important}
+body.cleanview{cursor:none}
 
 </style>
 </head>
@@ -265,23 +288,30 @@ body.textarm #cv{cursor:crosshair}
 
 <div id="bar">
   <span class="title">OBAN <b>BUILDER</b></span>
+  <!-- 手順1〜3（PLACE→TAKE→EXPORT） -->
   <button class="btn mode on" id="m-place" title="配置モード：画像をコマとして並べる。ドラッグ=移動 / [ ]=前後 / フレームに重ねて格納 / Wクリック=フレーム内へ / M=マスク編集">1. PLACE 配置</button>
   <button class="btn mode ice" id="m-take" title="カメラモード：スクロールに沿ったカメラワークをキーフレームで打つ。C=CAPTURE / ↑↓=KF移動 / SPACE=PREVIEW">2. TAKE カメラ</button>
   <button class="btn ex" id="b-export" title="スクロール駆動のモーションコミックを単一HTMLビューアで書き出し（依存ゼロ・画像同梱）">3. EXPORT ▸ HTML</button>
+  <!-- 作成中に使う道具（EXPORTのとなり） -->
+  <button class="btn" id="b-guide" title="ガイド表示 ON/OFF（G）。書き出しには影響しません">GUIDE [G]</button>
+  <button class="btn mode" id="b-frame" title="フレーム（コマ枠）を追加。画像を重ねて格納できる">+ FRAME</button>
+  <button class="btn fx" id="b-fx" title="撮影処理（SATSUEI FX）チェーンを編集（F）。プレビュー・書き出しに適用">FX [F]</button>
   <span style="width:14px"></span>
+  <!-- 入出力（読み込み・書き出し・連携） -->
   <button class="btn" id="b-ap" title="ANIMATORの連番をPNG書き出しなしで取り込み（同一ブラウザ・EX_DB経由。保存で自動同期）">+ FROM ANIMATOR</button>
   <button class="btn" id="b-comp" title="TAKEをCOMPOSERのCAMERAトラックJSONに変換してコピー（COMPOSER側の + FROM OBAN で貼り付け）">COPY FOR COMPOSER</button>
-  <button class="btn" id="b-export-json" title="プロジェクト全体をJSONファイルで書き出し（メモ帳に貼らずそのまま保存）">EXPORT JSON</button>
+  <button class="btn" id="b-export-json" title="プロジェクト全体をJSONファイルで書き出し">EXPORT JSON</button>
   <button class="btn" id="b-import-json" title="JSONファイルからプロジェクトを読み込み（既存を置換）">IMPORT JSON</button>
   <input type="file" id="oban-json-input" accept="application/json,.json" style="display:none;">
   <button class="btn" id="b-clear" title="プロジェクトを空にする（元に戻せません）">CLEAR</button>
-  <button class="btn" id="b-guide" title="ガイド表示 ON/OFF（G）">GUIDE [G]</button>
-  <button class="btn mode" id="b-frame" title="フレーム（コマ枠）を追加。画像を重ねて格納できる">+ FRAME</button>
-  <button class="btn mode" id="b-text" title="縦書きテキストを追加（T）">+ TEXT [T]</button>
-  <button class="btn fx" id="b-fx" title="撮影処理（SATSUEI FX）チェーンを編集（F）。プレビュー・書き出しに適用">FX [F]</button>
   <span id="crumb"></span>
-  <button class="btn" id="b-home" title="ランディングページに戻る" style="margin-left:auto">HOME</button>
-  <span id="hint">画像をD&D（連番4枚以上は自動でシーケンス化）。PLACE: ドラッグ=移動 / [ ]=前後 / フレームに重ねて離す=格納 / ダブルクリック=フレーム内へ / M=マスク編集 / T=縦書きテキスト。TAKE: C=CAPTURE / ↑↓=KF移動 / SUB=カードで入力 / SPACE=PREVIEW。G=ガイド / Ctrl+Z・Ctrl+Shift+Z。</span>
+  <!-- 右端グループ（設定・全画面・HOME。HOMEは常に一番右） -->
+  <span id="bar-right">
+    <button class="btn" id="b-set" title="設定・ショートカット一覧">⚙</button>
+    <button class="btn" id="b-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
+    <button class="btn" id="b-home" title="ランディングページに戻る">HOME</button>
+  </span>
+  <span id="hint">画像をD&D（連番4枚以上は自動でシーケンス化）。PLACE: ドラッグ=移動 / [ ]=前後 / フレームに重ねて離す=格納 / ダブルクリック=フレーム内へ / M=マスク編集。TAKE: C=CAPTURE / ↑↓=KF移動 / SUB=カードで入力 / SPACE=PREVIEW。H=クリーン表示（ガイド類を全部隠す） / G=ガイド / Ctrl+Z・Ctrl+Shift+Z。</span>
 </div>
 
 <div id="cards">
@@ -305,6 +335,30 @@ body.textarm #cv{cursor:crosshair}
     <div class="fx-note">プレビュー(SPACE)と書き出しビューアに適用。編集中はOFF（軽量優先）</div></div>
   <div id="fx-body"></div>
   <div id="fx-resize" title="ドラッグで高さ調整"></div>
+</div>
+
+<!-- ==================== SETTINGS / SHORTCUTS MODAL ==================== -->
+<div id="set-modal">
+  <div id="set-head"><span>SETTINGS ⚙</span><button class="btn" id="set-close">✕ [Esc]</button></div>
+  <div id="set-body">
+    <div class="set-sect-h">KEYBOARD SHORTCUTS</div>
+    <table id="sc-table">
+      <tr><td>1 / 2</td><td>PLACE 配置 / TAKE カメラ 切替</td></tr>
+      <tr><td>SPACE</td><td>PREVIEW 再生 / 停止</td></tr>
+      <tr><td>H</td><td>クリーン表示（ガイド類・UIを全部隠す＝OBS等キャプチャ用）</td></tr>
+      <tr><td>G</td><td>ガイド表示 ON / OFF</td></tr>
+      <tr><td>F</td><td>撮影FX（SATSUEI FX）を開く</td></tr>
+      <tr><td>C</td><td>カメラ CAPTURE（TAKEモード）</td></tr>
+      <tr><td>↑ / ↓</td><td>KF移動（TAKEモード）</td></tr>
+      <tr><td>[ / ]</td><td>コマを背面 / 前面へ（PLACEモード）</td></tr>
+      <tr><td>M</td><td>マスク編集 ON / OFF（PLACEモード）</td></tr>
+      <tr><td>Delete / ⌫</td><td>選択コマを削除（PLACEモード）</td></tr>
+      <tr><td>Ctrl+Z / Ctrl+Shift+Z</td><td>元に戻す / やり直し</td></tr>
+      <tr><td>Esc</td><td>キャンセル（クリーン表示・モーダル・選択・プレビューを順に解除）</td></tr>
+    </table>
+    <div class="set-note">ショートカットは固定です。書き出したビューアでは S=字幕 ON/OFF が使えます。</div>
+  </div>
+  <div id="set-resize" title="ドラッグで高さ調整"></div>
 </div>
 
 <!-- ==================== COPY FOR COMPOSER MODAL (SPEC_06 P3) ==================== -->
@@ -698,10 +752,22 @@ addEventListener('resize',onResize);onResize();
 /* ---------- V2-C: SATSUEI FX（SPEC_06 P2 — take.fx / draft in PREVIEW） ---------- */
 const SFX=(typeof window!=='undefined'&&window.SatsueiFX)||null;
 let gFx=null,gSc=null,gScx=null;
+let gFxFailed=false;
 function gFxOK(){
+  if(gFxFailed)return false;
   if(!SFX)return false;
   if(!gFx)gFx=SFX.createSatsueiFX();
   return gFx.available;
+}
+// ビルダー側PREVIEWのFX。汚染canvas等で落ちてもrAFループを止めない（書き出しビューアと同方針）
+function gFxApplySafe(src,params,info){
+  try{ return gFx.apply(src,params,info); }
+  catch(e){
+    gFxFailed=true;
+    toast('撮影FXを無効化しました（この画像ではFXを適用できません）');
+    console.warn('[OBAN] preview FX disabled:',e.message);
+    return src;
+  }
 }
 function ensureSc(w,h){
   if(!gSc){gSc=document.createElement('canvas');gScx=gSc.getContext('2d');}
@@ -834,6 +900,14 @@ let sel=null,drag=null,selKf=-1;
 const PV={on:false,p:0};
 let toastT=0;
 let guides=true;                           // V2-A: ガイド表示（G）
+// クリーン表示（H）: ガイド類＋編集UI（トップバー/カード/チップ）を全部隠して、絵だけを全面に。
+// ローカルサーバを立てずに、この画面をそのまま全画面→OBS等のブラウザキャプチャに使うための表示。
+let cleanView=false;
+function toggleCleanView(){
+  cleanView=!cleanView;
+  document.body.classList.toggle('cleanview',cleanView);
+  if(cleanView)toast('クリーン表示 — H または Esc で戻す（OBS等のキャプチャ用）');
+}
 try{guides=(localStorage.getItem('oban-guides')??'1')==='1';}catch(e){}
 
 /* ---------- persistence (localStorage / 画像はファイル名参照) ---------- */
@@ -1643,12 +1717,6 @@ function enterFrame(f){ctxFrame=f;sel=null;maskEdit.on=false;renderChip();render
 cv.addEventListener('pointerdown',e=>{
   if(PV.on){stopPreview();return;}
   if(textEd){closeTextEditor(true);return;}   // V2-D: 入力中に余白クリック=確定
-  if(textArm){                                 // V2-D: T待機中のクリック=その位置に入力開始
-    e.preventDefault();   // 既定のフォーカス移動を止める（直後にエディタがblurで閉じるのを防ぐ）
-    textArm=false;document.body.classList.remove('textarm');
-    openTextEditor(e.clientX,e.clientY,null);
-    return;
-  }
   /* マスク編集: 4隅ハンドルのドラッグ */
   if(maskEdit.on&&maskEdit.f){
     const R=prect(maskEdit.f,VC);
@@ -1763,13 +1831,9 @@ $('#m-take').addEventListener('click',()=>setMode('take'));
    V2-D: 縦書きテキスト — T→クリック位置で contenteditable 入力→確定でcanvas描画データ化
    （writing-mode:vertical-rl でその場縦書き入力。IME不可環境は catch で prompt フォールバック）
    ============================================================ */
-let textArm=false,textEd=null;
-function armText(){
-  if(textEd){closeTextEditor(true);return;}
-  textArm=!textArm;
-  document.body.classList.toggle('textarm',textArm);
-  if(textArm)toast('縦書きテキスト: 置きたい場所をクリック（Escで取消）');
-}
+// V2-D: 縦書きテキスト。新規追加ボタン(+TEXT)は廃止（テキスト作り込みは manga-plate 側へ）。
+// 既存プロジェクトのテキストはダブルクリックで編集/削除できるよう openTextEditor は維持。
+let textEd=null;
 function openTextEditor(cssX,cssY,t,fsCssOpt){
   closeTextEditor(true);
   const fsCss=fsCssOpt??((t?(t.size??24):24)/1000*VH*VC.z);
@@ -1845,7 +1909,6 @@ function editTextAt(t){   // 現在の画面位置にエディタを重ねて再
   }
   openTextEditor(sx/DPR,sy/DPR,t,fs/DPR);
 }
-$('#b-text').addEventListener('click',armText);
 
 function startPreview(){if(!PROJECT.take.kf.length){toast('KFがまだありません — TAKEモードで C=CAPTURE');return;}PV.on=true;PV.p=0;}
 function stopPreview(){PV.on=false;}
@@ -1867,16 +1930,17 @@ addEventListener('keydown',e=>{
   else if(e.key==='['&&mode==='place'&&sel&&!isText(sel))reorder(sel,-1);   // V2-A: 背面へ（テキストは常に最前）
   else if(e.key===']'&&mode==='place'&&sel&&!isText(sel))reorder(sel,+1);   // V2-A: 前面へ
   else if((e.key==='m'||e.key==='M')&&mode==='place')toggleMask();   // V2-B
-  else if(e.key==='t'||e.key==='T')armText();                        // V2-D: 縦書きテキスト
   else if(e.key==='f'||e.key==='F')toggleFxModal();                  // V2-C
   else if(e.key==='g'||e.key==='G')toggleGuides();
+  else if(e.key==='h'||e.key==='H')toggleCleanView();               // クリーン表示（ガイド類を全部隠す・OBS等キャプチャ用）
   else if((e.key==='Delete'||e.key==='Backspace')&&mode==='place'&&sel)deleteSel();
   else if(e.key==='Escape'){   // カスケード テキスト待機→APモーダル→コンバータ→FXモーダル→マスク→フレーム内→選択解除→プレビュー
     if(textEd)closeTextEditor(false);   // V2-D（入力フォーカス中はエディタ自身のEscが先に効く）
-    else if(textArm){textArm=false;document.body.classList.remove('textarm');}
+    else if(cleanView)toggleCleanView();   // クリーン表示中はEscでも戻せる
     else if(document.body.classList.contains('apopen'))toggleApModal(false);
     else if(document.body.classList.contains('cvtopen'))toggleCvtModal();
     else if(document.body.classList.contains('fxopen'))toggleFxModal();
+    else if(document.body.classList.contains('setopen'))toggleSetModal(false);
     else if(maskEdit.on)toggleMask();
     else if(ctxFrame)exitFrame();
     else if(sel){sel=null;renderChip();}
@@ -2002,6 +2066,8 @@ makePanelDraggable($('#cards'),$('#cards-head'));
 makePanelResizable($('#cards-resize'),$('#cards-body'));
 makePanelDraggable($('#fx-modal'),$('#fx-head'));
 makePanelResizable($('#fx-resize'),$('#fx-body'));
+makePanelDraggable($('#set-modal'),$('#set-head'));
+makePanelResizable($('#set-resize'),$('#set-body'));
 
 /* ============================================================
    SPEC_06 P3: COPY FOR COMPOSER — TAKE→composer CAMERAトラックJSON
@@ -2099,6 +2165,34 @@ $('#oban-json-input').addEventListener('change',async e=>{
 });
 $('#b-home').addEventListener('click',()=>{ location.href='index.html'; });
 $('#b-guide').addEventListener('click',toggleGuides);
+
+/* ---------- 設定・ショートカット一覧モーダル ---------- */
+function toggleSetModal(force){
+  const open=(typeof force==='boolean')?force:!document.body.classList.contains('setopen');
+  document.body.classList.toggle('setopen',open);
+}
+$('#b-set').addEventListener('click',()=>toggleSetModal());
+$('#set-close').addEventListener('click',()=>toggleSetModal(false));
+
+/* ---------- 全画面表示（PCのF11相当。iPad Safariは webkit プレフィクスAPI） ---------- */
+(function(){
+  const btn=$('#b-fullscreen'), root=document.documentElement;
+  const canFS=!!(root.requestFullscreen||root.webkitRequestFullscreen||document.body.webkitRequestFullscreen);
+  if(!canFS){ btn.style.display='none'; return; }
+  const isFS=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+  function sync(){
+    btn.classList.toggle('mode',isFS());
+    btn.title=isFS()?'全画面を解除（Escでも解除）':'全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）';
+  }
+  btn.addEventListener('click',async()=>{
+    try{
+      if(isFS()){ (document.exitFullscreen||document.webkitExitFullscreen).call(document); }
+      else{ (root.requestFullscreen||root.webkitRequestFullscreen||document.body.webkitRequestFullscreen).call(root); }
+    }catch(e){}
+  });
+  document.addEventListener('fullscreenchange',sync);
+  document.addEventListener('webkitfullscreenchange',sync);
+})();
 $('#b-clear').addEventListener('click',()=>{
   if(!confirm('プロジェクトを空にします。よろしいですか？'))return;
   PROJECT=migrate({version:2,name:'oban',panels:[],frames:[],take:{version:1,name:'take-A',kf:[]}});
@@ -2158,8 +2252,6 @@ body{background:#0c061d;overflow-x:hidden}
 #stage{position:fixed;inset:0;overflow:hidden}
 canvas{position:absolute;inset:0;width:100%;height:100%}
 #bar{position:fixed;top:0;left:0;height:2px;width:0%;background:#5AE9FF;z-index:9}
-#sub-btn{position:fixed;right:10px;bottom:10px;z-index:9;display:none;font-family:monospace;font-size:9px;letter-spacing:.2em;color:#f2eefc;background:rgba(16,7,34,.7);border:1px solid rgba(242,238,252,.35);padding:4px 9px;cursor:pointer}
-body.nohud #sub-btn{display:none!important}
 #gate{position:fixed;inset:0;background:#0c061d;color:#f2eefc;display:flex;justify-content:center;align-items:center;font-family:monospace;font-size:11px;letter-spacing:.3em;z-index:99;transition:opacity .5s}
 #gate.done{opacity:0;pointer-events:none}
 body.nohud #bar{display:none}
@@ -2168,7 +2260,6 @@ body.nohud #bar{display:none}
 <div id="sp"></div>
 <div id="stage"><canvas id="cv"></canvas></div>
 <div id="bar"></div>
-<button id="sub-btn">SUB ON</button>
 <script>
 ${CORE}
 ${S}
@@ -2292,13 +2383,13 @@ function kfWinAlpha(ki,P){
   return ain*(1-map(P,seg.p1-w*0.2,seg.p1));
 }
 function vAlpha(t,P){return(t.kf==null||P==null)?1:kfWinAlpha(t.kf,P);}
-/* V2-D: EN字幕（?sub=0で非表示・右下ボタンで切替） */
+/* V2-D: EN字幕（?sub=0で初期非表示・キーボード S で切替） */
 let subOn=Q.get('sub')!=='0';
-const subBtn=document.getElementById('sub-btn');
-if((PROJ.texts||[]).some(function(t){return t.type==='sub';})){
-  subBtn.style.display='block';subBtn.textContent=subOn?'SUB ON':'SUB OFF';
-  subBtn.addEventListener('click',function(){subOn=!subOn;subBtn.textContent=subOn?'SUB ON':'SUB OFF';});
-}
+const hasSub=(PROJ.texts||[]).some(function(t){return t.type==='sub';});
+addEventListener('keydown',function(e){
+  if(!hasSub)return;
+  if(e.key==='s'||e.key==='S'){subOn=!subOn;}
+});
 function drawSubs(P,W,H){
   for(const t of (PROJ.texts||[])){
     if(t.type!=='sub'||t.kf==null||!t.str)continue;
@@ -2314,7 +2405,6 @@ const CLICKFX=PROJ.clickFx||'invert';
 let clickT=0;
 addEventListener('pointerdown',function(e){
   if(CLICKFX==='none')return;
-  if(e.target&&e.target.id==='sub-btn')return;
   const n=performance.now();
   if(clickT&&n-clickT<180)return;
   clickT=n;
@@ -2324,6 +2414,20 @@ const FXP=(Q.get('fx')==='0')?null:((PROJ.take&&PROJ.take.fx)||null);   // ?fx=0
 const gfx=(typeof window!=='undefined'&&window.SatsueiFX)
   ? window.SatsueiFX.createSatsueiFX()
   : {available:false,apply:function(s){return s;}};                     // WebGL不可→素通し
+/* file:// 直開き対策: Chromeは file: を1ファイル=1オリジン扱いにするため、同フォルダの
+   画像を描いたcanvasでも「汚染(tainted)」となり texImage2D が SecurityError を投げる。
+   捕まえずに落ちると rAF ループごと止まり画面が固まるので、失敗したらFXを諦めて
+   素の絵を出し続ける（絵が出ないより見えるほうを優先）。ローカルサーバ経由なら通常どおりFXが効く。 */
+let fxFailed=false;
+function applyFxSafe(src,params,info){
+  if(fxFailed)return src;
+  try{ return gfx.apply(src,params,info); }
+  catch(e){
+    fxFailed=true;
+    console.warn('[OBAN] 撮影FXを無効化しました（file://直開きではブラウザのセキュリティ制限でFXを適用できません。ローカルサーバ経由で開くとFXも有効になります）:',e.message);
+    return src;
+  }
+}
 function frameKfIdx(f){
   if(f.fx&&f.fx.kf!=null&&PROJ.take.kf[f.fx.kf])return f.fx.kf;
   let bi=null,bd=1e9;
@@ -2418,7 +2522,7 @@ function frame(nowMs){
     const cam={x:camAt(Pd).x+mx*0.01,y:camAt(Pd).y+my*0.008,z:camAt(Pd).z};
     const W=cv.width,H=cv.height;
     cx.clearRect(0,0,W,H);
-    if(FXP&&FXP.enabled&&gfx.available){cx.fillStyle='#0c061d';cx.fillRect(0,0,W,H);}   // FX時は不透明化（αキワ荒れ対策）
+    if(FXP&&FXP.enabled&&gfx.available&&!fxFailed){cx.fillStyle='#0c061d';cx.fillRect(0,0,W,H);}   // FX時は不透明化（αキワ荒れ対策）
     const items=[].concat(PROJ.panels.filter(p=>!p.parent),PROJ.frames||[]).sort(bySort);
     for(const o of items){
       let R=rect(o,cam,W,H);
@@ -2449,8 +2553,8 @@ function frame(nowMs){
       drawVText(t3,W/2+(t3.x-cam.x)*W*cam.z,H/2+(t3.y-cam.y)*H*cam.z,(t3.size||24)/1000*H*cam.z,vAlpha(t3,Pd));
     }
     /* V2-C: SATSUEI FX (rt) — enabled:false は apply を呼ばない（後方互換の要） */
-    const out=(FXP&&FXP.enabled&&gfx.available)
-      ? gfx.apply(sc,FXP,{t:tS,velX:clamp(cam.x-pcx,-0.05,0.05),velY:clamp(cam.y-pcy,-0.05,0.05)})
+    const out=(FXP&&FXP.enabled&&gfx.available&&!fxFailed)
+      ? applyFxSafe(sc,FXP,{t:tS,velX:clamp(cam.x-pcx,-0.05,0.05),velY:clamp(cam.y-pcy,-0.05,0.05)})
       : sc;
     vx.clearRect(0,0,W,H);vx.drawImage(out,0,0,W,H);
     pcx=cam.x;pcy=cam.y;
@@ -2499,19 +2603,21 @@ function frame(nowMs){
   if(useFx){ensureSc(W,H);cx=gScx;}else cx=cx0;
   cx.clearRect(0,0,W,H);
   if(useFx){cx.fillStyle='#0c061d';cx.fillRect(0,0,W,H);}   // FX時は不透明化（αキワ荒れ対策）
-  grid(cam);
+  if(!cleanView)grid(cam);
   renderWorld(cam,tS,P);
   if(useFx){
-    const out=gFx.apply(gSc,fxp,{t:tS});   // draft: velなし=mbは素通し（実装済み挙動）
+    const out=gFxApplySafe(gSc,fxp,{t:tS});   // draft: velなし=mbは素通し（実装済み挙動）
     cx=cx0;cx.clearRect(0,0,W,H);cx.drawImage(out,0,0,W,H);
   }
   if(PV.on)drawSubs(cx0,P,W,H);             // V2-D: EN字幕（ビューアと同表示・ワイプ白の下）
   applyWipeVisual(P);                       // V2-C: invert/whiteout（PREVIEW時のみ発火）
-  drawTakePath(cam);
-  drawGuides();
-  if(PV.on){
-    cx.save();cx.fillStyle='#5AE9FF';cx.font=`${11*DPR}px monospace`;
-    cx.fillText('PREVIEW '+(PV.p*100).toFixed(0)+'%'+(useFx?' +FX':'')+' — 触ると停止',14*DPR,H-16*DPR);cx.restore();
+  if(!cleanView){                           // クリーン表示中はガイド類（カメラ軌道/セーフフレーム/PREVIEW表記）を全部隠す
+    drawTakePath(cam);
+    drawGuides();
+    if(PV.on){
+      cx.save();cx.fillStyle='#5AE9FF';cx.font=`${11*DPR}px monospace`;
+      cx.fillText('PREVIEW '+(PV.p*100).toFixed(0)+'%'+(useFx?' +FX':'')+' — 触ると停止',14*DPR,H-16*DPR);cx.restore();
+    }
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)$('#toast').style.display='none';}
   requestAnimationFrame(frame);

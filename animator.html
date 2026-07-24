@@ -135,6 +135,12 @@ html,body{
   background:var(--neon);box-shadow:0 0 5px rgba(255,210,122,0.9);
 }
 .tool.fe-on::after{background:#5AE9FF;box-shadow:0 0 5px rgba(90,233,255,0.9);}
+/* 投げ縄塗りバッジ（fe-on の ::after と重ならないよう左上に ::before で表示） */
+.tool.lasso-on::before{
+  content:'';position:absolute;top:4px;left:4px;
+  width:6px;height:6px;border-radius:50%;
+  background:#B98CFF;box-shadow:0 0 5px rgba(185,140,255,0.9);
+}
 .tool-sep{
   width:32px;height:1px;
   background:var(--border);
@@ -1893,6 +1899,9 @@ const state = {
   // ペンボタン Wクリックで筆圧ペン / 塗りつぶしボタン Wクリックで透明消し
   pressurePen: false,
   fillErase: false,
+  // 塗りつぶしの方式: 'flood'=バケツ（クリックで領域） / 'lasso'=投げ縄（囲って一括塗り）
+  // FILLボタン長押しで切替。ドット(トーン)選択中は投げ縄でも網点で塗れる。
+  fillMode: 'flood',
   // 直近にスクラブ/クリックしたティック（SPLITのクリック位置分割に使用）
   scrubTick: -1,
   // ツールバー左右入れ替え
@@ -3275,6 +3284,60 @@ function floodFill(startX, startY, fillHex){
     }
   }
   ctx.putImageData(img, 0, 0);
+}
+
+// ============================================================
+// LASSO FILL（投げ縄塗り）
+// 手描き多角形の内側をスキャンラインで一括塗り。色/トーン/透明消しの規則は
+// FLOOD FILL と同じ（ドット＝トーンインク選択中は網点のドット位置のみ着色）。
+// ブラシで網点を1点ずつ塗るより桁違いに軽い。
+// pts: activeDrawCtx() のピクセル座標系の頂点配列 [{x,y},...]。
+// ============================================================
+function lassoFillPolygon(pts){
+  if(!pts || pts.length < 3) return;
+  const ctx = activeDrawCtx();
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for(const p of pts){
+    if(p.x < minX) minX = p.x; if(p.x > maxX) maxX = p.x;
+    if(p.y < minY) minY = p.y; if(p.y > maxY) maxY = p.y;
+  }
+  minX = Math.max(0, Math.floor(minX)); minY = Math.max(0, Math.floor(minY));
+  maxX = Math.min(W - 1, Math.ceil(maxX)); maxY = Math.min(H - 1, Math.ceil(maxY));
+  if(minX > maxX || minY > maxY) return;
+  const erase = !!state.fillErase;
+  // トーンインク選択中は網点で塗る（ドットの位置だけ着色）
+  const tone = (!erase && isToneInk(state.inkColor)) ? TONE[state.inkColor] : null;
+  const fc = erase ? {r:0,g:0,b:0} : hexToRgb(tone ? tone.color : currentFillHex());
+  const fA = erase ? 0 : 255;
+  const bw = maxX - minX + 1, bh = maxY - minY + 1;
+  const img = ctx.getImageData(minX, minY, bw, bh);
+  const data = img.data;
+  const n = pts.length;
+  const xs = [];
+  for(let y = minY; y <= maxY; y++){
+    const yc = y + 0.5;
+    xs.length = 0;
+    // ピクセル中心 yc を横切る辺との交点X（レイキャスティング＝偶奇規則）
+    for(let i = 0, j = n - 1; i < n; j = i++){
+      const yi = pts[i].y, yj = pts[j].y;
+      if((yi > yc) !== (yj > yc)){
+        xs.push(pts[i].x + (yc - yi) / (yj - yi) * (pts[j].x - pts[i].x));
+      }
+    }
+    if(xs.length < 2) continue;
+    xs.sort((a, b) => a - b);
+    for(let k = 0; k + 1 < xs.length; k += 2){
+      const x0 = Math.max(minX, Math.ceil(xs[k] - 0.5));
+      const x1 = Math.min(maxX, Math.floor(xs[k + 1] - 0.5));
+      for(let x = x0; x <= x1; x++){
+        if(tone && !toneOn(tone, x, y)) continue;
+        const di = ((y - minY) * bw + (x - minX)) * 4;
+        data[di] = fc.r; data[di+1] = fc.g; data[di+2] = fc.b; data[di+3] = fA;
+      }
+    }
+  }
+  ctx.putImageData(img, minX, minY);
 }
 
 function hexToRgb(hex){
@@ -4769,6 +4832,57 @@ function endStroke(){
   }
 }
 
+// ── LASSO FILL（投げ縄塗り）操作 ──
+// FILL ツールが lasso モードのとき、キャンバスを囲うと内側を一括塗り。
+// 実際の塗りは lassoFillPolygon()。ここでは頂点収集と輪郭プレビューだけ担当。
+let lassoing = false;
+let lassoPts = [];   // 作業座標(WORK)の頂点。プレビュー＆塗り用。
+function lassoBegin(clientX, clientY){
+  if(state.frameLayer.editMode) ensureFlBaseline();
+  const {x, y} = toCanvasCoord(clientX, clientY);
+  lassoing = true;
+  lassoPts = [{x, y}];
+  drawLassoPreview();
+}
+function lassoMove(clientX, clientY){
+  if(!lassoing) return;
+  const {x, y} = toCanvasCoord(clientX, clientY);
+  const last = lassoPts[lassoPts.length - 1];
+  if(last && last.x === x && last.y === y) return; // 同一ピクセルは間引く
+  lassoPts.push({x, y});
+  drawLassoPreview();
+}
+function lassoEnd(){
+  if(!lassoing) return;
+  lassoing = false;
+  renderGuides();               // プレビュー消去
+  if(lassoPts.length >= 3){
+    const em = state.frameLayer.editMode;
+    // FRAMEレイヤー編集中（移動/拡縮あり）はフレーム内座標へ写像してから塗る
+    const poly = em ? lassoPts.map(p => toFrameLocal(p.x, p.y)) : lassoPts;
+    lassoFillPolygon(poly);
+    if(em) pushFrameLayerHistory(); else pushHistory();
+  }
+  lassoPts = [];
+}
+// 投げ縄の輪郭プレビュー（ガイドレイヤーに破線。書き出し非対象）
+function drawLassoPreview(){
+  renderGuides();               // 既存ガイドを保ちつつ前フレームのプレビューをクリア
+  if(!guideCtx || lassoPts.length < 1) return;
+  const lw = Math.max(1, 1.5 / Math.max(0.01, state.zoom)); // 画面上ほぼ一定幅
+  guideCtx.save();
+  guideCtx.lineWidth = lw;
+  guideCtx.lineJoin = 'round';
+  guideCtx.strokeStyle = 'rgba(90,233,255,0.95)';
+  guideCtx.setLineDash([Math.max(4, lw * 4), Math.max(3, lw * 3)]);
+  guideCtx.beginPath();
+  guideCtx.moveTo(lassoPts[0].x, lassoPts[0].y);
+  for(let i = 1; i < lassoPts.length; i++) guideCtx.lineTo(lassoPts[i].x, lassoPts[i].y);
+  guideCtx.closePath();         // 始点へ繋いで「囲い」を明示
+  guideCtx.stroke();
+  guideCtx.restore();
+}
+
 // startPinch/endPinch/startPan/endPan は stage-level touch handler に統合済み
 
 // ============================================================
@@ -4787,12 +4901,16 @@ drawCanvas.addEventListener('pointerdown', e => {
     if(inkPickActive()) eyedropInk(e.clientX, e.clientY);
     else eyedropAt(e.clientX, e.clientY);
   } else if(state.tool === 'fill'){
-    if(state.frameLayer.editMode) ensureFlBaseline();
-    let {x, y} = toCanvasCoord(e.clientX, e.clientY);
-    if(state.frameLayer.editMode){ const fc = toFrameLocal(x, y); x = fc.x; y = fc.y; }
-    floodFill(x, y, currentFillHex());
-    if(state.frameLayer.editMode) pushFrameLayerHistory();
-    else pushHistory();
+    if(state.fillMode === 'lasso'){
+      lassoBegin(e.clientX, e.clientY);   // 囲って一括塗り（塗りは lassoEnd で確定）
+    } else {
+      if(state.frameLayer.editMode) ensureFlBaseline();
+      let {x, y} = toCanvasCoord(e.clientX, e.clientY);
+      if(state.frameLayer.editMode){ const fc = toFrameLocal(x, y); x = fc.x; y = fc.y; }
+      floodFill(x, y, currentFillHex());
+      if(state.frameLayer.editMode) pushFrameLayerHistory();
+      else pushHistory();
+    }
   } else {
     startStroke(e.clientX, e.clientY, e.pressure);
   }
@@ -4803,6 +4921,13 @@ drawCanvas.addEventListener('pointermove', e => {
   if(refDragging){ refDragMove(e.clientX, e.clientY); return; }
   const {x, y} = toCanvasCoord(e.clientX, e.clientY);
   document.getElementById('hud-coord').textContent = `${x} · ${y}`;
+  if(lassoing && e.pointerId === drawingPointerId){
+    e.preventDefault();
+    const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+    if(coalesced && coalesced.length){ for(const ce of coalesced) lassoMove(ce.clientX, ce.clientY); }
+    else lassoMove(e.clientX, e.clientY);
+    return;
+  }
   if(drawing && e.pointerId === drawingPointerId){
     e.preventDefault();
     // Apple Pencil等の高レート入力（240Hz）を間引かず全点使う。非対応環境はそのまま1点
@@ -4818,6 +4943,7 @@ drawCanvas.addEventListener('pointermove', e => {
 function onPenEnd(e){
   if(e.pointerType === 'touch') return;
   if(refDragging){ refDragEnd(); return; }
+  if(lassoing && e.pointerId === drawingPointerId){ lassoEnd(); return; }
   if(drawing && e.pointerId === drawingPointerId) endStroke();
 }
 drawCanvas.addEventListener('pointerup', onPenEnd);
@@ -4839,7 +4965,7 @@ document.querySelectorAll('.tool').forEach(btn => {
       if(tb === 'undo' || tb === 'redo') return;
       b.classList.toggle('on', tb === t);
     });
-    drawCanvas.style.cursor = (t === 'fill') ? 'cell' : 'crosshair';
+    drawCanvas.style.cursor = (t === 'fill') ? (state.fillMode === 'lasso' ? 'crosshair' : 'cell') : 'crosshair';
     // ペン↔消しゴムでサイズUIを更新
     refreshPenSizeUI();
     applyInkUIForTool();
@@ -4968,13 +5094,48 @@ onDoubleActivate(penToolBtn, () => {
   penToolBtn.classList.toggle('pp-on', state.pressurePen);
   penToolBtn.title = '筆圧ペン: ' + (state.pressurePen ? 'ON（Wクリックで切替）' : 'OFF（Wクリックで切替）');
 });
+// ロングプレス検出（FILL長押し＝投げ縄塗り切替）。クリック/ダブルタップとは独立。
+function onLongPress(el, handler, ms = 500){
+  if(!el) return;
+  let timer = null, sx = 0, sy = 0;
+  const clear = () => { if(timer){ clearTimeout(timer); timer = null; } };
+  el.addEventListener('pointerdown', e => {
+    if(e.button !== undefined && e.button !== 0) return; // 主ボタン/タッチのみ
+    sx = e.clientX; sy = e.clientY; clear();
+    timer = setTimeout(() => { timer = null; handler(e); }, ms);
+  });
+  el.addEventListener('pointermove', e => {
+    if(timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 12) clear();
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(ev => el.addEventListener(ev, clear));
+}
+
 // FILL ボタン ダブルクリック/ダブルタップ → 透明塗りつぶし消し ON/OFF
 const fillToolBtn = document.querySelector('.tool[data-tool="fill"]');
 onDoubleActivate(fillToolBtn, () => {
   state.fillErase = !state.fillErase;
   fillToolBtn.classList.toggle('fe-on', state.fillErase);
-  fillToolBtn.title = '透明塗りつぶし消し: ' + (state.fillErase ? 'ON（Wクリックで切替）' : 'OFF（Wクリックで切替）');
+  applyFillModeUI();
 });
+// FILL ボタン 長押し → 投げ縄塗り(lasso) ⇔ 通常の塗りつぶし(flood) を切替
+onLongPress(fillToolBtn, () => {
+  state.fillMode = (state.fillMode === 'lasso') ? 'flood' : 'lasso';
+  if(state.tool !== 'fill') fillToolBtn.click(); // 長押しで切替時はFILLを選択状態に
+  applyFillModeUI();
+});
+// FILLボタンのラベル/バッジ/カーソル/タイトルを現在の塗り方式・透明消しに同期
+function applyFillModeUI(){
+  const lasso = state.fillMode === 'lasso';
+  fillToolBtn.classList.toggle('lasso-on', lasso);
+  const lbl = fillToolBtn.querySelector('.lbl');
+  if(lbl) lbl.textContent = lasso ? 'LASSO' : 'FILL';
+  const eraseNote = state.fillErase ? '／透明消しON' : '';
+  fillToolBtn.title = (lasso
+    ? '投げ縄塗り: 囲って一括塗り（長押しで通常塗りに戻す・Wクリックで透明消し）'
+    : '塗りつぶし (G)（長押しで投げ縄塗り・Wクリックで透明消し）') + eraseNote;
+  if(state.tool === 'fill') drawCanvas.style.cursor = lasso ? 'crosshair' : 'cell';
+}
+applyFillModeUI();
 
 document.querySelectorAll('.tb-pen').forEach(btn => {
   btn.addEventListener('click', () => {

@@ -66,8 +66,10 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
 /* INSPECTOR（フローティング：設定UI同様。ドラッグ移動＋内部スクロール＝タイムラインを上げても隠れない）*/
 #inspector{position:fixed;top:40px;right:12px;width:216px;max-height:calc(100dvh - 240px);background:rgba(8,8,8,0.96);border:1px solid var(--border-bright);box-shadow:0 8px 40px rgba(0,0,0,0.7),0 0 0 1px rgba(0,0,0,0.4);z-index:60;font-size:10px;display:flex;flex-direction:column;}
 #inspector-head{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;cursor:move;background:linear-gradient(90deg,rgba(255,79,168,0.10),transparent);border-bottom:1px solid var(--border);font-size:9px;letter-spacing:0.3em;color:var(--acid);user-select:none;flex-shrink:0;}
-#inspector-collapse{cursor:pointer;color:rgba(255,255,255,0.5);font-size:12px;line-height:1;padding:0 4px;}
-#inspector-collapse:hover{color:var(--acid);}
+.insp-head-btns{display:flex;align-items:center;gap:7px;}
+#inspector-collapse,#inspector-dock{cursor:pointer;color:rgba(255,255,255,0.5);font-size:12px;line-height:1;padding:0 2px;}
+#inspector-collapse:hover,#inspector-dock:hover{color:var(--acid);}
+#btn-fullscreen.on{color:var(--acid);border-color:var(--acid);}
 #inspector.collapsed{max-height:none;}
 #inspector.collapsed #inspector-body{display:none;}
 #inspector-body{padding:10px 12px;overflow-y:auto;}
@@ -422,6 +424,7 @@ input[type=number]{-moz-appearance:textfield;}
       <button id="btn-export-jsx" disabled title="カメラKF（親NULL合成込み）をAfter Effects用.jsxとして書き出し。AEでコンポを開いた状態で File > Scripts > Run Script File">AE JSX</button>
       <span style="color:var(--dim)">/</span>
       <button id="btn-live" class="primary" title="ANIMATORの編集をライブ反映中（クリックでOFF）">LIVE ●</button>
+      <button id="btn-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
       <button id="btn-home" title="ランディングページに戻る">HOME</button>
       <input type="file" id="file-input" accept=".json,image/png,image/jpeg,image/webp,audio/*" multiple>
     </div>
@@ -450,7 +453,7 @@ input[type=number]{-moz-appearance:textfield;}
   </div>
 
   <div id="inspector">
-    <div id="inspector-head">INSPECTOR<span id="inspector-collapse" title="折りたたみ／展開">▾</span></div>
+    <div id="inspector-head">INSPECTOR<span class="insp-head-btns"><span id="inspector-dock" title="左右ドックに戻す（Tabで左右入替）">⇄</span><span id="inspector-collapse" title="折りたたみ／展開">▾</span></span></div>
     <div id="inspector-body">
     <div class="insp-section">
       <div class="insp-h">PROJECT</div>
@@ -1870,6 +1873,38 @@ function selectTrack(idx){
   $('#meta-tl').textContent=t?(t.name||'—'):'—';
   updateKfUI(); drawCurrentFrame();
 }
+// 矢印キーでトラック選択送り。UI上=前面=state末尾なので Up=+1(上へ)/Down=-1(下へ)。
+// Shift+Up=最上段(前面), Shift+Down=最下段(BG)
+function selectTrackStep(dir, toEnd){
+  const N=state.tracks.length; if(!N) return;
+  let cur=state.selectedTrack; if(cur<0||cur>=N) cur=N-1;
+  const next = toEnd ? (dir>0?N-1:0) : Math.max(0,Math.min(N-1,cur+dir));
+  selectTrack(next);
+  const el=document.querySelector(`#tl-tracks .tl-track[data-track="${next}"]`);
+  if(el) el.scrollIntoView({block:'nearest'});
+}
+// Ctrl+↑↓ で選択トラックを上下移動（並び替え）。Shiftで一番上/一番下。
+// UI上=前面=state末尾なので dir>0(↑)=末尾方向へ。CAMERAは最上固定なので越えない/自身は不動。
+function moveTrack(dir, toEnd){
+  const N=state.tracks.length; if(!N) return;
+  let cur=state.selectedTrack; if(cur<0||cur>=N) return;
+  const track=state.tracks[cur];
+  if(track.type==='camera'){ flashLive('CAMERAは常に最上段（移動不可）'); return; }
+  const camExists=state.tracks.some(t=>t.type==='camera');
+  const maxIdx=camExists?N-2:N-1; // カメラの1つ下まで
+  let target = toEnd ? (dir>0?maxIdx:0) : cur+dir;
+  target=Math.max(0,Math.min(maxIdx,target));
+  if(target===cur) return;
+  state.tracks.splice(cur,1);
+  state.tracks.splice(target,0,track);
+  pinCameraTop();
+  state.selectedTrack=state.tracks.indexOf(track);
+  rebuildAllTrackUI();
+  const el=document.querySelector(`#tl-tracks .tl-track[data-track="${state.selectedTrack}"]`);
+  if(el) el.scrollIntoView({block:'nearest'});
+  recordHistory();
+  flashLive(dir>0?'TRACK ▲':'TRACK ▼');
+}
 
 function toggleTrackVis(idx){
   const t=state.tracks[idx]; if(!t) return;
@@ -2476,6 +2511,21 @@ function applyView(){
 function resetView(){
   state.view.zoom=1; state.view.panX=0; state.view.panY=0;
   applyView();
+}
+// 100%（実ピクセル1:1）表示。zoom=1 はビューにフィット（baseW）なので、実寸は width/baseW 倍
+function zoomActual100(){
+  const v=state.view;
+  if(!v.baseW){ resetView(); return; }
+  v.zoom=state.width/v.baseW; v.panX=0; v.panY=0;
+  applyView();
+}
+// F 1回=FIT（リセット）、500ms以内にもう1回（FF）=100%表示。ANIMATOR の fitAction 準拠
+let _lastFitAt=-1e9;
+function fitAction(){
+  if(!state.width) return;
+  const now=performance.now();
+  if(now-_lastFitAt<500){ _lastFitAt=-1e9; zoomActual100(); flashLive('VIEW 100%'); return; }
+  _lastFitAt=now; resetView(); flashLive('VIEW FIT');
 }
 // 画面座標→キャンバス内px の換算係数（pan/zoom込み）。ドラッグ移動量の補正に使用
 function screenToCanvasScale(){
@@ -4187,7 +4237,10 @@ const SHORTCUT_ACTIONS=[
   {id:'prevKey',  label:'前のキーへ (J)',       def:'J',         run:()=>seekPrevKey()},
   {id:'nextKey',  label:'次のキーへ (K)',       def:'K',         run:()=>seekNextKey()},
   {id:'delKey',   label:'キー削除 (Del)',       def:'Delete',    prevent:true, run:()=>deleteSelectedOrCurrentKf()},
-  {id:'fit',      label:'表示リセット (FIT)',   def:'F',         run:()=>{ if(state.width) resetView(); }},
+  {id:'fit',      label:'表示 FIT / 2回で100% (F)', def:'F',      run:()=>fitAction()},
+  {id:'trackUp',  label:'トラック選択↑ (Shift=最上)', def:'ArrowUp',  prevent:true, run:e=>selectTrackStep(+1, e&&e.shiftKey)},
+  {id:'trackDn',  label:'トラック選択↓ (Shift=最下)', def:'ArrowDown',prevent:true, run:e=>selectTrackStep(-1, e&&e.shiftKey)},
+  {id:'inspSwap', label:'INSPECTOR 左右入替 (Tab)', def:'Tab',     prevent:true, run:()=>toggleInspectorSide()},
   {id:'propP',    label:'HUD 位置 (P)',         def:'P',         run:()=>{togglePropGroup(['x','y','z']);showFxHud();}},
   {id:'propS',    label:'HUD スケール (S)',     def:'S',         run:()=>{togglePropGroup(['s']);showFxHud();}},
   {id:'propA',    label:'HUD アンカー (A)',     def:'A',         run:()=>{togglePropGroup(['ax','ay']);showFxHud();}},
@@ -4231,6 +4284,10 @@ window.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'&&e.target.tagName!=='INPUT'){ e.preventDefault(); pasteKeyframes(); return; }
   if(e.target.tagName==='INPUT') return;
   if(e.code==='Backspace'){ e.preventDefault(); deleteSelectedOrCurrentKf(); return; }
+  // Ctrl(⌘)+↑↓ = 選択トラックの上下移動。Shift併用で一番上/一番下
+  if((e.ctrlKey||e.metaKey)&&(e.code==='ArrowUp'||e.code==='ArrowDown')){
+    e.preventDefault(); moveTrack(e.code==='ArrowUp'?+1:-1, e.shiftKey); return;
+  }
   if(e.ctrlKey||e.metaKey||e.altKey) return;
   const k=normKey(e);
   for(const a of SHORTCUT_ACTIONS){
@@ -4534,7 +4591,8 @@ document.querySelectorAll('#settings-panel .sg-preset[data-gw]').forEach(b=>{
 (function(){
   const panel=$('#inspector'), collapse=$('#inspector-collapse');
   if(!panel) return;
-  makeFloatDrag(panel, $('#inspector-head'), t=>t===collapse);
+  // ヘッダ右のボタン群（⇄ドック / ▾折りたたみ）からはドラッグを始めない＝クリックを潰さない
+  makeFloatDrag(panel, $('#inspector-head'), t=>!!(t&&t.closest&&t.closest('.insp-head-btns')));
   collapse.addEventListener('click',e=>{ e.stopPropagation(); panel.classList.toggle('collapsed'); });
   // 下端リサイズ（設定パネルと同方式・セクション境目でスナップ）
   const handle=$('#inspector-resize'), body=$('#inspector-body');
@@ -4564,6 +4622,58 @@ document.querySelectorAll('#settings-panel .sg-preset[data-gw]').forEach(b=>{
   });
   handle.addEventListener('pointerup',endResize);
   handle.addEventListener('pointercancel',endResize);
+})();
+
+// ===== INSPECTOR ドッキング（左右） / Tabで左右入替（ANIMATORのパレット準拠）=====
+let gInspSide='right';
+try{ const s=localStorage.getItem('composer_insp_side'); if(s==='left'||s==='right') gInspSide=s; }catch(e){}
+function dockInspector(side){
+  const panel=$('#inspector'); if(!panel) return;
+  if(side==='left'||side==='right') gInspSide=side;
+  panel.style.transform='none'; panel.style.top='40px';
+  if(gInspSide==='left'){ panel.style.right='auto'; panel.style.left='12px'; }
+  else { panel.style.left='auto'; panel.style.right='12px'; }
+  try{ localStorage.setItem('composer_insp_side',gInspSide); }catch(e){}
+}
+function toggleInspectorSide(){
+  dockInspector(gInspSide==='right'?'left':'right');
+  flashLive(gInspSide==='left'?'◀ INSPECTOR LEFT':'INSPECTOR RIGHT ▶');
+}
+(function(){
+  const dock=$('#inspector-dock');
+  if(dock) dock.addEventListener('click',e=>{ e.stopPropagation(); dockInspector(); }); // 現在の側へ再ドック（フリードラッグを戻す）
+  dockInspector(); // 起動時に保存済みの側を適用
+})();
+
+// ===== 全画面表示（PCのF11相当。iPad Safariは webkit プレフィクスAPI。iPhone非対応時はボタンを隠す）=====
+(function(){
+  const btn=document.getElementById('btn-fullscreen');
+  const root=document.documentElement;
+  if(!btn) return;
+  const canFS=!!(root.requestFullscreen||root.webkitRequestFullscreen||document.body.webkitRequestFullscreen);
+  if(!canFS){ btn.style.display='none'; return; }
+  function isFS(){ return !!(document.fullscreenElement||document.webkitFullscreenElement); }
+  function syncFS(){
+    const on=isFS();
+    btn.classList.toggle('on',on);
+    btn.title=on?'全画面を解除（Escでも解除）':'全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）';
+    // 全画面切替でビューポートサイズが変わるのでフィット基準を取り直す
+    setTimeout(()=>{ if(state.width) setupViewport(); },120);
+  }
+  btn.addEventListener('click',async()=>{
+    try{
+      if(isFS()){
+        if(document.exitFullscreen) await document.exitFullscreen();
+        else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else {
+        if(root.requestFullscreen) await root.requestFullscreen({navigationUI:'hide'});
+        else if(root.webkitRequestFullscreen) root.webkitRequestFullscreen();
+        else if(document.body.webkitRequestFullscreen) document.body.webkitRequestFullscreen();
+      }
+    }catch(e){ /* ユーザー操作外/非対応時は無視 */ }
+  });
+  document.addEventListener('fullscreenchange',syncFS);
+  document.addEventListener('webkitfullscreenchange',syncFS);
 })();
 </script>
 </body>

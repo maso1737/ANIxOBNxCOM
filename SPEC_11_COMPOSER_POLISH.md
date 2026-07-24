@@ -213,6 +213,18 @@ function cloneEditState(){
 
 ---
 
+## P6: ビュー/UIの操作性（ANIMATOR挙動に合わせる・2026-07-23）【実装済】
+
+ANIMATOR と同じ操作感を composer に移植。すべて実装・実機検証済み。
+
+1. **100%表示（FF）**: `F` 1回=FIT（`resetView`）、500ms以内にもう1回=100%（`zoomActual100`＝`state.width/state.view.baseW` 倍）。`fitAction()` に集約し `SHORTCUT_ACTIONS.fit` から呼ぶ。ANIMATOR `fitAction` 準拠。
+2. **全画面ボタン**: HOME の右に `#btn-fullscreen`（⛶）。Fullscreen API（webkitフォールバック・iPhone非対応時は自動非表示）。`fullscreenchange` で `setupViewport()` 再フィット。
+3. **INSPECTOR ドッキング＋Tab左右入替**: `#inspector` を左右どちらかにドック（`dockInspector('left'|'right')`、`localStorage 'composer_insp_side'` 永続）。`Tab`=`toggleInspectorSide()` で左右入替。ヘッダの `#inspector-dock`（⇄）で現在の側へ再ドック（フリードラッグ解除）。
+4. **トラック選択の矢印送り**: `↑`=前面へ／`↓`=背面へ（`selectTrackStep`。UI上=前面=state末尾なので Up=+1）。`Shift+↑`=最上段、`Shift+↓`=最下段。`prevent:true` でページスクロール抑止。
+5. **トラックの上下移動（並び替え）**: `Ctrl(⌘)+↑↓`＝選択トラックを1つ上/下へ移動（`moveTrack`）、`Ctrl+Shift+↑↓`＝一番上/下へ。keydown で `ctrl||meta||alt` 早期returnの前に割り込ませて処理。CAMERAは移動不可・`pinCameraTop`維持・`recordHistory`でundo可。
+
+---
+
 ## P5: CAMERA & トラック行の操作性修正【割り込み最優先・2026-07-23】
 
 発注者報告の5件。CAMERA トラックまわりの選択・親子・並び替え・改名の使い勝手/退行バグ。
