@@ -316,10 +316,26 @@ ANIMATOR と同じ操作感を composer に移植。すべて実装・実機検�
 - [x] P0 座標ずれ修正（2026-07-19。frameFrac統一・グラフのtotal-1バグ修正・scrollbar非表示CSS）
 - [x] P1 自動保存（2026-07-19。cells/meta分離・復元バーはLIVE先行ロードより優先＝置き換えセマンティクス・✕=温存で閉じる・⚙にCLEAR）
 - [x] P1b トラックundo（2026-07-19。trackRefs+perTrack(tid引き当て)方式。削除/並び替え/◉/SOLO/WAがundo対象に。applyHistoryはrebuildAllTrackUI）
-- [ ] P2 ホールド補間
-- [ ] P2b ペアレント補正
-- [ ] P2c グラフ編集
-- [ ] P3 PNG WA準拠
-- [ ] P3b-1 IN/OUTトリム
-- [ ] P3b-2 時間オフセット
-- [ ] P4 小物
+- [x] **P2 ホールド補間**（2026-07-25。KFの任意 `hold:true`＝区間の左キーに付与。`getKfValue` はinfluence判定より前に `if(arr[i].hold) return arr[i].v;`（本体・ビューアの2箇所）。インスペクタ `◻ HOLD (選択KFトグル)`＝`applyHold()`（1つでもOFFがあれば全ON）。ダイヤは `.ez-hold`＝回転なしグレー正方形でイーズ形状より優先。§0-2の全経路（putKeys/groupSnap/copy/paste/直列化4箇所/parse/viewer）に持ち回り済み）
+- [x] **P2b ペアレント補正**（2026-07-25。`localXformAt`/`xformMul`/`xformInv`/`chainXformAt` で2D相似変換を数値再現（camは含めない）→ `setTrackParent(track,newTid,compensate)` が `L=P⁻¹·W` を分解して x/y/rot に差分加算・s に乗算（KFが無いプロパティは現フレームに1キー作成、ax/ayは不変）。`#kf-parent` の pointerdown/keydown で altKey を記録＝**Alt併用で補正なし**。カメラの親付けは加算合成なので対象外。実機で描画ピクセルが完全一致することを確認）
+- [x] **P2c グラフ編集**（2026-07-25。凡例クリック=`gGraphSolo` 単独表示トグル（矩形を `gGraphLegendHits` に記録して判定・非選択は α0.28）。キー点ドラッグ=VALモードのみ、半径7px、横は相対フレーム移動で既存キーと衝突したら不動、縦は `GRAPH_NORM` の逆写像（**ドラッグ中は正規化を凍結**）・Shiftで×0.1精密。up で recordHistory＋ダイヤ再描画。SPDモードはヒット0＝表示専用）
+- [x] **P3 PNG WA準拠**（2026-07-25。`exportPNG`/`exportTrackPNG` とも `webRange()` の `{start,len}` を使用。`exportZipPNG` に第4引数 `numStart` を追加し**ファイル名＝絶対フレーム番号**（WA=10..20 → 10枚 `frame_00011`〜`frame_00020`）。WA全範囲なら従来と同一出力）
+- [x] **P3b-1 IN/OUTトリム**（2026-07-25。`track.tIn`(既定0)/`tOut`(既定null=末尾まで)＝**コンポ時間基準**。`drawOneTrack` 冒頭ガード（本体・ビューア）＋`webCollectTracks` の frameMap を範囲外 −1 で二重に安全。ストリップ両端に `.tl-trim-handle`（7px・z5・ドラッグでスナップ＆クランプ、右端まで引くと `null`＝末尾まで）、範囲外コマは `.tl-frame-block.trimmed` でグレーアウト。`Alt+[`/`Alt+]`＝`setTrackTrim`。直列化/undo/AE JSXのIN/OUT点に反映）
+- [x] **P3b-2 時間オフセット**（2026-07-25。`track.tOffset`（既定0・負可）。規約=**トラック内時間 = コンポ時間 − tOffset**。`applyTrackChain`/`getCamAt` は各トラックが自分の tOffset を引いて評価、`drawOneTrack` のセル参照も同様（範囲外は従来どおり端のコマを保持＝消したいときはトリム）。KF編集の入口は全部 `curLocalFrame()` に統一（commitProp/addKf/paste/delete/influence/hold/ダイヤ/ハンドルドラッグ/ステッパ/インスペクタ表示）。タイムラインはコマブロック・ダイヤ・マーカー・ミニグラフを `+tOffset` した位置に描画。**Alt+ドラッグ**でストリップを掴んでずらし（マーキー選択は altKey で早期return）。ビューアは frameMap にセルを焼き込み＋`tOffset` でKF評価）
+- [x] **P4 小物**（2026-07-25。**1 OPパンチ**=`O`（op 1→0）/`Shift+O`（0→1）。**2 トラックロック**=`track.locked`＋`lockedGuard()` を編集系10箇所に。🔒ボタン追加で7個になりラベル128pxを超えたため `.tl-tbtn` padding `2px 3px→2px 2px`・`.tl-track-btns` gap `2px→1px` に再調整（実測134→122px）。**3 1/2解像度ドラフト再生**=`gDraftPlay`（設定パネル＋localStorage。再生中のみ半解像度オフスクリーン→拡大、pauseでフル解像度に復帰）。**4 AE JSX にトラックも**=各トラックを平面（NULLはヌル）3Dレイヤーとして Anchor/Position/Scale/Rotation/Opacity のKF付きで生成、親子・トリム(IN/OUT点)・HOLD(`KeyframeInterpolationType.HOLD`)も反映。カメラ無しでも書き出し可に。**5 タイムリマップは本SPEC対象外**（別SPEC））
+
+### 発注者フィードバック対応（2026-07-25・実装直後）
+
+1. **トリムの視認性**: 範囲外のグレーアウトをコマブロック単位 → **IN/OUT のフレーム位置ちょうどで切るオーバーレイ**（`.tl-trim-veil.left/.right`）に変更。コマ境界に吸着しなくなり、`Alt+[`/`Alt+]` した位置がそのまま見える。旧 `.tl-frame-block.trimmed` は廃止
+2. **`[` / `]` = レイヤーをインジケータ位置へ移動**（AE準拠）を追加。`[`＝レイヤーの頭を現コマへ／`]`＝尻を現コマ+1へ。**tOffset だけでなく tIn/tOut も一緒に平行移動**＝レイヤーバーごと掴んで動かす挙動。Alt+[ / Alt+] は従来どおりトリム（同一キーにAlt有無で2アクション＝再割当の重複解除は同じalt枠内だけに限定）
+   - **追加指摘対応**: ストリップの **Alt+ドラッグ**でもトリムが置き去りになっていたので、`[`/`]` と同じく tIn/tOut を連れて動かすよう統一。判定は `(tIn||0)!==0 || tOut!=null` で**両方**を同じ delta で移動（`if(t.tIn)` だけだと tIn が0を通過した時点で置き去りになる）。
+     ずらし中は **tIn/tOut をクランプしない**（0で潰すとトリム長が壊れて戻せない）。コンポ外の値はそのまま保持し、丸めるのは `refreshTrimUI` の表示だけ。`parseTrackFromJSON` の tIn も `Math.max(0,…)` を撤去して負値を往復できるようにした。
+     トリムハンドル自身のドラッグと `Alt+[`/`Alt+]` は従来どおり境界だけを動かす（クランプあり・レイヤーは不動）
+3. **FXボタンをトグル化**: `#btn-fx` で開閉。開いている間はボタンが `.primary` で点灯（✕/Escでも消灯）
+4. **トラック並び替えの反応**: pointer capture をやめて **window で pointermove/pointerup を追う**方式に変更。captureが外れて pointerup を取り逃す→ゴーストがカーソルに張り付く、が根治。ラベルの dblclick 改名との両立も維持（4px閾値はそのまま）
+5. **INSPECTORのドック**: 位置決めを inline style → **クラス（`dock-left`/`dock-right`）**に変更し、`dockInspector()` でフリードラッグの inline とリサイズが付けた `maxHeight`/`body.height` を**全消し**するようにした。ANIMATOR のパレットと同じく「押したら定位置にきちんと収まる」挙動に
+
+### 実装後メモ（2026-07-25）
+- P3b-2 の副産物として、**ミニグラフの横軸もコンポ時間に統一**（`getKfValue(f-off)` で評価し、キー点は `frameFrac(k.f+off)`）。実装直後は tOffset 分だけダイヤとズレていたのを実機で発見・修正済み。P0の座標規約はこれで tOffset 込みで守られている。
+- `locked` は undo（perTrack）に加えて **PROJECT_v2 にも直列化**した（保存/復元でロックが保たれる）。
+- 受け入れ確認は実機（file://）で実施。`buildProjectPayload()` の save→load→save が hold/tIn/tOut/tOffset/locked/parent/ei/eo/WA 込みで**バイト一致**することを確認済み。

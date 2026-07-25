@@ -70,6 +70,10 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
 #inspector-collapse,#inspector-dock{cursor:pointer;color:rgba(255,255,255,0.5);font-size:12px;line-height:1;padding:0 2px;}
 #inspector-collapse:hover,#inspector-dock:hover{color:var(--acid);}
 #btn-fullscreen.on{color:var(--acid);border-color:var(--acid);}
+/* ドック位置はクラスで決める（フリードラッグの inline left/top は dockInspector で全消しする＝ANIMATORのパレット準拠） */
+#inspector.dock-left{left:12px;right:auto;}
+#inspector.dock-right{left:auto;right:12px;}
+#inspector.floating{box-shadow:0 10px 48px rgba(0,0,0,0.8),0 0 0 1px var(--acid);}
 #inspector.collapsed{max-height:none;}
 #inspector.collapsed #inspector-body{display:none;}
 #inspector-body{padding:10px 12px;overflow-y:auto;}
@@ -80,7 +84,7 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
 #inspector-resize:hover::after,#inspector-resize.active::after{background:var(--acid);box-shadow:0 0 6px rgba(255,79,168,0.5);}
 #inspector.collapsed #inspector-resize{display:none;}
 /* ペン/タッチでドラッグ中にブラウザのパンに奪われてpointercancelになる（バーが張り付く）のを防止 */
-#tl-resize,#settings-resize,#inspector-resize,#tl-ruler,.tl-kf-d,.tl-marker,.tl-gmarker,.tl-wa-handle,#inspector-head,#settings-panel-head,#fx-hud-head,#sfx-head{touch-action:none;}
+#tl-resize,#settings-resize,#inspector-resize,#tl-ruler,.tl-kf-d,.tl-marker,.tl-gmarker,.tl-wa-handle,#inspector-head,#settings-panel-head,#fx-hud-head,#sfx-head,#tl-graph-canvas,.tl-trim-handle{touch-action:none;}
 .insp-section{margin-bottom:14px;}
 .insp-h{font-size:8px;letter-spacing:0.3em;color:rgba(255,79,168,0.6);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
 .insp-row{display:flex;justify-content:space-between;padding:2px 0;}
@@ -123,13 +127,19 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-track-name{font-size:12px;letter-spacing:0.08em;color:rgba(255,255,255,0.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tl-track-name .num{color:var(--acid);margin-right:4px;}
 /* SPEC_07: ANI/Re追加で最大6個並ぶため、ラベル幅128pxに収まるよう詰める（✕の見切れ防止） */
-.tl-track-btns{display:flex;gap:2px;}
-.tl-tbtn{background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.4);font-family:var(--mono);font-size:9.5px;letter-spacing:0.04em;padding:2px 3px;cursor:pointer;line-height:1.4;}
+.tl-track-btns{display:flex;gap:1px;}
+/* SPEC_11 P4-2: 🔒を足して7個になったため padding/gap を詰めて 128px 制限に収めた（実測 134→118px） */
+.tl-tbtn{background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.4);font-family:var(--mono);font-size:9.5px;letter-spacing:0.04em;padding:2px 2px;cursor:pointer;line-height:1.4;}
 .tl-tbtn:hover{border-color:var(--border-bright);color:var(--acid);}
 .tl-tbtn.vis-off{color:rgba(255,255,255,0.18);border-style:dashed;}
 .tl-tbtn.anm{color:rgba(255,79,168,0.5);font-size:9px;letter-spacing:0;}
 .tl-tbtn.anm:hover{color:var(--acid);border-color:var(--acid);}
 .tl-tbtn.del:hover{color:#ff4444;border-color:rgba(255,68,68,0.4);}
+/* SPEC_11 P4-2: ロック。128px制限があるのでグリフ1文字＋最小パディング */
+.tl-tbtn.lock{padding:2px 1px;font-size:8.5px;filter:grayscale(1) opacity(.55);}
+.tl-tbtn.lock.on{filter:none;border-color:rgba(255,210,122,0.6);background:rgba(255,210,122,0.10);}
+.tl-track.locked .tl-track-strip{background:repeating-linear-gradient(45deg,rgba(255,255,255,0.02) 0 6px,rgba(255,210,122,0.05) 6px 12px);}
+.tl-track.locked .tl-track-name{opacity:.6;}
 /* 枠線はoutline（レイアウト外）で描く：borderだと内側の座標系が2px縮んでルーラーとずれる */
 .tl-track-strip{position:relative;flex:1;height:calc(var(--track-h,54px) - 10px);background:rgba(255,255,255,0.02);outline:1px solid var(--border);outline-offset:-1px;overflow:hidden;}
 .tl-frame-block{position:absolute;top:0;height:100%;border-right:1px solid rgba(0,0,0,0.5);overflow:hidden;}
@@ -141,6 +151,15 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-frame-block.draw .tl-label{color:rgba(0,0,0,0.8);}
 .tl-frame-block.empty{background:rgba(255,255,255,0.04);background-image:repeating-linear-gradient(45deg,transparent 0,transparent 4px,rgba(255,255,255,0.04) 4px,rgba(255,255,255,0.04) 5px);}
 .tl-frame-block.empty .tl-label{color:rgba(255,255,255,0.4);}
+/* SPEC_11 P3b-1: IN/OUTトリム — 範囲外は「IN/OUT位置ぴったり」でベールを掛ける（コマ単位だと境目がズレて分かりにくいため）*/
+.tl-trim-veil{position:absolute;top:0;bottom:0;z-index:2;pointer-events:none;background:rgba(6,6,10,0.72);
+  background-image:repeating-linear-gradient(45deg,transparent 0 5px,rgba(255,255,255,0.05) 5px 6px);
+  backdrop-filter:grayscale(1) brightness(.5);-webkit-backdrop-filter:grayscale(1) brightness(.5);}
+.tl-trim-veil.left{border-right:1px solid rgba(255,210,122,0.55);}
+.tl-trim-veil.right{border-left:1px solid rgba(255,210,122,0.55);}
+.tl-trim-handle{position:absolute;top:0;bottom:0;width:7px;z-index:5;pointer-events:all;cursor:ew-resize;background:rgba(255,210,122,0.10);border-left:1px solid rgba(255,210,122,0.25);border-right:1px solid rgba(255,210,122,0.25);}
+.tl-trim-handle:hover,.tl-trim-handle.active{background:rgba(255,210,122,0.45);border-color:var(--neon);box-shadow:0 0 6px rgba(255,210,122,0.6);}
+.tl-trim-handle.set{background:rgba(255,210,122,0.30);border-color:rgba(255,210,122,0.7);}
 .tl-kf-row{position:absolute;bottom:11px;left:0;right:0;height:12px;pointer-events:none;z-index:3;}
 .tl-kf-d{position:absolute;width:11px;height:11px;background:var(--neon);border:1.5px solid #000;box-shadow:0 0 0 1px rgba(255,210,122,0.5);transform:translate(-50%,-50%) rotate(45deg);top:50%;pointer-events:all;cursor:ew-resize;transition:transform .1s;}
 .tl-kf-d:hover{background:var(--acid);box-shadow:0 0 6px 1px var(--acid);transform:translate(-50%,-50%) rotate(45deg) scale(1.35);animation:kf-pulse .6s ease-in-out infinite;}
@@ -150,6 +169,10 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-kf-d.ez-mid{border-radius:3px;background:#5AE9FF;box-shadow:0 0 0 1px rgba(90,233,255,0.5);}
 .tl-kf-d.ez-max{border-radius:50%;background:#FF4FA8;box-shadow:0 0 0 1px rgba(255,79,168,0.5);}
 .tl-kf-d.ez-mid.sel,.tl-kf-d.ez-max.sel{background:#fff;}
+/* SPEC_11 P2: HOLD（ステップ）＝回転なしの正方形・グレー。イーズ形状より優先 */
+.tl-kf-d.ez-hold{border-radius:0;background:#8892a0;box-shadow:0 0 0 1px rgba(136,146,160,0.6);transform:translate(-50%,-50%);}
+.tl-kf-d.ez-hold:hover{transform:translate(-50%,-50%) scale(1.35);}
+.tl-kf-d.ez-hold.sel{background:#fff;}
 #tl-marquee{position:fixed;border:1px solid var(--acid);background:rgba(255,79,168,0.10);pointer-events:none;z-index:200;display:none;}
 .tl-marker-row{position:absolute;bottom:0;left:0;right:0;height:11px;pointer-events:none;z-index:4;}
 .tl-marker{position:absolute;top:0;bottom:0;width:10px;pointer-events:all;cursor:grab;transform:translateX(-50%);background:transparent;}
@@ -412,7 +435,7 @@ input[type=number]{-moz-appearance:textfield;}
       <!-- トラック追加・設定 -->
       <button id="btn-camera" title="カメラトラックを追加（1つまで）。X/Y=パン, Z=ドリー(パララックス), ROT=回転, SCL=ズーム">+ CAMERA</button>
       <button id="btn-null" title="ヌルトラックを追加（描画されない親専用トラック）。カメラや複数トラックの親にして丸ごと調整">+ NULL</button>
-      <button id="btn-fx" title="撮影処理（SATSUEI FX）チェーンを編集">FX</button>
+      <button id="btn-fx" title="撮影処理（SATSUEI FX）チェーンを編集（もう一度押すと閉じる）">FX</button>
       <button id="btn-fx-preview" title="プレビューに撮影処理を適用（draft品質: MB/DOFなし）">FX PREVIEW</button>
       <button id="btn-settings" title="設定（ガイド/ショートカット）">⚙</button>
       <span style="color:var(--dim)">/</span>
@@ -421,7 +444,7 @@ input[type=number]{-moz-appearance:textfield;}
       <button id="btn-export" disabled title="全フレームをBG透過の連番PNGでZIP書き出し（AE合成用）">SEQ PNG</button>
       <button id="btn-export-video" disabled title="全体をmp4で書き出し（実時間）">EXPORT VIDEO</button>
       <button id="btn-export-web" disabled title="スクロール駆動のモーションコミックHTMLを書き出し（単一ファイル・依存ゼロ）">EXPORT WEB</button>
-      <button id="btn-export-jsx" disabled title="カメラKF（親NULL合成込み）をAfter Effects用.jsxとして書き出し。AEでコンポを開いた状態で File > Scripts > Run Script File">AE JSX</button>
+      <button id="btn-export-jsx" disabled title="カメラKF（親NULL合成込み）＋各トラック（平面/ヌル・Position/Anchor/Scale/Rotation/Opacityのキー付き）をAfter Effects用.jsxとして書き出し。絵そのものは運ばないので平面のソースを差し替えて使います。AEでコンポを開いた状態で File > Scripts > Run Script File">AE JSX</button>
       <span style="color:var(--dim)">/</span>
       <button id="btn-live" class="primary" title="ANIMATORの編集をライブ反映中（クリックでOFF）">LIVE ●</button>
       <button id="btn-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
@@ -470,7 +493,7 @@ input[type=number]{-moz-appearance:textfield;}
     </div>
     <div class="insp-section">
       <div class="insp-h">TRANSFORM &nbsp;<span id="kf-status" style="font-size:7px;color:rgba(255,255,255,0.3)">NO KF</span></div>
-      <div class="kf-row" id="parent-row" style="display:none" title="親トラック（AEのペアレント相当）。親の移動/回転/拡縮に追従"><span class="k">PRNT</span><select id="kf-parent"></select></div>
+      <div class="kf-row" id="parent-row" style="display:none" title="親トラック（AEのペアレント相当）。親の移動/回転/拡縮に追従。付け外しの瞬間は「現フレームの見た目が変わらない」ようKFを自動補正します（親にKFがある場合、他フレームでは見え方が変わります）。Altを押しながら選ぶと補正なし"><span class="k">PRNT</span><select id="kf-parent"></select></div>
       <div class="kf-row" data-prop="ax"><span class="k">AX</span><button class="num-step" data-step="ax" data-dir="-1">◀</button><input class="kf-val" id="kf-ax" type="number" value="0" step="1"><button class="num-step" data-step="ax" data-dir="1">▶</button><div class="kf-dot" id="dot-ax"></div></div>
       <div class="kf-row" data-prop="ay"><span class="k">AY</span><button class="num-step" data-step="ay" data-dir="-1">◀</button><input class="kf-val" id="kf-ay" type="number" value="0" step="1"><button class="num-step" data-step="ay" data-dir="1">▶</button><div class="kf-dot" id="dot-ay"></div></div>
       <div class="kf-row" data-prop="x" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span class="k">X</span><button class="num-step" data-step="x" data-dir="-1">◀</button><input class="kf-val" id="kf-x" type="number" value="0" step="1"><button class="num-step" data-step="x" data-dir="1">▶</button><div class="kf-dot" id="dot-x"></div></div>
@@ -484,6 +507,7 @@ input[type=number]{-moz-appearance:textfield;}
       <button class="kf-btn" id="btn-kf-copy">⧉ COPY KEYFRAMES</button>
       <button class="kf-btn" id="btn-kf-paste">⮃ PASTE TO TRACK</button>
       <button class="kf-btn" id="btn-kf-ease">∿ EASE (中) / SHIFT=最大</button>
+      <button class="kf-btn" id="btn-kf-hold" title="ホールド（ステップ）補間。このキーから次のキーまで値を固定します。対象=選択KF（無ければ現フレームのキー）。ダイヤは灰色の正方形になります">◻ HOLD (選択KFトグル)</button>
       <div class="kf-row" id="inf-row" style="margin-top:4px" title="AE風イーズ影響度（%・0〜100）。IN=キーに入る側 / OUT=キーから出る側。選択KF（無ければ現フレームのキー）に適用。空欄=ezイーズに戻す"><span class="k">INF</span><input class="kf-val" id="kf-inf-in" type="number" min="0" max="100" step="1" placeholder="IN"><input class="kf-val" id="kf-inf-out" type="number" min="0" max="100" step="1" placeholder="OUT"></div>
     </div>
     <div class="insp-section">
@@ -595,6 +619,13 @@ input[type=number]{-moz-appearance:textfield;}
         <span class="sg-x">%</span>
         <input type="number" id="guide-safe-b" class="sg-num" min="1" max="100" step="1" title="タイトルセーフ(%)">
         <span class="sg-x">%</span>
+      </div>
+    </div>
+    <div class="set-sect">
+      <div class="set-sect-h">PLAYBACK</div>
+      <div class="sc-hint">重いコンポで再生がカクつくときに。停止すると自動でフル解像度に戻ります</div>
+      <div class="sg-row">
+        <button id="draft-play-toggle" class="sc-key sg-toggle" title="再生中だけ1/2解像度で描画して軽くする">1/2解像度ドラフト再生</button>
       </div>
     </div>
     <div class="set-sect">
@@ -1037,6 +1068,10 @@ const LABEL_W = 154;
 // タイムラインX座標規約（SPEC_11 P0）: フレーム f の左端 = LABEL_W + frameFrac(f)*描画幅。
 // ルーラー/プレイヘッド/WAバンド/KFダイヤ/コマブロック/ミニグラフの全UIでこれに統一（分母は total。total-1 は使わない）
 const frameFrac = f => state.totalFrames ? f/state.totalFrames : 0;
+// SPEC_11 P3b-2: トラック内時間 = コンポ時間 − tOffset。KFの読み書きは常にトラック内時間で行う
+// （タイムライン上のダイヤ/マーカーは +tOffset した位置に描かれるので、プレイヘッド直下＝curLocalFrame）
+const trackOff = t => (t&&t.tOffset)||0;
+const curLocalFrame = () => state.currentFrame - trackOff(selTrack());
 const OUT_W = 3840, OUT_H = 2160;
 const ALL_PROPS = ['x','y','z','s','ax','ay','rot','op'];
 const PROP_STEP = {x:1,y:1,z:1,s:0.01,ax:1,ay:1,rot:0.5,op:0.01};
@@ -1045,10 +1080,15 @@ const PERSP_FOCAL = 1000; // Z軸疑似3Dの焦点距離
 const propDefOf = p => (p==='s'||p==='op') ? 1 : 0;
 function fmtProp(p,v){ if(p==='s'||p==='op') return v.toFixed(3); if(p==='rot') return v.toFixed(1); return String(Math.round(v)); }
 function clampProp(p,v){ if(PROP_MIN[p]!==undefined) v=Math.max(PROP_MIN[p],v); if(PROP_MAX[p]!==undefined) v=Math.min(PROP_MAX[p],v); return v; }
+// SPEC_11 P4-2: トラックロック。選択はできるが編集系は拒否（true を返したら呼び出し側は中断）
+function lockedGuard(t){
+  if(t&&t.locked){ flashLive('🔒 '+((t.name||'TRACK'))+' はロック中です'); return true; }
+  return false;
+}
 // 値の確定：現フレームにキーが無ければ作成（＝変化した瞬間に即キー）
 function commitProp(prop,value,record){
-  const t=selTrack(); if(!t) return;
-  setKf(prop,state.currentFrame,clampProp(prop,value),t.keyframes);
+  const t=selTrack(); if(!t||lockedGuard(t)) return;
+  setKf(prop,curLocalFrame(),clampProp(prop,value),t.keyframes);
   renderKfDiamonds(state.selectedTrack); drawCurrentFrame();
   if(record!==false) recordHistory();
 }
@@ -1128,6 +1168,7 @@ function getKfValue(prop, frame, kfs){
   if(frame>=arr[arr.length-1].f) return arr[arr.length-1].v;
   for(let i=0;i<arr.length-1;i++){
     if(frame>=arr[i].f&&frame<=arr[i+1].f){
+      if(arr[i].hold) return arr[i].v; // SPEC_11 P2: ホールド（区間の左キーに付く。次のキーまで値固定）
       let t=(frame-arr[i].f)/(arr[i+1].f-arr[i].f);
       const eo=arr[i].eo, ei=arr[i+1].ei;
       if(eo!=null||ei!=null){
@@ -1158,8 +1199,8 @@ function removeKf(prop, frame, kfs){
 }
 
 function addKfAtCurrent(){
-  const t = selTrack(); if(!t) return;
-  const f = state.currentFrame, kfs = t.keyframes;
+  const t = selTrack(); if(!t||lockedGuard(t)) return;
+  const f = curLocalFrame(), kfs = t.keyframes;
   ALL_PROPS.forEach(p=>{
     const el=$(`#kf-${p}`); const v=el?parseFloat(el.value):NaN;
     setKf(p,f,isNaN(v)?propDefOf(p):v,kfs);
@@ -1167,7 +1208,7 @@ function addKfAtCurrent(){
   recordHistory(); renderKfDiamonds(state.selectedTrack); drawCurrentFrame();
 }
 function clearAllKf(){
-  const t = selTrack(); if(!t) return;
+  const t = selTrack(); if(!t||lockedGuard(t)) return;
   t.keyframes = makeEmptyKfs();
   recordHistory(); renderKfDiamonds(state.selectedTrack); drawCurrentFrame();
 }
@@ -1183,23 +1224,24 @@ function refreshKfSelClasses(){
 }
 
 // ── KF コピー / ペースト（選択優先・同一/別TRACK可・プレイヘッド基準） / イーズ ──
-let kfClipboard=null; // {items:[{rel,prop,v,ez}]}
+let kfClipboard=null; // {items:[{rel,prop,v,ez,ei,eo,hold}]}
 function copyKeyframes(){
   let items=[], min=Infinity;
   if(kfSel.length){
-    kfSel.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k){ items.push({f:s.f,prop:p,v:k.v,ez:k.ez||0,ei:k.ei,eo:k.eo}); min=Math.min(min,s.f); } }); });
+    kfSel.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k){ items.push({f:s.f,prop:p,v:k.v,ez:k.ez||0,ei:k.ei,eo:k.eo,hold:k.hold}); min=Math.min(min,s.f); } }); });
   } else {
     const t=selTrack(); if(!t){ flashLive('トラック未選択'); return; }
-    ALL_PROPS.forEach(p=>t.keyframes[p].forEach(k=>{ items.push({f:k.f,prop:p,v:k.v,ez:k.ez||0,ei:k.ei,eo:k.eo}); min=Math.min(min,k.f); }));
+    ALL_PROPS.forEach(p=>t.keyframes[p].forEach(k=>{ items.push({f:k.f,prop:p,v:k.v,ez:k.ez||0,ei:k.ei,eo:k.eo,hold:k.hold}); min=Math.min(min,k.f); }));
   }
   if(!items.length){ flashLive('コピー対象なし'); return; }
-  kfClipboard={ items: items.map(it=>({rel:it.f-min, prop:it.prop, v:it.v, ez:it.ez, ei:it.ei, eo:it.eo})) };
+  kfClipboard={ items: items.map(it=>({rel:it.f-min, prop:it.prop, v:it.v, ez:it.ez, ei:it.ei, eo:it.eo, hold:it.hold})) };
   flashLive('⧉ KF COPIED ('+items.length+')');
 }
 function pasteKeyframes(){
   const t=selTrack(); if(!t||!kfClipboard||!kfClipboard.items.length){ flashLive('クリップボードが空です'); return; }
-  const pf=state.currentFrame;
-  kfClipboard.items.forEach(it=>{ const f=pf+it.rel; setKf(it.prop,f,it.v,t.keyframes); const k=t.keyframes[it.prop].find(k=>k.f===f); if(k){ k.ez=it.ez; if(it.ei!=null)k.ei=it.ei; else delete k.ei; if(it.eo!=null)k.eo=it.eo; else delete k.eo; } });
+  if(lockedGuard(t)) return;
+  const pf=curLocalFrame();
+  kfClipboard.items.forEach(it=>{ const f=pf+it.rel; setKf(it.prop,f,it.v,t.keyframes); const k=t.keyframes[it.prop].find(k=>k.f===f); if(k){ k.ez=it.ez; if(it.ei!=null)k.ei=it.ei; else delete k.ei; if(it.eo!=null)k.eo=it.eo; else delete k.eo; if(it.hold)k.hold=true; else delete k.hold; } });
   recordHistory(); renderKfDiamonds(state.selectedTrack); drawCurrentFrame(); updateKfUI();
   flashLive('⮃ KF PASTED → '+(t.name||'TRACK'));
 }
@@ -1210,7 +1252,7 @@ function deleteSelectedOrCurrentKf(){
     kfSel=[]; touched.forEach(ti=>renderKfDiamonds(ti));
     recordHistory(); drawCurrentFrame(); updateKfUI(); flashLive('✕ KF DELETED');
   } else {
-    const t=selTrack(); if(!t) return; const f=state.currentFrame; let any=false;
+    const t=selTrack(); if(!t) return; const f=curLocalFrame(); let any=false;
     ALL_PROPS.forEach(p=>{ if(hasKfAt(p,f,t.keyframes)){ removeKf(p,f,t.keyframes); any=true; } });
     if(any){ recordHistory(); renderKfDiamonds(state.selectedTrack); drawCurrentFrame(); updateKfUI(); flashLive('✕ KF DELETED'); }
   }
@@ -1223,7 +1265,7 @@ function applyEase(amount){ // インスペクターのEASEボタン：選択 or
     recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); drawCurrentFrame();
     flashLive('∿ EASE '+easeLabel(amount)+' (選択)'); return;
   }
-  const t=selTrack(); if(!t) return; let n=0;
+  const t=selTrack(); if(!t||lockedGuard(t)) return; let n=0;
   ALL_PROPS.forEach(p=>t.keyframes[p].forEach(k=>{k.ez=amount;n++;}));
   if(!n){ flashLive('キーがありません'); return; }
   recordHistory(); renderKfDiamonds(state.selectedTrack); refreshKfSelClasses(); drawCurrentFrame();
@@ -1242,7 +1284,7 @@ function applyEaseToFrame(trackIdx,f,amount){
 // field='ei'|'eo'。val=null で解除（ez smoothstepへ戻る）。対象=選択KF、無ければ現フレームのキー
 function applyInfluence(field,val){
   const targets = kfSel.length ? kfSel.slice()
-    : (selTrack() ? [{t:state.selectedTrack,f:state.currentFrame}] : []);
+    : (selTrack() ? [{t:state.selectedTrack,f:curLocalFrame()}] : []);
   if(!targets.length){ flashLive('対象キーがありません'); return; }
   const tracksInv=new Set(); let n=0;
   targets.forEach(s=>{
@@ -1259,12 +1301,31 @@ function applyInfluence(field,val){
   drawCurrentFrame(); renderGraph();
   flashLive('∿ INF '+(field==='ei'?'IN':'OUT')+(val==null?' CLEAR':'='+Math.round(val)+'%'));
 }
+// ── HOLD（ステップ補間・SPEC_11 P2）──
+// 対象=選択KF、無ければ現フレームのキー。1つでもOFFがあれば全ON（そろえるトグル）。
+// hold は「区間の左キー」に付く＝そのキーから次のキーまで値が固定される（AE準拠）
+function applyHold(){
+  const targets = kfSel.length ? kfSel.slice()
+    : (selTrack() ? [{t:state.selectedTrack,f:curLocalFrame()}] : []);
+  if(!targets.length){ flashLive('対象キーがありません'); return; }
+  let found=0, anyOff=false;
+  targets.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return;
+    ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k){ found++; if(!k.hold) anyOff=true; } }); });
+  if(!found){ flashLive('対象キーがありません'); return; }
+  const on=anyOff; const tracksInv=new Set();
+  targets.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return;
+    ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(!k) return; if(on) k.hold=true; else delete k.hold; });
+    tracksInv.add(s.t); });
+  recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses();
+  drawCurrentFrame(); renderGraph();
+  flashLive(on?'◻ HOLD ON':'◻ HOLD OFF');
+}
 // INF欄の現在値表示（単一選択KF or 現フレームのキー）
 function updateInfluenceUI(){
   const inEl=$('#kf-inf-in'), outEl=$('#kf-inf-out'); if(!inEl||!outEl) return;
   let src=null;
   if(kfSel.length===1) src=kfSel[0];
-  else if(!kfSel.length && selTrack()) src={t:state.selectedTrack,f:state.currentFrame};
+  else if(!kfSel.length && selTrack()) src={t:state.selectedTrack,f:curLocalFrame()};
   let ei=null,eo=null;
   if(src){
     const t=state.tracks[src.t];
@@ -1282,15 +1343,16 @@ function getFrameEz(trackIdx,f){
 
 // ── KFナビゲーション（J/K） ──
 function gatherKfFrames(t){ const s=new Set(); ALL_PROPS.forEach(p=>t.keyframes[p].forEach(k=>s.add(k.f))); return [...s].sort((a,b)=>a-b); }
-function seekPrevKey(){ const t=selTrack(); if(!t) return; const fs=gatherKfFrames(t); let best=null; for(const f of fs) if(f<state.currentFrame) best=f; if(best!=null){ pause(); seek(best); } }
-function seekNextKey(){ const t=selTrack(); if(!t) return; const fs=gatherKfFrames(t); const nx=fs.find(f=>f>state.currentFrame); if(nx!=null){ pause(); seek(nx); } }
+function seekPrevKey(){ const t=selTrack(); if(!t) return; const o=trackOff(t); const fs=gatherKfFrames(t); let best=null; for(const f of fs) if(f+o<state.currentFrame) best=f; if(best!=null){ pause(); seek(best+o); } }
+function seekNextKey(){ const t=selTrack(); if(!t) return; const o=trackOff(t); const fs=gatherKfFrames(t); const nx=fs.find(f=>f+o>state.currentFrame); if(nx!=null){ pause(); seek(nx+o); } }
 
 // ── Shiftスナップ（スクラブ/マーカー移動をKF・マーカー・WA端へ吸着） ──
 function gatherSnapFrames(exclMarker){
   const s=new Set();
   state.tracks.forEach(t=>{
-    ALL_PROPS.forEach(p=>t.keyframes[p].forEach(k=>s.add(k.f)));
-    t.markers.forEach(m=>{ if(m!==exclMarker) s.add(m.frame); });
+    const o=trackOff(t); // SPEC_11 P3b-2: 吸着はコンポ時間で判定
+    ALL_PROPS.forEach(p=>t.keyframes[p].forEach(k=>s.add(k.f+o)));
+    t.markers.forEach(m=>{ if(m!==exclMarker) s.add(m.frame+o); });
   });
   state.markers.forEach(m=>{ if(m!==exclMarker) s.add(m.frame); });
   if(state.workArea){ s.add(state.workArea.startFrame); s.add(Math.min(state.workArea.endFrame,Math.max(0,state.totalFrames-1))); }
@@ -1365,6 +1427,8 @@ function cloneEditState(){
       visible: t.visible!==false,
       solo: !!t.solo,
       name: t.name, // SPEC_11 P5-4: 改名を undo 対象に
+      tIn: t.tIn||0, tOut: t.tOut==null?null:t.tOut, tOffset: t.tOffset||0, // SPEC_11 P3b: トリム/ずらし
+      locked: !!t.locked, // SPEC_11 P4-2: ロック
     })),
     gmarkers: state.markers.map(m=>({...m})),
     selectedTrack: state.selectedTrack,
@@ -1474,6 +1538,8 @@ function applyHistory(snap){
     t.markers = pt.markers.map(m=>({...m}));
     t.parent = pt.parent; t.visible = pt.visible; t.solo = pt.solo;
     if('name' in pt) t.name = pt.name; // SPEC_11 P5-4: 改名の undo/redo
+    if('tIn' in pt){ t.tIn = pt.tIn; t.tOut = pt.tOut; t.tOffset = pt.tOffset||0; } // SPEC_11 P3b: トリム/ずらし
+    if('locked' in pt) t.locked = pt.locked;             // SPEC_11 P4-2: ロック
   });
   sanitizeParents();
   if(snap.gmarkers) state.markers = snap.gmarkers.map(m=>({...m}));
@@ -1557,7 +1623,7 @@ function toggleFxHud(){ $('#fx-hud').classList.contains('show') ? hideFxHud() : 
 function updateFxHud(){
   if(!$('#fx-hud').classList.contains('show')) return;
   const kfs = kfsNow();
-  const f = state.currentFrame, tr = getTransform(f, kfs);
+  const f = curLocalFrame(), tr = getTransform(f, kfs);
   ALL_PROPS.forEach(p=>{
     const el=$(`#fx-${p}`); if(el && document.activeElement!==el) el.value=fmtProp(p,tr[p]);
     const dot=$(`#fx-dot-${p}`); if(dot) dot.classList.toggle('active',hasKfAt(p,f,kfs));
@@ -1599,6 +1665,12 @@ function parseTrackFromJSON(json){
     markers: [],
     visible: json.visible!==false,
     solo: false,
+    // SPEC_11 P3b-1: IN/OUTトリム（コンポ時間基準。tOut=null は「末尾まで」）
+    tIn: (typeof json.tIn==='number')?(json.tIn|0):0, // 負もあり得る（ずらしでコンポ外へ出した状態を保つ）
+    tOut: (typeof json.tOut==='number')?(json.tOut|0):null,
+    // SPEC_11 P3b-2: 時間オフセット（正=後ろへずらす。トラック内時間 = コンポ時間 − tOffset）
+    tOffset: (typeof json.tOffset==='number')?(json.tOffset|0):0,
+    locked: json.locked===true, // SPEC_11 P4-2
   };
   const loopCells = track.cellsRaw;
   let fi=0;
@@ -1627,7 +1699,7 @@ function parseTrackFromJSON(json){
       if(Array.isArray(kf[p])){
         track.keyframes[p]=kf[p]
           .filter(k=>typeof k.frame==='number'&&typeof k.v==='number')
-          .map(k=>({f:k.frame|0,v:k.v,ez:typeof k.ez==='number'?k.ez:0,...(typeof k.ei==='number'?{ei:k.ei}:{}),...(typeof k.eo==='number'?{eo:k.eo}:{})}))
+          .map(k=>({f:k.frame|0,v:k.v,ez:typeof k.ez==='number'?k.ez:0,...(typeof k.ei==='number'?{ei:k.ei}:{}),...(typeof k.eo==='number'?{eo:k.eo}:{}),...(k.hold?{hold:true}:{})}))
           .sort((a,b)=>a.f-b.f);
       }
     }
@@ -1920,6 +1992,7 @@ function toggleTrackVis(idx){
 }
 
 function removeTrack(idx){
+  if(lockedGuard(state.tracks[idx])) return; // SPEC_11 P4-2
   if(state.tracks.length<=1){ alert('最後のトラックは削除できません'); return; }
   state.tracks.splice(idx,1);
   sanitizeParents(); // 削除トラックを親にしていた子は親なしへ
@@ -1930,6 +2003,17 @@ function removeTrack(idx){
   recordHistory();
 }
 
+// SPEC_11 P4-2: トラックロック（選択は可・編集系は lockedGuard で拒否）
+function toggleTrackLock(idx){
+  const t=state.tracks[idx]; if(!t) return;
+  t.locked=!t.locked;
+  const el=document.querySelector(`.tl-track[data-track="${idx}"]`);
+  const btn=el?el.querySelector('.tl-tbtn.lock'):null;
+  if(btn){ btn.textContent=t.locked?'🔒':'🔓'; btn.classList.toggle('on',t.locked); }
+  if(el) el.classList.toggle('locked',t.locked);
+  recordHistory();
+  flashLive(t.locked?('🔒 LOCKED — '+(t.name||'TRACK')):('🔓 UNLOCKED — '+(t.name||'TRACK')));
+}
 function toggleTrackSolo(idx){
   const t=state.tracks[idx]; if(!t) return;
   t.solo=!t.solo;
@@ -1938,7 +2022,8 @@ function toggleTrackSolo(idx){
   // update solo button visual
   document.querySelectorAll('.tl-track').forEach(el=>{
     const i=parseInt(el.dataset.track);
-    const btn=el.querySelectorAll('.tl-tbtn')[1]; // solo is 2nd button
+    // SPEC_11 P4-2: 🔒が2番目に入ったので添字ではなくクラスで引く（添字[1]だと🔒が光っていた）
+    const btn=el.querySelector('.tl-tbtn.solo');
     if(btn&&state.tracks[i]){
       btn.classList.toggle('on',state.tracks[i].solo);
     }
@@ -1948,16 +2033,19 @@ function toggleTrackSolo(idx){
 async function exportTrackPNG(trackIdx){
   const track=state.tracks[trackIdx]; if(!track) return;
   const tname=(track.name||'track').toLowerCase().replace(/[^a-z0-9]/g,'_');
-  await exportZipPNG(track.totalFrames,`${tname}_4k.zip`,(ctx,i)=>{
+  const {start,len}=webRange(); // SPEC_11 P3: 全体書き出しと同じくWA準拠
+  if(len<=0){ flashLive('ワークエリアが空です'); return; }
+  await exportZipPNG(len,`${tname}_4k.zip`,(ctx,i)=>{
+    const f=start+i;
     const bg=Math.round(255*(state.bgBright/100));
     ctx.fillStyle=`rgb(${bg},${bg},${bg})`; ctx.fillRect(0,0,OUT_W,OUT_H);
     // カメラは見たまま焼き込み（カメラ抜きで出したいときは◉でカメラOFFにして書き出す）
-    const cam=getCamAt(i);
+    const cam=getCamAt(f);
     ctx.save();
     applyCamWrap(ctx,OUT_W,OUT_H,cam);
-    drawOneTrack(ctx,OUT_W,OUT_H,i,track,false,cam);
+    drawOneTrack(ctx,OUT_W,OUT_H,f,track,false,cam);
     ctx.restore();
-  });
+  },start);
 }
 
 // ── TRACK DRAG & DROP ──
@@ -2019,7 +2107,7 @@ function buildTrackElement(idx){
   const track=state.tracks[idx];
   const total=state.totalFrames;
   const el=document.createElement('div');
-  el.className='tl-track'+(idx===state.selectedTrack?' selected':'')+(track.type==='camera'?' tl-cam':'');
+  el.className='tl-track'+(idx===state.selectedTrack?' selected':'')+(track.type==='camera'?' tl-cam':'')+(track.locked?' locked':'');
   el.dataset.track=idx;
   el.addEventListener('pointerdown',()=>selectTrack(idx));
 
@@ -2048,50 +2136,40 @@ function buildTrackElement(idx){
     el.style.opacity='';
     const ind=$('#tl-drop-indicator'); if(ind) ind.style.display='none';
   }
+  // 並び替えドラッグは pointer capture を使わず window でポインタを追う。
+  // ・capture 無し ＝ ラベルの dblclick 改名が死なない（SPEC_11 P5-4 の要件）
+  // ・window 追従 ＝ 行の外／rebuild で消えたノードの上でも取りこぼさない
+  //   （captureが外れて pointerup を拾えず、ゴーストがカーソルに張り付く不具合の根治）
   function attachTrackDrag(node, immediate){
-    let capPid=null;
+    const onMove=e=>{
+      if(dhPending&&Math.abs(e.clientY-dhStartY)>4) dhBegin(); // 4px動いてからドラッグ確定
+      if(!dhActive) return;
+      e.preventDefault();
+      dhGhost.style.top=(dhOrigR.top+e.clientY-dhStartY)+'px';
+      updateDropIndicator(e.clientY,idx);
+    };
+    const onEnd=e=>{
+      window.removeEventListener('pointermove',onMove);
+      window.removeEventListener('pointerup',onEnd);
+      window.removeEventListener('pointercancel',onEnd);
+      dhPending=false;
+      if(!dhActive) return;
+      dhActive=false;
+      // SPEC_11 P5-3: reorder中に rebuild/例外が挟まってもゴーストを必ず消す
+      try{ if(e.type==='pointerup') doTrackReorder(e.clientY,idx); } finally{ dhCleanup(); }
+    };
     node.addEventListener('pointerdown',e=>{
       if(e.button!==0&&e.pointerType==='mouse') return;
       if(!immediate){
         // ボタン群や改名中の入力欄からはドラッグを始めない
         if(e.target.closest('.tl-track-btns')||e.target.tagName==='INPUT') return;
       }
-      dhStartY=e.clientY; capPid=e.pointerId;
-      if(immediate){
-        e.stopPropagation(); e.preventDefault(); dhBegin();
-        try{ node.setPointerCapture(e.pointerId); }catch(err){}
-      } else {
-        dhPending=true;   // 動き出すまでは通常のクリック扱い
-        // SPEC_11 P5-4: ラベルは即captureしない。即captureするとダブルクリック改名が死ぬため、
-        // 4px動いてドラッグ確定した時点(pointermove)で初めてcaptureする。
-      }
-    });
-    node.addEventListener('pointermove',e=>{
-      if(dhPending&&Math.abs(e.clientY-dhStartY)>4){
-        dhBegin();
-        try{ node.setPointerCapture(capPid!=null?capPid:e.pointerId); }catch(err){}
-      }
-      if(!dhActive) return;
-      dhGhost.style.top=(dhOrigR.top+e.clientY-dhStartY)+'px';
-      updateDropIndicator(e.clientY,idx);
-    });
-    node.addEventListener('pointerup',e=>{
-      dhPending=false;
-      if(!dhActive) return;
-      dhActive=false;
-      // SPEC_11 P5-3: reorder中に rebuild/例外が挟まってもゴーストを必ず消す
-      try{ doTrackReorder(e.clientY,idx); } finally{ dhCleanup(); }
-    });
-    node.addEventListener('pointercancel',()=>{
-      dhPending=false;
-      if(!dhActive) return;
-      dhActive=false; dhCleanup();
-    });
-    // SPEC_11 P5-3: captureが外れた時も残骸を残さない
-    node.addEventListener('lostpointercapture',()=>{
-      dhPending=false;
-      if(!dhActive) return;
-      dhActive=false; dhCleanup();
+      dhStartY=e.clientY;
+      if(immediate){ e.stopPropagation(); e.preventDefault(); dhBegin(); }
+      else dhPending=true; // 動き出すまでは通常のクリック扱い
+      window.addEventListener('pointermove',onMove);
+      window.addEventListener('pointerup',onEnd);
+      window.addEventListener('pointercancel',onEnd);
     });
   }
   // SPEC_11 P5-5: CAMERA は並び替え不可（常に最上固定）。ハンドルは無効化して見せる
@@ -2165,6 +2243,13 @@ function buildTrackElement(idx){
   reBtn.title='ANIMATORの最新の絵を取り直す（KF/トランスフォームは保持）';
   reBtn.addEventListener('click',e=>{e.stopPropagation();reloadTrackFromAnimator(idx);});
 
+  // SPEC_11 P4-2: ロック（幅128px制限があるので最小幅のグリフ1文字）
+  const lockBtn=document.createElement('button');
+  lockBtn.className='tl-tbtn lock'+(track.locked?' on':'');
+  lockBtn.textContent=track.locked?'🔒':'🔓';
+  lockBtn.title='ロック（選択はできるが編集・削除を禁止）';
+  lockBtn.addEventListener('click',e=>{e.stopPropagation();toggleTrackLock(idx);});
+
   const delBtn=document.createElement('button');
   delBtn.className='tl-tbtn del';
   delBtn.textContent='✕';
@@ -2201,6 +2286,7 @@ function buildTrackElement(idx){
   }
 
   btns.appendChild(visBtn);
+  btns.appendChild(lockBtn); // SPEC_11 P4-2
   if(track.type!=='camera'){ btns.appendChild(soloBtn); btns.appendChild(pngBtn); } // カメラにSOLO/PNGは無意味
   if(track.type!=='camera'&&track.projectId){ btns.appendChild(aniBtn); btns.appendChild(reBtn); } // SPEC_07
   if(camParentSel) btns.appendChild(camParentSel); // 削除ボタンの左隣
@@ -2223,10 +2309,11 @@ function buildTrackElement(idx){
 
   // Cell blocks
   if(total&&track.cellInfos.length){
+    const off=track.tOffset||0; // SPEC_11 P3b-2: ずらしぶんを表示位置へ
     for(const c of track.cellInfos){
       const block=document.createElement('div');
       block.className='tl-frame-block '+(c.kind==='empty'?'empty':'draw');
-      block.style.left=(c.startFrame/total*100)+'%';
+      block.style.left=((c.startFrame+off)/total*100)+'%';
       block.style.width=(c.duration/total*100)+'%';
       const lbl=document.createElement('div'); lbl.className='tl-label';
       const cn=String(c.cellIdx+1).padStart(3,'0');
@@ -2249,6 +2336,87 @@ function buildTrackElement(idx){
     }
   }
 
+  // SPEC_11 P3b-2: ストリップの Alt+ドラッグ = 時間オフセット（AEのレイヤーバー移動相当）。
+  // トリム(tIn/tOut)も一緒に平行移動する＝レイヤーバーごと掴んで動かす（[ / ] と同じ挙動）。
+  // 素のドラッグは既存のマーキー選択に譲る（#tl-tracks 側は altKey で早期return）
+  if(track.type!=='camera'){
+    strip.title='Alt+ドラッグ = このトラックを時間方向にずらす（絵・KF・IN/OUTトリムが一緒に動きます）';
+    let offDrag=false, offStartX=0, offStart=0, offStartIn=0, offStartOut=null, offMoved=false;
+    strip.addEventListener('pointerdown',e=>{
+      if(!e.altKey) return;
+      if(e.target.closest('.tl-kf-d,.tl-marker,.tl-trim-handle')) return; // 個別要素が優先
+      if(track.locked){ flashLive('🔒 ロック中です'); return; }
+      offDrag=true; offMoved=false; offStartX=e.clientX;
+      // 開始時の値を控えて毎回そこからの差分で決める（クランプしても戻せば元に復帰する）
+      offStart=track.tOffset||0; offStartIn=track.tIn||0; offStartOut=(track.tOut==null?null:track.tOut);
+      strip.setPointerCapture(e.pointerId); e.stopPropagation(); e.preventDefault();
+    });
+    strip.addEventListener('pointermove',e=>{
+      if(!offDrag) return;
+      if(!e.buttons){ offDrag=false; if(offMoved) endOff(); return; }
+      const rect=strip.getBoundingClientRect();
+      const d=Math.round((e.clientX-offStartX)/rect.width*(state.totalFrames||1));
+      const nv=offStart+d;
+      if(nv!==(track.tOffset||0)){
+        track.tOffset=nv; offMoved=true;
+        // トリムもレイヤーと一緒にずらす。コンポ外へはみ出しても**クランプしない**
+        // （0で潰すとトリム長が壊れて戻せなくなる。表示側 refreshTrimUI が画面内に丸める）
+        if(offStartIn!==0||offStartOut!=null){
+          track.tIn=offStartIn+d;
+          if(offStartOut!=null) track.tOut=offStartOut+d;
+        }
+        renderKfDiamonds(idx); renderMarkers(idx); refreshTrimUI(idx);
+        strip.querySelectorAll('.tl-frame-block').forEach((b,i)=>{
+          const c=track.cellInfos[i]; if(c) b.style.left=((c.startFrame+nv)/state.totalFrames*100)+'%';
+        });
+        drawCurrentFrame();
+      }
+    });
+    const endOff=()=>{
+      recordHistory(); updateKfUI();
+      const tr=(track.tIn||track.tOut!=null)?('  IN '+((track.tIn||0)+1)+' / OUT '+(track.tOut==null?'—':track.tOut)):'';
+      flashLive('⇄ OFFSET '+((track.tOffset||0)>=0?'+':'')+(track.tOffset||0)+' コマ'+tr);
+    };
+    strip.addEventListener('pointerup',()=>{ if(!offDrag) return; offDrag=false; if(offMoved) endOff(); });
+    strip.addEventListener('pointercancel',()=>{ if(!offDrag) return; offDrag=false; if(offMoved) endOff(); });
+  }
+
+  // SPEC_11 P3b-1: IN/OUTトリムのハンドル（絵を持つトラックのみ。camera/nullは対象外）
+  if(total&&track.frames.length&&track.type!=='camera'&&track.type!=='null'){
+    const mk=(which)=>{
+      const h=document.createElement('div');
+      h.className='tl-trim-handle '+which;
+      h.title=which==='in'
+        ? 'IN トリム（ドラッグ／Alt+[ で現フレーム）— ここより前は表示されません'
+        : 'OUT トリム（ドラッグ／Alt+] で現フレーム）— ここ以降は表示されません';
+      let drag=false, moved=false;
+      h.addEventListener('pointerdown',e=>{
+        if(track.locked){ flashLive('🔒 ロック中です'); return; }
+        drag=true; moved=false; h.classList.add('active');
+        h.setPointerCapture(e.pointerId); e.stopPropagation(); e.preventDefault();
+      });
+      h.addEventListener('pointermove',e=>{
+        if(!drag) return;
+        if(!e.buttons){ drag=false; h.classList.remove('active'); if(moved) endTrim(); return; }
+        const rect=strip.getBoundingClientRect();
+        let f=Math.round(Math.max(0,Math.min(total,(e.clientX-rect.left)/rect.width*total)));
+        if(which==='in') track.tIn=Math.max(0,Math.min(f,(track.tOut==null?total:track.tOut)-1));
+        else track.tOut=(f>=total)?null:Math.max((track.tIn||0)+1,f);
+        moved=true;
+        refreshTrimUI(idx); // ドラッグ中は再構築せず位置とグレーだけ更新
+      });
+      const endTrim=()=>{ recordHistory(); drawCurrentFrame(); flashLive(which==='in'?('◧ IN = F'+((track.tIn||0)+1)):('◨ OUT = '+(track.tOut==null?'—':'F'+track.tOut))); };
+      h.addEventListener('pointerup',()=>{ if(!drag) return; drag=false; h.classList.remove('active'); if(moved) endTrim(); });
+      h.addEventListener('pointercancel',()=>{ if(!drag) return; drag=false; h.classList.remove('active'); if(moved) endTrim(); });
+      return h;
+    };
+    // 範囲外ベール（IN/OUT位置ちょうどで切る。ハンドルより下・KFダイヤより上には出さない）
+    const vL=document.createElement('div'); vL.className='tl-trim-veil left'; vL.style.display='none';
+    const vR=document.createElement('div'); vR.className='tl-trim-veil right'; vR.style.display='none';
+    strip.appendChild(vL); strip.appendChild(vR);
+    strip.appendChild(mk('in')); strip.appendChild(mk('out'));
+  }
+
   // KF row and marker row (populated later in rebuildAllTrackUI)
   const kfRow=document.createElement('div');
   kfRow.className='tl-kf-row'; kfRow.dataset.track=idx;
@@ -2260,6 +2428,22 @@ function buildTrackElement(idx){
   return el;
 }
 
+// SPEC_11 P3b-1: トリムハンドルの位置と、範囲外コマのグレーアウトだけを更新（DOM再構築なし）
+function refreshTrimUI(trackIdx){
+  const track=state.tracks[trackIdx]; if(!track) return;
+  const strip=document.querySelector(`.tl-track-strip[data-track="${trackIdx}"]`); if(!strip) return;
+  const total=state.totalFrames; if(!total) return;
+  // データ上の tIn/tOut はコンポ外（負や total超）もあり得る（ずらしで持ち出した場合）。表示はここで画面内に丸める
+  const clampF=v=>Math.max(0,Math.min(total,v));
+  const tIn=clampF(track.tIn||0), tOut=clampF(track.tOut==null?total:track.tOut);
+  const hIn=strip.querySelector('.tl-trim-handle.in'), hOut=strip.querySelector('.tl-trim-handle.out');
+  if(hIn){ hIn.style.left=(tIn/total*100)+'%'; hIn.classList.toggle('set',!!track.tIn); }
+  if(hOut){ hOut.style.left='calc('+(tOut/total*100)+'% - 7px)'; hOut.classList.toggle('set',track.tOut!=null); }
+  // 範囲外のベールは IN/OUT のフレーム位置ちょうどで切る（コマ境界には吸着させない）
+  const vL=strip.querySelector('.tl-trim-veil.left'), vR=strip.querySelector('.tl-trim-veil.right');
+  if(vL){ vL.style.left='0'; vL.style.width=(tIn/total*100)+'%'; vL.style.display=tIn>0?'block':'none'; }
+  if(vR){ vR.style.left=(tOut/total*100)+'%'; vR.style.right='0'; vR.style.display=tOut<total?'block':'none'; }
+}
 function updateTrackHeights(){
   const N=state.tracks.length; if(!N) return;
   const container=$('#tl-tracks');
@@ -2290,7 +2474,7 @@ function rebuildAllTrackUI(){
     container.appendChild(buildTrackElement(i));
   }
   if(audioRow) container.appendChild(audioRow);
-  state.tracks.forEach((_,i)=>{ renderKfDiamonds(i); renderMarkers(i); });
+  state.tracks.forEach((_,i)=>{ renderKfDiamonds(i); renderMarkers(i); refreshTrimUI(i); });
   drawRuler(); updateWorkArea(); updateTrackHeights(); renderGlobalMarkers();
 }
 
@@ -2300,18 +2484,21 @@ function renderKfDiamonds(trackIdx){
   const track=state.tracks[trackIdx]; if(!track||!strip) return;
   row.innerHTML='';
   const total=state.totalFrames; if(!total) return;
+  const off=track.tOffset||0; // SPEC_11 P3b-2: KFはトラック内時間、表示は +off したコンポ時間
   const frames=new Set(ALL_PROPS.flatMap(p=>track.keyframes[p].map(k=>k.f)));
   for(const f of frames){
     const d=document.createElement('div'); d.className='tl-kf-d';
     d.dataset.track=trackIdx; d.dataset.f=f;
     if(kfSelHas(trackIdx,f)) d.classList.add('sel');
     // この frame のイーズ量に応じて形を変える（リニア=菱形 / 中=角丸 / 最大=円）。influence付きは中扱い
-    let ezAmt=0; ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k)ezAmt=Math.max(ezAmt,k.ez||0,(k.ei!=null||k.eo!=null)?0.5:0);});
-    if(ezAmt>=0.99) d.classList.add('ez-max'); else if(ezAmt>0) d.classList.add('ez-mid');
-    d.style.left=(f/total*100)+'%'; d.title=`F${f+1}`+(ezAmt>=0.99?' (EASE最大)':ezAmt>0?' (EASE中)':'')+'  Ctrl+クリックでイーズ切替';
+    let ezAmt=0, holdOn=false; ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k){ezAmt=Math.max(ezAmt,k.ez||0,(k.ei!=null||k.eo!=null)?0.5:0);if(k.hold)holdOn=true;}});
+    // SPEC_11 P2: HOLD は形状優先（正方形グレー）。イーズ形状は hold でないときだけ
+    if(holdOn) d.classList.add('ez-hold');
+    else if(ezAmt>=0.99) d.classList.add('ez-max'); else if(ezAmt>0) d.classList.add('ez-mid');
+    d.style.left=((f+off)/total*100)+'%'; d.title=`F${f+off+1}`+(holdOn?' (HOLD)':ezAmt>=0.99?' (EASE最大)':ezAmt>0?' (EASE中)':'')+'  Ctrl+クリックでイーズ切替';
     // この frame の各プロパティ値（単一移動/複製で持ち回る）
-    const kfVals={}, kfEz={}, kfInf={};
-    ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k){kfVals[p]=k.v;kfEz[p]=k.ez||0;kfInf[p]={ei:k.ei,eo:k.eo};}});
+    const kfVals={}, kfEz={}, kfInf={}, kfHold={};
+    ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k){kfVals[p]=k.v;kfEz[p]=k.ez||0;kfInf[p]={ei:k.ei,eo:k.eo};if(k.hold)kfHold[p]=true;}});
     let dragActive=false, wasDragged=false, origF=f, shiftStart=false, ctrlStart=false, copyF=f;
     let groupMode=false, groupSnap=null, lastDelta=0, gMin=0, gMax=total-1;
     function putKeys(targetF,removeF){
@@ -2321,6 +2508,7 @@ function renderKfDiamonds(trackIdx){
         if(!track.keyframes[p].some(k=>k.f===targetF)){
           const nk={f:targetF,v:kfVals[p],ez:kfEz[p]};
           if(kfInf[p]){ if(kfInf[p].ei!=null)nk.ei=kfInf[p].ei; if(kfInf[p].eo!=null)nk.eo=kfInf[p].eo; }
+          if(kfHold[p]) nk.hold=true; // SPEC_11 P2
           track.keyframes[p].push(nk);
           track.keyframes[p].sort((a,b)=>a.f-b.f);
         }
@@ -2331,16 +2519,17 @@ function renderKfDiamonds(trackIdx){
       if(delta===lastDelta) return;
       // 2パス：旧位置から除去 → 新位置へ配置（グループ内衝突回避）
       groupSnap.forEach(it=>{ const t=state.tracks[it.t]; const from=it.f+lastDelta; it.props.forEach(pr=>{ t.keyframes[pr.p]=t.keyframes[pr.p].filter(k=>k.f!==from); }); });
-      groupSnap.forEach(it=>{ const t=state.tracks[it.t]; const to=it.f+delta; it.props.forEach(pr=>{ if(!t.keyframes[pr.p].some(k=>k.f===to)){ const nk={f:to,v:pr.v,ez:pr.ez}; if(pr.ei!=null)nk.ei=pr.ei; if(pr.eo!=null)nk.eo=pr.eo; t.keyframes[pr.p].push(nk); t.keyframes[pr.p].sort((a,b)=>a.f-b.f);} }); });
+      groupSnap.forEach(it=>{ const t=state.tracks[it.t]; const to=it.f+delta; it.props.forEach(pr=>{ if(!t.keyframes[pr.p].some(k=>k.f===to)){ const nk={f:to,v:pr.v,ez:pr.ez}; if(pr.ei!=null)nk.ei=pr.ei; if(pr.eo!=null)nk.eo=pr.eo; if(pr.hold)nk.hold=true; t.keyframes[pr.p].push(nk); t.keyframes[pr.p].sort((a,b)=>a.f-b.f);} }); });
       lastDelta=delta;
     }
     d.addEventListener('pointerdown',e=>{
+      if(lockedGuard(track)) return; // SPEC_11 P4-2
       dragActive=true; wasDragged=false; origF=f; copyF=f; lastDelta=0;
       shiftStart=e.shiftKey; ctrlStart=e.ctrlKey||e.metaKey;
       // 複数選択中のキーを掴んだ場合はグループ移動
       groupMode = !shiftStart && kfSel.length>1 && kfSelHas(trackIdx,f);
       if(groupMode){
-        groupSnap=kfSel.map(s=>{ const t=state.tracks[s.t]; const it={t:s.t,f:s.f,props:[]}; ALL_PROPS.forEach(p=>{const k=t.keyframes[p].find(k=>k.f===s.f);if(k)it.props.push({p,v:k.v,ez:k.ez||0,ei:k.ei,eo:k.eo});}); return it; });
+        groupSnap=kfSel.map(s=>{ const t=state.tracks[s.t]; const it={t:s.t,f:s.f,props:[]}; ALL_PROPS.forEach(p=>{const k=t.keyframes[p].find(k=>k.f===s.f);if(k)it.props.push({p,v:k.v,ez:k.ez||0,ei:k.ei,eo:k.eo,hold:k.hold});}); return it; });
         gMin=Math.min(...groupSnap.map(it=>it.f)); gMax=Math.max(...groupSnap.map(it=>it.f));
       }
       d.setPointerCapture(e.pointerId);
@@ -2350,37 +2539,37 @@ function renderKfDiamonds(trackIdx){
       if(!dragActive) return;
       if(!e.buttons){ dragActive=false; if(wasDragged) endKfDrag(); return; } // ペン等の保険
       const rect=strip.getBoundingClientRect();
-      const newF=Math.round(Math.max(0,Math.min(total-1,(e.clientX-rect.left)/rect.width*total)));
-      if(!wasDragged){ if(Math.abs(e.clientX-(rect.left+origF/total*rect.width))<3) return; wasDragged=true; }
+      const newF=Math.round(Math.max(0,Math.min(total-1,(e.clientX-rect.left)/rect.width*total)))-off;
+      if(!wasDragged){ if(Math.abs(e.clientX-(rect.left+(origF+off)/total*rect.width))<3) return; wasDragged=true; }
       if(groupMode){
         applyGroupDelta(newF-f);
-        d.style.left=((f+lastDelta)/total*100)+'%'; d.title=`F${f+lastDelta+1}`;
+        d.style.left=((f+lastDelta+off)/total*100)+'%'; d.title=`F${f+lastDelta+off+1}`;
         drawCurrentFrame(); updateKfUI();
       } else if(shiftStart){
         // Shift+ドラッグ＝複製（元のキーは残す）
         if(newF===copyF) return;
         putKeys(newF, copyF===origF?null:copyF);
         copyF=newF;
-        d.style.left=(newF/total*100)+'%'; d.title=`F${newF+1} (copy)`;
+        d.style.left=((newF+off)/total*100)+'%'; d.title=`F${newF+off+1} (copy)`;
       } else {
         if(newF===origF) return;
         putKeys(newF, origF);
         origF=newF;
-        d.style.left=(newF/total*100)+'%'; d.title=`F${newF+1}`;
+        d.style.left=((newF+off)/total*100)+'%'; d.title=`F${newF+off+1}`;
         drawCurrentFrame(); updateKfUI();
       }
     });
     function endKfDrag(){ // ドラッグ確定処理（pointerup／ペンでupを取り逃した際の保険から共用）
       if(groupMode){ kfSel=groupSnap.map(it=>({t:it.t,f:it.f+lastDelta})); const tracksInv=new Set(groupSnap.map(it=>it.t)); recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); }
       else if(shiftStart){ kfSel=[{t:trackIdx,f:copyF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); } // 複製→新キーを選択
-      else { kfSel=[{t:trackIdx,f:origF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); seek(origF); } // 移動後も選択（直後に削除可）
+      else { kfSel=[{t:trackIdx,f:origF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); seek(origF+off); } // 移動後も選択（直後に削除可）
     }
     d.addEventListener('pointerup',()=>{
       if(!dragActive) return; dragActive=false;
       if(wasDragged){ endKfDrag(); }
       else if(ctrlStart){ cycleEase(trackIdx,origF); } // Ctrl+クリックでイーズ順送り(AE準拠)
       else if(shiftStart){ kfSelToggle(trackIdx,origF); }
-      else { kfSelSet(trackIdx,origF); seek(origF); }
+      else { kfSelSet(trackIdx,origF); seek(origF+off); }
     });
     d.addEventListener('pointercancel',()=>{ if(!dragActive) return; dragActive=false; if(wasDragged) endKfDrag(); });
     d.addEventListener('dblclick',e=>{ e.stopPropagation(); cycleEase(trackIdx,origF); }); // iPad用ダブルタップでも切替
@@ -2403,14 +2592,16 @@ function renderMarkers(trackIdx){
   const track=state.tracks[trackIdx]; if(!track||!strip) return;
   row.innerHTML='';
   const total=state.totalFrames; if(!total) return;
+  const off=track.tOffset||0; // SPEC_11 P3b-2
   for(const m of track.markers){
     const el=document.createElement('div');
     el.className='tl-marker';
-    el.style.left=(m.frame/total*100)+'%';
+    el.style.left=((m.frame+off)/total*100)+'%';
     el.dataset.label=m.label||('M'+(track.markers.indexOf(m)+1));
-    el.title=`コマ${m.frame+1}${m.label?' — '+m.label:''}`;
+    el.title=`コマ${m.frame+off+1}${m.label?' — '+m.label:''}`;
     let dragActive=false, wasDragged=false;
     el.addEventListener('pointerdown',e=>{
+      if(lockedGuard(track)) return; // SPEC_11 P4-2
       dragActive=true; wasDragged=false;
       el.setPointerCapture(e.pointerId);
       e.stopPropagation(); e.preventDefault();
@@ -2422,12 +2613,12 @@ function renderMarkers(trackIdx){
       const rect=strip.getBoundingClientRect();
       let newF=Math.round(Math.max(0,Math.min(total-1,(e.clientX-rect.left)/rect.width*total)));
       if(e.shiftKey) newF=snapFrame(newF,rect.width/total,m,true);
-      m.frame=newF; el.style.left=(newF/total*100)+'%';
+      m.frame=newF-off; el.style.left=(newF/total*100)+'%';
     });
     el.addEventListener('pointerup',()=>{
       if(!dragActive) return; dragActive=false;
       if(wasDragged){track.markers.sort((a,b)=>a.frame-b.frame);recordHistory();renderMarkers(trackIdx);}
-      else seek(m.frame);
+      else seek(m.frame+off);
     });
     el.addEventListener('pointercancel',()=>{
       if(!dragActive) return; dragActive=false;
@@ -2592,12 +2783,12 @@ function getCameraTrack(){ return state.tracks.find(t=>t.type==='camera')||null;
 function getCamAt(frameIdx){
   const c=getCameraTrack();
   if(!c||!c.visible) return null; // ◉トグル＝カメラON/OFF
-  const tr=getTransform(frameIdx,c.keyframes);
+  const tr=getTransform(frameIdx-(c.tOffset||0),c.keyframes); // SPEC_11 P3b-2: データ上は統一（カメラにUIは出さない）
   // カメラの親（NULLチェーン）を加算合成：x/y/z/rot=加算, s=乗算
   // → OBAN から流し込んだカメラKFを NULL 側のキーで丸ごとオフセット調整できる
   let p=c.parent?state.tracks.find(t=>t.tid===c.parent&&t.type!=='camera'):null, n=0;
   while(p&&n++<8){
-    const pt=getTransform(frameIdx,p.keyframes);
+    const pt=getTransform(frameIdx-(p.tOffset||0),p.keyframes);
     tr.x+=pt.x; tr.y+=pt.y; tr.z+=pt.z; tr.rot+=pt.rot; tr.s*=pt.s;
     p=p.parent?state.tracks.find(t=>t.tid===p.parent&&t.type!=='camera'):null;
   }
@@ -2614,9 +2805,10 @@ function applyCamWrap(tCtx, tw, th, cam){
 }
 // 親子チェーンを ctx に適用（root→self の順）。戻り値=自トラックのtransform（描画不可ならnull）
 // ルール: 子のZ＝親平面上のローカル透視スケール（カメラドリーは掛からない）／OPは継承しない（AE準拠）／カメラのパン・ドリーはrootのみに適用
+// frameIdx は常に「コンポ時間」。各トラックのKF評価は自身の tOffset を引いた時間で行う（SPEC_11 P3b-2）
 function applyTrackChain(tCtx, tw, th, frameIdx, track, sx, sy, cam, depth){
   if(depth>8) return null; // 循環・過深の安全弁（UI側でも循環は防止）
-  const tr=getTransform(frameIdx,track.keyframes);
+  const tr=getTransform(frameIdx-(track.tOffset||0),track.keyframes);
   const p = track.parent ? state.tracks.find(t=>t.tid===track.parent&&t.type!=='camera') : null;
   if(p){
     if(!applyTrackChain(tCtx,tw,th,frameIdx,p,sx,sy,cam,depth+1)) return null;
@@ -2640,14 +2832,80 @@ function applyTrackChain(tCtx, tw, th, frameIdx, track, sx, sy, cam, depth){
   }
   return tr;
 }
+// ── ペアレント時のジャンプ補正（SPEC_11 P2b）──
+// applyTrackChain と同じ式を Canvas ctx 無しで数値再現する。単位はコンポ座標(sx=sy=1)。
+// root式に cam は含めない（カメラは表示側の話＝補正対象外）。2D相似変換 {tx,ty,rot(deg),s} で表現。
+function localXformAt(track, frame, isRoot){
+  const tr=getTransform(frame-trackOff(track),track.keyframes); // SPEC_11 P3b-2
+  const persp=PERSP_FOCAL/Math.max(1,PERSP_FOCAL+(tr.z||0));
+  const s=tr.s*persp;
+  return isRoot
+    ? {tx:state.width/2+tr.x+tr.ax, ty:state.height/2+tr.y+tr.ay, rot:tr.rot, s}
+    : {tx:tr.x+tr.ax, ty:tr.y+tr.ay, rot:tr.rot, s};
+}
+// A の後に B を適用（ctx.translate/rotate/scale の積み順と同じ）
+function xformMul(A,B){
+  const a=A.rot*Math.PI/180, c=Math.cos(a), si=Math.sin(a);
+  return {
+    tx: A.tx + A.s*(c*B.tx - si*B.ty),
+    ty: A.ty + A.s*(si*B.tx + c*B.ty),
+    rot: A.rot+B.rot, s: A.s*B.s,
+  };
+}
+function xformInv(A){
+  const s=A.s||1e-6, a=-A.rot*Math.PI/180, c=Math.cos(a), si=Math.sin(a);
+  const ix=-(c*A.tx - si*A.ty)/s, iy=-(si*A.tx + c*A.ty)/s;
+  return {tx:ix, ty:iy, rot:-A.rot, s:1/s};
+}
+function chainXformAt(track, frame, depth){
+  depth=depth||0;
+  const p=(depth<8&&track.parent)?state.tracks.find(t=>t.tid===track.parent&&t.type!=='camera'):null;
+  const L=localXformAt(track,frame,!p);
+  return p ? xformMul(chainXformAt(p,frame,depth+1),L) : L;
+}
+// 全KFへ差分を加算／乗算（KFが無いプロパティは現フレームに1キー作成）
+function kfShiftProp(track,prop,delta,f){
+  if(!isFinite(delta)||Math.abs(delta)<1e-9) return;
+  const arr=track.keyframes[prop];
+  if(!arr.length){ setKf(prop,f,clampProp(prop,propDefOf(prop)+delta),track.keyframes); return; }
+  arr.forEach(k=>{ k.v=clampProp(prop,k.v+delta); });
+}
+function kfScaleProp(track,prop,mul,f){
+  if(!isFinite(mul)||Math.abs(mul-1)<1e-9) return;
+  const arr=track.keyframes[prop];
+  if(!arr.length){ setKf(prop,f,clampProp(prop,propDefOf(prop)*mul),track.keyframes); return; }
+  arr.forEach(k=>{ k.v=clampProp(prop,k.v*mul); });
+}
+// 親の付け外し。compensate=true で「現フレームの見た目が変わらない」ようKFを一括補正（AE準拠）。
+// 全フレーム一致は親のKFが時変なので原理的に不可＝現フレーム基準。ax/ay は触らない。
+function setTrackParent(track, newParentTid, compensate){
+  const f=state.currentFrame;
+  const W=compensate?chainXformAt(track,f,0):null;
+  track.parent=newParentTid||null;
+  if(!compensate) return;
+  const np=track.parent?state.tracks.find(x=>x.tid===track.parent&&x.type!=='camera'):null;
+  const L=np?xformMul(xformInv(chainXformAt(np,f,0)),W):W;
+  const tr=getTransform(f-trackOff(track),track.keyframes);
+  const persp=PERSP_FOCAL/Math.max(1,PERSP_FOCAL+(tr.z||0));
+  const tX=(np?L.tx:L.tx-state.width/2)-tr.ax;
+  const tY=(np?L.ty:L.ty-state.height/2)-tr.ay;
+  const tS=persp>0?L.s/persp:tr.s;
+  kfShiftProp(track,'x',tX-tr.x,f);
+  kfShiftProp(track,'y',tY-tr.y,f);
+  kfShiftProp(track,'rot',L.rot-tr.rot,f);
+  kfScaleProp(track,'s',Math.abs(tr.s)>1e-6?tS/tr.s:1,f);
+}
 function drawOneTrack(tCtx, tw, th, frameIdx, track, hasSolo, cam){
   const soloed = hasSolo !== undefined ? hasSolo : state.tracks.some(t=>t.solo&&t.type!=='camera');
   if(track.type==='camera') return; // カメラ自体は描画しない
   if(!track.visible||!track.frames.length) return;
   if(soloed && !track.solo) return;
+  // SPEC_11 P3b-1: IN/OUTトリム（コンポ時間基準・camera/nullは対象外＝上でreturn済み）
+  if(frameIdx<(track.tIn||0)||frameIdx>=(track.tOut==null?Infinity:track.tOut)) return;
   // SPEC_06 §6.1: セル参照のみfloor（MB finalのサブフレーム対応）。カメラ/KFへは小数のまま渡す
   // ＝トランスフォームだけサブフレーム補間され、作画のコマは踏み替えない（アニメ撮として正しい挙動）
-  const fi=Math.max(0,Math.min(Math.floor(frameIdx),track.totalFrames-1));
+  // SPEC_11 P3b-2: セル参照は「コンポ時間 − tOffset」。範囲外は従来どおり端のコマを保持（消したい場合はトリム）
+  const fi=Math.max(0,Math.min(Math.floor(frameIdx-(track.tOffset||0)),track.totalFrames-1));
   const f=track.frames[fi];
   if(!f||f.kind!=='draw'||f.hidden||!f.image||!f.image.complete) return;
   const sx=tw/state.width, sy=th/state.height; // コンポ座標→出力座標
@@ -2714,12 +2972,20 @@ function drawCurrentFrame(){
     const out=gFx.apply(srcC,state.fx,{t:state.currentFrame/state.fps}); // velなし＝rt mb不発
     ctx.clearRect(0,0,state.width,state.height);
     ctx.drawImage(out,0,0,state.width,state.height);
+  } else if(gDraftPlay&&state.isPlaying){
+    // SPEC_11 P4-3: 1/2解像度ドラフト再生（再生中のみ。停止すると自動でフル解像度に戻る）
+    const hw=Math.max(1,Math.round(state.width/2)), hh=Math.max(1,Math.round(state.height/2));
+    if(!gDraftC){ gDraftC=document.createElement('canvas'); gDraft2d=gDraftC.getContext('2d'); }
+    if(gDraftC.width!==hw||gDraftC.height!==hh){ gDraftC.width=hw; gDraftC.height=hh; gDraft2d.imageSmoothingEnabled=false; }
+    drawFrame(gDraft2d,hw,hh,state.currentFrame);
+    ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(gDraftC,0,0,state.width,state.height);
   } else {
     drawFrame(ctx,state.width,state.height,state.currentFrame);
   }
   const t=selTrack();
   const kfs=t?t.keyframes:makeEmptyKfs();
-  const tr=getTransform(state.currentFrame,kfs);
+  const tr=getTransform(curLocalFrame(),kfs);
   const inner=$('#viewport-inner');
   const sx=inner.clientWidth/state.width, sy=inner.clientHeight/state.height;
   // 親付きの子はハンドル位置が視覚と一致しないため非表示（数値/スクラブで編集）
@@ -2737,9 +3003,21 @@ function drawCurrentFrame(){
   updatePlayhead(); updateKfUI(); updateInspectorCurrent(); updateTransport();
 }
 
+// SPEC_11 P4-3: 1/2解像度ドラフト再生（設定パネルのトグル・localStorage永続）
+const DRAFT_LS='composer_draft_play_v1';
+let gDraftPlay=false, gDraftC=null, gDraft2d=null;
+try{ gDraftPlay=localStorage.getItem(DRAFT_LS)==='1'; }catch(e){}
+
 // ── ミニグラフ（選択トラックの値/速度カーブ。AEグラフエディタの簡易版）──
 const GRAPH_COLORS={x:'#36FF00',y:'#F9FF47',z:'#4FC3F7',s:'#FF4FA8',rot:'#FF8A4F',ax:'#8AFFB0',ay:'#B08AFF',op:'#999999'};
 let gGraphMode='val'; // 'val'=値カーブ / 'spd'=速度カーブ（|Δv|/frame）
+// SPEC_11 P2c: 凡例クリックでプロパティ単独表示 / キー点ドラッグ編集（VALモードのみ）
+let gGraphSolo=null;        // null=全表示 / 'x'|'y'|… = そのプロパティのみ
+let gGraphLegendHits=[];    // [{p,x,y,w,h}] canvas描画なのでヒット判定は矩形を記録して行う
+let gGraphKeyHits=[];       // [{p,k,px,py}] キー点の当たり判定（描画時に記録）
+let gGraphDrag=null;        // ドラッグ中: {p,k,f0,v0,px0,py0,mn,rng,moved}
+const GRAPH_NORM={};        // {prop:{mn,rng}} 直近描画時の正規化（縦ドラッグの逆写像に使う）
+let gGraphGeo={x0:LABEL_W,sw:0,H:0,pad:6}; // 直近描画時のジオメトリ
 function toggleGraph(){
   const g=$('#tl-graph'); g.classList.toggle('show');
   const btn=$('#btn-graph'); if(btn) btn.classList.toggle('on',g.classList.contains('show'));
@@ -2755,20 +3033,29 @@ function renderGraph(){
   c.clearRect(0,0,W,H);
   const t=selTrack(), total=state.totalFrames;
   const sw=W-LABEL_W, x0=LABEL_W, pad=6;
+  gGraphLegendHits=[]; gGraphKeyHits=[]; gGraphGeo={x0,sw,H,pad};
+  const off=trackOff(t); // SPEC_11 P3b-2: グラフの横軸もコンポ時間（KFダイヤ／ルーラーと同じ規約）
   // 凡例エリア（左）
   c.font='8px monospace';
   if(t&&total>1){
     let ly=24;
     for(const p of ALL_PROPS){
       if(t.keyframes[p].length<2) continue;
-      c.fillStyle=GRAPH_COLORS[p]; c.fillText(p.toUpperCase(),8,ly); ly+=10;
+      const dim=(gGraphSolo&&gGraphSolo!==p);
+      c.globalAlpha=dim?0.28:1;
+      c.fillStyle=GRAPH_COLORS[p]; c.fillText(p.toUpperCase(),8,ly);
+      if(gGraphSolo===p){ c.strokeStyle=GRAPH_COLORS[p]; c.lineWidth=1; c.strokeRect(4.5,ly-9.5,26,12); }
+      c.globalAlpha=1;
+      gGraphLegendHits.push({p,x:4,y:ly-10,w:28,h:13});
+      ly+=10;
       if(ly>H-4) break;
     }
     // 各プロパティのカーブ（プロパティごとに min-max 正規化）
     for(const p of ALL_PROPS){
       const arr=t.keyframes[p]; if(arr.length<2) continue;
-      const vals=new Float32Array(total);
-      for(let f=0;f<total;f++) vals[f]=getKfValue(p,f,t.keyframes);
+      if(gGraphSolo&&gGraphSolo!==p) continue; // SPEC_11 P2c: 単独表示
+      const vals=new Float32Array(total); // 添字＝コンポ時間。評価は トラック内時間(f-off)
+      for(let f=0;f<total;f++) vals[f]=getKfValue(p,f-off,t.keyframes);
       let series=vals;
       if(gGraphMode==='spd'){
         series=new Float32Array(total);
@@ -2777,7 +3064,9 @@ function renderGraph(){
       }
       let mn=Infinity,mx=-Infinity;
       for(let f=0;f<total;f++){ if(series[f]<mn)mn=series[f]; if(series[f]>mx)mx=series[f]; }
-      const rng=(mx-mn)||1;
+      let rng=(mx-mn)||1;
+      // ドラッグ中は正規化を開始時に固定（毎フレーム再正規化するとカーブが暴れるため）
+      if(gGraphDrag&&gGraphDrag.p===p){ mn=gGraphDrag.mn; rng=gGraphDrag.rng; }
       c.strokeStyle=GRAPH_COLORS[p]; c.lineWidth=1; c.globalAlpha=0.9;
       c.beginPath();
       for(let f=0;f<total;f++){
@@ -2786,15 +3075,19 @@ function renderGraph(){
         if(f===0)c.moveTo(px,py);else c.lineTo(px,py);
       }
       c.stroke();
-      // キー位置に点
+      // キー位置に点（VALモードのみドラッグ可＝ヒット矩形を記録）
       c.fillStyle=GRAPH_COLORS[p];
       for(const k of arr){
-        const f=Math.min(k.f,total-1);
+        const f=Math.max(0,Math.min(k.f+off,total-1)); // 表示はコンポ時間
         const px=x0+frameFrac(f)*sw;
         const py=H-pad-(series[f]-mn)/rng*(H-pad*2);
-        c.fillRect(px-2,py-2,4,4);
+        const on=gGraphDrag&&gGraphDrag.k===k;
+        c.fillRect(px-(on?3:2),py-(on?3:2),on?6:4,on?6:4);
+        if(gGraphMode==='val') gGraphKeyHits.push({p,k,px,py});
       }
       c.globalAlpha=1;
+      // 正規化パラメータを保持（ドラッグ開始時に凍結して逆写像に使う）
+      if(!gGraphDrag) { GRAPH_NORM[p]={mn,rng}; }
     }
   } else {
     c.fillStyle='rgba(255,255,255,0.25)';
@@ -2805,6 +3098,79 @@ function renderGraph(){
   c.strokeStyle='rgba(255,255,255,0.6)'; c.lineWidth=1;
   c.beginPath(); c.moveTo(px,0); c.lineTo(px,H); c.stroke();
 }
+// ── ミニグラフの操作（SPEC_11 P2c）──
+// 凡例クリック=プロパティ単独表示トグル / キー点ドラッグ=横:フレーム移動・縦:値変更（VALモードのみ）
+(function initGraphEdit(){
+  const cv=$('#tl-graph-canvas'); if(!cv) return;
+  const localPt=e=>{ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
+  cv.addEventListener('click',e=>{
+    if(gGraphDrag) return;
+    const {x,y}=localPt(e);
+    for(const h of gGraphLegendHits){
+      if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){
+        gGraphSolo=(gGraphSolo===h.p)?null:h.p;
+        renderGraph(); flashLive(gGraphSolo?('GRAPH: '+gGraphSolo.toUpperCase()+' のみ'):'GRAPH: 全プロパティ');
+        return;
+      }
+    }
+  });
+  cv.addEventListener('pointerdown',e=>{
+    const t=selTrack(); if(!t) return;
+    if(gGraphMode!=='val') return;      // SPD は表示専用
+    const {x,y}=localPt(e);
+    if(x<gGraphGeo.x0) return;          // 凡例エリアはclickで処理
+    let hit=null, best=7*7;
+    for(const h of gGraphKeyHits){
+      const d=(h.px-x)*(h.px-x)+(h.py-y)*(h.py-y);
+      if(d<=best){ best=d; hit=h; }
+    }
+    if(!hit) return;
+    const nrm=GRAPH_NORM[hit.p]||{mn:0,rng:1};
+    gGraphDrag={p:hit.p,k:hit.k,f0:hit.k.f,v0:hit.k.v,px0:x,py0:y,mn:nrm.mn,rng:nrm.rng,moved:false};
+    try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault(); e.stopPropagation();
+  });
+  cv.addEventListener('pointermove',e=>{
+    if(!gGraphDrag){
+      // ホバーでカーソルを変える（掴めることを示す）
+      if(gGraphMode!=='val'){ cv.style.cursor=''; return; }
+      const {x,y}=localPt(e);
+      let near=false;
+      for(const h of gGraphKeyHits){ if((h.px-x)*(h.px-x)+(h.py-y)*(h.py-y)<=49){ near=true; break; } }
+      cv.style.cursor=near?'move':'';
+      return;
+    }
+    if(!e.buttons){ endGraphDrag(); return; } // ペン等でupを取り逃した場合の保険
+    const t=selTrack(); if(!t){ endGraphDrag(); return; }
+    const {x,y}=localPt(e);
+    const total=state.totalFrames||1;
+    const arr=t.keyframes[gGraphDrag.p];
+    const d=gGraphDrag;
+    // 横＝フレーム移動（相対）。既存キーと衝突したら移動しない（クランプ）
+    const df=Math.round((x-d.px0)/(gGraphGeo.sw||1)*total);
+    const nf=Math.max(0,Math.min(total-1,d.f0+df));
+    if(nf!==d.k.f && !arr.some(k=>k!==d.k&&k.f===nf)){ d.k.f=nf; arr.sort((a,b)=>a.f-b.f); d.moved=true; }
+    // 縦＝値（Shiftで×0.1の精密。既存スクラブと同じ流儀）
+    let dv=(d.py0-y)/Math.max(1,(gGraphGeo.H-gGraphGeo.pad*2))*d.rng;
+    if(e.shiftKey) dv*=0.1;
+    const nv=clampProp(d.p,d.v0+dv);
+    if(nv!==d.k.v){ d.k.v=nv; d.moved=true; }
+    drawCurrentFrame(); // 内部で renderGraph も走る
+  });
+  function endGraphDrag(){
+    if(!gGraphDrag) return;
+    const moved=gGraphDrag.moved; const p=gGraphDrag.p, k=gGraphDrag.k;
+    gGraphDrag=null;
+    if(moved){
+      kfSel=[{t:state.selectedTrack,f:k.f}];
+      recordHistory(); renderKfDiamonds(state.selectedTrack); refreshKfSelClasses();
+      drawCurrentFrame(); updateKfUI();
+      flashLive('GRAPH '+p.toUpperCase()+' → F'+(k.f+1)+' / '+fmtProp(p,k.v));
+    } else renderGraph();
+  }
+  cv.addEventListener('pointerup',endGraphDrag);
+  cv.addEventListener('pointercancel',endGraphDrag);
+})();
 // ── PLAYBACK ──
 function updatePlayhead(){
   const total=state.totalFrames||1;
@@ -2845,7 +3211,7 @@ function play(){
 function pause(){
   state.isPlaying=false; stopAudioSync();
   $('#btn-play').textContent='▶';
-  if(gFxPreview&&gFxFinalPrev) drawCurrentFrame(); // 停止した瞬間にFINAL PREVIEWへ切替
+  if((gFxPreview&&gFxFinalPrev)||gDraftPlay) drawCurrentFrame(); // 停止した瞬間にFINAL PREVIEW／フル解像度へ戻す
 }
 function togglePlay(){state.isPlaying?pause():play();}
 function seek(f){state.currentFrame=Math.max(0,Math.min(state.totalFrames-1,f));drawCurrentFrame();}
@@ -2874,7 +3240,7 @@ function frameToTimecode(frameIdx){
 }
 function updateInspectorCurrent(){
   const t=selTrack();
-  const fi=t?Math.min(state.currentFrame,t.totalFrames-1):-1;
+  const fi=t?Math.max(0,Math.min(state.currentFrame-trackOff(t),t.totalFrames-1)):-1;
   const f=fi>=0?t.frames[fi]:null;
   $('#i-cur').textContent=String(state.currentFrame+1).padStart(4,'0');
   $('#i-cell').textContent=f?String(f.srcCellIndex+1).padStart(2,'0')+' ['+f.cellOffset+']':'—';
@@ -2887,7 +3253,7 @@ function updateInspectorCurrent(){
 }
 function updateKfUI(){
   const kfs=kfsNow();
-  const f=state.currentFrame, tr=getTransform(f,kfs);
+  const f=curLocalFrame(), tr=getTransform(f,kfs);
   ALL_PROPS.forEach(p=>{
     const el=$(`#kf-${p}`); if(el && document.activeElement!==el) el.value=fmtProp(p,tr[p]);
     const dot=$(`#dot-${p}`); if(dot) dot.classList.toggle('active',hasKfAt(p,f,kfs));
@@ -2916,7 +3282,7 @@ function updateExportButtons(){
   $('#btn-export-project').disabled=!has;
   $('#btn-export-video').disabled=!has;
   $('#btn-export-web').disabled=!has;
-  $('#btn-export-jsx').disabled=!getCameraTrack();
+  $('#btn-export-jsx').disabled=!state.tracks.length; // SPEC_11 P4-4: カメラが無くてもトラックだけ書き出せる
 }
 
 // ── PAYLOAD / EXPORT ──
@@ -2932,13 +3298,14 @@ function buildTrackPayload(track){
     format:'PROJECT_v1',
     projectId:track.projectId||('p_'+Date.now().toString(36)),
     tid:track.tid, type:track.type||'anim',
+    ...(track.tIn?{tIn:track.tIn}:{}), ...(track.tOut!=null?{tOut:track.tOut}:{}), ...(track.tOffset?{tOffset:track.tOffset}:{}), ...(track.locked?{locked:true}:{}), // SPEC_11 P3b/P4-2
     exportedAt:new Date().toISOString(),
     fps:state.fps, durationUnit:'frames',
     width:state.width, height:state.height,
     bgBright:state.bgBright,
     cellCount:cells.length, cells,
     composer:{
-      keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:track.keyframes[p].map(k=>({frame:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{})}))}),{}),
+      keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:track.keyframes[p].map(k=>({frame:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{}),...(k.hold?{hold:true}:{})}))}),{}),
       markers:track.markers.map(m=>({frame:m.frame,label:m.label||''})),
     },
   };
@@ -2961,10 +3328,11 @@ function buildProjectPayload(){
         name:t.name,
         projectId:(t.type==='camera'||t.type==='null')?null:(t.projectId||('p_'+Date.now().toString(36))),
         tid:t.tid, type:t.type||'anim', parent:t.parent||null, visible:t.visible!==false,
+        ...(t.tIn?{tIn:t.tIn}:{}), ...(t.tOut!=null?{tOut:t.tOut}:{}), ...(t.tOffset?{tOffset:t.tOffset}:{}), ...(t.locked?{locked:true}:{}), // SPEC_11 P3b トリム/ずらし・P4-2 ロック（無指定は省略）
         width:t.width||state.width, height:t.height||state.height, // トラック固有解像度を保持
         cellCount:cells.length, cells,
         composer:{
-          keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:t.keyframes[p].map(k=>({frame:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{})}))}),{}),
+          keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:t.keyframes[p].map(k=>({frame:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{}),...(k.hold?{hold:true}:{})}))}),{}),
           markers:t.markers.map(m=>({frame:m.frame,label:m.label||''})),
         },
       };
@@ -2985,88 +3353,166 @@ function exportProject(){
 // カメラKF（親NULLチェーン合成込み）を「AEでヌル＋一節点カメラを生成するスクリプト」として書き出す。
 // マッピング: x/y/z→ヌルPosition（コンポ中央基準・コンポ解像度へスケール）/ rot→ヌルZ回転 /
 // s→カメラZoom乗算（applyCamWrapのパララックス無しズームと等価）/ 焦点距離1000px=Zoom基準
+// SPEC_11 P4-4: 各トラックも平面（NULLはヌル）レイヤーとして Position/Anchor/Scale/Rotation/Opacity の
+// KF付きで生成する。Z→AEのZ位置（コンポ解像度へ ×sx）。カメラのZoom/位置設定と組み合わせて
+// composerのPERSP_FOCAL透視と一致する。絵そのものは運ばないので、平面のソースを差し替えて使う。
 function exportAeJsx(){
   const camT=getCameraTrack();
-  if(!camT){ flashLive('CAMERAトラックがありません'); return; }
+  const layerTracks=state.tracks.filter(t=>t.type!=='camera');
+  if(!camT&&!layerTracks.length){ flashLive('書き出す内容がありません'); return; }
   const fps=state.fps;
   // 親NULLチェーン収集（getCamAtと同じ順）
-  const chain=[camT];
-  let p=camT.parent?state.tracks.find(t=>t.tid===camT.parent&&t.type!=='camera'):null, n=0;
+  const chain=camT?[camT]:[];
+  let p=(camT&&camT.parent)?state.tracks.find(t=>t.tid===camT.parent&&t.type!=='camera'):null, n=0;
   while(p&&n++<8){ chain.push(p); p=p.parent?state.tracks.find(t=>t.tid===p.parent&&t.type!=='camera'):null; }
-  const unionFrames=props=>{ const s=new Set(); chain.forEach(t=>props.forEach(pr=>t.keyframes[pr].forEach(k=>s.add(k.f)))); return [...s].sort((a,b)=>a-b); };
+  const unionFrames=props=>{ const s=new Set(); chain.forEach(t=>props.forEach(pr=>t.keyframes[pr].forEach(k=>s.add(k.f+trackOff(t))))); return [...s].sort((a,b)=>a-b); }; // コンポ時間
   const composedAt=f=>{
-    const tr=getTransform(f,camT.keyframes);
-    for(let i=1;i<chain.length;i++){ const pt=getTransform(f,chain[i].keyframes); tr.x+=pt.x;tr.y+=pt.y;tr.z+=pt.z;tr.rot+=pt.rot;tr.s*=pt.s; }
+    const tr=getTransform(f-trackOff(camT),camT.keyframes);
+    for(let i=1;i<chain.length;i++){ const pt=getTransform(f-trackOff(chain[i]),chain[i].keyframes); tr.x+=pt.x;tr.y+=pt.y;tr.z+=pt.z;tr.rot+=pt.rot;tr.s*=pt.s; }
     return tr;
   };
   const easeInf=(f,pr)=>{ // ez/influence → AE influence%（近似）
-    for(const t of chain){ const k=t.keyframes[pr].find(k=>k.f===f); if(!k) continue;
+    for(const t of chain){ const k=t.keyframes[pr].find(k=>k.f===f-trackOff(t)); if(!k) continue;
       if(k.ei!=null||k.eo!=null) return Math.max(k.ei||0.1,k.eo||0.1);
       return (k.ez||0)>=0.99?75:(k.ez||0)>0?33.33:0; }
     return 0;
   };
-  const bake=(props,pick)=>unionFrames(props).map(f=>({t:+(f/fps).toFixed(5),v:pick(composedAt(f)),inf:easeInf(f,props[0])}));
+  const holdInf=(f,pr)=>{ for(const t of chain){ const k=t.keyframes[pr].find(k=>k.f===f-trackOff(t)); if(k) return k.hold?1:0; } return 0; };
+  const bake=(props,pick)=>unionFrames(props).map(f=>({t:+(f/fps).toFixed(5),v:pick(composedAt(f)),inf:easeInf(f,props[0]),h:holdInf(f,props[0])}));
+  // ── 各トラックのレイヤーデータ（SPEC_11 P4-4）──
+  const idxOf=new Map(layerTracks.map((t,i)=>[t.tid,i]));
+  const tData=layerTracks.map(t=>{
+    const o=trackOff(t);
+    const at=(f,pr)=>getKfValue(pr,f,t.keyframes);
+    const kOf=(f,pr)=>t.keyframes[pr].find(k=>k.f===f);
+    const infOf=(f,props)=>{ for(const pr of props){ const k=kOf(f,pr); if(!k) continue;
+      if(k.ei!=null||k.eo!=null) return Math.max(k.ei||0.1,k.eo||0.1);
+      return (k.ez||0)>=0.99?75:(k.ez||0)>0?33.33:0; } return 0; };
+    const holdOf=(f,props)=>{ for(const pr of props){ const k=kOf(f,pr); if(k) return k.hold?1:0; } return 0; };
+    const mk=(props,pick)=>{
+      const s=new Set(); props.forEach(pr=>t.keyframes[pr].forEach(k=>s.add(k.f)));
+      return [...s].sort((a,b)=>a-b).map(f=>({t:+((f+o)/fps).toFixed(5),v:pick(f),inf:infOf(f,props),h:holdOf(f,props)}));
+    };
+    return {
+      name:(t.name||'TRACK'), isNull:t.type==='null',
+      w:Math.max(1,Math.round(t.width||state.width)), h:Math.max(1,Math.round(t.height||state.height)),
+      parent:(t.parent&&idxOf.has(t.parent))?idxOf.get(t.parent):-1,
+      vis:t.visible!==false,
+      tIn:t.tIn||0, tOut:t.tOut==null?null:t.tOut, // トリム→AEのIN/OUT点
+      // 位置は「x+ax」（composerの回転/拡縮の原点）、アンカーは画像中心+ax
+      pos: mk(['x','y','z','ax','ay'], f=>[at(f,'x')+at(f,'ax'), at(f,'y')+at(f,'ay'), at(f,'z')]),
+      anc: mk(['ax','ay'], f=>[at(f,'ax'), at(f,'ay')]),
+      scl: mk(['s'],   f=>at(f,'s')),
+      rot: mk(['rot'], f=>at(f,'rot')),
+      opa: mk(['op'],  f=>at(f,'op')),
+      // KFが1つも無いプロパティ用の静止値
+      v0:{ x:at(0,'x')+at(0,'ax'), y:at(0,'y')+at(0,'ay'), z:at(0,'z'),
+           ax:at(0,'ax'), ay:at(0,'ay'), s:at(0,'s'), rot:at(0,'rot'), op:at(0,'op') },
+    };
+  });
   const data={
     fps, W:state.width, H:state.height, focal:PERSP_FOCAL,
-    pos: bake(['x','y','z'],tr=>[tr.x,tr.y,tr.z]),
-    rot: bake(['rot'],tr=>tr.rot),
-    zoom: bake(['s'],tr=>tr.s),
+    cam: camT ? {
+      pos: bake(['x','y','z'],tr=>[tr.x,tr.y,tr.z]),
+      rot: bake(['rot'],tr=>tr.rot),
+      zoom: bake(['s'],tr=>tr.s),
+    } : null,
+    tracks: tData,
   };
   const jsx=[
-'// COMPOSER camera export — After Effects用スクリプト',
+'// COMPOSER export — After Effects用スクリプト',
 '// 使い方: 同サイズ（または任意サイズ）のコンポを開いた状態で File > Scripts > Run Script File...',
 '// 生成物: COMPOSER_CAM_NULL（親ヌル・Position/Z回転キー）+ COMPOSER_CAM（一節点カメラ・Zoomキー）',
+'//         + 各トラックの平面/ヌルレイヤー（Position/Anchor/Scale/Rotation/Opacity のキー付き）',
+'// 注: 絵そのものは運びません。平面のソースを差し替えて使ってください。',
+'//     親子付きレイヤーのZ透視はAEのカメラ透視で解釈されるため、composerの子Z（親平面基準）とは',
+'//     厳密には一致しません（Z=0の子は一致）。',
 'var D='+JSON.stringify(data)+';',
 '(function(){',
 '  var comp=app.project.activeItem;',
 '  if(!comp||!(comp instanceof CompItem)){alert("コンポをアクティブにして実行してください");return;}',
-'  app.beginUndoGroup("COMPOSER CAMERA IMPORT");',
+'  app.beginUndoGroup("COMPOSER IMPORT");',
 '  var sx=comp.width/D.W;',
 '  var Z0=D.focal*sx;',
-'  var nul=comp.layers.addNull(comp.duration);',
-'  nul.name="COMPOSER_CAM_NULL"; nul.threeDLayer=true;',
-'  var nT=nul.property("ADBE Transform Group");',
-'  nT.property("ADBE Anchor Point").setValue([50,50,0]);',
-'  nT.property("ADBE Position").setValue([comp.width/2,comp.height/2,0]);',
-'  var cam=comp.layers.addCamera("COMPOSER_CAM",[comp.width/2,comp.height/2]);',
-'  cam.autoOrient=AutoOrientType.NO_AUTO_ORIENT; // 一節点カメラ化（親ヌルで動かすため）',
-'  var cT=cam.property("ADBE Transform Group");',
-'  cT.property("ADBE Position").setValue([comp.width/2,comp.height/2,-Z0]);',
-'  var zoomProp=cam.property("ADBE Camera Options Group").property("ADBE Camera Zoom");',
-'  zoomProp.setValue(Z0);',
-'  cam.parent=nul;',
 '  function keys(prop,arr,mk){',
 '    if(!arr.length)return;',
 '    if(arr.length===1){prop.setValue(mk(arr[0]));return;}',
 '    for(var i=0;i<arr.length;i++)prop.setValueAtTime(arr[i].t,mk(arr[i]));',
 '    for(var j=0;j<arr.length;j++){',
-'      if(arr[j].inf>0){',
+'      if(arr[j].h){',
+'        try{prop.setInterpolationTypeAtKey(j+1,prop.keyInInterpolationType(j+1),KeyframeInterpolationType.HOLD);}catch(err){}',
+'      } else if(arr[j].inf>0){',
 '        var e=new KeyframeEase(0,Math.max(0.1,Math.min(100,arr[j].inf)));',
 '        try{prop.setTemporalEaseAtKey(j+1,[e],[e]);}catch(err){}',
 '      }',
 '    }',
 '  }',
-'  keys(nT.property("ADBE Position"),D.pos,function(k){return [comp.width/2+k.v[0]*sx,comp.height/2+k.v[1]*sx,k.v[2]*sx];});',
-'  keys(nT.property("ADBE Rotate Z"),D.rot,function(k){return k.v;});',
-'  keys(zoomProp,D.zoom,function(k){return Z0*k.v;});',
+'  // ── トラック（下＝BGから順に作る＝AEでは後から作ったものが上に載る）──',
+'  var made=[],ti,td,L,T;',
+'  for(ti=0;ti<D.tracks.length;ti++){',
+'    td=D.tracks[ti];',
+'    if(td.isNull){ L=comp.layers.addNull(comp.duration); L.name=td.name; }',
+'    else { L=comp.layers.addSolid([0.35,0.35,0.40],td.name,td.w,td.h,1,comp.duration); }',
+'    L.threeDLayer=true;',
+'    L.enabled=td.vis;',
+'    made.push(L);',
+'  }',
+'  for(ti=0;ti<made.length;ti++){ if(D.tracks[ti].parent>=0) made[ti].parent=made[D.tracks[ti].parent]; }',
+'  for(ti=0;ti<made.length;ti++){',
+'    td=D.tracks[ti]; L=made[ti]; T=L.property("ADBE Transform Group");',
+'    var cw=td.isNull?100:td.w, chh=td.isNull?100:td.h;',
+'    var aP=T.property("ADBE Anchor Point"), pP=T.property("ADBE Position");',
+'    var sP=T.property("ADBE Scale"), rP=T.property("ADBE Rotate Z"), oP=T.property("ADBE Opacity");',
+'    if(td.anc.length) keys(aP,td.anc,function(k){return [cw/2+k.v[0],chh/2+k.v[1],0];});',
+'    else aP.setValue([cw/2+td.v0.ax,chh/2+td.v0.ay,0]);',
+'    if(td.pos.length) keys(pP,td.pos,function(k){return [comp.width/2+k.v[0]*sx,comp.height/2+k.v[1]*sx,k.v[2]*sx];});',
+'    else pP.setValue([comp.width/2+td.v0.x*sx,comp.height/2+td.v0.y*sx,td.v0.z*sx]);',
+'    var sc=td.isNull?100:100*sx;',
+'    if(td.scl.length) keys(sP,td.scl,function(k){return [k.v*sc,k.v*sc,100];});',
+'    else sP.setValue([td.v0.s*sc,td.v0.s*sc,100]);',
+'    if(td.rot.length) keys(rP,td.rot,function(k){return k.v;}); else rP.setValue(td.v0.rot);',
+'    if(td.opa.length) keys(oP,td.opa,function(k){return k.v*100;}); else oP.setValue(td.v0.op*100);',
+'    if(td.tIn>0) L.inPoint=td.tIn/D.fps;',
+'    if(td.tOut!==null) L.outPoint=td.tOut/D.fps;',
+'  }',
+'  // ── カメラ ──',
+'  if(D.cam){',
+'    var nul=comp.layers.addNull(comp.duration);',
+'    nul.name="COMPOSER_CAM_NULL"; nul.threeDLayer=true;',
+'    var nT=nul.property("ADBE Transform Group");',
+'    nT.property("ADBE Anchor Point").setValue([50,50,0]);',
+'    nT.property("ADBE Position").setValue([comp.width/2,comp.height/2,0]);',
+'    var cam=comp.layers.addCamera("COMPOSER_CAM",[comp.width/2,comp.height/2]);',
+'    cam.autoOrient=AutoOrientType.NO_AUTO_ORIENT; // 一節点カメラ化（親ヌルで動かすため）',
+'    var cT=cam.property("ADBE Transform Group");',
+'    cT.property("ADBE Position").setValue([comp.width/2,comp.height/2,-Z0]);',
+'    var zoomProp=cam.property("ADBE Camera Options Group").property("ADBE Camera Zoom");',
+'    zoomProp.setValue(Z0);',
+'    cam.parent=nul;',
+'    keys(nT.property("ADBE Position"),D.cam.pos,function(k){return [comp.width/2+k.v[0]*sx,comp.height/2+k.v[1]*sx,k.v[2]*sx];});',
+'    keys(nT.property("ADBE Rotate Z"),D.cam.rot,function(k){return k.v;});',
+'    keys(zoomProp,D.cam.zoom,function(k){return Z0*k.v;});',
+'  }',
 '  app.endUndoGroup();',
-'  alert("COMPOSER CAMERA IMPORTED\\nPOS:"+D.pos.length+"  ROT:"+D.rot.length+"  ZOOM:"+D.zoom.length+" keys");',
+'  alert("COMPOSER IMPORTED\\nLAYERS:"+D.tracks.length+"  CAMERA:"+(D.cam?"YES":"NO"));',
 '})();',
   ].join('\n');
   const blob=new Blob([jsx],{type:'application/javascript'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-  a.href=url; a.download=`composer_camera_${ts}.jsx`; a.click();
+  a.href=url; a.download=`composer_ae_${ts}.jsx`; a.click();
   URL.revokeObjectURL(url);
-  flashLive('🎥 AE JSX EXPORTED');
+  flashLive('🎥 AE JSX EXPORTED — '+layerTracks.length+'レイヤー'+(camT?' + CAMERA':''));
 }
 
 // ── 4K EXPORT ──
 let gExportCancel=false;
 $('#export-cancel').addEventListener('click',()=>{gExportCancel=true;});
-// PNG連番→ZIP書き出しの共通処理。drawAt(ctx2d, frameIdx) で1コマ描画
-async function exportZipPNG(total, zipName, drawAt){
+// PNG連番→ZIP書き出しの共通処理。drawAt(ctx2d, i) で1コマ描画（i=0..total-1 の相対番号）
+// SPEC_11 P3: numStart=ファイル名に使う絶対フレーム番号の起点（WA開始）。AEに読み込んだとき
+// タイムライン上のコマ番号と一致させるため、連番はWAの絶対番号で振る（WA未設定なら従来と同一）
+async function exportZipPNG(total, zipName, drawAt, numStart){
   pause();
   gExportCancel=false;
   $('#export-msg').textContent='EXPORTING PNG SEQUENCE';
@@ -3079,7 +3525,7 @@ async function exportZipPNG(total, zipName, drawAt){
   for(let i=0;i<total;i++){
     if(gExportCancel){canceled=true;break;}
     drawAt(oc2d,i);
-    folder.file(`frame_${String(i+1).padStart(5,'0')}.png`,oc.toDataURL('image/png').split(',')[1],{base64:true});
+    folder.file(`frame_${String((numStart||0)+i+1).padStart(5,'0')}.png`,oc.toDataURL('image/png').split(',')[1],{base64:true});
     const pct=((i+1)/total*100).toFixed(1);
     bar.style.width=pct+'%'; prog.textContent=`${i+1} / ${total} — ${pct}%`;
     if(i%4===3) await new Promise(r=>setTimeout(r,0));
@@ -3153,8 +3599,11 @@ async function exportVideoComposer(){
 $('#btn-export-video').addEventListener('click',exportVideoComposer);
 async function exportPNG(){
   if(!state.totalFrames) return;
+  // SPEC_11 P3: ワークエリア準拠（VIDEO/EXPORT WEB と同じ webRange）。WA=全範囲なら従来と同一出力
+  const {start,len}=webRange();
+  if(len<=0){ flashLive('ワークエリアが空です'); return; }
   gFxTier='final'; // SPEC_06 §6: PNG連番=final（MB蓄積＋DOF layer）。VIDEOはrtのまま
-  try{ await exportZipPNG(state.totalFrames,'composer_4k.zip',(ctx,i)=>fxRenderFinal(ctx,i)); }
+  try{ await exportZipPNG(len,'composer_4k.zip',(ctx,i)=>fxRenderFinal(ctx,start+i),start); }
   finally{ gFxTier='draft'; }
 }
 
@@ -3264,8 +3713,14 @@ function buildSfxUI(){
   }
 }
 function sfxChanged(){ if(gFxPreview) drawCurrentFrame(); } // undo対象外（SPEC_06 v1）
-function closeSfxModal(){ $('#sfx-modal').classList.remove('show'); }
-$('#btn-fx').addEventListener('click',()=>{ buildSfxUI(); $('#sfx-modal').classList.add('show'); });
+function closeSfxModal(){ $('#sfx-modal').classList.remove('show'); $('#btn-fx').classList.remove('primary'); }
+// FXボタンは開く/閉じるのトグル（✕とEscでも閉じる。ボタンは開いている間 primary で光る）
+function toggleSfxModal(){
+  const m=$('#sfx-modal');
+  if(m.classList.contains('show')){ closeSfxModal(); return; }
+  buildSfxUI(); m.classList.add('show'); $('#btn-fx').classList.add('primary');
+}
+$('#btn-fx').addEventListener('click',toggleSfxModal);
 $('#sfx-close').addEventListener('click',closeSfxModal);
 makeFloatDrag($('#sfx-modal'), $('#sfx-head'), t=>t.id==='sfx-close'); // フローティング（INSPECTOR/FX HUDと同じ）
 $('#btn-fx-preview').addEventListener('click',()=>{
@@ -3289,13 +3744,20 @@ function webCollectTracks(start,len){
     const rec={
       name:t.name, tid:t.tid, parent:t.parent||null,
       width:t.width||state.width, height:t.height||state.height,
-      keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:t.keyframes[p].map(k=>({f:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{})}))}),{}),
+      keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:t.keyframes[p].map(k=>({f:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{}),...(k.hold?{hold:true}:{})}))}),{}),
       frameMap:[], images:[]
     };
+    // SPEC_11 P3b-1: トリムはビューアローカル時間へ換算して持ち回る（frameMapの-1と二重に安全）
+    if(t.tIn) rec.tIn=Math.max(0,t.tIn-start);
+    if(t.tOut!=null) rec.tOut=Math.max(0,t.tOut-start);
+    if(t.tOffset) rec.tOffset=t.tOffset; // SPEC_11 P3b-2: KF評価用（セルはframeMapに焼き込み済み）
     if(t.visible&&t.frames.length){
       const map=new Map();
+      const tIn=t.tIn||0, tOut=(t.tOut==null?Infinity:t.tOut);
       for(let i=0;i<len;i++){
-        const fi=Math.min(start+i,t.totalFrames-1);
+        const af=start+i;
+        if(af<tIn||af>=tOut){ rec.frameMap.push(-1); continue; } // トリム範囲外
+        const fi=Math.max(0,Math.min(af-(t.tOffset||0),t.totalFrames-1)); // SPEC_11 P3b-2
         const f=t.frames[fi];
         if(!f||f.kind!=='draw'||f.hidden||!f.image||!f.image.complete){ rec.frameMap.push(-1); continue; }
         if(!map.has(f.image)){ map.set(f.image,map.size); jobs.push({img:f.image,rec}); }
@@ -3381,7 +3843,7 @@ async function exportWeb(){
     width:state.width, height:state.height, bgBright:state.bgBright, fps:state.fps,
     totalFrames:len,
     markers:state.markers.filter(m=>m.frame>=start&&m.frame<start+len).map(m=>({f:m.frame-start,label:m.label||''})),
-    camera:(camT&&camT.visible)?{parent:camT.parent||null,keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:camT.keyframes[p].map(k=>({f:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{})}))}),{})}:null,
+    camera:(camT&&camT.visible)?{parent:camT.parent||null,tOffset:camT.tOffset||0,keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:camT.keyframes[p].map(k=>({f:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{}),...(k.hold?{hold:true}:{})}))}),{})}:null,
     fx:state.fx, // SPEC_06 P2b: fxスキーマv1をそのまま同梱（ビューアはrt実行・?fx=0でOFF）
     tracks:tracksOut,
     cfg
@@ -3460,6 +3922,7 @@ function getKfValue(prop,frame,kfs){
   if(frame>=arr[arr.length-1].f)return arr[arr.length-1].v;
   for(var i=0;i<arr.length-1;i++){
     if(frame>=arr[i].f&&frame<=arr[i+1].f){
+      if(arr[i].hold)return arr[i].v; // SPEC_11 P2: ホールド
       var t=(frame-arr[i].f)/(arr[i+1].f-arr[i].f);
       var eo=arr[i].eo,ei=arr[i+1].ei;
       if(eo!=null||ei!=null){
@@ -3491,7 +3954,7 @@ function applyCamWrap(tCtx,tw,th,cam){
 }
 function applyTrackChain(tCtx,tw,th,af,track,sx,sy,cam,depth){
   if(depth>8)return null;
-  var tr=getTransform(af,track.keyframes);
+  var tr=getTransform(af-(track.tOffset||0),track.keyframes); // SPEC_11 P3b-2
   var p=track.parent?findTrack(track.parent):null;
   if(p){
     if(!applyTrackChain(tCtx,tw,th,af,p,sx,sy,cam,depth+1))return null;
@@ -3515,6 +3978,8 @@ function applyTrackChain(tCtx,tw,th,af,track,sx,sy,cam,depth){
 }
 function drawOneTrack(tCtx,tw,th,lf,track,cam){
   if(!track.frameMap.length)return;
+  // SPEC_11 P3b-1: IN/OUTトリム（ビューアローカル時間。frameMapの-1と二重に安全）
+  if(lf<(track.tIn||0)||lf>=(track.tOut==null?Infinity:track.tOut))return;
   var fi=Math.max(0,Math.min(Math.floor(lf),track.frameMap.length-1));
   var idx=track.frameMap[fi];
   if(idx<0)return;
@@ -3584,11 +4049,11 @@ window.addEventListener('mousemove',function(e){
   my=e.clientY/window.innerHeight*2-1;
 });
 function camAt(af){
-  var c=DATA.camera?getTransform(af,DATA.camera.keyframes):{x:0,y:0,z:0,s:1,ax:0,ay:0,rot:0,op:1};
+  var c=DATA.camera?getTransform(af-(DATA.camera.tOffset||0),DATA.camera.keyframes):{x:0,y:0,z:0,s:1,ax:0,ay:0,rot:0,op:1};
   // カメラの親（NULLチェーン）加算合成：COMPOSERのgetCamAtと同一ロジック
   var p=(DATA.camera&&DATA.camera.parent)?findTrack(DATA.camera.parent):null,n=0;
   while(p&&n++<8){
-    var pt=getTransform(af,p.keyframes);
+    var pt=getTransform(af-(p.tOffset||0),p.keyframes);
     c.x+=pt.x;c.y+=pt.y;c.z+=pt.z;c.rot+=pt.rot;c.s*=pt.s;
     p=p.parent?findTrack(p.parent):null;
   }
@@ -3912,13 +4377,23 @@ $('#tl-graph-mode').addEventListener('click',()=>{
   $('#tl-graph-mode').textContent=gGraphMode==='val'?'VAL':'SPD';
   renderGraph();
 });
+// SPEC_11 P2b: change イベントでは altKey が取れないため、直前の操作(pointerdown/keydown)で拾っておく
+let gParentAlt=false;
+$('#kf-parent').addEventListener('pointerdown',e=>{ gParentAlt=!!e.altKey; });
+$('#kf-parent').addEventListener('keydown',e=>{ gParentAlt=!!e.altKey; });
 $('#kf-parent').addEventListener('change',()=>{
   const t=selTrack(); if(!t) return; // SPEC_11 P5-2: カメラも許可（親=NULLのみは updateParentSelect が候補制限）
-  t.parent=$('#kf-parent').value||null;
+  const nv=$('#kf-parent').value||null;
+  const alt=gParentAlt; gParentAlt=false;
+  // SPEC_11 P2b: 通常は現フレームの見た目が変わらないようKFを補正。Alt併用で従来（補正なし）
+  // カメラの親付けは加算合成＝挙動が単純なので補正対象外（現状維持）
+  setTrackParent(t, nv, t.type!=='camera' && !alt);
   refreshTrackChainMarks(); // ⛓マーク更新（ラベルのみ。全再構築は不要）
-  drawCurrentFrame(); recordHistory();
+  renderKfDiamonds(state.selectedTrack);
+  drawCurrentFrame(); updateKfUI(); recordHistory();
   const p=t.parent?state.tracks.find(x=>x.tid===t.parent):null;
-  flashLive(p?('⛓ PARENT → '+(p.name||'TRACK')):'⛓ PARENT NONE');
+  const sfx=(t.type!=='camera'&&!alt)?' (補正あり)':'';
+  flashLive(p?('⛓ PARENT → '+(p.name||'TRACK')+sfx):'⛓ PARENT NONE'+sfx);
 });
 $('#btn-export').addEventListener('click',exportPNG);
 $('#btn-export-project').addEventListener('click',exportProject);
@@ -4029,6 +4504,7 @@ $('#btn-kf-clear').addEventListener('click',clearAllKf);
 $('#btn-kf-copy').addEventListener('click',copyKeyframes);
 $('#btn-kf-paste').addEventListener('click',pasteKeyframes);
 $('#btn-kf-ease').addEventListener('click',e=>applyEase(e.shiftKey?1:0.5));
+$('#btn-kf-hold').addEventListener('click',()=>applyHold()); // SPEC_11 P2
 
 // KFプロパティ入力の配線（インスペクター kf-/dot- と FX HUD fx-/fx-dot- で共通）
 function bindPropInputs(valPrefix, dotPrefix){
@@ -4040,8 +4516,8 @@ function bindPropInputs(valPrefix, dotPrefix){
       commitProp(prop,parseV());
     });
     $(`#${dotPrefix}${prop}`).addEventListener('click',()=>{
-      const t=selTrack(); if(!t) return;
-      const f=state.currentFrame, kfs=t.keyframes;
+      const t=selTrack(); if(!t||lockedGuard(t)) return;
+      const f=curLocalFrame(), kfs=t.keyframes;
       if(hasKfAt(prop,f,kfs)) removeKf(prop,f,kfs);
       else setKf(prop,f,parseV(),kfs);
       recordHistory(); renderKfDiamonds(state.selectedTrack); drawCurrentFrame();
@@ -4056,7 +4532,7 @@ document.querySelectorAll('.num-step[data-step], .num-step[data-fxstep]').forEac
     const t=selTrack(); if(!t) return;
     const dir=parseInt(btn.dataset.dir,10);
     const mul=e.shiftKey?10:1;
-    const cur=getKfValue(prop,state.currentFrame,t.keyframes);
+    const cur=getKfValue(prop,curLocalFrame(),t.keyframes);
     commitProp(prop, cur + dir*PROP_STEP[prop]*mul);
   });
 });
@@ -4067,9 +4543,9 @@ let anchorDragging=false, anchorDragStart=null, anchorDragKfStart=null;
 anchorHandle.addEventListener('pointerdown',e=>{
   if(e.pointerType==='touch') return; // 指はキャンバス操作優先。アンカー移動はペンで
   if(e.button!==0) return;
-  const t=selTrack(); if(!t) return;
+  const t=selTrack(); if(!t||lockedGuard(t)) return;
   pause(); anchorDragging=true;
-  const tr=getTransform(state.currentFrame,t.keyframes);
+  const tr=getTransform(curLocalFrame(),t.keyframes);
   anchorDragStart={px:e.clientX,py:e.clientY};
   anchorDragKfStart={ax:tr.ax,ay:tr.ay};
   anchorHandle.setPointerCapture(e.pointerId);
@@ -4079,8 +4555,8 @@ anchorHandle.addEventListener('pointermove',e=>{
   if(!anchorDragging) return;
   const t=selTrack(); if(!t) return;
   const {sx,sy}=screenToCanvasScale();
-  setKf('ax',state.currentFrame,Math.round(anchorDragKfStart.ax+(e.clientX-anchorDragStart.px)*sx),t.keyframes);
-  setKf('ay',state.currentFrame,Math.round(anchorDragKfStart.ay+(e.clientY-anchorDragStart.py)*sy),t.keyframes);
+  setKf('ax',curLocalFrame(),Math.round(anchorDragKfStart.ax+(e.clientX-anchorDragStart.px)*sx),t.keyframes);
+  setKf('ay',curLocalFrame(),Math.round(anchorDragKfStart.ay+(e.clientY-anchorDragStart.py)*sy),t.keyframes);
   renderKfDiamonds(state.selectedTrack); drawCurrentFrame();
 });
 anchorHandle.addEventListener('pointerup',()=>{
@@ -4093,9 +4569,9 @@ const vpInner=$('#viewport-inner');
 vpInner.addEventListener('pointerdown',e=>{
   if(e.pointerType==='touch') return; // 指はキャンバス操作（pan/zoom）優先。トラック移動はペンで
   if(e.button!==0) return; // 左/ペン接触のみ（中ボタンはPANに使う）
-  const t=selTrack(); if(!t) return;
+  const t=selTrack(); if(!t||lockedGuard(t)) return;
   pause(); state.vpDragging=true;
-  const tr=getTransform(state.currentFrame,t.keyframes);
+  const tr=getTransform(curLocalFrame(),t.keyframes);
   state.vpDragStart={px:e.clientX,py:e.clientY};
   state.vpDragKfStart={x:tr.x,y:tr.y};
   vpInner.setPointerCapture(e.pointerId);
@@ -4106,8 +4582,8 @@ vpInner.addEventListener('pointermove',e=>{
   if(!state.vpDragging) return;
   const t=selTrack(); if(!t) return;
   const {sx,sy}=screenToCanvasScale();
-  setKf('x',state.currentFrame,Math.round(state.vpDragKfStart.x+(e.clientX-state.vpDragStart.px)*sx),t.keyframes);
-  setKf('y',state.currentFrame,Math.round(state.vpDragKfStart.y+(e.clientY-state.vpDragStart.py)*sy),t.keyframes);
+  setKf('x',curLocalFrame(),Math.round(state.vpDragKfStart.x+(e.clientX-state.vpDragStart.px)*sx),t.keyframes);
+  setKf('y',curLocalFrame(),Math.round(state.vpDragKfStart.y+(e.clientY-state.vpDragStart.py)*sy),t.keyframes);
   renderKfDiamonds(state.selectedTrack); drawCurrentFrame();
 });
 vpInner.addEventListener('pointerup',()=>{
@@ -4250,7 +4726,60 @@ const SHORTCUT_ACTIONS=[
   {id:'fxHud',    label:'FX HUD 表示/非表示',   def:'X',         run:()=>toggleFxHud()},
   {id:'graph',    label:'ミニグラフ (G)',       def:'G',         run:()=>toggleGraph()},
   {id:'settings', label:'設定パネル',           def:',',         run:()=>toggleSettingsPanel()},
+  {id:'opPunch',  label:'OPパンチ (O / Shift=逆)', def:'O',      run:e=>opPunch(e&&e.shiftKey)}, // SPEC_11 P4-1
+  // SPEC_11 P3b-1: alt:true の項目は Alt 併用でのみ発火（AE準拠の [ / ]）
+  {id:'trimIn',   label:'トラックIN = 現コマ (Alt+[)',  def:'[', alt:true, prevent:true, run:()=>setTrackTrim('in')},
+  {id:'trimOut',  label:'トラックOUT = 現コマ (Alt+])', def:']', alt:true, prevent:true, run:()=>setTrackTrim('out')},
+  // Alt無しはレイヤーごとインジケータ位置へ移動（AE準拠）
+  {id:'layerIn',  label:'レイヤーの頭をインジケータへ ([)', def:'[', prevent:true, run:()=>trackToPlayhead('in')},
+  {id:'layerOut', label:'レイヤーの尻をインジケータへ (])', def:']', prevent:true, run:()=>trackToPlayhead('out')},
 ];
+// SPEC_11 P4-1: OPパンチ（フリッカー演出用）。O=現コマ op=1 → 次コマ op=0 ／ Shift+O=逆
+function opPunch(inv){
+  const t=selTrack(); if(!t){ flashLive('トラック未選択'); return; }
+  if(t.type==='camera'||t.type==='null'){ flashLive('OPパンチは絵のトラックのみ'); return; }
+  if(lockedGuard(t)) return;
+  const f=curLocalFrame(), a=inv?0:1, b=inv?1:0;
+  commitProp('op',a,false);                    // 現コマ（キーが無ければ作成）
+  setKf('op',f+1,b,t.keyframes);               // 次コマ
+  recordHistory(); renderKfDiamonds(state.selectedTrack); drawCurrentFrame(); updateKfUI();
+  flashLive('◐ OP PUNCH '+a+'→'+b+' (F'+(f+trackOff(t)+1)+')');
+}
+// SPEC_11 P3b-2 / 調整: レイヤーをインジケータ（プレイヘッド）位置へ移動（AEの [ / ] 相当）。
+// which='in' … レイヤーの頭を現コマへ / 'out' … レイヤーの尻を現コマ+1へ。
+// トリム(tIn/tOut)も一緒に平行移動する＝「レイヤーバーごと掴んで動かす」挙動
+function trackLen(t){
+  if(t.frames.length) return t.totalFrames;
+  const last=Math.max(0,...ALL_PROPS.map(p=>{const a=t.keyframes[p];return a.length?a[a.length-1].f:0;}));
+  return last+1; // CAMERA/NULL は KF の最終位置を尺とみなす
+}
+function trackToPlayhead(which){
+  const t=selTrack(); if(!t){ flashLive('トラック未選択'); return; }
+  if(lockedGuard(t)) return;
+  const head=t.tOffset||0, len=trackLen(t);
+  const delta=(which==='in') ? (state.currentFrame-head) : (state.currentFrame+1-(head+len));
+  if(!delta){ flashLive(which==='in'?'すでに頭がインジケータ位置です':'すでに尻がインジケータ位置です'); return; }
+  t.tOffset=head+delta;
+  // トリムもレイヤーと一緒に動く。はみ出してもクランプしない（表示側で丸める）
+  if((t.tIn||0)!==0||t.tOut!=null){
+    t.tIn=(t.tIn||0)+delta;
+    if(t.tOut!=null) t.tOut=t.tOut+delta;
+  }
+  rebuildAllTrackUI(); drawCurrentFrame(); updateKfUI(); recordHistory();
+  flashLive((which==='in'?'⇥ レイヤー頭 → F':'⇤ レイヤー尻 → F')+(state.currentFrame+1)
+    +'（OFFSET '+((t.tOffset||0)>=0?'+':'')+(t.tOffset||0)+'）');
+}
+// 選択トラックのIN/OUTを現フレームに設定（OUT=現フレーム+1＝そのコマまで表示）
+function setTrackTrim(which){
+  const t=selTrack(); if(!t){ flashLive('トラック未選択'); return; }
+  if(t.type==='camera'||t.type==='null'){ flashLive('CAMERA/NULLはトリム対象外'); return; }
+  if(t.locked){ flashLive('🔒 ロック中です'); return; }
+  const total=state.totalFrames||1, f=state.currentFrame;
+  if(which==='in') t.tIn=Math.max(0,Math.min(f,(t.tOut==null?total:t.tOut)-1));
+  else t.tOut=(f+1>=total)?null:Math.max((t.tIn||0)+1,f+1);
+  refreshTrimUI(state.selectedTrack); drawCurrentFrame(); recordHistory();
+  flashLive(which==='in'?('◧ IN = F'+((t.tIn||0)+1)):('◨ OUT = '+(t.tOut==null?'—（末尾まで）':'F'+t.tOut)));
+}
 const KEYMAP_LS='composer_keymap_v1';
 let gKeymap={}, gCaptureId=null;
 function defaultKeymap(){ const m={}; SHORTCUT_ACTIONS.forEach(a=>m[a.id]=a.def); return m; }
@@ -4270,7 +4799,9 @@ function handleShortcutCapture(e){
   if(['Shift','Control','Alt','Meta'].includes(e.key)) return true;
   const k=normKey(e);
   if(k==='Escape'){ gCaptureId=null; buildShortcutList(); return true; }
-  for(const id in gKeymap){ if(id!==gCaptureId && gKeymap[id]===k) gKeymap[id]=''; }
+  // 同じキーでも Alt必須/不要 は別枠（[ / ] はトリムとレイヤー移動で共用）なので、同じ枠の中でだけ重複解除
+  const altOf=id=>{ const a=SHORTCUT_ACTIONS.find(x=>x.id===id); return !!(a&&a.alt); };
+  for(const id in gKeymap){ if(id!==gCaptureId && gKeymap[id]===k && altOf(id)===altOf(gCaptureId)) gKeymap[id]=''; }
   gKeymap[gCaptureId]=k; gCaptureId=null; saveKeymap(); buildShortcutList();
   return true;
 }
@@ -4288,9 +4819,17 @@ window.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&(e.code==='ArrowUp'||e.code==='ArrowDown')){
     e.preventDefault(); moveTrack(e.code==='ArrowUp'?+1:-1, e.shiftKey); return;
   }
+  // SPEC_11 P3b-1: Alt 併用のショートカット（トリム等）。他のアクションはAlt併用を無視する従来方針のまま
+  if(e.altKey&&!e.ctrlKey&&!e.metaKey){
+    const ak=normKey(e);
+    for(const a of SHORTCUT_ACTIONS){
+      if(a.alt&&gKeymap[a.id]&&gKeymap[a.id]===ak){ if(a.prevent) e.preventDefault(); a.run(e); return; }
+    }
+  }
   if(e.ctrlKey||e.metaKey||e.altKey) return;
   const k=normKey(e);
   for(const a of SHORTCUT_ACTIONS){
+    if(a.alt) continue; // Alt必須のアクションは上で処理済み
     if(gKeymap[a.id]&&gKeymap[a.id]===k){
       if(a.prevent) e.preventDefault();
       a.run(e); return;
@@ -4311,6 +4850,8 @@ function makeFloatDrag(panel, head, skip){
     if(skip&&skip(e.target)) return;
     dragging=true; const r=panel.getBoundingClientRect();
     sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
+    // ドック状態を解除してフリー配置へ（⇄ボタンの dockInspector が inline を全消しして戻す）
+    panel.classList.add('floating'); panel.classList.remove('dock-left','dock-right');
     panel.style.left=ox+'px'; panel.style.top=oy+'px'; panel.style.right='auto'; panel.style.transform='none';
     head.setPointerCapture(e.pointerId); e.preventDefault();
   });
@@ -4372,7 +4913,8 @@ window.addEventListener('pointercancel',()=>{scrubbing=false;});
   let active=false, sx=0, sy=0, addMode=false, moved=false;
   cont.addEventListener('pointerdown',e=>{
     if(e.button!==0) return;
-    if(e.target.closest('.tl-kf-d,.tl-marker,.tl-drag-handle,.tl-tbtn,.tl-track-name,.tl-audio-btn,#tl-audio-strip')) return;
+    if(e.altKey) return; // SPEC_11 P3b-2: Alt+ドラッグはトラックのずらし（ストリップ側が処理）
+    if(e.target.closest('.tl-kf-d,.tl-marker,.tl-drag-handle,.tl-tbtn,.tl-track-name,.tl-audio-btn,#tl-audio-strip,.tl-trim-handle')) return;
     active=true; moved=false; sx=e.clientX; sy=e.clientY; addMode=e.shiftKey;
   });
   window.addEventListener('pointermove',e=>{
@@ -4496,7 +5038,7 @@ function buildShortcutList(){
     const lab=document.createElement('span'); lab.className='sc-label'; lab.textContent=a.label;
     const key=document.createElement('button'); key.className='sc-key'; key.dataset.id=a.id;
     const cur=gKeymap[a.id]||'';
-    key.textContent=(gCaptureId===a.id)?'…':dispKey(cur);
+    key.textContent=(gCaptureId===a.id)?'…':((a.alt&&cur)?'ALT+':'')+dispKey(cur); // SPEC_11 P3b-1: Alt必須の表示
     if(gCaptureId===a.id) key.classList.add('capturing');
     if(!cur) key.classList.add('unbound');
     key.addEventListener('click',()=>{ gCaptureId=(gCaptureId===a.id)?null:a.id; buildShortcutList(); });
@@ -4524,6 +5066,15 @@ $('#shortcut-reset').addEventListener('click',()=>{
   gKeymap=defaultKeymap(); gCaptureId=null; saveKeymap(); buildShortcutList();
 });
 // Guide toggles / inputs
+// SPEC_11 P4-3: ドラフト再生トグル
+$('#draft-play-toggle').classList.toggle('on',gDraftPlay);
+$('#draft-play-toggle').addEventListener('click',()=>{
+  gDraftPlay=!gDraftPlay;
+  $('#draft-play-toggle').classList.toggle('on',gDraftPlay);
+  try{ localStorage.setItem(DRAFT_LS,gDraftPlay?'1':'0'); }catch(e){}
+  drawCurrentFrame();
+  flashLive(gDraftPlay?'▶ ドラフト再生 ON（1/2解像度）':'▶ ドラフト再生 OFF');
+});
 $('#guide-res-toggle').addEventListener('click',()=>{ state.guides.resOn=!state.guides.resOn; applyGuideUI(); renderGuides(); });
 $('#guide-safe-toggle').addEventListener('click',()=>{ state.guides.safeOn=!state.guides.safeOn; applyGuideUI(); renderGuides(); });
 [['guide-res-w','resW'],['guide-res-h','resH'],['guide-safe-a','safeA'],['guide-safe-b','safeB']].forEach(([id,key])=>{
@@ -4627,12 +5178,18 @@ document.querySelectorAll('#settings-panel .sg-preset[data-gw]').forEach(b=>{
 // ===== INSPECTOR ドッキング（左右） / Tabで左右入替（ANIMATORのパレット準拠）=====
 let gInspSide='right';
 try{ const s=localStorage.getItem('composer_insp_side'); if(s==='left'||s==='right') gInspSide=s; }catch(e){}
+// ドック＝「CSSの定位置にきちんと収まる」状態に戻す（ANIMATORのパレットのドック挙動に合わせた）。
+// フリードラッグの inline left/top/right/transform と、リサイズハンドルが付けた
+// maxHeight/height を**すべて消して**からクラスで左右を決める。消し忘れると宙に浮いたままになる。
 function dockInspector(side){
   const panel=$('#inspector'); if(!panel) return;
   if(side==='left'||side==='right') gInspSide=side;
-  panel.style.transform='none'; panel.style.top='40px';
-  if(gInspSide==='left'){ panel.style.right='auto'; panel.style.left='12px'; }
-  else { panel.style.left='auto'; panel.style.right='12px'; }
+  panel.classList.remove('floating');
+  panel.style.left=''; panel.style.right=''; panel.style.top=''; panel.style.bottom='';
+  panel.style.transform=''; panel.style.maxHeight='';
+  const body=$('#inspector-body'); if(body) body.style.height=''; // リサイズで固定した高さを解除
+  panel.classList.toggle('dock-left', gInspSide==='left');
+  panel.classList.toggle('dock-right', gInspSide!=='left');
   try{ localStorage.setItem('composer_insp_side',gInspSide); }catch(e){}
 }
 function toggleInspectorSide(){

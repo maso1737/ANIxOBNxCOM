@@ -9,7 +9,7 @@
 | ツール | 入口（読めるもの） | 出口（書き出すもの） | 撮影処理 |
 |---|---|---|---|
 | **animator.html** | 画像(REF/下絵) / プロジェクトJSON(IndexedDB) / **2026-07〜: REFパネル `+ JSON / SEQ` に連番画像を複数選択 → 1件のREF ANIMATOR（ファイル名の数字順・1枚=1コマ）** | ANIMATOR_v1 JSON（ファイル名 `animator_<ISO>.json`） / ライブ連携(BroadcastChannel `tdr_live`) | なし（作画に専念） |
-| **composer.html** | PROJECT_v2 / PROJECT_v1 / ANIMATOR_v1 / IMAGE_v1(PNG·JPEG·WebP) / audio / ライブ連携 / **SPEC_07: トラックの`Re`でEX_DBから絵を取り直し** / **2026-07〜: 連番画像4枚以上（`^(.*?)(\d{3,5})\.(png\|webp\|jpe?g)$` の同名グループ）はIMPORT・D&Dとも1トラックのシーケンスに自動集約（OBANの `addFiles` と同一判定）** | 連番PNG(zip・作業解像度) / 動画(MP4·WebM) / EXPORT WEB(スクロールビューアHTML) / PROJECT_v2 JSON（ファイル名 `composer_<ISO>.json`） / **SPEC_07: トラックの`ANI`で `animator.html?open=` ディープリンク** | **P0〜: fxチェーン**（VIDEO=rt / PNG=final / EXPORT WEB=rt・P2b〜） |
+| **composer.html** | PROJECT_v2 / PROJECT_v1 / ANIMATOR_v1 / IMAGE_v1(PNG·JPEG·WebP) / audio / ライブ連携 / **SPEC_07: トラックの`Re`でEX_DBから絵を取り直し** / **2026-07〜: 連番画像4枚以上（`^(.*?)(\d{3,5})\.(png\|webp\|jpe?g)$` の同名グループ）はIMPORT・D&Dとも1トラックのシーケンスに自動集約（OBANの `addFiles` と同一判定）** | 連番PNG(zip・作業解像度・**SPEC_11 P3〜: 全体/トラック単体ともワークエリア準拠。ファイル名は絶対フレーム番号 `frame_00011.png`〜**) / 動画(MP4·WebM) / EXPORT WEB(スクロールビューアHTML) / PROJECT_v2 JSON（ファイル名 `composer_<ISO>.json`） / **SPEC_11 P4-4〜: AE JSX（`composer_ae_<ISO>.jsx`＝カメラ＋各トラックを平面/ヌルレイヤーとしてKF付き生成。絵は運ばないのでソース差し替え前提）** / **SPEC_07: トラックの`ANI`で `animator.html?open=` ディープリンク** | **P0〜: fxチェーン**（VIDEO=rt / PNG=final / EXPORT WEB=rt・P2b〜） |
 | **OBAN_BUILDER** | 画像D&D(単品/連番seq・**MANGA PLATEのPNG含む**) / プロジェクトJSON(**2026-07〜: EXPORT JSON / IMPORT JSON＝ファイル入出力に統一。旧 COPY/PASTE PROJ のクリップボード方式は廃止**) / **SPEC_07: + FROM ANIMATOR(EX_DB)＋ライブ連携(`tdr_live`受信・PNG書き出し不要)** | oban-viewer.html(単一HTML・画像は同フォルダ参照・**ap-seqはdataURLベイク同梱**・**SPEC_09 P4: FRAME枠線含む**・**V2-D: 縦書きテキスト/EN字幕(`?sub=0`)/クリックFX含む**) / プロジェクトJSON(**V2-D〜: `texts[]`+`clickFx`含む**) / **P3: COPY FOR COMPOSER(PROJECT_v2=CAMERAトラック+fx+obanPanels配置同梱・クリップボード。composer側で画像を先にIMPORTしておくと名前一致で配置が自動適用=P3b。textsは対象外)** / **SPEC_07 B3: EDIT IN ANIMATOR(`?open=`ディープリンク)** | **P2〜: take.fx→ビューアrt** |
 | **manga-plate.html** | REF画像(下敷き・表示のみ) / PLATE_v1 JSON(クリップボード) | 透過PNG(elem別/全体/×4 SEEDS連番) / PLATE_v1 JSON | なし（素材生成に専念） |
 | **econte.html** | 紙ネーム/ラフの写真(D&D・IMPORT) / パレットJSON | **動画コンテ WebM/mp4（P1・実時間録画・C#/尺焼き込み可）** / **P2予定: animator REF(`tdr_live`)・カラースクリプト一覧PNG** | なし（プリプロに専念） |
@@ -22,7 +22,7 @@
 
 - **fxスキーマ v1**（SPEC_06 §2）— 全ツール共通・無変換で持ち回り。未知エフェクトはスキップ（前方互換）
 - **TAKE**（SPEC_01）— `{kf:[{x,y,z,dwell,ease}]}`。OBAN / LP_Model_CR 系で共通。P3でcomposer CAMERAトラックへ変換可
-- **PROJECT_v2** — composerの保存形式。IMPORT JSONは複数回で追加合成できる。**P0〜: トップレベル `fx:`（fxスキーマv1）を同梱**（欠損時は composer 側で `makeDefaultFx()` 補完。PROJECT_v1 単一トラック保存には乗らない）。**2026-07〜: トラック `type:'null'`（描画されない親専用ヌル）、カメラトラックの `parent`（NULLのtid）、KFの任意 `ei`/`eo`（influence% 0-100）を追加**（いずれも旧リーダーでは無視されるだけの後方互換フィールド）
+- **PROJECT_v2** — composerの保存形式。IMPORT JSONは複数回で追加合成できる。**P0〜: トップレベル `fx:`（fxスキーマv1）を同梱**（欠損時は composer 側で `makeDefaultFx()` 補完。PROJECT_v1 単一トラック保存には乗らない）。**2026-07〜: トラック `type:'null'`（描画されない親専用ヌル）、カメラトラックの `parent`（NULLのtid）、KFの任意 `ei`/`eo`（influence% 0-100）を追加**（いずれも旧リーダーでは無視されるだけの後方互換フィールド）。**SPEC_11 P2/P3b/P4-2 で追加（すべて任意・省略時は既定値＝後方互換）: KFの `hold:true`（ステップ補間。区間の左キーに付き、次のキーまで値固定）／トラックの `tIn`(既定0)・`tOut`(既定 null=末尾まで)＝**コンポ時間基準**のIN/OUTトリム、`tOffset`(既定0・負可)＝時間オフセット（**トラック内時間 = コンポ時間 − tOffset**。絵とKFの両方が動く）、`locked:true`（編集ロック）**
 
 ## 成立している制作ルート
 

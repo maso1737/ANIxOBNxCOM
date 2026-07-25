@@ -125,7 +125,32 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - SPEC_07（トラックの往復ボタン `ANI` / `Re`）: `track.projectId` があるanim系トラックだけに表示（カメラ/画像トラックには出ない）
   - `ANI`=editInAnimator() → `animator.html?open=<projectId>` を別ウィンドウで開く。ANIMATOR側が別プロジェクトを開いていれば**確認モーダル**を出してから切替（無断上書きしない）。ポップアップブロック時はトースト
   - `Re`=reloadTrackFromAnimator() → request-sync を投げつつ EX_DB から取得し `onLiveProjectUpdate()` に流す＝**絵だけ差し替え**（KF/マーカー/tid/transform保持）。未登録なら「ANIMATORで LIVE を押してください」
-  - CSS: `.tl-tbtn.anm`（rouge）を再利用。6個並ぶとラベル幅128pxを超えて✕が見切れるため、`.tl-tbtn`のpaddingを`2px 3px`・gapを`2px`に詰めてある（**ボタンを増やすときは要再計測**）
+  - CSS: `.tl-tbtn.anm`（rouge）を再利用。**SPEC_11 P4-2 で🔒が増えて7個になり、`.tl-tbtn`のpaddingを`2px 2px`・gapを`1px`に再調整（実測 134px→122px / ラベル幅128px）**（**ボタンを増やすときは要再計測**。計測は `document.querySelectorAll('.tl-track-btns')` の `scrollWidth` と `.tl-track-label` の `clientWidth-6` を比較）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+【SPEC_11 P2〜P4（2026-07-25）】
+- **HOLD（P2）**: KFの任意 `hold:true`。**区間の左キーに付く**（そのキーから次のキーまで値固定・AE準拠）。`getKfValue` の区間ループで influence 判定より**前**に `if(arr[i].hold) return arr[i].v;`。**本体とビューアテンプレの2箇所**。ダイヤは `.ez-hold`（回転なし正方形・グレー）でイーズ形状より優先。トグルは `applyHold()`（インスペクタ `#btn-kf-hold`）。`cycleEase`(Ctrl+クリック)は従来どおり 0↔1 のみで hold には触れない
+- **トリム / ずらし（P3b）**: `track.tIn`(既定0) / `tOut`(既定 null=末尾まで) / `tOffset`(既定0・負可)。
+  - **規約: トラック内時間 = コンポ時間 − tOffset**。`tIn`/`tOut` は**コンポ時間基準**（tOffsetの影響を受けない）
+  - 描画: `drawOneTrack` 冒頭でトリムガード → セル参照 `fi=floor(frameIdx-tOffset)`（範囲外は端のコマを保持＝消したいときはトリム）。`applyTrackChain`/`getCamAt` は**各トラックが自分の tOffset を引いて** KF評価（親は親自身の tOffset）
+  - **KF編集の入口は必ず `curLocalFrame()`（＝currentFrame − 選択トラックのtOffset）を使う**。`state.currentFrame` を直接 setKf に渡すと tOffset 時にズレる
+  - タイムライン表示は逆に `+tOffset`：コマブロックのleft / ダイヤ / マーカー / ミニグラフのキー点。ドラッグ換算も対で直す
+  - UI: `.tl-trim-handle`（両端7px・z5）、範囲外は `.tl-frame-block.trimmed`。位置とグレーの更新は `refreshTrimUI(idx)`（DOM再構築なし）。**ストリップのAlt+ドラッグ=ずらし**（`#tl-tracks` のマーキー選択は altKey で早期return）
+  - ショートカット: `SHORTCUT_ACTIONS` に `alt:true` 属性を追加（`Alt+[`/`Alt+]`）。keydown は `ctrl||meta||alt` 早期returnの**前**に alt:true のアクションだけ処理し、通常ループでは `if(a.alt) continue;`
+- **ペアレント補正（P2b）**: `chainXformAt(track,frame)` が applyTrackChain と同じ式を ctx 無しで数値再現（2D相似 `{tx,ty,rot,s}`・camは含めない）。`setTrackParent(t,newTid,compensate)` が `L=P⁻¹·W` を分解して**全KFへ差分加算（sは乗算）**。**現フレームでのみ見た目一致**（親がKFを持つと他フレームは変わる＝原理的制約。ツールチップに明記）。`#kf-parent` は change で altKey が取れないので pointerdown/keydown で `gParentAlt` に記録（Alt=補正なし）
+- **ミニグラフ編集（P2c）**: canvas描画なのでヒット判定は描画時に記録した矩形（`gGraphLegendHits` / `gGraphKeyHits`）で行う。凡例=click / キー点=pointerdown。**ドラッグ中は正規化(mn,rng)を凍結**しないとカーブが暴れる。SPDモードは `gGraphKeyHits` を積まない＝表示専用
+- **トリムの見せ方**: 範囲外は `.tl-trim-veil.left/.right` の**オーバーレイ**で覆う（IN/OUT のフレーム位置ちょうどで切る）。コマブロックにクラスを付ける旧方式はコマ境界に吸着して境目が分かりにくかったため廃止。`pointer-events:none` / `z-index:2`（コマ=下、KFダイヤ=3、マーカー=4、トリムハンドル=5 の順）
+- **レイヤーのずらしは常にトリムも連れて動く**（`[`/`]` の `trackToPlayhead` と、ストリップの **Alt+ドラッグ**の両方）。判定は「トリムが設定されているか」＝`(tIn||0)!==0 || tOut!=null` で、真なら **tIn と tOut の両方**を同じ delta で平行移動する（`if(t.tIn)` だけで見ると tIn がちょうど0を通過したときに置き去りになる）。
+  - **ずらし中は tIn/tOut をクランプしない**。0で止めるとトリム長が潰れて戻せなくなるため、コンポ外（負や total超）をそのまま保持する。丸めるのは**表示側だけ**（`refreshTrimUI` の `clampF`）。`parseTrackFromJSON` も tIn を `Math.max(0,…)` しない（負の状態を保存/復元できる）
+  - Alt+ドラッグは**ドラッグ開始時の tOffset/tIn/tOut を控えて毎回そこからの差分**で決める（累積更新だと端で丸めた分がずれて戻らない）
+  - 一方 **トリムハンドル自身のドラッグと `Alt+[`/`Alt+]` は tIn/tOut だけを動かす**（レイヤーは不動）。ここは境界の直接操作なので [0,total] にクランプしてよい
+- **`[` / `]` = レイヤーをインジケータへ**（`trackToPlayhead`）: Alt無し＝レイヤーの頭/尻をプレイヘッドへ／Alt付き＝トリム（`setTrackTrim`）。同じキーに Alt有無で2アクション載るので、`handleShortcutCapture` の重複解除は**同じ alt 枠の中だけ**で行う
+- **トラック並び替えドラッグ**: pointer capture は使わず **window の pointermove/pointerup で追う**。captureすると①ラベルの dblclick 改名が死ぬ ②途中でcaptureが外れると pointerup を拾えずゴーストがカーソルに張り付く、の両方が起きる。`onEnd` は `pointerup` のときだけ `doTrackReorder` し、`finally` で必ず `dhCleanup()`
+- **INSPECTORのドック**: 位置は `#inspector.dock-left/.dock-right` の**クラス**で決める。`dockInspector()` はフリードラッグの inline `left/right/top/transform` と**リサイズが付けた `maxHeight`／`#inspector-body` の `height` を全消し**してからクラスを付け直す（消し忘れると宙に浮いて「収まらない」）。`makeFloatDrag` 側は掴んだ時に `.floating` を付けて dock クラスを外す。ANIMATOR のパレット（`applyPaletteFloat` が `style.left/top/right` と `palette` の height/maxHeight をクリア）と同じ考え方
+- **FXモーダル**: `#btn-fx` は `toggleSfxModal()`＝開閉トグル。開いている間はボタンに `.primary`。`closeSfxModal()`（✕/Esc）でも消灯させること
+- **ロック（P4-2）**: `lockedGuard(t)` が true を返したら呼び出し側は中断。現在の適用先は commitProp / addKfAtCurrent / clearAllKf / pasteKeyframes / removeTrack / applyEase(全体) / ダイヤ・マーカー・トリム・ずらしのドラッグ / アンカー・ビューポートドラッグ / dotトグル。**編集系を足したらここにも足す**
+- **ドラフト再生（P4-3）**: `gDraftPlay` かつ `state.isPlaying` のときだけ半解像度オフスクリーンへ描いて拡大。`pause()` でフル解像度に戻す（FINAL PREVIEW と同じ流儀）
+- **AE JSX（P4-4）**: カメラに加えて各トラックを平面/ヌルの3Dレイヤーで生成。solidは**composer px そのままのサイズ**で作り、スケールに `sx=comp.width/D.W` を掛けて合わせる（アンカー=`[w/2+ax, h/2+ay]`、Position=`comp中央+(x+ax)*sx`）。Z=`z*sx` でカメラのZoom設定と組み合わせると composer の `PERSP_FOCAL` 透視と一致する。**親付きレイヤーの子Zだけは AE のカメラ透視で解釈されるため厳密には一致しない**（Z=0の子は一致・JSX冒頭のコメントに明記）
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 【コードの注意点】
@@ -134,12 +159,12 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - KFダイヤのドラッグ中はrenderKfDiamondsを呼ばない（pointer capture喪失）。pointerup後に再描画
 - data-track属性でDOM→state.tracks[idx]対応
 - rebuildAllTrackUI()で全再構築（#tl-audio-row退避→再追加）。renderKfDiamonds/renderMarkers/renderGlobalMarkersはDOM追加後
-- drawOneTrack(ctx,w,h,frame,track,hasSolo) 第6引数hasSolo必須
-- SOLOボタンは el.querySelectorAll('.tl-tbtn')[1]
+- drawOneTrack(ctx,w,h,frame,track,hasSolo) 第6引数hasSolo必須。**frame は常にコンポ時間**（トラック内時間への換算は関数内で `-tOffset`）
+- **`.tl-tbtn` を添字で引かないこと**（SPEC_11 P4-2で🔒が2番目に入り、旧 `querySelectorAll('.tl-tbtn')[1]`＝SOLO想定が🔒を掴んでいた）。`toggleTrackSolo` は `.tl-tbtn.solo`、`toggleTrackLock` は `.tl-tbtn.lock` でクラス指定。ボタンを増やすときは既存の添字参照が無いか grep すること
 - 確認ダイアログ(confirm)は全廃方針
 - CAMERAは常に state.tracks 末尾＝タイムライン最上段に固定（`pinCameraTop()`、rebuildAllTrackUI冒頭で強制）。合成順は getCamAt が別管理なので配列位置は表示専用。camera はドラッグ並び替え不可
 - カメラの親(NULL)は行内 `.tl-parent-sel`（削除ボタン左）とインスペクタ #kf-parent の両方から設定可。両者は `refreshTrackChainMarks` で同期
-- undo対象のトラック編集データ(cloneEditState/applyHistory の perTrack)は keyframes/markers/parent/visible/solo/**name**。トラック行の新プロパティを undo させたいときはこの2箇所に追加
+- undo対象のトラック編集データ(cloneEditState/applyHistory の perTrack)は keyframes/markers/parent/visible/solo/**name**/**tIn**/**tOut**/**tOffset**/**locked**。トラック行の新プロパティを undo させたいときはこの2箇所に追加
 - ビュー: `F`=FIT(resetView)、500ms以内に2回目=100%(`zoomActual100`=width/baseW倍)。両方 `fitAction()` 経由。zoom=1 はビューにフィット(baseW)であって実寸ではない点に注意
 - 全画面: `#btn-fullscreen`(HOME右)。`fullscreenchange`→`setupViewport()`で再フィット。iPhone非対応時はボタン自動非表示
 - INSPECTOR: 左右ドック(`dockInspector`/localStorage 'composer_insp_side')。`Tab`=左右入替(`toggleInspectorSide`)、ヘッダ⇄で再ドック。フローティングは makeFloatDrag（left/top上書き）なので再ドックで解除
@@ -149,8 +174,8 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 
 【未実装 / 将来候補】
 - FRAME参照画像（複数ANIMATOR参照）
-- イーズの数値カーブ編集 / グラフエディタ
-- モーションブラー、調整レイヤー的なエフェクト
+- 調整レイヤー的なエフェクト
+- タイムリマップ（frames/cellInfos構造に踏み込む大工事＝別SPEC。SPEC_11 P4-5で対象外と明記）
 
 【変更後チェック】
 node -e "const fs=require('fs');const h=fs.readFileSync('composer.html','utf8');const m=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]).filter(s=>s.length>200).join('\n;\n');new Function(m);console.log('OK')"
