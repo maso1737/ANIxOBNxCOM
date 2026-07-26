@@ -134,6 +134,10 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-tbtn.vis-off{color:rgba(255,255,255,0.18);border-style:dashed;}
 .tl-tbtn.anm{color:rgba(255,79,168,0.5);font-size:9px;letter-spacing:0;}
 .tl-tbtn.anm:hover{color:var(--acid);border-color:var(--acid);}
+/* ANIMATOR非連携（読み込んだ画像/連番）は押せないことが分かるようグレーアウトして残す */
+.tl-tbtn:disabled{opacity:.3;cursor:not-allowed;border-style:dashed;}
+.tl-tbtn:disabled:hover{color:rgba(255,255,255,0.4);border-color:var(--border);}
+.tl-tbtn.anm:disabled:hover{color:rgba(255,79,168,0.5);border-color:var(--border);}
 .tl-tbtn.del:hover{color:#ff4444;border-color:rgba(255,68,68,0.4);}
 /* SPEC_11 P4-2: ロック。128px制限があるのでグリフ1文字＋最小パディング */
 .tl-tbtn.lock{padding:2px 1px;font-size:8.5px;filter:grayscale(1) opacity(.55);}
@@ -149,9 +153,13 @@ input[type=number]{-moz-appearance:textfield;}
 /* KFダイヤ/マーカーの帯（下23px）にだけ暗いグラデを敷く＝白いサムネの上でもキーが埋もれない */
 .tl-track-strip::after{content:'';position:absolute;left:0;right:0;bottom:0;height:23px;z-index:1;pointer-events:none;
   background:linear-gradient(to top,rgba(7,3,15,0.85),rgba(7,3,15,0.55) 55%,rgba(7,3,15,0));}
-/* 選択中はストリップ自体を縁取り＋地色（サムネで覆われても分かるように） */
-.tl-track.selected .tl-track-strip{outline:1px solid rgba(255,79,168,0.8);background:rgba(255,79,168,0.09);}
-.tl-track.tl-cam.selected .tl-track-strip{outline-color:rgba(90,233,255,0.8);background:rgba(90,233,255,0.09);}
+/* 選択のフォーカスは ::before で**サムネの上に**乗せる（背景だと絵の下に潜って見えない）。
+   ::before は最初の子として描かれるので、同じ z-index の KFダイヤ(z3)より下＝キーは埋もれない */
+.tl-track-strip::before{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;}
+.tl-track.selected .tl-track-strip{outline:1px solid rgba(255,79,168,0.85);}
+.tl-track.selected .tl-track-strip::before{background:rgba(255,79,168,0.16);box-shadow:inset 0 0 0 1px rgba(255,79,168,0.55),inset 0 0 14px rgba(255,79,168,0.25);}
+.tl-track.tl-cam.selected .tl-track-strip{outline-color:rgba(90,233,255,0.85);}
+.tl-track.tl-cam.selected .tl-track-strip::before{background:rgba(90,233,255,0.14);box-shadow:inset 0 0 0 1px rgba(90,233,255,0.55),inset 0 0 14px rgba(90,233,255,0.25);}
 .tl-frame-block{pointer-events:none;}
 .tl-track-strip{pointer-events:auto;}
 /* コマ番号はKF帯の暗いグラデ（strip::after, z1）より上に出す。地が暗くなったので文字は白+影 */
@@ -245,6 +253,14 @@ input[type=number]{-moz-appearance:textfield;}
 .tc{color:var(--acid);font-size:10px;letter-spacing:0.15em;font-variant-numeric:tabular-nums;}
 .tc-dim{color:rgba(255,255,255,0.25);}
 .badge{color:rgba(255,79,168,0.5);font-size:8px;letter-spacing:0.3em;}
+/* イーズ量（influence%）— インスペクタから移設。手が届きやすいトランスポートバーへ */
+.ease-grp{display:flex;align-items:center;gap:5px;margin-left:6px;padding-left:10px;border-left:1px solid var(--border);}
+.ease-range{-webkit-appearance:none;appearance:none;width:64px;height:3px;background:rgba(255,255,255,0.18);outline:none;cursor:pointer;border-radius:2px;}
+.ease-range::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:14px;background:var(--acid);cursor:pointer;border-radius:1px;box-shadow:0 0 4px rgba(255,79,168,0.6);}
+.ease-range::-moz-range-thumb{width:10px;height:14px;background:var(--acid);cursor:pointer;border:none;border-radius:1px;}
+.ease-num{width:34px;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--acid);font-family:var(--mono);font-size:9px;padding:1px 2px;outline:none;text-align:right;}
+.ease-num:focus{border-color:var(--border-bright);}
+.ease-num::-webkit-inner-spin-button{opacity:.35;}
 
 /* EXPORT OVERLAY */
 #export-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
@@ -451,7 +467,7 @@ input[type=number]{-moz-appearance:textfield;}
       <span style="color:var(--dim)">/</span>
       <!-- 書き出し系 -->
       <button id="btn-export-project" disabled title="プロジェクト全体をJSONで書き出し（トラック・KF・カメラ込み）">EXPORT PROJECT</button>
-      <button id="btn-export" disabled title="全フレームをBG透過の連番PNGでZIP書き出し（AE合成用）">SEQ PNG</button>
+      <button id="btn-export" disabled title="連番PNGでZIP書き出し（AE合成用）&#10;OUTPUT: 3840×2160 / NEAREST（ドット等倍・ぼかさない）&#10;範囲: ワークエリア準拠・ファイル名は絶対フレーム番号&#10;誤爆防止: Shift+クリック">SEQ PNG</button>
       <button id="btn-export-video" disabled title="全体をmp4で書き出し（実時間）">EXPORT VIDEO</button>
       <button id="btn-export-web" disabled title="スクロール駆動のモーションコミックHTMLを書き出し（単一ファイル・依存ゼロ）">EXPORT WEB</button>
       <button id="btn-export-jsx" disabled title="カメラKF（親NULL合成込み）＋各トラック（平面/ヌル・Position/Anchor/Scale/Rotation/Opacityのキー付き）をAfter Effects用.jsxとして書き出し。絵そのものは運ばないので平面のソースを差し替えて使います。AEでコンポを開いた状態で File > Scripts > Run Script File">AE JSX</button>
@@ -469,7 +485,7 @@ input[type=number]{-moz-appearance:textfield;}
     <div class="corner tl"><span class="lbl">CMP/</span><span class="val" id="meta-tl">—</span></div>
     <div class="corner tr"><span class="val" id="meta-tr">—</span><br><span class="lbl">RES/</span></div>
     <div class="corner bl"><span class="lbl">FPS/</span><span class="val" id="meta-bl">—</span></div>
-    <div class="corner br"><span class="val" id="meta-br">[ — / — ]</span><br><span class="lbl" id="frm-toggle" title="クリックでコマ⇔タイムコード切替" style="pointer-events:auto;cursor:pointer;">FRM/</span></div>
+    <div class="corner br"><span class="val" id="meta-br">[ — / — ]</span><br><span class="val" id="meta-cell" style="color:rgba(255,255,255,0.45);font-size:9px;">—</span><br><span class="lbl" id="frm-toggle" title="クリックでコマ⇔タイムコード切替" style="pointer-events:auto;cursor:pointer;">FRM/</span></div>
     <div id="viewport-inner">
       <canvas id="preview-canvas" width="640" height="360"></canvas>
       <canvas id="guide-canvas" width="640" height="360"></canvas>
@@ -488,19 +504,8 @@ input[type=number]{-moz-appearance:textfield;}
   <div id="inspector">
     <div id="inspector-head">INSPECTOR<span class="insp-head-btns"><span id="inspector-dock" title="左右ドックに戻す（Tabで左右入替）">⇄</span><span id="inspector-collapse" title="折りたたみ／展開">▾</span></span></div>
     <div id="inspector-body">
-    <div class="insp-section">
-      <div class="insp-h">PROJECT</div>
-      <div class="insp-row"><span class="k">FPS</span><span class="v acid" id="i-fps">—</span></div>
-      <div class="insp-row"><span class="k">SRC</span><span class="v" id="i-res">—</span></div>
-      <div class="insp-row"><span class="k">FRAMES</span><span class="v" id="i-frames">—</span></div>
-      <div class="insp-row"><span class="k">DUR</span><span class="v acid" id="i-dur">—</span></div>
-    </div>
-    <div class="insp-section">
-      <div class="insp-h">OUTPUT</div>
-      <div class="insp-row"><span class="k">TARGET</span><span class="v acid">3840×2160</span></div>
-      <div class="insp-row"><span class="k">SCALE</span><span class="v" id="i-scale">—</span></div>
-      <div class="insp-row"><span class="k">FILTER</span><span class="v">NEAREST</span></div>
-    </div>
+    <!-- PROJECT/OUTPUT は削除。FPS/解像度はトップバーとキャンバス四隅、尺は設定パネル(⚙)、
+         出力仕様は SEQ PNG ボタンのツールチップへ集約した（INSPECTORは選択トラックの編集に専念） -->
     <div class="insp-section">
       <div class="insp-h">TRANSFORM &nbsp;<span id="kf-status" style="font-size:7px;color:rgba(255,255,255,0.3)">NO KF</span></div>
       <div class="kf-row" id="parent-row" style="display:none" title="親トラック（AEのペアレント相当）。親の移動/回転/拡縮に追従。付け外しの瞬間は「現フレームの見た目が変わらない」ようKFを自動補正します（親にKFがある場合、他フレームでは見え方が変わります）。Altを押しながら選ぶと補正なし"><span class="k">PRNT</span><select id="kf-parent"></select></div>
@@ -514,16 +519,8 @@ input[type=number]{-moz-appearance:textfield;}
       <div class="kf-row" data-prop="op"><span class="k">OP</span><button class="num-step" data-step="op" data-dir="-1">◀</button><input class="kf-val" id="kf-op" type="number" value="1.000" step="0.01" min="0" max="1"><button class="num-step" data-step="op" data-dir="1">▶</button><div class="kf-dot" id="dot-op"></div></div>
       <button class="kf-btn" id="btn-kf-add">+ ADD KEYFRAME HERE</button>
       <button class="kf-btn" id="btn-kf-clear">✕ CLEAR ALL KF</button>
-      <button class="kf-btn" id="btn-kf-copy">⧉ COPY KEYFRAMES</button>
-      <button class="kf-btn" id="btn-kf-paste">⮃ PASTE TO TRACK</button>
-      <button class="kf-btn" id="btn-kf-ease">∿ EASE (中) / SHIFT=最大</button>
-      <button class="kf-btn" id="btn-kf-hold" title="ホールド（ステップ）補間。このキーから次のキーまで値を固定します。対象=選択KF（無ければ現フレームのキー）。ダイヤは灰色の正方形になります">◻ HOLD (選択KFトグル)</button>
-      <div class="kf-row" id="inf-row" style="margin-top:4px" title="AE風イーズ影響度（%・0〜100）。IN=キーに入る側 / OUT=キーから出る側。選択KF（無ければ現フレームのキー）に適用。空欄=ezイーズに戻す"><span class="k">INF</span><input class="kf-val" id="kf-inf-in" type="number" min="0" max="100" step="1" placeholder="IN"><input class="kf-val" id="kf-inf-out" type="number" min="0" max="100" step="1" placeholder="OUT"></div>
-    </div>
-    <div class="insp-section">
-      <div class="insp-h">CURRENT FRAME</div>
-      <div class="insp-row"><span class="k">FRAME</span><span class="v acid" id="i-cur">—</span></div>
-      <div class="insp-row"><span class="k">CELL</span><span class="v" id="i-cell">—</span></div>
+      <!-- COPY/PASTE は Ctrl+C / Ctrl+V、EASE・HOLD はキーのWクリック送り、
+           イーズ量はトランスポートバーの EASE スライダーへ移動したのでボタンは廃止 -->
     </div>
     </div><!-- /#inspector-body -->
     <div id="inspector-resize" title="ドラッグで高さ調整（セクション境目でスナップ）"></div>
@@ -571,6 +568,16 @@ input[type=number]{-moz-appearance:textfield;}
       <button id="btn-last">▶|</button>
       <button id="btn-loop" class="on">⟲</button>
       <button id="btn-graph" title="ミニグラフ 値/速度カーブ (G)">∿</button>
+      <!-- イーズ量（AE風 influence %）。対象=選択KF、無ければ現フレームのキー。0=解除 -->
+      <span class="ease-grp" title="イーズの効き（0〜100%）。IN=キーに入る側 / OUT=キーから出る側。0でリニアに戻ります。対象は選択中のキー（無ければ現フレームのキー）">
+        <span class="badge">EASE</span>
+        <span class="tc-dim">IN</span>
+        <input type="range" id="ease-in-range" class="ease-range" min="0" max="100" step="1" value="0">
+        <input type="number" id="ease-in-num" class="ease-num" min="0" max="100" step="1" placeholder="—">
+        <span class="tc-dim">OUT</span>
+        <input type="range" id="ease-out-range" class="ease-range" min="0" max="100" step="1" value="0">
+        <input type="number" id="ease-out-num" class="ease-num" min="0" max="100" step="1" placeholder="—">
+      </span>
     </div>
     <div class="g">
       <span class="tc-dim">FRAME</span>
@@ -629,6 +636,17 @@ input[type=number]{-moz-appearance:textfield;}
         <span class="sg-x">%</span>
         <input type="number" id="guide-safe-b" class="sg-num" min="1" max="100" step="1" title="タイトルセーフ(%)">
         <span class="sg-x">%</span>
+      </div>
+    </div>
+    <div class="set-sect">
+      <div class="set-sect-h">COMP LENGTH（尺）</div>
+      <div class="sc-hint">コマ数・秒数どちらからでも後ろに伸ばせます。素材より短くはできません（自動で素材の長さに戻ります）</div>
+      <div class="sg-row">
+        <span class="sg-x" style="min-width:44px">FRAMES</span>
+        <input type="number" id="set-frames" class="sg-num" min="1" step="1" title="コンポ全体のコマ数">
+        <span class="sg-x" style="min-width:28px">DUR</span>
+        <input type="number" id="set-dur" class="sg-num" min="0.04" step="0.1" title="コンポ全体の秒数（FPS換算でコマ数に反映）">
+        <span class="sg-x">s</span>
       </div>
     </div>
     <div class="set-sect">
@@ -1112,6 +1130,7 @@ const state = {
   fps: 24, width: 0, height: 0, bgBright: 100,
   isPlaying: false, loop: true, lastTimestamp: 0, frameAccumulator: 0,
   workArea: null,
+  compFrames: null,     // 手入力したコンポ尺（null=素材まかせ・SPEC_11調整）
   fx: SatsueiFX.makeDefaultFx(), // 撮影処理チェーン（SPEC_06 SATSUEI KIT）
   markers: [],         // グローバル(ワークエリア)マーカー [{frame,label}]
   vpDragging: false, vpDragStart: null, vpDragKfStart: null,
@@ -1139,6 +1158,32 @@ const rulerCanvas = $('#tl-ruler-canvas');
 const rulerCtx = rulerCanvas.getContext('2d');
 
 // ── TRACK HELPERS ──
+// コンポ尺 = 素材から決まる自然長と、設定パネルで手入力した尺(state.compFrames)の大きい方。
+// compFrames=null なら従来どおり素材まかせ（＝後方互換）
+function recalcTotalFrames(){
+  const auto=state.tracks.length?Math.max(0,...state.tracks.map(t=>t.totalFrames)):0;
+  state.totalFrames=Math.max(auto, state.compFrames||0);
+  if(state.currentFrame>=state.totalFrames) state.currentFrame=Math.max(0,state.totalFrames-1);
+}
+// 設定パネルの FRAMES / DUR から呼ぶ。素材の自然長より短くはできない（絵が消えるため）
+function setCompFrames(n){
+  const auto=state.tracks.length?Math.max(0,...state.tracks.map(t=>t.totalFrames)):0;
+  const v=Math.max(1,Math.min(60*60*24, Math.round(n)||0));
+  state.compFrames=(v<=auto)?null:v; // 自然長以下なら「自動」に戻す
+  recalcTotalFrames();
+  if(state.workArea){
+    state.workArea.startFrame=Math.min(state.workArea.startFrame,Math.max(0,state.totalFrames-1));
+    state.workArea.endFrame=Math.min(state.workArea.endFrame,state.totalFrames);
+    if(state.workArea.endFrame<=state.workArea.startFrame) state.workArea.endFrame=state.totalFrames;
+  }
+  rebuildAllTrackUI(); drawCurrentFrame(); updateTransport(); updateCompLenUI(); recordHistory();
+  flashLive('⟷ 尺 '+state.totalFrames+'コマ / '+(state.totalFrames/state.fps).toFixed(2)+'s'+(state.compFrames?'':'（素材まかせ）'));
+}
+function updateCompLenUI(){
+  const f=$('#set-frames'), d=$('#set-dur'); if(!f||!d) return;
+  if(document.activeElement!==f) f.value=state.totalFrames;
+  if(document.activeElement!==d) d.value=(state.totalFrames/state.fps).toFixed(2);
+}
 function makeEmptyKfs(){
   return ALL_PROPS.reduce((o,p)=>({...o,[p]:[]}),{});
 }
@@ -1267,20 +1312,6 @@ function deleteSelectedOrCurrentKf(){
     if(any){ recordHistory(); renderKfDiamonds(state.selectedTrack); drawCurrentFrame(); updateKfUI(); flashLive('✕ KF DELETED'); }
   }
 }
-function easeLabel(a){ return a>=1?'MAX':a>0?'MID':'LINEAR'; }
-function applyEase(amount){ // インスペクターのEASEボタン：選択 or 選択トラック全体
-  if(kfSel.length){
-    const tracksInv=new Set();
-    kfSel.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k) k.ez=amount; }); tracksInv.add(s.t); });
-    recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); drawCurrentFrame();
-    flashLive('∿ EASE '+easeLabel(amount)+' (選択)'); return;
-  }
-  const t=selTrack(); if(!t||lockedGuard(t)) return; let n=0;
-  ALL_PROPS.forEach(p=>t.keyframes[p].forEach(k=>{k.ez=amount;n++;}));
-  if(!n){ flashLive('キーがありません'); return; }
-  recordHistory(); renderKfDiamonds(state.selectedTrack); refreshKfSelClasses(); drawCurrentFrame();
-  flashLive('∿ EASE '+easeLabel(amount)+' ×'+n);
-}
 // キーの「送り」で切り替わる3モード（0=リニア / 1=イーズ最大 / 2=ホールド）。
 // ダイヤ形状: 菱形(ネオン) / 円(マゼンタ) / 正方形(グレー) と1対1で対応する
 const KEY_MODES=['LINEAR','EASE','HOLD'];
@@ -1305,10 +1336,11 @@ function getFrameKeyMode(trackIdx,f){
 }
 // ── INFLUENCE（AE風 influence%）──
 // field='ei'|'eo'。val=null で解除（ez smoothstepへ戻る）。対象=選択KF、無ければ現フレームのキー
-function applyInfluence(field,val){
+// live=true（スライダーのドラッグ中）は履歴を積まない＝undoが1操作1件に収まる
+function applyInfluence(field,val,live){
   const targets = kfSel.length ? kfSel.slice()
     : (selTrack() ? [{t:state.selectedTrack,f:curLocalFrame()}] : []);
-  if(!targets.length){ flashLive('対象キーがありません'); return; }
+  if(!targets.length){ if(!live) flashLive('対象キーがありません'); return; }
   const tracksInv=new Set(); let n=0;
   targets.forEach(s=>{
     const t=state.tracks[s.t]; if(!t) return;
@@ -1324,28 +1356,13 @@ function applyInfluence(field,val){
   drawCurrentFrame(); renderGraph();
   flashLive('∿ INF '+(field==='ei'?'IN':'OUT')+(val==null?' CLEAR':'='+Math.round(val)+'%'));
 }
-// ── HOLD（ステップ補間・SPEC_11 P2）──
-// 対象=選択KF、無ければ現フレームのキー。1つでもOFFがあれば全ON（そろえるトグル）。
-// hold は「区間の左キー」に付く＝そのキーから次のキーまで値が固定される（AE準拠）
-function applyHold(){
-  const targets = kfSel.length ? kfSel.slice()
-    : (selTrack() ? [{t:state.selectedTrack,f:curLocalFrame()}] : []);
-  if(!targets.length){ flashLive('対象キーがありません'); return; }
-  let found=0, anyOff=false;
-  targets.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return;
-    ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k){ found++; if(!k.hold) anyOff=true; } }); });
-  if(!found){ flashLive('対象キーがありません'); return; }
-  const on=anyOff; const tracksInv=new Set();
-  targets.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return;
-    ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(!k) return; if(on) k.hold=true; else delete k.hold; });
-    tracksInv.add(s.t); });
-  recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses();
-  drawCurrentFrame(); renderGraph();
-  flashLive(on?'◻ HOLD ON':'◻ HOLD OFF');
-}
-// INF欄の現在値表示（単一選択KF or 現フレームのキー）
+// HOLD は キーのWクリック/Ctrl+クリック送り（cycleEase → applyKeyModeToFrame）に統合したので
+// 専用のトグル関数は廃止（旧 applyHold）
+// イーズ量スライダーの現在値表示（単一選択KF or 現フレームのキー）
 function updateInfluenceUI(){
-  const inEl=$('#kf-inf-in'), outEl=$('#kf-inf-out'); if(!inEl||!outEl) return;
+  const inEl=$('#ease-in-num'), outEl=$('#ease-out-num');
+  const inR=$('#ease-in-range'), outR=$('#ease-out-range');
+  if(!inEl||!outEl||!inR||!outR) return;
   let src=null;
   if(kfSel.length===1) src=kfSel[0];
   else if(!kfSel.length && selTrack()) src={t:state.selectedTrack,f:curLocalFrame()};
@@ -1356,6 +1373,8 @@ function updateInfluenceUI(){
   }
   if(document.activeElement!==inEl)  inEl.value = ei==null?'':Math.round(ei);
   if(document.activeElement!==outEl) outEl.value= eo==null?'':Math.round(eo);
+  if(document.activeElement!==inR)   inR.value  = ei==null?0:Math.round(ei);
+  if(document.activeElement!==outR)  outR.value = eo==null?0:Math.round(eo);
 }
 
 // ── KFナビゲーション（J/K） ──
@@ -1448,6 +1467,7 @@ function cloneEditState(){
       locked: !!t.locked, // SPEC_11 P4-2: ロック
     })),
     gmarkers: state.markers.map(m=>({...m})),
+    compFrames: state.compFrames,
     selectedTrack: state.selectedTrack,
     workArea: state.workArea?{...state.workArea}:null,
   };
@@ -1560,7 +1580,8 @@ function applyHistory(snap){
   });
   sanitizeParents();
   if(snap.gmarkers) state.markers = snap.gmarkers.map(m=>({...m}));
-  state.totalFrames = state.tracks.length?Math.max(...state.tracks.map(t=>t.totalFrames)):0;
+  state.compFrames = snap.compFrames!==undefined?snap.compFrames:null;
+  recalcTotalFrames();
   if(state.currentFrame>=state.totalFrames) state.currentFrame=Math.max(0,state.totalFrames-1);
   if(snap.workArea) state.workArea={...snap.workArea};
   state.selectedTrack = Math.min(snap.selectedTrack, state.tracks.length-1);
@@ -1750,7 +1771,8 @@ function loadJSON(json){
     state.fps=24; state.width=json.width; state.height=json.height;
   }
   state.bgBright = json.bgBright??100;
-  state.totalFrames = Math.max(...state.tracks.map(t=>t.totalFrames));
+  state.compFrames = (typeof json.compFrames==='number'&&json.compFrames>0)?(json.compFrames|0):null;
+  recalcTotalFrames();
   if(json.workArea&&typeof json.workArea==='object'){
     const s=Math.max(0,Math.min(state.totalFrames,json.workArea.startFrame|0));
     const e=Math.max(s,Math.min(state.totalFrames,json.workArea.endFrame|0));
@@ -1850,7 +1872,7 @@ function pinCameraTop(){
 }
 function finishImport(){
   dedupeCameras(); sanitizeParents();
-  state.totalFrames=Math.max(...state.tracks.map(t=>t.totalFrames));
+  recalcTotalFrames();
   if(!state.workArea) state.workArea={startFrame:0,endFrame:state.totalFrames};
   else state.workArea.endFrame=Math.max(state.workArea.endFrame,state.totalFrames);
   state.selectedTrack=state.tracks.length-1;
@@ -2013,7 +2035,7 @@ function removeTrack(idx){
   if(state.tracks.length<=1){ alert('最後のトラックは削除できません'); return; }
   state.tracks.splice(idx,1);
   sanitizeParents(); // 削除トラックを親にしていた子は親なしへ
-  state.totalFrames=state.tracks.length?Math.max(...state.tracks.map(t=>t.totalFrames)):0;
+  recalcTotalFrames();
   if(state.selectedTrack>=state.tracks.length) state.selectedTrack=state.tracks.length-1;
   rebuildAllTrackUI();
   updateInspector(); drawCurrentFrame(); updateKfUI(); updateExportButtons();
@@ -2047,6 +2069,61 @@ function toggleTrackSolo(idx){
   });
 }
 
+// ── トラックの複製 / 分割（2026-07-25 追加）──
+// 絵(cellsRaw/cellInfos/frames)は Image を共有して軽く複製。編集データだけ深コピー
+function cloneTrackObj(src, name){
+  return Object.assign({},src,{
+    tid:newTid(), name:name,
+    keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:src.keyframes[p].map(k=>({...k}))}),{}),
+    markers:src.markers.map(m=>({...m})),
+    cellsRaw:src.cellsRaw.slice(), cellInfos:src.cellInfos.slice(), frames:src.frames.slice(),
+    solo:false, locked:false,
+  });
+}
+function duplicateTrack(idx){
+  const src=state.tracks[idx]; if(!src){ flashLive('トラック未選択'); return; }
+  if(src.type==='camera'){ flashLive('CAMERAは複製できません'); return; }
+  const t=cloneTrackObj(src,(src.name||'TRACK')+' COPY');
+  state.tracks.splice(idx+1,0,t);   // UI上は1つ上に積まれる
+  pinCameraTop();
+  state.selectedTrack=state.tracks.indexOf(t);
+  recalcTotalFrames(); rebuildAllTrackUI(); drawCurrentFrame(); updateKfUI(); updateExportButtons(); recordHistory();
+  flashLive('⧉ TRACK 複製 → '+t.name);
+}
+// AEの Ctrl+Shift+D 相当: インジケータ位置で2本に割る（前半=元 / 後半=複製）
+function splitTrackAtPlayhead(idx){
+  const src=state.tracks[idx]; if(!src){ flashLive('トラック未選択'); return; }
+  if(src.type==='camera'||src.type==='null'){ flashLive('CAMERA/NULLは分割できません'); return; }
+  if(lockedGuard(src)) return;
+  const f=state.currentFrame;
+  const inF=src.tIn||0, outF=(src.tOut==null?state.totalFrames:src.tOut);
+  if(f<=inF||f>=outF){ flashLive('インジケータがトラックの範囲内にありません'); return; }
+  const t=cloneTrackObj(src,(src.name||'TRACK')+' B');
+  src.tOut=f;                       // 前半：分割点まで
+  t.tIn=f; t.tOut=(src.tOut===outF)?null:outF; // 後半：分割点から
+  if(outF===state.totalFrames&&src.tOut===f) t.tOut=null;
+  state.tracks.splice(idx+1,0,t);
+  pinCameraTop();
+  state.selectedTrack=state.tracks.indexOf(t);
+  recalcTotalFrames(); rebuildAllTrackUI(); drawCurrentFrame(); updateKfUI(); updateExportButtons(); recordHistory();
+  flashLive('✂ SPLIT @F'+(f+1)+' → '+t.name);
+}
+function unlockAllTracks(){
+  const n=state.tracks.filter(t=>t.locked).length;
+  if(!n){ flashLive('ロック中のトラックはありません'); return; }
+  state.tracks.forEach(t=>{ t.locked=false; });
+  rebuildAllTrackUI(); recordHistory();
+  flashLive('🔓 全ロック解除 ×'+n);
+}
+// Del/BackSpace: キーが対象にあればキー削除、無ければトラック削除（undoで戻せる）
+function deleteKfOrTrack(){
+  const t=selTrack();
+  const hasKey = kfSel.length>0 || (t && ALL_PROPS.some(p=>hasKfAt(p,curLocalFrame(),t.keyframes)));
+  if(hasKey){ deleteSelectedOrCurrentKf(); return; }
+  if(!t){ flashLive('トラック未選択'); return; }
+  removeTrack(state.selectedTrack);
+  flashLive('✕ TRACK 削除 — '+(t.name||'TRACK')+'（Ctrl+Zで戻せます）');
+}
 async function exportTrackPNG(trackIdx){
   const track=state.tracks[trackIdx]; if(!track) return;
   const tname=(track.name||'track').toLowerCase().replace(/[^a-z0-9]/g,'_');
@@ -2241,24 +2318,35 @@ function buildTrackElement(idx){
   soloBtn.title='ソロ（このトラックのみ表示）';
   soloBtn.addEventListener('click',e=>{e.stopPropagation();toggleTrackSolo(idx);});
 
+  // 誤爆しやすい位置なので Shift+クリック必須（素のクリックは案内だけ出す）
   const pngBtn=document.createElement('button');
   pngBtn.className='tl-tbtn';
   pngBtn.textContent='PNG';
-  pngBtn.title='このトラック単体を連番PNGで書き出し';
-  pngBtn.addEventListener('click',e=>{e.stopPropagation();exportTrackPNG(idx);});
+  pngBtn.title='このトラック単体を連番PNGで書き出し（誤爆防止: Shift+クリック）';
+  pngBtn.addEventListener('click',e=>{
+    e.stopPropagation();
+    if(!e.shiftKey){ flashLive('PNG書き出しは Shift+クリック'); return; }
+    exportTrackPNG(idx);
+  });
 
-  // SPEC_07: ANIMATOR由来トラック（projectIdあり）だけに往復ボタン
+  // SPEC_07: ANIMATOR由来トラック（projectIdあり）でのみ有効。
+  // 画像/連番トラックでも「行の項目が揃う方が見やすい」ので**出したままグレーアウト**する
+  const linked=!!track.projectId;
   const aniBtn=document.createElement('button');
   aniBtn.className='tl-tbtn anm';
   aniBtn.textContent='ANI';
-  aniBtn.title='ANIMATORでこのトラックを開く（別ウィンドウ・開いたら確認ダイアログが出ます）';
-  aniBtn.addEventListener('click',e=>{e.stopPropagation();editInAnimator(idx);});
+  aniBtn.disabled=!linked;
+  aniBtn.title=linked?'ANIMATORでこのトラックを開く（別ウィンドウ・開いたら確認ダイアログが出ます）'
+                     :'ANIMATOR由来のトラックのみ（読み込んだ画像/連番はANIMATORと同期しません）';
+  aniBtn.addEventListener('click',e=>{e.stopPropagation();if(linked)editInAnimator(idx);});
 
   const reBtn=document.createElement('button');
   reBtn.className='tl-tbtn anm';
   reBtn.textContent='Re';
-  reBtn.title='ANIMATORの最新の絵を取り直す（KF/トランスフォームは保持）';
-  reBtn.addEventListener('click',e=>{e.stopPropagation();reloadTrackFromAnimator(idx);});
+  reBtn.disabled=!linked;
+  reBtn.title=linked?'ANIMATORの最新の絵を取り直す（KF/トランスフォームは保持）'
+                    :'ANIMATOR由来のトラックのみ（読み込んだ画像/連番はANIMATORと同期しません）';
+  reBtn.addEventListener('click',e=>{e.stopPropagation();if(linked)reloadTrackFromAnimator(idx);});
 
   // SPEC_11 P4-2: ロック（幅128px制限があるので最小幅のグリフ1文字）
   const lockBtn=document.createElement('button');
@@ -2305,7 +2393,7 @@ function buildTrackElement(idx){
   btns.appendChild(visBtn);
   btns.appendChild(lockBtn); // SPEC_11 P4-2
   if(track.type!=='camera'){ btns.appendChild(soloBtn); btns.appendChild(pngBtn); } // カメラにSOLO/PNGは無意味
-  if(track.type!=='camera'&&track.projectId){ btns.appendChild(aniBtn); btns.appendChild(reBtn); } // SPEC_07
+  if(track.type!=='camera'&&track.type!=='null'){ btns.appendChild(aniBtn); btns.appendChild(reBtn); } // SPEC_07（無効時はグレーアウトで残す）
   if(camParentSel) btns.appendChild(camParentSel); // 削除ボタンの左隣
   btns.appendChild(delBtn);
   label.appendChild(nameEl); label.appendChild(btns);
@@ -3239,11 +3327,16 @@ function seek(f){state.currentFrame=Math.max(0,Math.min(state.totalFrames-1,f));
 // ── INSPECTOR / KF UI ──
 function updateInspector(){
   if(!state.width) return;
-  $('#i-fps').textContent=state.fps;
-  $('#i-res').textContent=`${state.width}×${state.height}`;
-  $('#i-frames').textContent=state.totalFrames;
-  $('#i-dur').textContent=(state.totalFrames/state.fps).toFixed(2)+'s';
-  $('#i-scale').textContent=`×${(OUT_W/state.width).toFixed(3)}`;
+  // PROJECT/OUTPUT セクションは廃止。出力仕様は SEQ PNG のツールチップに集約（ホバーで確認）
+  const ex=$('#btn-export');
+  if(ex) ex.title=[
+    '連番PNGでZIP書き出し（AE合成用）',
+    `OUTPUT: ${OUT_W}×${OUT_H} / SCALE ×${(OUT_W/state.width).toFixed(3)} / NEAREST（ドット等倍・ぼかさない）`,
+    `SRC: ${state.width}×${state.height} / ${state.fps}fps`,
+    '範囲: ワークエリア準拠・ファイル名は絶対フレーム番号',
+    '誤爆防止: Shift+クリック',
+  ].join('\n');
+  updateCompLenUI();
   const t=selTrack();
   $('#proj-meta').textContent=`${state.width}×${state.height} / ${state.fps}fps / ${state.totalFrames}f / ${state.tracks.length}T`;
   $('#meta-tl').textContent=t?(t.name||'—'):'—';
@@ -3262,8 +3355,7 @@ function updateInspectorCurrent(){
   const t=selTrack();
   const fi=t?Math.max(0,Math.min(state.currentFrame-trackOff(t),t.totalFrames-1)):-1;
   const f=fi>=0?t.frames[fi]:null;
-  $('#i-cur').textContent=String(state.currentFrame+1).padStart(4,'0');
-  $('#i-cell').textContent=f?String(f.srcCellIndex+1).padStart(2,'0')+' ['+f.cellOffset+']':'—';
+  $('#meta-cell').textContent=f?('CELL '+String(f.srcCellIndex+1).padStart(2,'0')+' ['+f.cellOffset+']'):'—';
   if(state.timeMode==='time'){
     $('#meta-br').textContent=frameToTimecode(state.currentFrame);
   }else{
@@ -3340,13 +3432,14 @@ function buildProjectPayload(){
     fps:state.fps, width:state.width, height:state.height,
     bgBright:state.bgBright,
     workArea:state.workArea||{startFrame:0,endFrame:state.totalFrames},
+    ...(state.compFrames?{compFrames:state.compFrames}:{}),
     fx:state.fx, // 撮影処理チェーン（スキーマ共通・変換なしで持ち回る）
     markers:state.markers.map(m=>({frame:m.frame,label:m.label||''})),
     tracks:state.tracks.map(t=>{
       const cells=serializeTrackCells(t);
       return {
         name:t.name,
-        projectId:(t.type==='camera'||t.type==='null')?null:(t.projectId||('p_'+Date.now().toString(36))),
+        projectId:t.projectId||null, // ANIMATOR由来のみ。画像/連番に偽のIDを振ると ANI/Re が使えるように見えてしまう
         tid:t.tid, type:t.type||'anim', parent:t.parent||null, visible:t.visible!==false,
         ...(t.tIn?{tIn:t.tIn}:{}), ...(t.tOut!=null?{tOut:t.tOut}:{}), ...(t.tOffset?{tOffset:t.tOffset}:{}), ...(t.locked?{locked:true}:{}), // SPEC_11 P3b トリム/ずらし・P4-2 ロック（無指定は省略）
         width:t.width||state.width, height:t.height||state.height, // トラック固有解像度を保持
@@ -4387,8 +4480,22 @@ $('#file-input').addEventListener('change',async e=>{
 });
 $('#btn-camera').addEventListener('click',addCameraTrack);
 $('#btn-null').addEventListener('click',addNullTrack);
-$('#kf-inf-in').addEventListener('change',()=>{ const v=$('#kf-inf-in').value.trim(); applyInfluence('ei', v===''?null:parseFloat(v)); });
-$('#kf-inf-out').addEventListener('change',()=>{ const v=$('#kf-inf-out').value.trim(); applyInfluence('eo', v===''?null:parseFloat(v)); });
+// イーズ量（influence%）— スライダーと数値は同じ値を編集。0 と 空欄 は「解除＝リニアへ」
+// 100超は意味がないので range/number とも max=100 でクランプ
+(function(){
+  const clamp=v=>Math.max(0,Math.min(100,v));
+  const apply=(field,raw,live)=>{
+    const v = (raw===''||raw==null) ? null : clamp(parseFloat(raw));
+    applyInfluence(field, (v==null||v===0)?null:v, live);
+  };
+  // range は input 中は履歴を積まず（live=true）、離した時に確定
+  $('#ease-in-range').addEventListener('input',e=>apply('ei',e.target.value,true));
+  $('#ease-out-range').addEventListener('input',e=>apply('eo',e.target.value,true));
+  $('#ease-in-range').addEventListener('change',e=>apply('ei',e.target.value,false));
+  $('#ease-out-range').addEventListener('change',e=>apply('eo',e.target.value,false));
+  $('#ease-in-num').addEventListener('change',e=>apply('ei',e.target.value.trim(),false));
+  $('#ease-out-num').addEventListener('change',e=>apply('eo',e.target.value.trim(),false));
+})();
 $('#btn-graph').addEventListener('click',toggleGraph);
 $('#btn-export-jsx').addEventListener('click',exportAeJsx);
 $('#btn-as-clear').addEventListener('click',()=>{ asClearAll().then(()=>flashLive('AUTOSAVE CLEARED')).catch(()=>{}); });
@@ -4415,7 +4522,10 @@ $('#kf-parent').addEventListener('change',()=>{
   const sfx=(t.type!=='camera'&&!alt)?' (補正あり)':'';
   flashLive(p?('⛓ PARENT → '+(p.name||'TRACK')+sfx):'⛓ PARENT NONE'+sfx);
 });
-$('#btn-export').addEventListener('click',exportPNG);
+$('#btn-export').addEventListener('click',e=>{
+  if(!e.shiftKey){ flashLive('SEQ PNG書き出しは Shift+クリック'); return; }
+  exportPNG();
+});
 $('#btn-export-project').addEventListener('click',exportProject);
 $('#btn-home').addEventListener('click',()=>{location.href='index.html';});
 $('#frm-toggle').addEventListener('click',()=>{ state.timeMode=state.timeMode==='time'?'frame':'time'; updateInspectorCurrent(); });
@@ -4446,7 +4556,7 @@ function onLiveProjectUpdate(json){
   let matched=false;
   state.tracks.forEach(t=>{ if(t.projectId===json.projectId){ if(liveUpdateTrack(t,json)) matched=true; } });
   if(matched){
-    state.totalFrames=Math.max(0,...state.tracks.map(t=>t.totalFrames));
+    recalcTotalFrames();
     if(state.workArea) state.workArea.endFrame=Math.max(state.workArea.endFrame,state.totalFrames);
     if(state.currentFrame>=state.totalFrames) state.currentFrame=Math.max(0,state.totalFrames-1);
     rebuildAllTrackUI(); updateTransport(); updateInspector(); drawCurrentFrame();
@@ -4521,10 +4631,7 @@ $('#btn-live').addEventListener('click',()=>{
 
 $('#btn-kf-add').addEventListener('click',addKfAtCurrent);
 $('#btn-kf-clear').addEventListener('click',clearAllKf);
-$('#btn-kf-copy').addEventListener('click',copyKeyframes);
-$('#btn-kf-paste').addEventListener('click',pasteKeyframes);
-$('#btn-kf-ease').addEventListener('click',e=>applyEase(e.shiftKey?1:0.5));
-$('#btn-kf-hold').addEventListener('click',()=>applyHold()); // SPEC_11 P2
+// COPY/PASTE=Ctrl+C/Ctrl+V、EASE/HOLD=キーのWクリック送り、イーズ量=トランスポートのスライダー
 
 // KFプロパティ入力の配線（インスペクター kf-/dot- と FX HUD fx-/fx-dot- で共通）
 function bindPropInputs(valPrefix, dotPrefix){
@@ -4732,7 +4839,8 @@ const SHORTCUT_ACTIONS=[
   {id:'addKf',    label:'キーフレーム追加 (i)', def:'I',         run:()=>addKfAtCurrent()},
   {id:'prevKey',  label:'前のキーへ (J)',       def:'J',         run:()=>seekPrevKey()},
   {id:'nextKey',  label:'次のキーへ (K)',       def:'K',         run:()=>seekNextKey()},
-  {id:'delKey',   label:'キー削除 (Del)',       def:'Delete',    prevent:true, run:()=>deleteSelectedOrCurrentKf()},
+  {id:'delKey',   label:'キー削除／無ければトラック削除 (Del)', def:'Delete', prevent:true, run:()=>deleteKfOrTrack()},
+  {id:'trackVis', label:'トラック 表示/非表示 (H)', def:'H',      run:()=>toggleTrackVis(state.selectedTrack)},
   {id:'fit',      label:'表示 FIT / 2回で100% (F)', def:'F',      run:()=>fitAction()},
   {id:'trackUp',  label:'トラック選択↑ (Shift=最上)', def:'ArrowUp',  prevent:true, run:e=>selectTrackStep(+1, e&&e.shiftKey)},
   {id:'trackDn',  label:'トラック選択↓ (Shift=最下)', def:'ArrowDown',prevent:true, run:e=>selectTrackStep(-1, e&&e.shiftKey)},
@@ -4776,10 +4884,14 @@ function trackLen(t){
 function trackToPlayhead(which){
   const t=selTrack(); if(!t){ flashLive('トラック未選択'); return; }
   if(lockedGuard(t)) return;
-  const head=t.tOffset||0, len=trackLen(t);
-  const delta=(which==='in') ? (state.currentFrame-head) : (state.currentFrame+1-(head+len));
+  const off=t.tOffset||0, len=trackLen(t);
+  // トリムしてあれば「トリムのIN/OUT」を、してなければ素材の頭/尻を基準にする
+  const hasTrim=(t.tIn||0)!==0||t.tOut!=null;
+  const head=hasTrim?(t.tIn||0):off;
+  const tail=hasTrim?(t.tOut==null?off+len:t.tOut):(off+len);
+  const delta=(which==='in') ? (state.currentFrame-head) : (state.currentFrame+1-tail);
   if(!delta){ flashLive(which==='in'?'すでに頭がインジケータ位置です':'すでに尻がインジケータ位置です'); return; }
-  t.tOffset=head+delta;
+  t.tOffset=off+delta; // 基準(head/tail)はトリムでも、ずらすのは常に tOffset からの相対
   // トリムもレイヤーと一緒に動く。はみ出してもクランプしない（表示側で丸める）
   if((t.tIn||0)!==0||t.tOut!=null){
     t.tIn=(t.tIn||0)+delta;
@@ -4834,10 +4946,22 @@ window.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyC'&&e.target.tagName!=='INPUT'){ e.preventDefault(); copyKeyframes(); return; }
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'&&e.target.tagName!=='INPUT'){ e.preventDefault(); pasteKeyframes(); return; }
   if(e.target.tagName==='INPUT') return;
-  if(e.code==='Backspace'){ e.preventDefault(); deleteSelectedOrCurrentKf(); return; }
+  if(e.code==='Backspace'){ e.preventDefault(); deleteKfOrTrack(); return; }
   // Ctrl(⌘)+↑↓ = 選択トラックの上下移動。Shift併用で一番上/一番下
   if((e.ctrlKey||e.metaKey)&&(e.code==='ArrowUp'||e.code==='ArrowDown')){
     e.preventDefault(); moveTrack(e.code==='ArrowUp'?+1:-1, e.shiftKey); return;
+  }
+  // Ctrl(⌘)+L = ロック / Ctrl+Shift+L = 全ロック解除
+  if((e.ctrlKey||e.metaKey)&&e.code==='KeyL'){
+    e.preventDefault();
+    if(e.shiftKey) unlockAllTracks(); else toggleTrackLock(state.selectedTrack);
+    return;
+  }
+  // Ctrl(⌘)+D = トラック複製 / Ctrl+Shift+D = インジケータで分割
+  if((e.ctrlKey||e.metaKey)&&e.code==='KeyD'){
+    e.preventDefault();
+    if(e.shiftKey) splitTrackAtPlayhead(state.selectedTrack); else duplicateTrack(state.selectedTrack);
+    return;
   }
   // SPEC_11 P3b-1: Alt 併用のショートカット（トリム等）。他のアクションはAlt併用を無視する従来方針のまま
   if(e.altKey&&!e.ctrlKey&&!e.metaKey){
@@ -5086,6 +5210,9 @@ $('#shortcut-reset').addEventListener('click',()=>{
   gKeymap=defaultKeymap(); gCaptureId=null; saveKeymap(); buildShortcutList();
 });
 // Guide toggles / inputs
+// コンポ尺（設定パネル）: FRAMES / DUR のどちらを触っても同じ setCompFrames へ
+$('#set-frames').addEventListener('change',()=>{ setCompFrames(parseFloat($('#set-frames').value)); });
+$('#set-dur').addEventListener('change',()=>{ setCompFrames(parseFloat($('#set-dur').value)*state.fps); });
 // SPEC_11 P4-3: ドラフト再生トグル
 $('#draft-play-toggle').classList.toggle('on',gDraftPlay);
 $('#draft-play-toggle').addEventListener('click',()=>{

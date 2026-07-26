@@ -348,6 +348,21 @@ ANIMATOR と同じ操作感を composer に移植。すべて実装・実機検�
   発注者案「上にコマ・下半分にキー」の意図を、**サムネを小さくせずに**満たす形（行が低いときにサムネが潰れないため）。コマ番号ラベルは帯の上へ（z-index:2・白文字+影）
 - **選択トラックの明示**: `.tl-track.selected .tl-track-strip` にも outline＋地色。ラベル側の強調だけだとサムネに覆われて分からなかった
 
+### UI整理・ショートカット拡張（2026-07-25・2回目のpush後）
+
+- **選択フォーカスをサムネの上へ**: `.tl-track-strip::before`（z3）で乗せる。背景色だと絵の下に潜って見えなかった
+- **ANI/Re をグレーアウトで残す**: projectId が無いトラック（読み込んだ画像/連番）でもボタンは並べて `disabled`。
+  併せて `buildProjectPayload` が画像/連番に**偽の projectId を振っていたバグ**を修正（往復後に連携できるように見えていた）
+- **PNG書き出しは Shift+クリック必須**（トラック行の `PNG` / トップバーの `SEQ PNG`）
+- **`[` / `]` はトリムしてあればトリムのIN/OUT基準**（無ければ素材の頭/尻）。ずらす量は常に `tOffset` からの相対
+- **INSPECTOR を編集専用に整理**: PROJECT / OUTPUT / CURRENT FRAME を廃止。
+  尺 → 設定パネルの **COMP LENGTH**（FRAMES / DUR どちらからでも後ろに伸ばせる＝`state.compFrames`）、
+  出力仕様 → SEQ PNG のツールチップ、CELL → キャンバス右下（`#meta-cell`）へ移動
+- **COPY/PASTE/EASE/HOLD ボタンを廃止**（Ctrl+C・Ctrl+V／キーのWクリック送りで代替）。
+  **イーズ量はトランスポートバーの EASE スライダー**（IN/OUT・0〜100・0で解除）へ移設。100超は入らない
+- **ショートカット追加**: `H`=トラック表示切替 / `Ctrl+L`=ロック / `Ctrl+Shift+L`=全ロック解除 /
+  `Ctrl+D`=トラック複製 / `Ctrl+Shift+D`=インジケータで分割 / `Del`・`BackSpace`=キー削除、キーが無ければトラック削除
+
 ### 実装後メモ（2026-07-25）
 - P3b-2 の副産物として、**ミニグラフの横軸もコンポ時間に統一**（`getKfValue(f-off)` で評価し、キー点は `frameFrac(k.f+off)`）。実装直後は tOffset 分だけダイヤとズレていたのを実機で発見・修正済み。P0の座標規約はこれで tOffset 込みで守られている。
 - `locked` は undo（perTrack）に加えて **PROJECT_v2 にも直列化**した（保存/復元でロックが保たれる）。

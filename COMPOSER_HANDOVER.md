@@ -148,6 +148,19 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - **トラック並び替えドラッグ**: pointer capture は使わず **window の pointermove/pointerup で追う**。captureすると①ラベルの dblclick 改名が死ぬ ②途中でcaptureが外れると pointerup を拾えずゴーストがカーソルに張り付く、の両方が起きる。`onEnd` は `pointerup` のときだけ `doTrackReorder` し、`finally` で必ず `dhCleanup()`
 - **INSPECTORのドック**: 位置は `#inspector.dock-left/.dock-right` の**クラス**で決める。`dockInspector()` はフリードラッグの inline `left/right/top/transform` と**リサイズが付けた `maxHeight`／`#inspector-body` の `height` を全消し**してからクラスを付け直す（消し忘れると宙に浮いて「収まらない」）。`makeFloatDrag` 側は掴んだ時に `.floating` を付けて dock クラスを外す。ANIMATOR のパレット（`applyPaletteFloat` が `style.left/top/right` と `palette` の height/maxHeight をクリア）と同じ考え方
 - **FXモーダル**: `#btn-fx` は `toggleSfxModal()`＝開閉トグル。開いている間はボタンに `.primary`。`closeSfxModal()`（✕/Esc）でも消灯させること
+- **INSPECTOR は「選択トラックの編集」専用**（2026-07-25 整理）。PROJECT/OUTPUT/CURRENT FRAME セクションは廃止し、
+  FPS・解像度＝トップバーとキャンバス四隅 / 出力仕様＝`#btn-export`(SEQ PNG) の title（`updateInspector` が毎回焼き直す）/
+  尺＝設定パネルの COMP LENGTH / CELL＝キャンバス右下 `#meta-cell` に移した。**新しい情報をINSPECTORに足す前に、この4箇所のどれかに載らないか考えること**
+- **コンポ尺は `state.compFrames`**（null=素材まかせ）。`recalcTotalFrames()` が `max(素材の自然長, compFrames)` を `state.totalFrames` に入れる。
+  **`state.totalFrames` に直接代入しないこと**（5箇所あった代入は全部 `recalcTotalFrames()` へ集約済み）。設定パネルの FRAMES/DUR はどちらも `setCompFrames()` に入る（DURは×fps）。素材より短い値は自動で null に戻る
+- **イーズ量(influence)はトランスポートバーのスライダー**（`#ease-in-range`/`#ease-in-num`/`#ease-out-*`）。0=解除、max=100。
+  range の `input` は `applyInfluence(field,val,live=true)` で**履歴を積まない**、`change` で確定＝1ドラッグ1undo
+- **PNG書き出しは Shift+クリック必須**（トラック行の `PNG` と トップバーの `SEQ PNG` の両方）。誤爆すると4K書き出しが走るため
+- **ANI/Re は projectId が無いトラックでも表示して `disabled`**（行の項目が揃う方が見やすいという要望）。
+  `buildProjectPayload` で画像/連番に**偽の projectId を振らない**こと（振ると往復後にANIMATOR連携できるように見えてしまう）
+- **トラック複製/分割**: `cloneTrackObj()` は Image を共有して cellsRaw/cellInfos/frames を浅コピー、keyframes/markers だけ深コピー。
+  `duplicateTrack`(Ctrl+D) / `splitTrackAtPlayhead`(Ctrl+Shift+D＝前半 tOut=現コマ・後半 tIn=現コマ)
+- **Del/BackSpace は `deleteKfOrTrack()`**: キー（選択 or 現コマ）があればキー削除、無ければ**トラック削除**。undoで戻せる前提の設計
 - **キーの順送りは3モード**（`KEY_MODES` = LINEAR / EASE / HOLD）。Ctrl+クリックもダブルクリックも `cycleEase()` → `getFrameKeyMode()` で現在値を読み `applyKeyModeToFrame()` で次へ。
   ダイヤ形状と1対1: 菱形(ネオン)=LINEAR / 円(マゼンタ)=EASE / **正方形(グレー)=HOLD**。
   送りでは `ei`/`eo`(influence) を**消す**（半端な状態が残ると形と実挙動が食い違うため）。influenceを使いたい場合はINF欄から入れ直す。
