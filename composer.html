@@ -143,23 +143,33 @@ input[type=number]{-moz-appearance:textfield;}
 /* 枠線はoutline（レイアウト外）で描く：borderだと内側の座標系が2px縮んでルーラーとずれる */
 .tl-track-strip{position:relative;flex:1;height:calc(var(--track-h,54px) - 10px);background:rgba(255,255,255,0.02);outline:1px solid var(--border);outline-offset:-1px;overflow:hidden;}
 .tl-frame-block{position:absolute;top:0;height:100%;border-right:1px solid rgba(0,0,0,0.5);overflow:hidden;}
-.tl-frame-block img.tl-thumb{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;image-rendering:pixelated;image-rendering:-moz-crisp-edges;display:block;pointer-events:none;-webkit-user-drag:none;user-select:none;}
+/* サムネはセルの「先頭に原寸比で1枚」。width:100% だと長いセルほど横に引き伸ばされて（cover＝縦が切れて）
+   何の絵か分からなくなるため、高さ基準の width:auto にする。余った右側は素のブロック色＝選択の地色が透ける */
+.tl-frame-block img.tl-thumb{position:absolute;top:0;left:0;height:100%;width:auto;max-width:100%;object-fit:cover;object-position:left center;image-rendering:pixelated;image-rendering:-moz-crisp-edges;display:block;pointer-events:none;-webkit-user-drag:none;user-select:none;}
+/* KFダイヤ/マーカーの帯（下23px）にだけ暗いグラデを敷く＝白いサムネの上でもキーが埋もれない */
+.tl-track-strip::after{content:'';position:absolute;left:0;right:0;bottom:0;height:23px;z-index:1;pointer-events:none;
+  background:linear-gradient(to top,rgba(7,3,15,0.85),rgba(7,3,15,0.55) 55%,rgba(7,3,15,0));}
+/* 選択中はストリップ自体を縁取り＋地色（サムネで覆われても分かるように） */
+.tl-track.selected .tl-track-strip{outline:1px solid rgba(255,79,168,0.8);background:rgba(255,79,168,0.09);}
+.tl-track.tl-cam.selected .tl-track-strip{outline-color:rgba(90,233,255,0.8);background:rgba(90,233,255,0.09);}
 .tl-frame-block{pointer-events:none;}
 .tl-track-strip{pointer-events:auto;}
-.tl-frame-block .tl-label{position:absolute;bottom:1px;left:3px;font-size:7px;line-height:1;z-index:1;pointer-events:none;}
+/* コマ番号はKF帯の暗いグラデ（strip::after, z1）より上に出す。地が暗くなったので文字は白+影 */
+.tl-frame-block .tl-label{position:absolute;bottom:1px;left:3px;font-size:7px;line-height:1;z-index:2;pointer-events:none;}
 .tl-frame-block.draw{border-right-color:rgba(255,79,168,0.3);}
-.tl-frame-block.draw .tl-label{color:rgba(0,0,0,0.8);}
+.tl-frame-block.draw .tl-label{color:rgba(255,255,255,0.7);text-shadow:0 0 3px #000,0 1px 2px #000;}
 .tl-frame-block.empty{background:rgba(255,255,255,0.04);background-image:repeating-linear-gradient(45deg,transparent 0,transparent 4px,rgba(255,255,255,0.04) 4px,rgba(255,255,255,0.04) 5px);}
 .tl-frame-block.empty .tl-label{color:rgba(255,255,255,0.4);}
 /* SPEC_11 P3b-1: IN/OUTトリム — 範囲外は「IN/OUT位置ぴったり」でベールを掛ける（コマ単位だと境目がズレて分かりにくいため）*/
 .tl-trim-veil{position:absolute;top:0;bottom:0;z-index:2;pointer-events:none;background:rgba(6,6,10,0.72);
   background-image:repeating-linear-gradient(45deg,transparent 0 5px,rgba(255,255,255,0.05) 5px 6px);
   backdrop-filter:grayscale(1) brightness(.5);-webkit-backdrop-filter:grayscale(1) brightness(.5);}
-.tl-trim-veil.left{border-right:1px solid rgba(255,210,122,0.55);}
-.tl-trim-veil.right{border-left:1px solid rgba(255,210,122,0.55);}
-.tl-trim-handle{position:absolute;top:0;bottom:0;width:7px;z-index:5;pointer-events:all;cursor:ew-resize;background:rgba(255,210,122,0.10);border-left:1px solid rgba(255,210,122,0.25);border-right:1px solid rgba(255,210,122,0.25);}
-.tl-trim-handle:hover,.tl-trim-handle.active{background:rgba(255,210,122,0.45);border-color:var(--neon);box-shadow:0 0 6px rgba(255,210,122,0.6);}
-.tl-trim-handle.set{background:rgba(255,210,122,0.30);border-color:rgba(255,210,122,0.7);}
+/* 境界とハンドルは紫（--magenta）。ネオン黄はサムネの白地に埋もれて見えないため */
+.tl-trim-veil.left{border-right:1px solid rgba(184,80,255,0.75);}
+.tl-trim-veil.right{border-left:1px solid rgba(184,80,255,0.75);}
+.tl-trim-handle{position:absolute;top:0;bottom:0;width:7px;z-index:5;pointer-events:all;cursor:ew-resize;background:rgba(184,80,255,0.22);border-left:1px solid rgba(184,80,255,0.45);border-right:1px solid rgba(184,80,255,0.45);}
+.tl-trim-handle:hover,.tl-trim-handle.active{background:var(--magenta);border-color:#fff;box-shadow:0 0 8px rgba(184,80,255,0.9);}
+.tl-trim-handle.set{background:rgba(184,80,255,0.85);border-color:#fff;box-shadow:0 0 5px rgba(184,80,255,0.7);}
 .tl-kf-row{position:absolute;bottom:11px;left:0;right:0;height:12px;pointer-events:none;z-index:3;}
 .tl-kf-d{position:absolute;width:11px;height:11px;background:var(--neon);border:1.5px solid #000;box-shadow:0 0 0 1px rgba(255,210,122,0.5);transform:translate(-50%,-50%) rotate(45deg);top:50%;pointer-events:all;cursor:ew-resize;transition:transform .1s;}
 .tl-kf-d:hover{background:var(--acid);box-shadow:0 0 6px 1px var(--acid);transform:translate(-50%,-50%) rotate(45deg) scale(1.35);animation:kf-pulse .6s ease-in-out infinite;}
@@ -1271,14 +1281,27 @@ function applyEase(amount){ // インスペクターのEASEボタン：選択 or
   recordHistory(); renderKfDiamonds(state.selectedTrack); refreshKfSelClasses(); drawCurrentFrame();
   flashLive('∿ EASE '+easeLabel(amount)+' ×'+n);
 }
-function applyEaseToFrame(trackIdx,f,amount){
+// キーの「送り」で切り替わる3モード（0=リニア / 1=イーズ最大 / 2=ホールド）。
+// ダイヤ形状: 菱形(ネオン) / 円(マゼンタ) / 正方形(グレー) と1対1で対応する
+const KEY_MODES=['LINEAR','EASE','HOLD'];
+function applyKeyModeToFrame(trackIdx,f,mode){
   const tracksInv=new Set([trackIdx]);
+  const setK=k=>{
+    if(mode===2){ k.hold=true; }                       // ホールド（ez/influenceより優先されるので値は触らない）
+    else { delete k.hold; k.ez=(mode===1?1:0); delete k.ei; delete k.eo; } // influenceは送りでは扱わない＝解除して素直な状態へ
+  };
   if(kfSel.length && kfSelHas(trackIdx,f)){
-    kfSel.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k) k.ez=amount; }); tracksInv.add(s.t); });
+    kfSel.forEach(s=>{ const t=state.tracks[s.t]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===s.f); if(k) setK(k); }); tracksInv.add(s.t); });
   } else {
-    const t=state.tracks[trackIdx]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===f); if(k) k.ez=amount; });
+    const t=state.tracks[trackIdx]; if(!t) return; ALL_PROPS.forEach(p=>{ const k=t.keyframes[p].find(k=>k.f===f); if(k) setK(k); });
   }
-  recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); drawCurrentFrame();
+  recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); drawCurrentFrame(); renderGraph(); updateKfUI();
+}
+// 現フレームのキーが今どのモードか（ホールド優先→ez）
+function getFrameKeyMode(trackIdx,f){
+  const t=state.tracks[trackIdx]; if(!t) return 0;
+  for(const p of ALL_PROPS){ const k=t.keyframes[p].find(k=>k.f===f); if(k) return k.hold?2:((k.ez||0)>=0.5?1:0); }
+  return 0;
 }
 // ── INFLUENCE（AE風 influence%）──
 // field='ei'|'eo'。val=null で解除（ez smoothstepへ戻る）。対象=選択KF、無ければ現フレームのキー
@@ -1333,12 +1356,6 @@ function updateInfluenceUI(){
   }
   if(document.activeElement!==inEl)  inEl.value = ei==null?'':Math.round(ei);
   if(document.activeElement!==outEl) outEl.value= eo==null?'':Math.round(eo);
-}
-// 現フレーム(grabbed)のイーズ量を取得（メニューの現在値表示用）
-function getFrameEz(trackIdx,f){
-  const t=state.tracks[trackIdx]; if(!t) return 0;
-  for(const p of ALL_PROPS){ const k=t.keyframes[p].find(k=>k.f===f); if(k) return k.ez||0; }
-  return 0;
 }
 
 // ── KFナビゲーション（J/K） ──
@@ -2321,12 +2338,16 @@ function buildTrackElement(idx){
       block.appendChild(lbl);
       if(c.kind==='draw'&&c.image){
         const thumb=document.createElement('img'); thumb.className='tl-thumb';
-        const oc=document.createElement('canvas'); oc.width=160; oc.height=90;
+        // サムネはトラック本来のアスペクトで作る（従来は常に160×90に押し込めていたので
+        // 4:3などの素材が横に潰れて「引き伸ばされて見える」原因になっていた）
+        const trW=track.width||state.width||160, trH=track.height||state.height||90;
+        const thH=90, thW=Math.max(1,Math.round(thH*trW/trH));
+        const oc=document.createElement('canvas'); oc.width=thW; oc.height=thH;
         const oc2d=oc.getContext('2d'); oc2d.imageSmoothingEnabled=false;
         const dt=()=>{
           const bg=Math.round(255*(state.bgBright/100));
-          oc2d.fillStyle=`rgb(${bg},${bg},${bg})`; oc2d.fillRect(0,0,160,90);
-          oc2d.drawImage(c.image,0,0,160,90); thumb.src=oc.toDataURL();
+          oc2d.fillStyle=`rgb(${bg},${bg},${bg})`; oc2d.fillRect(0,0,thW,thH);
+          oc2d.drawImage(c.image,0,0,thW,thH); thumb.src=oc.toDataURL();
         };
         if(c.image.complete&&c.image.naturalWidth>0) dt();
         else c.image.addEventListener('load',dt,{once:true});
@@ -2495,7 +2516,7 @@ function renderKfDiamonds(trackIdx){
     // SPEC_11 P2: HOLD は形状優先（正方形グレー）。イーズ形状は hold でないときだけ
     if(holdOn) d.classList.add('ez-hold');
     else if(ezAmt>=0.99) d.classList.add('ez-max'); else if(ezAmt>0) d.classList.add('ez-mid');
-    d.style.left=((f+off)/total*100)+'%'; d.title=`F${f+off+1}`+(holdOn?' (HOLD)':ezAmt>=0.99?' (EASE最大)':ezAmt>0?' (EASE中)':'')+'  Ctrl+クリックでイーズ切替';
+    d.style.left=((f+off)/total*100)+'%'; d.title=`F${f+off+1}`+(holdOn?' (HOLD)':ezAmt>=0.99?' (EASE最大)':ezAmt>0?' (EASE中)':' (LINEAR)')+'  Ctrl+クリック / ダブルクリックで LINEAR→EASE→HOLD 送り';
     // この frame の各プロパティ値（単一移動/複製で持ち回る）
     const kfVals={}, kfEz={}, kfInf={}, kfHold={};
     ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k){kfVals[p]=k.v;kfEz[p]=k.ez||0;kfInf[p]={ei:k.ei,eo:k.eo};if(k.hold)kfHold[p]=true;}});
@@ -2577,12 +2598,11 @@ function renderKfDiamonds(trackIdx){
   }
 }
 
-// ── EASE トグル（Ctrl+クリック / ダブルタップ）：リニア↔最大（0↔1） ──
+// ── キーの順送り（Ctrl+クリック / ダブルクリック・ダブルタップ）：LINEAR → EASE → HOLD → LINEAR ──
 function cycleEase(trackIdx,f){
-  const cur=getFrameEz(trackIdx,f);
-  const next = cur<0.5 ? 1 : 0;
-  applyEaseToFrame(trackIdx,f,next);
-  flashLive('∿ EASE '+easeLabel(next));
+  const next=(getFrameKeyMode(trackIdx,f)+1)%3;
+  applyKeyModeToFrame(trackIdx,f,next);
+  flashLive(['◆ LINEAR','● EASE 最大','◻ HOLD（次のキーまで固定）'][next]);
 }
 function closeEaseMenu(){} // 旧メニュー互換のno-op（Escハンドラから呼ばれる）
 

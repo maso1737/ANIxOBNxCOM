@@ -335,6 +335,19 @@ ANIMATOR と同じ操作感を composer に移植。すべて実装・実機検�
 4. **トラック並び替えの反応**: pointer capture をやめて **window で pointermove/pointerup を追う**方式に変更。captureが外れて pointerup を取り逃す→ゴーストがカーソルに張り付く、が根治。ラベルの dblclick 改名との両立も維持（4px閾値はそのまま）
 5. **INSPECTORのドック**: 位置決めを inline style → **クラス（`dock-left`/`dock-right`）**に変更し、`dockInspector()` でフリードラッグの inline とリサイズが付けた `maxHeight`/`body.height` を**全消し**するようにした。ANIMATOR のパレットと同じく「押したら定位置にきちんと収まる」挙動に
 
+### 視認性・キー送りの調整（2026-07-25・push後）
+
+- **キーの順送りを3段に**: Ctrl+クリック / ダブルクリックともに **LINEAR → EASE → HOLD → LINEAR**（`KEY_MODES`）。
+  `getFrameKeyMode()`＋`applyKeyModeToFrame()` に統合し、旧 `getFrameEz`/`applyEaseToFrame` は廃止。
+  送りでは influence(`ei`/`eo`) を消す（形と実挙動の食い違いを防ぐ）。SPEC本文 P2 の「送りは0↔1のみ・holdはボタン専用」は本変更で**上書き**
+- **トリムのIN/OUTを紫に**: ハンドル・境界線を `--magenta #B850FF` へ。ネオン黄はサムネの白地に完全に埋もれていた。
+  → **タイムラインでサムネ（白地になり得る）に重なる要素に黄は使わない**、を規約として HANDOVER に記載
+- **サムネの引き伸ばし解消**: `img.tl-thumb` を `height:100%; width:auto`＝**セル先頭に原寸比で1枚**（旧 `width:100%`+`cover` は長いセルほど横に伸びて縦が切れていた）。
+  サムネ生成canvasもトラック本来のアスペクトで作る（旧: 常に160×90＝4:3素材が潰れる）
+- **キーがサムネの白地に乗らないように**: `.tl-track-strip::after` で下23px（KFダイヤ+マーカーの帯）に暗いグラデを敷く。
+  発注者案「上にコマ・下半分にキー」の意図を、**サムネを小さくせずに**満たす形（行が低いときにサムネが潰れないため）。コマ番号ラベルは帯の上へ（z-index:2・白文字+影）
+- **選択トラックの明示**: `.tl-track.selected .tl-track-strip` にも outline＋地色。ラベル側の強調だけだとサムネに覆われて分からなかった
+
 ### 実装後メモ（2026-07-25）
 - P3b-2 の副産物として、**ミニグラフの横軸もコンポ時間に統一**（`getKfValue(f-off)` で評価し、キー点は `frameFrac(k.f+off)`）。実装直後は tOffset 分だけダイヤとズレていたのを実機で発見・修正済み。P0の座標規約はこれで tOffset 込みで守られている。
 - `locked` は undo（perTrack）に加えて **PROJECT_v2 にも直列化**した（保存/復元でロックが保たれる）。

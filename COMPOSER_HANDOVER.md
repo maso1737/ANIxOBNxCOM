@@ -148,6 +148,16 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - **トラック並び替えドラッグ**: pointer capture は使わず **window の pointermove/pointerup で追う**。captureすると①ラベルの dblclick 改名が死ぬ ②途中でcaptureが外れると pointerup を拾えずゴーストがカーソルに張り付く、の両方が起きる。`onEnd` は `pointerup` のときだけ `doTrackReorder` し、`finally` で必ず `dhCleanup()`
 - **INSPECTORのドック**: 位置は `#inspector.dock-left/.dock-right` の**クラス**で決める。`dockInspector()` はフリードラッグの inline `left/right/top/transform` と**リサイズが付けた `maxHeight`／`#inspector-body` の `height` を全消し**してからクラスを付け直す（消し忘れると宙に浮いて「収まらない」）。`makeFloatDrag` 側は掴んだ時に `.floating` を付けて dock クラスを外す。ANIMATOR のパレット（`applyPaletteFloat` が `style.left/top/right` と `palette` の height/maxHeight をクリア）と同じ考え方
 - **FXモーダル**: `#btn-fx` は `toggleSfxModal()`＝開閉トグル。開いている間はボタンに `.primary`。`closeSfxModal()`（✕/Esc）でも消灯させること
+- **キーの順送りは3モード**（`KEY_MODES` = LINEAR / EASE / HOLD）。Ctrl+クリックもダブルクリックも `cycleEase()` → `getFrameKeyMode()` で現在値を読み `applyKeyModeToFrame()` で次へ。
+  ダイヤ形状と1対1: 菱形(ネオン)=LINEAR / 円(マゼンタ)=EASE / **正方形(グレー)=HOLD**。
+  送りでは `ei`/`eo`(influence) を**消す**（半端な状態が残ると形と実挙動が食い違うため）。influenceを使いたい場合はINF欄から入れ直す。
+  旧 `getFrameEz`/`applyEaseToFrame` は廃止（`getFrameKeyMode`/`applyKeyModeToFrame` に統合）
+- **タイムラインのサムネ**（2026-07-25 視認性調整）:
+  - `img.tl-thumb` は `height:100%; width:auto; max-width:100%`＝**セル先頭に原寸比で1枚**。旧 `width:100%`+`cover` は長いセルほど横に引き伸ばして縦を切っていた（ANIMATOR由来の18コマセル等で「引き伸ばされて見える」原因）
+  - サムネ生成canvasは**トラック本来のアスペクト**で作る（旧: 常に160×90へ押し込め＝4:3素材が潰れる）
+  - `.tl-track-strip::after` が下23px（KFダイヤ+マーカーの帯）に暗いグラデを敷く＝**白いサムネの上でもキーが埋もれない**。コマ番号ラベルはこの帯の上に出す必要があるので `z-index:2`＋白文字+影
+  - 選択中は**ストリップ自体**にも `outline`＋地色を出す（`.tl-track.selected .tl-track-strip`）。ラベル側だけだとサムネに覆われて選択が分からない
+  - **トリムのハンドル/境界線は紫（--magenta `#B850FF`）**。ネオン黄(--neon)は白いサムネ地に完全に埋もれる。タイムライン上でサムネ（＝白地になり得る）に重なる要素に黄は使わないこと
 - **ロック（P4-2）**: `lockedGuard(t)` が true を返したら呼び出し側は中断。現在の適用先は commitProp / addKfAtCurrent / clearAllKf / pasteKeyframes / removeTrack / applyEase(全体) / ダイヤ・マーカー・トリム・ずらしのドラッグ / アンカー・ビューポートドラッグ / dotトグル。**編集系を足したらここにも足す**
 - **ドラフト再生（P4-3）**: `gDraftPlay` かつ `state.isPlaying` のときだけ半解像度オフスクリーンへ描いて拡大。`pause()` でフル解像度に戻す（FINAL PREVIEW と同じ流儀）
 - **AE JSX（P4-4）**: カメラに加えて各トラックを平面/ヌルの3Dレイヤーで生成。solidは**composer px そのままのサイズ**で作り、スケールに `sx=comp.width/D.W` を掛けて合わせる（アンカー=`[w/2+ax, h/2+ay]`、Position=`comp中央+(x+ax)*sx`）。Z=`z*sx` でカメラのZoom設定と組み合わせると composer の `PERSP_FOCAL` 透視と一致する。**親付きレイヤーの子Zだけは AE のカメラ透視で解釈されるため厳密には一致しない**（Z=0の子は一致・JSX冒頭のコメントに明記）
