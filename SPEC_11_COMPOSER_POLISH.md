@@ -385,3 +385,61 @@ ANIMATOR と同じ操作感を composer に移植。すべて実装・実機検�
 - P3b-2 の副産物として、**ミニグラフの横軸もコンポ時間に統一**（`getKfValue(f-off)` で評価し、キー点は `frameFrac(k.f+off)`）。実装直後は tOffset 分だけダイヤとズレていたのを実機で発見・修正済み。P0の座標規約はこれで tOffset 込みで守られている。
 - `locked` は undo（perTrack）に加えて **PROJECT_v2 にも直列化**した（保存/復元でロックが保たれる）。
 - 受け入れ確認は実機（file://）で実施。`buildProjectPayload()` の save→load→save が hold/tIn/tOut/tOffset/locked/parent/ei/eo/WA 込みで**バイト一致**することを確認済み。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+## P6 — AE準拠のブラッシュアップ（2026-07-26）
+
+### P6-1 トラック行のボタン列を揃える
+- `.tl-track-btns{width:100%}` ＋ `.tl-tbtn.del{margin-left:auto}` で **✕ を常に右端＝全行で縦一列**。
+- NULL も `S / PNG / ANI / Re` を**グレーアウトで残す**（行の項目が揃う。ANI/Re の前例と同じ考え方）。
+- CAMERA の `PRNT` セレクトは `flex:1`（旧 `max-width:58px`）＝ S/PNG/ANI/Re のぶんの余白を全部使う。実測 58→89px。
+- ボタンが増えたぶんラベル幅 **128→138px**。連動して **`LABEL_W` 154→164**、`#tl-audio-label` も 138px。
+  （LABEL_W = `.tl-track` の padding-left 14 + ⠿ 12 + ラベル幅。**ラベル幅を変えたら必ず両方直す**）
+
+### P6-2 触ったトラックが選択される
+- KFダイヤ / トラックマーカー / トリムハンドル / ストリップのAlt+ドラッグの各 `pointerdown` 冒頭で `selectTrack(idx)`。
+  これらは `stopPropagation()` するので、行の pointerdown まで届いていなかった。
+
+### P6-3 Shiftスナップの拡張
+- `gatherSnapFrames(exclMarker, exclTrack)` に **各トラックの IN/OUT（トリム端 or レイヤーバーの頭/尻）** を追加。
+- 対応した操作: **KFドラッグ（単体/グループ）/ トリムハンドル / Alt+ドラッグのレイヤーずらし**。すべてインジケータも候補。
+- `snapDelta(delta, edges, ppf, exclTrack, cands)` = 頭と尻の2点を同じ delta で動かすとき、ズレが小さい方の端に吸着。
+- **`freezeSnapCands()` でドラッグ開始時に候補を凍結する**のが要。ドラッグ中に毎回 `gatherSnapFrames` を取り直すと、
+  動かしている当人（キー／レイヤーのKF）が候補に混ざって**自分自身に吸着して動けなくなる**（実機で発見）。
+  凍結時に「動かす対象のコンポ時間」を `delete` しておく（元位置への張り付き防止）。ミニグラフの正規化凍結（P2c）と同じ理屈。
+- **Shift+ドラッグ＝複製 は Alt+ドラッグへ移動**（Shift をスナップに使うため）。
+
+### P6-4 トラックの複数選択
+- `gSelTids` = **選択順の tid 配列**（添字だと並び替え/undoで壊れる）。プライマリ = `state.selectedTrack` は常に末尾。
+- `selectTrack(idx, mode)` … `'single'`(既定) / `'toggle'`(Ctrl) / `'range'`(Shift＝プライマリから idx まで**間を飛ばさず順に**追加)。
+  修飾キー付きの選択は**ラベル側でだけ**受ける（ストリップ上の Shift は KFマーキーの追加選択に予約）。
+- `Ctrl+A` = 全トラック選択。副選択は `.multi-sel`、行名の後ろに選択順バッジ `.tl-sel-ord`（#1,#2…）。
+- 複数に効く操作: **Ctrl+L ロック / Alt+S ソロ / H 表示 / Del トラック削除**。
+- `refreshTrackSelClasses()` が**自己修復**する（`state.selectedTrack` を直接書き換える moveTrack/duplicate/split/import 対策）。
+  undo は複数選択を持たない＝`applyHistory` でプライマリ1本に畳む。
+
+### P6-5 ロックの作り直し（不具合修正）
+- **旧不具合**: `Ctrl+L` を押すと下から順に全トラックがロックされた。原因は「ロックしたら選択を最下の非ロックへ逃がす」処理＋キーリピート。
+- **ロック中でも選択できる**ようにした（P5の「AE準拠＝選択不可」を撤回）。`selectTrack`/`selectTrackStep` の除外を削除。
+- 選択枠は**ロック色（--neon 琥珀）**で出す（`.tl-track.locked.selected`）＝「選択はできているが編集は不可」が一目で分かる。
+- `setTrackLock(idx,on)` は選択を動かさない。`toggleLockSelected()`（Ctrl+L）が選択分をまとめて反転。`e.repeat` は無視。
+
+### P6-6 ショートカット（AE準拠）
+- **`I` / `O` ＝ インジケータをレイヤーの IN / OUT へ**（`playheadToTrackEdge`）。旧「`I`＝全キー追加」は廃止（誤爆が多い）。
+  レイヤー側を動かすのは従来どおり `[` / `]`。OPパンチは `O` → **`Q`** へ移動。
+- `J` / `K` = 前後のキーへ（従来どおり。ラベルを「インジケータ吸着」に変更）。
+- **`Ctrl+X` = キーの切り取り**（`cutKeyframes` = copy → 削除。選択キー優先、無ければ選択トラック全部）。
+- **`Alt+S` = ソロ**（`alt:true` 枠なので QUICK TRANSFORM の `S`＝スケールと共存）。
+- **`X` = 撮影FX / `Shift+X` = FX PREVIEW**（P5で廃止した `X` を撮影FX用に再利用）。
+
+### P6-7 FRAME / TIME の直接入力
+- トランスポート右の `#tc-frame` / `#tc-time` をクリック → インラインinput → Enterでその位置へ seek。
+- `parseTimecodeToFrame()` は `frameToTimecode` の逆算（`f=idx+1`, `ff=f%fps`, 総秒=`floor(f/fps)`）。
+  コロン区切りは**右から** FF/SS/MM/HH。コロン無しは秒とみなしてその秒の先頭コマへ。
+- `updateTransport()` は**入力中なら上書きしない**（input が居る間は return）。
+
+### P6-8 SETTINGS を INSPECTOR と対にする
+- SETTINGS も左右ドック（`#settings-panel.dock-left/.dock-right`, top:40px）。**側は常に INSPECTOR の反対**（`dockSettings()` が `gInspSide` から決める）。
+- `Tab` で両方が同時に入れ替わる。ヘッダに **⇄ ドックボタン**（`#settings-panel-dock`）を追加。
+- ドラッグは INSPECTOR と同じ `makeFloatDrag`（掴んだ時点でドック解除）に統一。
+- **`Esc` では閉じない**（作業中に消えるのが不便）。閉じるのは ✕ か `,`。

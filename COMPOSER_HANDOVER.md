@@ -1,5 +1,23 @@
 COMPOSER v0.7（単一HTML）の続き開発用ハンドオフ。
 
+【2026-07-26 追加（SPEC_11 P6）】
+- **トラック行**: `.tl-track-btns{width:100%}`＋`.tl-tbtn.del{margin-left:auto}` で ✕ が全行縦一列。NULLも S/PNG/ANI/Re をグレーアウトで残す。CAMERAの PRNT は `flex:1`。
+  **ラベル幅 138px / `LABEL_W` 164 / `#tl-audio-label` 138 は3点セット**（どれか変えたら残り2つも）
+- **触ったトラックが選択される**: KFダイヤ/マーカー/トリムハンドル/ストリップAlt+ドラッグの pointerdown 冒頭で `selectTrack(idx)`（これらは stopPropagation するので行のハンドラに届かない）
+- **Shiftスナップ**: `gatherSnapFrames` に各トラックの IN/OUT（トリム端 or 素材の頭/尻）を追加。KFドラッグ（単体/グループ）・トリム・レイヤーずらしが対応。
+  **`freezeSnapCands()` でドラッグ開始時に候補を凍結すること**。ドラッグ中に取り直すと動かしている当人が候補に入って自己吸着で止まる。凍結時に対象自身のコンポ時間を delete する
+- **Shift+ドラッグ＝複製 は Alt+ドラッグへ移動**（Shift はスナップに使う）
+- **複数トラック選択**: `gSelTids`＝選択順の tid 配列（プライマリ=`state.selectedTrack` は常に末尾）。`selectTrack(idx,'single'|'toggle'|'range')`。
+  修飾キー付き選択は**ラベル側でだけ**受ける（ストリップのShiftはKFマーキー追加）。Ctrl+A=全選択。Ctrl+L/Alt+S/H/Del が選択分に効く。
+  `refreshTrackSelClasses()` が自己修復（`state.selectedTrack` を直接書くコードの受け皿）。undoは複数選択を持たない
+- **ロック**: **ロック中でも選択できる**（P5の「選択不可」は撤回）。選択枠は琥珀（`.tl-track.locked.selected`）。
+  `setTrackLock` は選択を動かさない／`toggleLockSelected()`(Ctrl+L)が選択分をまとめて反転／`e.repeat` 無視。
+  旧不具合「Ctrl+Lで下から順に全ロック」の原因は「ロックしたら選択を逃がす」処理＋キーリピート
+- **ショートカット**: `I`/`O`=インジケータをレイヤーIN/OUTへ（`playheadToTrackEdge`。レイヤーを動かすのは `[`/`]`）／OPパンチは `Q` へ移動／
+  `Ctrl+X`=キー切り取り／`Alt+S`=ソロ（alt枠なので QUICK TRANSFORM の `S` と共存）／`X`=撮影FX・`Shift+X`=FX PREVIEW
+- **FRAME/TIME 直接入力**: `#tc-frame`/`#tc-time` クリックでinput→Enterでseek。`updateTransport()` は入力中なら上書きしない
+- **SETTINGS**: 左右ドック対応。側は常に INSPECTOR の反対（`dockSettings()` が `gInspSide` から決める）。`Tab` で両方入替。ヘッダに ⇄。**Escでは閉じない**
+
 【2026-07 追加（SPEC_11 P0/P1/P1b）】
 - 座標規約: フレームf左端= LABEL_W + frameFrac(f)*幅（frameFrac=f/total）。**total-1を分母にしない**。全UI（ルーラー/PH/WA/ダイヤ/ブロック/グラフ）統一
 - 自動保存: IndexedDB `composer_autosave_v1`（cells=絵・import/LIVE時のみ ／ meta=cells抜きpayload・recordHistory毎debounce 2s）。起動時に復元バー（復元=置き換え/破棄/✕=温存）。LIVE自動ロードが先行してもバーは出す。⚙パネルにCLEARボタン。音声本体は対象外
@@ -99,8 +117,8 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 
 ■ ショートカット（登録制＋再割当, localStorage:composer_keymap_v1）
 - SHORTCUT_ACTIONS[].{id,label,def,prevent,run(e)}。gKeymapでキー→action。設定パネルで変更
-- 既定：Space再生 / ←→コマ(Shift=10) / Home/End / B,N ワークエリア / M マーカー / i キー追加 / J,K 前後キーへ / Del キー削除 / F FIT / P/S/A/R/T/U HUD表示 / X FX HUD / , 設定
-- Ctrl+Z/Shift+Z=undo/redo、Ctrl+C/V=KFコピペ、BackSpace=削除、Escape=メニュー/選択/HUD/設定を閉じる
+- 既定：Space再生 / ←→コマ(Shift=10) / Home/End / B,N ワークエリア / M マーカー / I,O レイヤーIN/OUTへ / J,K 前後キーへ / Del キー削除 / Q OPパンチ / H 表示 / Alt+S ソロ / [,] レイヤー移動（Alt=トリム） / F FIT / G グラフ / X 撮影FX(Shift=FX PREVIEW) / P/S/A/R/T/U QUICK TRANSFORM / Tab ドック入替 / , 設定
+- Ctrl+Z/Shift+Z=undo/redo、Ctrl+C/X/V=KFコピー/切取/貼付、Ctrl+A=全トラック選択、Ctrl+L=ロック、BackSpace=削除、Escape=QUICK TRANSFORM/FX/選択解除（**SETTINGSは閉じない**）
 
 ■ タイムコード
 - frameToTimecode(idx)=AE準拠 H:MM:SS:FF（1始まり, 末尾=コマ）。先頭=0:00:00:01
@@ -148,9 +166,8 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - **トラック並び替えドラッグ**: pointer capture は使わず **window の pointermove/pointerup で追う**。captureすると①ラベルの dblclick 改名が死ぬ ②途中でcaptureが外れると pointerup を拾えずゴーストがカーソルに張り付く、の両方が起きる。`onEnd` は `pointerup` のときだけ `doTrackReorder` し、`finally` で必ず `dhCleanup()`
 - **INSPECTORのドック**: 位置は `#inspector.dock-left/.dock-right` の**クラス**で決める。`dockInspector()` はフリードラッグの inline `left/right/top/transform` と**リサイズが付けた `maxHeight`／`#inspector-body` の `height` を全消し**してからクラスを付け直す（消し忘れると宙に浮いて「収まらない」）。`makeFloatDrag` 側は掴んだ時に `.floating` を付けて dock クラスを外す。ANIMATOR のパレット（`applyPaletteFloat` が `style.left/top/right` と `palette` の height/maxHeight をクリア）と同じ考え方
 - **FXモーダル**: `#btn-fx` は `toggleSfxModal()`＝開閉トグル。開いている間はボタンに `.primary`。`closeSfxModal()`（✕/Esc）でも消灯させること
-- **ロック中のトラックは選択できない**（AE準拠）。`selectTrack` が弾き、`selectTrackStep` は読み飛ばし、
-  `toggleTrackLock` は選択中をロックしたら選択を別トラックへ逃がす（全ロックなら `selectedTrack=-1`＝`selTrack()`がnull）。
-  **解除は行の🔒ボタンのみ**（Ctrl+Lは選択が要るのでロック専用）。だから🔒ボタンは選択と無関係に押せる必要がある
+- ~~**ロック中のトラックは選択できない**~~ → **2026-07-26（P6-5）で撤回**。ロック中でも選択でき、Ctrl+Lで解除もできる。
+  編集の禁止は `lockedGuard` 側だけで行う。🔒ボタンは選択と無関係に押せる（これは維持）
 - **ショートカット一覧はカテゴリ表示**。`SHORTCUT_ACTIONS` の各要素に `cat:` を持たせ、その配列順がそのまま表示順。
   修飾キー付き（Ctrl/Alt系）は再割当できないので **`FIXED_SHORTCUTS`** に読み取り専用で列挙する。
   **キーバインドを足したら必ずどちらかに登録すること**（設定パネルに出ないと誰も気づけない）
@@ -200,7 +217,8 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - undo対象のトラック編集データ(cloneEditState/applyHistory の perTrack)は keyframes/markers/parent/visible/solo/**name**/**tIn**/**tOut**/**tOffset**/**locked**。トラック行の新プロパティを undo させたいときはこの2箇所に追加
 - ビュー: `F`=FIT(resetView)、500ms以内に2回目=100%(`zoomActual100`=width/baseW倍)。両方 `fitAction()` 経由。zoom=1 はビューにフィット(baseW)であって実寸ではない点に注意
 - 全画面: `#btn-fullscreen`(HOME右)。`fullscreenchange`→`setupViewport()`で再フィット。iPhone非対応時はボタン自動非表示
-- INSPECTOR: 左右ドック(`dockInspector`/localStorage 'composer_insp_side')。`Tab`=左右入替(`toggleInspectorSide`)、ヘッダ⇄で再ドック。フローティングは makeFloatDrag（left/top上書き）なので再ドックで解除
+- INSPECTOR: 左右ドック(`dockInspector`/localStorage 'composer_insp_side')。`Tab`=左右入替(`toggleInspectorSide`)、ヘッダ⇄で再ドック。フローティングは makeFloatDrag（left/top上書き）なので再ドックで解除。
+  **SETTINGS はその「対」**＝`dockSettings()` が `gInspSide` の反対側に置く。Tab/⇄ で両方が同時に動く（SETTINGS 側に独自の side 変数は持たせない）
 - 矢印↑↓=トラック選択送り(`selectTrackStep`。↑=前面/state末尾方向、Shift=端)。SHORTCUT_ACTIONS の run は e を受け取れる（Shift分岐可）
 - Ctrl(⌘)+↑↓=トラック上下移動(`moveTrack`。Shift=端)。keydownで `ctrl||meta||alt` 早期returnの前に割り込み処理（SHORTCUT_ACTIONS はCtrl系を受けないため）。CAMERA不動・pinCameraTop維持・recordHistoryでundo可
 - INSPECTORヘッダのボタン群は `.insp-head-btns` に入れる（makeFloatDragのskipが `.insp-head-btns` 全体を除外＝クリックがドラッグ開始で潰れない）
