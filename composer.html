@@ -326,7 +326,7 @@ input[type=number]{-moz-appearance:textfield;}
 
 #file-input{display:none;}
 
-/* FX HUD */
+/* QUICK TRANSFORM（旧FX HUD。id は fx-hud-* のまま＝FXボタンのSATSUEI FXとは別物）*/
 #fx-hud{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.82);border:1px solid rgba(255,79,168,0.45);min-width:200px;z-index:50;display:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 8px 32px rgba(0,0,0,0.6),0 0 0 1px rgba(255,79,168,0.06);font-family:var(--mono);font-size:10px;color:var(--white);}
 #fx-hud.show{display:block;}
 #fx-hud-head{display:flex;justify-content:space-between;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(255,79,168,0.18);background:linear-gradient(90deg,rgba(255,79,168,0.08),transparent);font-size:8px;letter-spacing:0.32em;color:var(--acid);cursor:move;user-select:none;}
@@ -366,6 +366,11 @@ input[type=number]{-moz-appearance:textfield;}
 .sc-key.capturing{border-color:var(--acid);color:var(--acid);background:rgba(255,79,168,0.12);}
 .sc-key.unbound{color:rgba(255,255,255,0.3);}
 .sc-key.on{border-color:var(--acid);color:var(--acid);background:rgba(255,79,168,0.12);}
+/* カテゴリ見出し／固定キー（再割当不可）*/
+.sc-cat{font-size:8px;letter-spacing:0.3em;color:rgba(255,79,168,0.65);margin:10px 0 3px;padding-bottom:2px;border-bottom:1px solid var(--border);}
+.sc-cat:first-child{margin-top:2px;}
+.sc-key.fixed{cursor:default;border-style:dashed;color:rgba(255,255,255,0.4);white-space:nowrap;}
+.sc-key.fixed:hover{border-color:var(--border);color:rgba(255,255,255,0.4);}
 .sg-row{display:flex;align-items:center;gap:6px;padding:4px 2px;}
 .sg-toggle{min-width:64px;}
 .sg-num{width:58px;background:rgba(255,255,255,0.04);border:1px solid var(--border);color:rgba(255,255,255,0.85);font-family:var(--mono);font-size:9px;padding:3px 5px;text-align:right;letter-spacing:0.04em;}
@@ -482,10 +487,9 @@ input[type=number]{-moz-appearance:textfield;}
   <div id="live-toast"></div>
 
   <div id="viewport">
-    <div class="corner tl"><span class="lbl">CMP/</span><span class="val" id="meta-tl">—</span></div>
-    <div class="corner tr"><span class="val" id="meta-tr">—</span><br><span class="lbl">RES/</span></div>
-    <div class="corner bl"><span class="lbl">FPS/</span><span class="val" id="meta-bl">—</span></div>
-    <div class="corner br"><span class="val" id="meta-br">[ — / — ]</span><br><span class="val" id="meta-cell" style="color:rgba(255,255,255,0.45);font-size:9px;">—</span><br><span class="lbl" id="frm-toggle" title="クリックでコマ⇔タイムコード切替" style="pointer-events:auto;cursor:pointer;">FRM/</span></div>
+    <!-- 解像度/FPSはトップバーに、FRAME/TIMEはトランスポートバーにあるのでキャンバス上からは削除。
+         INSPECTORの左右ドックで隠れない右下に、選択トラック名(CMP/)と現在のセルだけを集約 -->
+    <div class="corner br"><span class="lbl">CMP/</span><span class="val" id="meta-tl">—</span><br><span class="val" id="meta-cell" style="color:rgba(255,255,255,0.45);font-size:9px;">—</span></div>
     <div id="viewport-inner">
       <canvas id="preview-canvas" width="640" height="360"></canvas>
       <canvas id="guide-canvas" width="640" height="360"></canvas>
@@ -591,7 +595,7 @@ input[type=number]{-moz-appearance:textfield;}
 </div>
 
 <div id="fx-hud">
-  <div id="fx-hud-head"><span>FX HUD / TRANSFORM</span><span id="fx-hud-close" title="閉じる (Esc)">✕</span></div>
+  <div id="fx-hud-head"><span>QUICK TRANSFORM</span><span id="fx-hud-close" title="閉じる (Esc)">✕</span></div>
   <div id="fx-hud-actions">
     <button id="fx-kf-add" title="現フレームに全プロパティのキーを追加">+ ADD KEYFRAME HERE</button>
     <button id="fx-kf-clear" title="このトラックの全キーを削除">✕ CLEAR ALL KF</button>
@@ -1138,7 +1142,6 @@ const state = {
   propVisible: {x:true,y:true,z:true,s:true,ax:true,ay:true,rot:true,op:true},
   view: {zoom:1, panX:0, panY:0, baseW:0, baseH:0}, // viewport pan/zoom (animator準拠)
   guides: {resOn:false, resW:1920, resH:1080, safeOn:false, safeA:90, safeB:80},
-  timeMode: 'frame', // FRM/ラベルの表示モード: 'frame' | 'time'
 };
 
 
@@ -1622,7 +1625,7 @@ function updateUndoButtons(){
   if(r) r.disabled=state.historyIdx>=state.history.length-1;
 }
 
-// ── AE PROP VISIBILITY（FX HUDのみ。インスペクターのトランスフォームは常時表示） ──
+// ── AE PROP VISIBILITY（QUICK TRANSFORMのみ。インスペクターのトランスフォームは常時表示） ──
 function applyPropVisible(){
   document.querySelectorAll('#fx-hud .fx-row[data-prop]').forEach(el=>{
     el.classList.toggle('prop-hidden', !state.propVisible[el.dataset.prop]);
@@ -1654,10 +1657,10 @@ function toggleUProp(){
   else { for(const k of Object.keys(state.propVisible)) state.propVisible[k]=hasKf(k); applyPropVisible(); }
 }
 
-// ── FX HUD ──
+// ── QUICK TRANSFORM（P/S/A/R/T/U で開く浮動パネル。Escで閉じる）──
+// 注: id は歴史的経緯で fx-hud-* のまま。撮影処理の FX ボタン(#btn-fx / SATSUEI FX)とは無関係
 function showFxHud(){ $('#fx-hud').classList.add('show'); updateFxHud(); }
 function hideFxHud(){ $('#fx-hud').classList.remove('show'); }
-function toggleFxHud(){ $('#fx-hud').classList.contains('show') ? hideFxHud() : showFxHud(); }
 function updateFxHud(){
   if(!$('#fx-hud').classList.contains('show')) return;
   const kfs = kfsNow();
@@ -1976,6 +1979,9 @@ function updateParentSelect(){
 // ── TRACK MANAGEMENT ──
 function selectTrack(idx){
   if(state.selectedTrack===idx) return;
+  // AE準拠: ロック中のトラックは選択できない（解除は行の🔒ボタンから）
+  const nt=state.tracks[idx];
+  if(nt&&nt.locked){ flashLive('🔒 ロック中は選択できません（行の🔒で解除）'); return; }
   state.selectedTrack=idx;
   document.querySelectorAll('.tl-track').forEach(el=>{
     el.classList.toggle('selected', parseInt(el.dataset.track)===idx);
@@ -1989,7 +1995,13 @@ function selectTrack(idx){
 function selectTrackStep(dir, toEnd){
   const N=state.tracks.length; if(!N) return;
   let cur=state.selectedTrack; if(cur<0||cur>=N) cur=N-1;
-  const next = toEnd ? (dir>0?N-1:0) : Math.max(0,Math.min(N-1,cur+dir));
+  // ロック中は選択できないので送りでも読み飛ばす
+  let next = toEnd ? (dir>0?N-1:0) : Math.max(0,Math.min(N-1,cur+dir));
+  while(state.tracks[next]&&state.tracks[next].locked){
+    const n2=next+(dir>0?1:-1);
+    if(n2<0||n2>=N){ flashLive('🔒 これ以上は全てロック中です'); return; }
+    next=n2;
+  }
   selectTrack(next);
   const el=document.querySelector(`#tl-tracks .tl-track[data-track="${next}"]`);
   if(el) el.scrollIntoView({block:'nearest'});
@@ -2050,6 +2062,14 @@ function toggleTrackLock(idx){
   const btn=el?el.querySelector('.tl-tbtn.lock'):null;
   if(btn){ btn.textContent=t.locked?'🔒':'🔓'; btn.classList.toggle('on',t.locked); }
   if(el) el.classList.toggle('locked',t.locked);
+  // AE準拠: 選択中のトラックをロックしたら選択を外す（ロック中は選択できないため）
+  if(t.locked&&state.selectedTrack===idx){
+    const next=state.tracks.findIndex(x=>!x.locked);
+    state.selectedTrack=next;
+    document.querySelectorAll('.tl-track').forEach(e=>e.classList.toggle('selected',parseInt(e.dataset.track)===next));
+    $('#meta-tl').textContent=next>=0?(state.tracks[next].name||'—'):'—';
+    updateKfUI(); drawCurrentFrame();
+  }
   recordHistory();
   flashLive(t.locked?('🔒 LOCKED — '+(t.name||'TRACK')):('🔓 UNLOCKED — '+(t.name||'TRACK')));
 }
@@ -2107,13 +2127,6 @@ function splitTrackAtPlayhead(idx){
   state.selectedTrack=state.tracks.indexOf(t);
   recalcTotalFrames(); rebuildAllTrackUI(); drawCurrentFrame(); updateKfUI(); updateExportButtons(); recordHistory();
   flashLive('✂ SPLIT @F'+(f+1)+' → '+t.name);
-}
-function unlockAllTracks(){
-  const n=state.tracks.filter(t=>t.locked).length;
-  if(!n){ flashLive('ロック中のトラックはありません'); return; }
-  state.tracks.forEach(t=>{ t.locked=false; });
-  rebuildAllTrackUI(); recordHistory();
-  flashLive('🔓 全ロック解除 ×'+n);
 }
 // Del/BackSpace: キーが対象にあればキー削除、無ければトラック削除（undoで戻せる）
 function deleteKfOrTrack(){
@@ -3340,8 +3353,6 @@ function updateInspector(){
   const t=selTrack();
   $('#proj-meta').textContent=`${state.width}×${state.height} / ${state.fps}fps / ${state.totalFrames}f / ${state.tracks.length}T`;
   $('#meta-tl').textContent=t?(t.name||'—'):'—';
-  $('#meta-tr').textContent=`${state.width}×${state.height}`;
-  $('#meta-bl').textContent=state.fps;
 }
 // コマ番号(0始まり)→AEタイムコード H:MM:SS:FF（1始まり。末尾がコマ）
 function frameToTimecode(frameIdx){
@@ -3356,12 +3367,6 @@ function updateInspectorCurrent(){
   const fi=t?Math.max(0,Math.min(state.currentFrame-trackOff(t),t.totalFrames-1)):-1;
   const f=fi>=0?t.frames[fi]:null;
   $('#meta-cell').textContent=f?('CELL '+String(f.srcCellIndex+1).padStart(2,'0')+' ['+f.cellOffset+']'):'—';
-  if(state.timeMode==='time'){
-    $('#meta-br').textContent=frameToTimecode(state.currentFrame);
-  }else{
-    $('#meta-br').textContent=`[ ${String(state.currentFrame+1).padStart(4,'0')} / ${String(state.totalFrames).padStart(4,'0')} ]`;
-  }
-  $('#frm-toggle').textContent=state.timeMode==='time'?'TC/':'FRM/';
 }
 function updateKfUI(){
   const kfs=kfsNow();
@@ -3835,7 +3840,7 @@ function toggleSfxModal(){
 }
 $('#btn-fx').addEventListener('click',toggleSfxModal);
 $('#sfx-close').addEventListener('click',closeSfxModal);
-makeFloatDrag($('#sfx-modal'), $('#sfx-head'), t=>t.id==='sfx-close'); // フローティング（INSPECTOR/FX HUDと同じ）
+makeFloatDrag($('#sfx-modal'), $('#sfx-head'), t=>t.id==='sfx-close'); // フローティング（INSPECTOR/QUICK TRANSFORMと同じ）
 $('#btn-fx-preview').addEventListener('click',()=>{
   gFxPreview=!gFxPreview;
   $('#btn-fx-preview').classList.toggle('primary',gFxPreview);
@@ -4528,7 +4533,6 @@ $('#btn-export').addEventListener('click',e=>{
 });
 $('#btn-export-project').addEventListener('click',exportProject);
 $('#btn-home').addEventListener('click',()=>{location.href='index.html';});
-$('#frm-toggle').addEventListener('click',()=>{ state.timeMode=state.timeMode==='time'?'frame':'time'; updateInspectorCurrent(); });
 
 // ── LIVE SYNC（ANIMATORの編集をリアルタイム受信 / BroadcastChannel）──
 let gLiveChan=null, gLiveOn=true;
@@ -4633,7 +4637,7 @@ $('#btn-kf-add').addEventListener('click',addKfAtCurrent);
 $('#btn-kf-clear').addEventListener('click',clearAllKf);
 // COPY/PASTE=Ctrl+C/Ctrl+V、EASE/HOLD=キーのWクリック送り、イーズ量=トランスポートのスライダー
 
-// KFプロパティ入力の配線（インスペクター kf-/dot- と FX HUD fx-/fx-dot- で共通）
+// KFプロパティ入力の配線（インスペクター kf-/dot- と QUICK TRANSFORM fx-/fx-dot- で共通）
 function bindPropInputs(valPrefix, dotPrefix){
   ALL_PROPS.forEach(prop=>{
     const parseV=()=>{const v=parseFloat($(`#${valPrefix}${prop}`).value);return isNaN(v)?propDefOf(prop):v;};
@@ -4652,7 +4656,7 @@ function bindPropInputs(valPrefix, dotPrefix){
   });
 }
 bindPropInputs('kf-','dot-');
-// ◀▶ ステッパ（インスペクター / FX HUD 共通）。Shift=×10
+// ◀▶ ステッパ（インスペクター / QUICK TRANSFORM 共通）。Shift=×10
 document.querySelectorAll('.num-step[data-step], .num-step[data-fxstep]').forEach(btn=>{
   btn.addEventListener('click',e=>{
     const prop=btn.dataset.step||btn.dataset.fxstep;
@@ -4827,40 +4831,57 @@ $('#btn-undo').addEventListener('click',undo);
 $('#btn-redo').addEventListener('click',redo);
 
 // ── SHORTCUTS（登録制＋再割当。animator準拠） ──
+// cat=設定パネルでのグループ見出し（この配列の並び順がそのまま表示順）
 const SHORTCUT_ACTIONS=[
-  {id:'play',     label:'再生 / 停止',          def:'Space',     prevent:true, run:()=>togglePlay()},
-  {id:'prevFrame',label:'前のコマ (Shift=10)',  def:'ArrowLeft', prevent:true, run:e=>{pause();seek(state.currentFrame-(e&&e.shiftKey?10:1));}},
-  {id:'nextFrame',label:'次のコマ (Shift=10)',  def:'ArrowRight',prevent:true, run:e=>{pause();seek(state.currentFrame+(e&&e.shiftKey?10:1));}},
-  {id:'first',    label:'先頭',                 def:'Home',      prevent:true, run:()=>{pause();seek(0);}},
-  {id:'last',     label:'末尾',                 def:'End',       prevent:true, run:()=>{pause();seek(state.totalFrames-1);}},
-  {id:'waIn',     label:'ワークエリア イン',    def:'B',         run:()=>setWaStart(state.currentFrame)},
-  {id:'waOut',    label:'ワークエリア アウト',  def:'N',         run:()=>setWaEnd(state.currentFrame+1)},
-  {id:'marker',   label:'マーカー 追加/削除',   def:'M',         run:()=>toggleGlobalMarker()},
-  {id:'addKf',    label:'キーフレーム追加 (i)', def:'I',         run:()=>addKfAtCurrent()},
-  {id:'prevKey',  label:'前のキーへ (J)',       def:'J',         run:()=>seekPrevKey()},
-  {id:'nextKey',  label:'次のキーへ (K)',       def:'K',         run:()=>seekNextKey()},
-  {id:'delKey',   label:'キー削除／無ければトラック削除 (Del)', def:'Delete', prevent:true, run:()=>deleteKfOrTrack()},
-  {id:'trackVis', label:'トラック 表示/非表示 (H)', def:'H',      run:()=>toggleTrackVis(state.selectedTrack)},
-  {id:'fit',      label:'表示 FIT / 2回で100% (F)', def:'F',      run:()=>fitAction()},
-  {id:'trackUp',  label:'トラック選択↑ (Shift=最上)', def:'ArrowUp',  prevent:true, run:e=>selectTrackStep(+1, e&&e.shiftKey)},
-  {id:'trackDn',  label:'トラック選択↓ (Shift=最下)', def:'ArrowDown',prevent:true, run:e=>selectTrackStep(-1, e&&e.shiftKey)},
-  {id:'inspSwap', label:'INSPECTOR 左右入替 (Tab)', def:'Tab',     prevent:true, run:()=>toggleInspectorSide()},
-  {id:'propP',    label:'HUD 位置 (P)',         def:'P',         run:()=>{togglePropGroup(['x','y','z']);showFxHud();}},
-  {id:'propS',    label:'HUD スケール (S)',     def:'S',         run:()=>{togglePropGroup(['s']);showFxHud();}},
-  {id:'propA',    label:'HUD アンカー (A)',     def:'A',         run:()=>{togglePropGroup(['ax','ay']);showFxHud();}},
-  {id:'propR',    label:'HUD 回転 (R)',         def:'R',         run:()=>{togglePropGroup(['rot']);showFxHud();}},
-  {id:'propT',    label:'HUD 不透明度 (T)',     def:'T',         run:()=>{togglePropGroup(['op']);showFxHud();}},
-  {id:'propU',    label:'HUD KFありのみ (U)',   def:'U',         run:()=>{toggleUProp();showFxHud();}},
-  {id:'fxHud',    label:'FX HUD 表示/非表示',   def:'X',         run:()=>toggleFxHud()},
-  {id:'graph',    label:'ミニグラフ (G)',       def:'G',         run:()=>toggleGraph()},
-  {id:'settings', label:'設定パネル',           def:',',         run:()=>toggleSettingsPanel()},
-  {id:'opPunch',  label:'OPパンチ (O / Shift=逆)', def:'O',      run:e=>opPunch(e&&e.shiftKey)}, // SPEC_11 P4-1
-  // SPEC_11 P3b-1: alt:true の項目は Alt 併用でのみ発火（AE準拠の [ / ]）
-  {id:'trimIn',   label:'トラックIN = 現コマ (Alt+[)',  def:'[', alt:true, prevent:true, run:()=>setTrackTrim('in')},
-  {id:'trimOut',  label:'トラックOUT = 現コマ (Alt+])', def:']', alt:true, prevent:true, run:()=>setTrackTrim('out')},
-  // Alt無しはレイヤーごとインジケータ位置へ移動（AE準拠）
-  {id:'layerIn',  label:'レイヤーの頭をインジケータへ ([)', def:'[', prevent:true, run:()=>trackToPlayhead('in')},
-  {id:'layerOut', label:'レイヤーの尻をインジケータへ (])', def:']', prevent:true, run:()=>trackToPlayhead('out')},
+  {cat:'再生 / 時間',   id:'play',     label:'再生 / 停止',          def:'Space',     prevent:true, run:()=>togglePlay()},
+  {cat:'再生 / 時間',   id:'prevFrame',label:'前のコマ (Shift=10)',  def:'ArrowLeft', prevent:true, run:e=>{pause();seek(state.currentFrame-(e&&e.shiftKey?10:1));}},
+  {cat:'再生 / 時間',   id:'nextFrame',label:'次のコマ (Shift=10)',  def:'ArrowRight',prevent:true, run:e=>{pause();seek(state.currentFrame+(e&&e.shiftKey?10:1));}},
+  {cat:'再生 / 時間',   id:'first',    label:'先頭',                 def:'Home',      prevent:true, run:()=>{pause();seek(0);}},
+  {cat:'再生 / 時間',   id:'last',     label:'末尾',                 def:'End',       prevent:true, run:()=>{pause();seek(state.totalFrames-1);}},
+  {cat:'再生 / 時間',   id:'waIn',     label:'ワークエリア イン',    def:'B',         run:()=>setWaStart(state.currentFrame)},
+  {cat:'再生 / 時間',   id:'waOut',    label:'ワークエリア アウト',  def:'N',         run:()=>setWaEnd(state.currentFrame+1)},
+  {cat:'再生 / 時間',   id:'marker',   label:'マーカー 追加/削除',   def:'M',         run:()=>toggleGlobalMarker()},
+
+  {cat:'キーフレーム',  id:'addKf',    label:'キーフレーム追加',     def:'I',         run:()=>addKfAtCurrent()},
+  {cat:'キーフレーム',  id:'prevKey',  label:'前のキーへ',           def:'J',         run:()=>seekPrevKey()},
+  {cat:'キーフレーム',  id:'nextKey',  label:'次のキーへ',           def:'K',         run:()=>seekNextKey()},
+  {cat:'キーフレーム',  id:'delKey',   label:'キー削除／無ければトラック削除', def:'Delete', prevent:true, run:()=>deleteKfOrTrack()},
+  {cat:'キーフレーム',  id:'opPunch',  label:'OPパンチ 1→0（Shift=逆）', def:'O',     run:e=>opPunch(e&&e.shiftKey)},
+
+  {cat:'トラック',      id:'trackUp',  label:'選択を上へ（Shift=最上）', def:'ArrowUp',  prevent:true, run:e=>selectTrackStep(+1, e&&e.shiftKey)},
+  {cat:'トラック',      id:'trackDn',  label:'選択を下へ（Shift=最下）', def:'ArrowDown',prevent:true, run:e=>selectTrackStep(-1, e&&e.shiftKey)},
+  {cat:'トラック',      id:'trackVis', label:'表示 / 非表示',        def:'H',         run:()=>toggleTrackVis(state.selectedTrack)},
+  // Alt無し＝レイヤーごと移動 / Alt付き＝トリム（同じキーに2アクション。alt枠ごとに重複判定する）
+  {cat:'トラック',      id:'layerIn',  label:'レイヤーの頭をインジケータへ', def:'[', prevent:true, run:()=>trackToPlayhead('in')},
+  {cat:'トラック',      id:'layerOut', label:'レイヤーの尻をインジケータへ', def:']', prevent:true, run:()=>trackToPlayhead('out')},
+  {cat:'トラック',      id:'trimIn',   label:'トリム IN = 現コマ',   def:'[', alt:true, prevent:true, run:()=>setTrackTrim('in')},
+  {cat:'トラック',      id:'trimOut',  label:'トリム OUT = 現コマ',  def:']', alt:true, prevent:true, run:()=>setTrackTrim('out')},
+
+  {cat:'表示',          id:'fit',      label:'FIT / 2回で100%',      def:'F',         run:()=>fitAction()},
+  {cat:'表示',          id:'graph',    label:'ミニグラフ',           def:'G',         run:()=>toggleGraph()},
+  {cat:'表示',          id:'inspSwap', label:'INSPECTOR 左右入替',   def:'Tab',       prevent:true, run:()=>toggleInspectorSide()},
+  {cat:'表示',          id:'settings', label:'設定パネル',           def:',',         run:()=>toggleSettingsPanel()},
+
+  {cat:'QUICK TRANSFORM', id:'propP', label:'位置',                 def:'P',         run:()=>{togglePropGroup(['x','y','z']);showFxHud();}},
+  {cat:'QUICK TRANSFORM', id:'propS', label:'スケール',             def:'S',         run:()=>{togglePropGroup(['s']);showFxHud();}},
+  {cat:'QUICK TRANSFORM', id:'propA', label:'アンカー',             def:'A',         run:()=>{togglePropGroup(['ax','ay']);showFxHud();}},
+  {cat:'QUICK TRANSFORM', id:'propR', label:'回転',                 def:'R',         run:()=>{togglePropGroup(['rot']);showFxHud();}},
+  {cat:'QUICK TRANSFORM', id:'propT', label:'不透明度',             def:'T',         run:()=>{togglePropGroup(['op']);showFxHud();}},
+  {cat:'QUICK TRANSFORM', id:'propU', label:'キーのあるものだけ',   def:'U',         run:()=>{toggleUProp();showFxHud();}},
+];
+// 修飾キー付きの固定ショートカット（ブラウザ/OSと競合しやすいので再割当なし。一覧表示のみ）
+const FIXED_SHORTCUTS=[
+  {cat:'ファイル',      label:'インポート',                 key:'Ctrl+I'},
+  {cat:'キーフレーム',  label:'キーをコピー',               key:'Ctrl+C'},
+  {cat:'キーフレーム',  label:'キーを貼り付け',             key:'Ctrl+V'},
+  {cat:'キーフレーム',  label:'キーの送り LINEAR→EASE→HOLD',key:'Ctrl+クリック / Wクリック'},
+  {cat:'トラック',      label:'選択トラックを上下へ移動（Shift=端）', key:'Ctrl+↑↓'},
+  {cat:'トラック',      label:'ロック（解除は行の🔒から）',  key:'Ctrl+L'},
+  {cat:'トラック',      label:'複製',                       key:'Ctrl+D'},
+  {cat:'トラック',      label:'インジケータで分割',         key:'Ctrl+Shift+D'},
+  {cat:'トラック',      label:'時間方向にずらす（ストリップ上）', key:'Alt+ドラッグ'},
+  {cat:'表示',          label:'元に戻す / やり直す',        key:'Ctrl+Z / Ctrl+Shift+Z'},
+  {cat:'表示',          label:'閉じる（パネル/選択解除）',  key:'Esc'},
 ];
 // SPEC_11 P4-1: OPパンチ（フリッカー演出用）。O=現コマ op=1 → 次コマ op=0 ／ Shift+O=逆
 function opPunch(inv){
@@ -4951,11 +4972,13 @@ window.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&(e.code==='ArrowUp'||e.code==='ArrowDown')){
     e.preventDefault(); moveTrack(e.code==='ArrowUp'?+1:-1, e.shiftKey); return;
   }
-  // Ctrl(⌘)+L = ロック / Ctrl+Shift+L = 全ロック解除
+  // Ctrl(⌘)+L = 選択トラックのロック（解除は行の🔒から。ロック中は選択できないため）
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyL'){
-    e.preventDefault();
-    if(e.shiftKey) unlockAllTracks(); else toggleTrackLock(state.selectedTrack);
-    return;
+    e.preventDefault(); toggleTrackLock(state.selectedTrack); return;
+  }
+  // Ctrl(⌘)+I = インポート（トップバーの IMPORT と同じ）
+  if((e.ctrlKey||e.metaKey)&&e.code==='KeyI'){
+    e.preventDefault(); $('#btn-import').click(); return;
   }
   // Ctrl(⌘)+D = トラック複製 / Ctrl+Shift+D = インジケータで分割
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyD'){
@@ -4981,7 +5004,7 @@ window.addEventListener('keydown',e=>{
   }
 });
 
-// FX HUD close & drag
+// QUICK TRANSFORM close & drag
 $('#fx-hud-close').addEventListener('pointerdown',e=>e.stopPropagation()); // ドラッグ開始で閉じるが効かない不具合の対策
 $('#fx-hud-close').addEventListener('click',e=>{e.stopPropagation();hideFxHud();});
 $('#fx-kf-add').addEventListener('click',addKfAtCurrent);
@@ -5012,7 +5035,7 @@ function makeFloatDrag(panel, head, skip){
 }
 makeFloatDrag($('#fx-hud'), $('#fx-hud-head'), t=>t.id==='fx-hud-close');
 
-// FX HUD inputs
+// QUICK TRANSFORM inputs
 bindPropInputs('fx-','fx-dot-');
 
 // Ruler scrub
@@ -5174,19 +5197,35 @@ drawRuler();
 })();
 
 // ── SETTINGS PANEL（ガイド + ショートカット） ──
+// カテゴリ見出しでグループ化して表示。再割当できるもの（SHORTCUT_ACTIONS）は押すとキー記録、
+// 修飾キー付きの固定分（FIXED_SHORTCUTS）は同じカテゴリの末尾に読み取り専用で並べる
 function buildShortcutList(){
   const list=$('#shortcut-list'); if(!list) return;
   list.innerHTML='';
-  SHORTCUT_ACTIONS.forEach(a=>{
-    const row=document.createElement('div'); row.className='sc-row';
-    const lab=document.createElement('span'); lab.className='sc-label'; lab.textContent=a.label;
-    const key=document.createElement('button'); key.className='sc-key'; key.dataset.id=a.id;
-    const cur=gKeymap[a.id]||'';
-    key.textContent=(gCaptureId===a.id)?'…':((a.alt&&cur)?'ALT+':'')+dispKey(cur); // SPEC_11 P3b-1: Alt必須の表示
-    if(gCaptureId===a.id) key.classList.add('capturing');
-    if(!cur) key.classList.add('unbound');
-    key.addEventListener('click',()=>{ gCaptureId=(gCaptureId===a.id)?null:a.id; buildShortcutList(); });
-    row.appendChild(lab); row.appendChild(key); list.appendChild(row);
+  const cats=[];
+  SHORTCUT_ACTIONS.forEach(a=>{ if(!cats.includes(a.cat)) cats.push(a.cat); });
+  FIXED_SHORTCUTS.forEach(a=>{ if(!cats.includes(a.cat)) cats.push(a.cat); });
+  cats.forEach(cat=>{
+    const h=document.createElement('div'); h.className='sc-cat'; h.textContent=cat;
+    list.appendChild(h);
+    SHORTCUT_ACTIONS.filter(a=>a.cat===cat).forEach(a=>{
+      const row=document.createElement('div'); row.className='sc-row';
+      const lab=document.createElement('span'); lab.className='sc-label'; lab.textContent=a.label;
+      const key=document.createElement('button'); key.className='sc-key'; key.dataset.id=a.id;
+      const cur=gKeymap[a.id]||'';
+      key.textContent=(gCaptureId===a.id)?'…':((a.alt&&cur)?'ALT+':'')+dispKey(cur); // Alt必須の表示
+      if(gCaptureId===a.id) key.classList.add('capturing');
+      if(!cur) key.classList.add('unbound');
+      key.addEventListener('click',()=>{ gCaptureId=(gCaptureId===a.id)?null:a.id; buildShortcutList(); });
+      row.appendChild(lab); row.appendChild(key); list.appendChild(row);
+    });
+    FIXED_SHORTCUTS.filter(a=>a.cat===cat).forEach(a=>{
+      const row=document.createElement('div'); row.className='sc-row';
+      const lab=document.createElement('span'); lab.className='sc-label'; lab.textContent=a.label;
+      const key=document.createElement('span'); key.className='sc-key fixed'; key.textContent=a.key;
+      key.title='固定（再割当できません）';
+      row.appendChild(lab); row.appendChild(key); list.appendChild(row);
+    });
   });
 }
 function applyGuideUI(){

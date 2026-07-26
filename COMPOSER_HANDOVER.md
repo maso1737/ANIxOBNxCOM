@@ -148,6 +148,16 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - **トラック並び替えドラッグ**: pointer capture は使わず **window の pointermove/pointerup で追う**。captureすると①ラベルの dblclick 改名が死ぬ ②途中でcaptureが外れると pointerup を拾えずゴーストがカーソルに張り付く、の両方が起きる。`onEnd` は `pointerup` のときだけ `doTrackReorder` し、`finally` で必ず `dhCleanup()`
 - **INSPECTORのドック**: 位置は `#inspector.dock-left/.dock-right` の**クラス**で決める。`dockInspector()` はフリードラッグの inline `left/right/top/transform` と**リサイズが付けた `maxHeight`／`#inspector-body` の `height` を全消し**してからクラスを付け直す（消し忘れると宙に浮いて「収まらない」）。`makeFloatDrag` 側は掴んだ時に `.floating` を付けて dock クラスを外す。ANIMATOR のパレット（`applyPaletteFloat` が `style.left/top/right` と `palette` の height/maxHeight をクリア）と同じ考え方
 - **FXモーダル**: `#btn-fx` は `toggleSfxModal()`＝開閉トグル。開いている間はボタンに `.primary`。`closeSfxModal()`（✕/Esc）でも消灯させること
+- **ロック中のトラックは選択できない**（AE準拠）。`selectTrack` が弾き、`selectTrackStep` は読み飛ばし、
+  `toggleTrackLock` は選択中をロックしたら選択を別トラックへ逃がす（全ロックなら `selectedTrack=-1`＝`selTrack()`がnull）。
+  **解除は行の🔒ボタンのみ**（Ctrl+Lは選択が要るのでロック専用）。だから🔒ボタンは選択と無関係に押せる必要がある
+- **ショートカット一覧はカテゴリ表示**。`SHORTCUT_ACTIONS` の各要素に `cat:` を持たせ、その配列順がそのまま表示順。
+  修飾キー付き（Ctrl/Alt系）は再割当できないので **`FIXED_SHORTCUTS`** に読み取り専用で列挙する。
+  **キーバインドを足したら必ずどちらかに登録すること**（設定パネルに出ないと誰も気づけない）
+- **キャンバス四隅は右下だけ**（`CMP/`＝選択トラック名 と `#meta-cell`）。解像度/FPSはトップバー、FRAME/TIMEはトランスポートバーにあるため重複を削除。
+  INSPECTORが左右どちらにドックしても隠れない位置として右下を選んでいる。`state.timeMode`/`#frm-toggle` は用途が消えたので廃止
+- **QUICK TRANSFORM**（P/S/A/R/T/U で開く浮動パネル）。**旧称 FX HUD**＝撮影処理の `FX` ボタン(#btn-fx / SATSUEI FX)と紛らわしいので改名。
+  **id は `fx-hud-*` / `fx-*` / `fx-dot-*` のまま**（`bindPropInputs('fx-','fx-dot-')` が依存）。Xキーのトグルは U と紛らわしいため廃止（Escで閉じる）
 - **INSPECTOR は「選択トラックの編集」専用**（2026-07-25 整理）。PROJECT/OUTPUT/CURRENT FRAME セクションは廃止し、
   FPS・解像度＝トップバーとキャンバス四隅 / 出力仕様＝`#btn-export`(SEQ PNG) の title（`updateInspector` が毎回焼き直す）/
   尺＝設定パネルの COMP LENGTH / CELL＝キャンバス右下 `#meta-cell` に移した。**新しい情報をINSPECTORに足す前に、この4箇所のどれかに載らないか考えること**
