@@ -65,11 +65,38 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 - TIMELINE⇔EDITを行き来する処理でundo/redoスタックをクリアし忘れると、
   別カットのスナップショットを誤って適用してしまう
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+【V2-D（大判カメラ枠列）に着手する人へ・先読み必須】
+
+SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固定＋カメラプリセット」→
+**「カメラ枠列 `cam[]` ＋ ベイク範囲＝枠の和集合」**）。理由と全体像は SPEC_13 §5 冒頭。
+実装前に現行コードで効いてくる前提だけここに残す:
+
+- **`CONTE_W/CONTE_H` はキャンバス寸法として20箇所ほどに直書きされている**
+  （`bakeCut` L801 / `compositeTo` L851 / `cutThumb` L858 / `toCanvasCoord` L1007 /
+  undoの`getImageData` L1012,1020,1030 / FILLの走査と`visited` L1057-1084 /
+  `eyedropAt` L1136 / `clearDraw` L1219 / EDIT・TLのfit計算 L958,1245,1254）。
+  V2-D2 でここを `cut.bakeW/bakeH` に置き換える。**FILLの`visited`サイズとundoの
+  `getImageData`を取りこぼすと、症状が出ないまま静かに壊れる**（別カットの寸法で読む）
+- `blankCanvas()`（L427）が `CONTE_W/H` 決め打ちなので、引数でサイズを取る形に一般化する
+- `bakeCut(src)`（L801）の `s = CONTE_W / src.w` が「密度」を決めている唯一の箇所。
+  V2-D2 ではここが `CONTE_W / min(cam[].w)` ＋ `MAX_AREA` クランプになる
+- `createCutFromRect()` / `rebakeCut()` は `src` 前提。`cam[0]` 吸収後もこの2関数が
+  ベイクの入口であり続けるので、`bakeRect` 再計算 → `dirtyBase` の経路はここに集約する
+- **`cuts[]` の canvas は現状すべて常時メモリ常駐**。大判では 1カット66MB になるため、
+  V2-D2 で `getBase()/getDraw()` 経由のLRU（既定8カット）に変えるまで大判を作らせてはいけない。
+  `cutThumb()` が呼ばれる度にフル合成しているのも同時に直す（`cut.thumb` キャッシュ化）
+- V2-D1（枠列＋`drawCamFrame`）と V2-D2（可変解像度＋LRU）は**必ず分けて入れる**。
+  D1 はベイク1280×720のままでも動く（解像度が足りないだけ）ので、カメラワークの
+  操作感を先にユーザー確認できる
+
 【フェーズ状況】
 - P0（BOARD+SHEET+EDIT+IndexedDB保存）: 実装済み
 - P1（TIMELINE・動画書き出し）: 実装済み（2026-07）
 - P2（animator連携`tdr_live`参加・カラースクリプト一覧PNG）: 未着手
+  ※カラースクリプトの仕様は SPEC_13 §5h で確定（**枠単位**で並べる。カット単位ではない）
 - P3（manga-plate FRAME接続・OBANコマ送り）: 構想のみ
+- V2-A〜V2-D3（SPEC_13）: 未着手
 
 【変更後チェック】
 node tools/check.js（6ファイル一括。econte.html含む）

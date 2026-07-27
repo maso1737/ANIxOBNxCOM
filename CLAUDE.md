@@ -27,8 +27,8 @@
 - `SPEC_07_ANIMATOR_OBAN_BRIDGE.md` — animator⇄OBAN 連番往復ブリッジ仕様
 - `SPEC_09_MANGA_PLATE.md` — パラメトリック漫画素材ツール仕様（P4=OBANコマ枠線含む）
 - `SPEC_10_ECONTE.md` — プリプロツール仕様（cuts[]単一データ・BOARD/SHEET/TIMELINE設計。P0+P1実装済み、P2=animator連携/カラースクリプト）
-- `SPEC_13_ECONTE_V2.md` — ECONTE V2「STUDIO」仕様（1画面統合・BOARD強化・のりしろ1.2xカメラプリセット・MP4書き出し・iPad操作。V2-A〜D未着手）
-- `SPEC_11_COMPOSER_POLISH.md` — COMPOSER磨き込み仕様（P0座標ずれ/P1自動保存/P1bトラックundo=実装済み。P2ホールド補間/P2bペアレント補正/P2cグラフ編集/P3 PNG WA準拠/P3bトリム・ずらし=未着手）
+- `SPEC_13_ECONTE_V2.md` — ECONTE V2「STUDIO」仕様（1画面統合・BOARD強化・**大判カメラ枠列＋可変ベイク**・MP4書き出し・カラースクリプト・iPad操作。V2-A〜D3未着手）。※§5は2026-07に差し替え済み（旧「のりしろ1.2x固定＋カメラプリセット」は廃止）
+- `SPEC_11_COMPOSER_POLISH.md` — COMPOSER磨き込み仕様（**P0〜P6 すべて実装済み**。残タスクなし）
 - `SPEC_12_PARALLAX_TAKE_BRIDGE.md` — PARALLAX_LAB×OBAN TAKEブリッジ仕様（TAKE JSONを貼ると3流儀で同一カメラワークを再生＝差分検証機。**実装先は `LP_motion-graphics/PARALLAX_LAB/`**、本リポジトリ側はTAKE形式互換の意識のみ。P0/P1/P2未着手）
 
 GitHub: https://github.com/maso1737/animation-paint

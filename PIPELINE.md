@@ -12,7 +12,7 @@
 | **composer.html** | PROJECT_v2 / PROJECT_v1 / ANIMATOR_v1 / IMAGE_v1(PNG·JPEG·WebP) / audio / ライブ連携 / **SPEC_07: トラックの`Re`でEX_DBから絵を取り直し** / **2026-07〜: 連番画像4枚以上（`^(.*?)(\d{3,5})\.(png\|webp\|jpe?g)$` の同名グループ）はIMPORT・D&Dとも1トラックのシーケンスに自動集約（OBANの `addFiles` と同一判定）** | 連番PNG(zip・作業解像度・**SPEC_11 P3〜: 全体/トラック単体ともワークエリア準拠。ファイル名は絶対フレーム番号 `frame_00011.png`〜**) / 動画(MP4·WebM) / EXPORT WEB(スクロールビューアHTML) / PROJECT_v2 JSON（ファイル名 `composer_<ISO>.json`） / **SPEC_11 P4-4〜: AE JSX（`composer_ae_<ISO>.jsx`＝カメラ＋各トラックを平面/ヌルレイヤーとしてKF付き生成。絵は運ばないのでソース差し替え前提）** / **SPEC_07: トラックの`ANI`で `animator.html?open=` ディープリンク** | **P0〜: fxチェーン**（VIDEO=rt / PNG=final / EXPORT WEB=rt・P2b〜） |
 | **OBAN_BUILDER** | 画像D&D(単品/連番seq・**MANGA PLATEのPNG含む**) / プロジェクトJSON(**2026-07〜: EXPORT JSON / IMPORT JSON＝ファイル入出力に統一。旧 COPY/PASTE PROJ のクリップボード方式は廃止**) / **SPEC_07: + FROM ANIMATOR(EX_DB)＋ライブ連携(`tdr_live`受信・PNG書き出し不要)** | oban-viewer.html(単一HTML・画像は同フォルダ参照・**ap-seqはdataURLベイク同梱**・**SPEC_09 P4: FRAME枠線含む**・**V2-D: 縦書きテキスト/EN字幕(`?sub=0`)/クリックFX含む**) / プロジェクトJSON(**V2-D〜: `texts[]`+`clickFx`含む**) / **P3: COPY FOR COMPOSER(PROJECT_v2=CAMERAトラック+fx+obanPanels配置同梱・クリップボード。composer側で画像を先にIMPORTしておくと名前一致で配置が自動適用=P3b。textsは対象外)** / **SPEC_07 B3: EDIT IN ANIMATOR(`?open=`ディープリンク)** | **P2〜: take.fx→ビューアrt** |
 | **manga-plate.html** | REF画像(下敷き・表示のみ) / PLATE_v1 JSON(クリップボード) | 透過PNG(elem別/全体/×4 SEEDS連番) / PLATE_v1 JSON | なし（素材生成に専念） |
-| **econte.html** | 紙ネーム/ラフの写真(D&D・IMPORT) / パレットJSON | **動画コンテ WebM/mp4（P1・実時間録画・C#/尺焼き込み可）** / **P2予定: animator REF(`tdr_live`)・カラースクリプト一覧PNG** | なし（プリプロに専念） |
+| **econte.html** | 紙ネーム/ラフの写真(D&D・IMPORT) / パレットJSON / **V2-B予定: Ctrl+Vペースト・HEIC** | **動画コンテ WebM/mp4（P1・実時間録画・C#/尺焼き込み可）** / **P2予定: animator REF(`tdr_live`)** / **V2-D3予定: カラースクリプト一覧PNG（単位は「カット」ではなく**カメラ枠**。`C1-A`/`C1-L` が各1セル・`cam[].key` で間引き。SPEC_13 §5h）／ MP4非実時間(WebCodecs)** | なし（プリプロに専念） |
 | **oban-viewer.html** | 同フォルダの画像ファイル | （最終出力・スクロールLP） | rt実行時（`?fx=0`でOFF） |
 | **EXPORT WEBビューア** | （画像は埋め込み済み） | （最終出力・スクロールLP） | P2b(任意)でrt |
 | **AE** | 4K連番PNG | 完成動画 | AE側（fx OFFで持ち込む） |
@@ -34,6 +34,7 @@
 6. manga-plate →（透過PNG）→ OBAN（コマ内=FRAME子/飛び出し=ルート）/ composer …トーン・スピード線・枠の板（SPEC_09）
 7. manga-plate →（×4 SEEDS連番）→ OBAN seqパネル（loop）…集中線がバタつく演出
 8. 紙ネーム/ラフ写真 → econte（BOARD切り出し→SHEET絵コンテ→TIMELINE）→ **動画コンテ WebM/mp4** …プリプロ（SPEC_10 P0+P1）。**P2で → animator REF（本作画へ）／ → カラースクリプト一覧PNG を接続予定**
+9. **紙の大判レイアウト写真 → econte BOARD にカメラ枠列 A→B→…→L を置く → 動画コンテ／カラースクリプト** …大判PAN・T.U.のプリプロ（SPEC_13 V2-D 予定）。ベイク範囲＝枠の和集合なので「PAN先に画が無い」が構造的に起きない。**枠列 `cam[]` は OBAN の TAKE（`kf:[{x,y,z,dwell,ease}]`）と同じ「矩形/位置のキー列」なので、将来 econte → OBAN/composer のカメラ受け渡しに変換可**（未着手・変換式は未定）
 
 ## 関連スキル
 
