@@ -443,3 +443,73 @@ ANIMATOR と同じ操作感を composer に移植。すべて実装・実機検�
 - `Tab` で両方が同時に入れ替わる。ヘッダに **⇄ ドックボタン**（`#settings-panel-dock`）を追加。
 - ドラッグは INSPECTOR と同じ `makeFloatDrag`（掴んだ時点でドック解除）に統一。
 - **`Esc` では閉じない**（作業中に消えるのが不便）。閉じるのは ✕ か `,`。
+
+### P6 調整（2026-07-27）
+
+- **SETTINGSの既定の高さ**: `applySettingsDefaultHeight()` が **AUTOSAVE セクションの末尾＋10px** に下端バーをスナップさせる。
+  KEYBOARD SHORTCUTS まで全部展開すると画面外まで伸び、**下端バーが掴めず内部スクロールも効かない**状態になっていた。
+  適用タイミングは ①開いたとき（`buildShortcutList()` の**後**に測る）②`dockSettings()` ③ヘッダの pointerup（移動後）。
+- **SETTINGSの ✕ → ▾ 折りたたみ**（INSPECTOR と同じ）。`#settings-panel-close` を `#settings-panel-collapse` に置換。
+  閉じるのは ⚙ ボタンか `,` キー。`.collapsed` は body と `#settings-resize` を display:none
+- **行のボタンも複数選択に効く**: `inMultiSel(idx)`（複数選択中かつ押した行がその中）なら
+  `toggleVisSelected/ toggleSoloSelected/ toggleLockSelected/ removeSelectedTracks` へ流す。
+  **反転の基準は「押した行」**なので各関数に `baseIdx` を追加した（プライマリ基準だと押した行と逆に動く）。
+  選択に入っていない行のボタンは従来どおり単体で効く（🔒を選択と無関係に押せる要件を維持）
+- **キーマップを v2 へ**（`composer_keymap_v1` は読まずに削除）。
+  P6で既定を入れ替えた結果、v1 に保存済みの旧既定 `opPunch:'O'` が新設の `goLayerOut:'O'` と衝突し、
+  SHORTCUT_ACTIONS の先勝ちで **Q が無反応**になっていた。あわせて `dedupeKeymap()` を追加
+  （同じ alt 枠で同じキーが2つあったら**既定がそのキーの方**を残し、負けた方は未割当にする保険）。
+  **既定キーを変更するときは必ず LS のバージョンも上げること**
+- **ワークエリアのハンドルをダブルクリックで端まで開く**（IN→0 / OUT→totalFrames）。両方やれば全体に戻る
+- **並び替えドラッグの軽量化**: ①行のジオメトリは `measureDropGeo()` でドラッグ開始時に**一度だけ測る**
+  （毎 pointermove で全行 getBoundingClientRect していたのが重さの主因）②ゴースト/インジケータは
+  `top` ではなく `transform:translateY` ＋ rAF で1フレーム1回だけ描く ③**pointerup では `dhCleanup()` を
+  `doTrackReorder()` より先に呼ぶ**（reorder は rebuildAllTrackUI でブロックするので、後片付けを後回しにすると
+  「指を離してもゴーストが張り付く」ように見える）。挿入位置は測定済みの `gDropGeo` から求めるのでDOMを消してから計算してよい
+
+### P6 調整2（2026-07-27）
+
+- **ストリップ（レイヤーバー）そのものの操作**を追加。1つの pointerdown を `gStripGesture`（`'reorder'|'marquee'|null`）で振り分ける:
+  - **クリック（動かさず離す）** = トラック選択 ＋ **インジケータをクリック位置へ**（`pause()`+`seek`）
+  - **Shift / Ctrl+クリック** = トラックの範囲選択 / 個別トグル（ラベル側と同じ）。
+    ストリップ側は**pointerdownでは確定させず pointerup で判定**する（Shift+ドラッグのKF追加選択と両立させるため）
+  - **縦ドラッグ** = トラック並び替え（`attachTrackDrag(strip,false,{vOnly:true,guard})`）
+  - **横ドラッグ** = 従来のKFマーキー選択
+  - **Alt+ドラッグ** = 従来の時間ずらし（guard が altKey で弾く）
+  - guard: `.tl-kf-d/.tl-marker/.tl-trim-handle` の上、**下 `KF_BAND_H`(23px) のキー/マーカー帯**、CAMERA行では並び替えを始めない
+  - `gStripArmed`（並び替えが待機中か）を window の **capture フェーズ**でリセットしてから strip の pointerdown が立てる。
+    マーキー側はこれを見て「待機中かつ縦優勢なら譲る」。**待機していない場所（キー帯等）では縦ドラッグもマーキーになる＝死角を作らない**
+  - **落とし穴**: マーキーの除外セレクタに `.tl-track-label` を足すこと。ラベル余白から始めた並び替えが
+    マーキーに先に `gStripGesture='marquee'` を立てられて動かなくなる
+- **AE準拠のレイヤー追加**: `Ctrl+Alt+Shift+C`=カメラ / `Ctrl+Alt+Shift+N`=ヌル。
+  **keydown で `Ctrl+C`(KFコピー)より先に判定する**こと（先に書かないと Ctrl+Alt+Shift+C がコピーに食われる）。
+  設定パネルには出さず、`+ CAMERA` / `+ NULL` ボタンの title に併記
+- **インジケータの頭をダブルクリック → ワークエリア 全体⇔直前の範囲**（`gWaPrev` に退避）。
+  `#tl-playhead` は `pointer-events:none` のままにし、**頭だけ** `#tl-playhead-grab`(15×14px) を置く
+  （線全体を当たり判定にするとルーラーのクリックを線が食う）。掴んでのスクラブも同じ要素から `rulerScrub` へ流す
+- **SETTINGS: 折りたたみ→展開でも既定の高さに戻す**（畳む前に伸ばしていた高さが戻ると、また下端バーが画面外）
+- **SATSUEI FX に下端リサイズバー**（`#sfx-resize`）。縮小ボタンは持たない。
+  スナップ対象は `.sfx-ent,.sfx-master`＝エフェクト項目の切れ目
+- **リサイズバーを1つの関数に集約**: `attachPanelResize(handleSel, bodySel, snapSel, {min, clearMaxOn})`。
+  SETTINGS / INSPECTOR / SATSUEI FX の3箇所が同じ実装（旧: ほぼ同じ25行が2箇所にコピペ）。
+  `clearMaxOn` は掴んだ瞬間に max-height を外す対象（パネル本体かbodyかがパネルごとに違うため）
+- **行のボタン（◉/S/🔒/✕）が複数選択で1つずつしか効かない**件は P6 調整（前項）で対応済み
+- トップバー表記を `+ FROM OBAN` → **`+ OBAN`**
+
+### P6 調整3（2026-07-27）
+
+- **行のボタンが複数選択を解除していた不具合**: ボタンの `click` は `stopPropagation()` していたが
+  **`pointerdown` は素通り**して行のハンドラに届き、そこで単体選択に畳まれていた（→ `inMultiSel` が偽になり1本だけ処理）。
+  行の pointerdown で `.tl-track-btns` 内かつ複数選択に含まれる行なら**選択を触らずに return**する。
+  選択に入っていない行のボタンは従来どおり「その行を選択して単体で実行」
+- **選択分すべてに効くようになった操作を拡張**: `[` `]`（`trackToPlayhead`）／`Alt+[` `Alt+]`（`setTrackTrim`）／
+  `+ ADD KEYFRAME HERE`（`addKfAtCurrent`）／`✕ CLEAR ALL KF`（`clearAllKf`）。
+  - `trackToPlayhead` は**各トラックが自分の頭/尻をインジケータに合わせる**ので delta はトラックごとに違う
+  - `addKfAtCurrent` は**プライマリだけ INSPECTOR の入力値**、他は `getKfValue` の実効値でキーを立てる（見た目を変えずにキーだけ増える）。
+    フレームは `state.currentFrame - trackOff(t)` を**トラックごとに**計算すること（`curLocalFrame()` は選択トラック固定なので使えない）
+  - ロック／CAMERA・NULL（トリム時）は対象から外すだけで、残りは実行する（全部が対象外のときだけメッセージ）
+- **マーカーに「出した順の番号」`n`**（AE準拠）。`nextMarkerNo()`＝空いている最小の正整数。
+  配列は frame でソートされるので**番号は配列の添字ではなく `m.n` で持つ**。`ensureMarkerNos()` が旧データにも採番。
+  ラベルは `M<n>`（メモ付きなら `<n> メモ`）。PROJECT_v2 に `n` を直列化、undo（gmarkers）も `{...m}` で保持
+- **数字キー1〜9（テンキー可）でその番号のマーカーへ**（`seekToMarkerNo`）。
+  `e.code` の `Digit[1-9]` / `Numpad[1-9]` で拾う。1〜9をまとめて1つの挙動として扱うので**再割当の対象にはせず** `FIXED_SHORTCUTS` に記載

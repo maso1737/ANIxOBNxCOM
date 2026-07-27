@@ -84,7 +84,7 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
 #inspector-resize:hover::after,#inspector-resize.active::after{background:var(--acid);box-shadow:0 0 6px rgba(255,79,168,0.5);}
 #inspector.collapsed #inspector-resize{display:none;}
 /* ペン/タッチでドラッグ中にブラウザのパンに奪われてpointercancelになる（バーが張り付く）のを防止 */
-#tl-resize,#settings-resize,#inspector-resize,#tl-ruler,.tl-kf-d,.tl-marker,.tl-gmarker,.tl-wa-handle,#inspector-head,#settings-panel-head,#fx-hud-head,#sfx-head,#tl-graph-canvas,.tl-trim-handle{touch-action:none;}
+#tl-resize,#settings-resize,#inspector-resize,#sfx-resize,#tl-ruler,.tl-kf-d,.tl-marker,.tl-gmarker,.tl-wa-handle,#inspector-head,#settings-panel-head,#fx-hud-head,#sfx-head,#tl-graph-canvas,.tl-trim-handle{touch-action:none;}
 .insp-section{margin-bottom:14px;}
 .insp-h{font-size:8px;letter-spacing:0.3em;color:rgba(255,79,168,0.6);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
 .insp-row{display:flex;justify-content:space-between;padding:2px 0;}
@@ -225,14 +225,18 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-gmarker:hover::before{background:#fff;box-shadow:0 0 8px var(--neon);}
 #tl-playhead{position:absolute;top:0;bottom:0;width:1px;background:var(--acid);pointer-events:none;z-index:5;box-shadow:0 0 6px rgba(255,79,168,0.5);}
 #tl-playhead::before{content:'';position:absolute;top:0;left:-4px;width:9px;height:6px;background:var(--acid);}
+/* インジケータの頭だけ掴める（スクラブ＋ダブルクリックでワークエリア全体⇔元の範囲）。
+   線全体を pointer-events:all にするとルーラーのクリックを線が食ってしまうので頭だけ */
+#tl-playhead-grab{position:absolute;top:0;left:-7px;width:15px;height:14px;pointer-events:all;cursor:ew-resize;touch-action:none;}
 .kf-row.prop-hidden{display:none;}
 
 /* DRAG HANDLE */
 .tl-drag-handle{width:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:grab;color:rgba(255,255,255,0.15);font-size:11px;letter-spacing:-2px;user-select:none;transition:color .1s;}
 .tl-drag-handle:hover{color:rgba(255,79,168,0.5);}
 .tl-drag-handle:active{cursor:grabbing;}
-#tl-drop-indicator{position:absolute;left:0;right:0;height:2px;background:var(--acid);pointer-events:none;z-index:10;display:none;box-shadow:0 0 6px rgba(255,79,168,0.6);}
-.tl-drag-ghost{position:fixed;pointer-events:none;z-index:1000;opacity:0.8;border:1px solid rgba(255,79,168,0.55);background:rgba(16,7,34,0.96);display:flex;align-items:center;}
+/* 位置は transform:translateY で動かす（top書き換えだと毎フレーム再レイアウトが走る）。top:0 が基準 */
+#tl-drop-indicator{position:absolute;left:0;right:0;top:0;height:2px;background:var(--acid);pointer-events:none;z-index:10;display:none;box-shadow:0 0 6px rgba(255,79,168,0.6);will-change:transform;}
+.tl-drag-ghost{position:fixed;pointer-events:none;z-index:1000;opacity:0.8;border:1px solid rgba(255,79,168,0.55);background:rgba(16,7,34,0.96);display:flex;align-items:center;will-change:transform;}
 
 /* SCRUB CURSOR */
 .fx-row .k{cursor:ew-resize;}
@@ -326,7 +330,11 @@ input[type=number]{-moz-appearance:textfield;}
 #sfx-head{padding:8px 14px;border-bottom:1px solid rgba(255,79,168,0.18);color:var(--acid);font-size:9px;letter-spacing:0.32em;background:linear-gradient(90deg,rgba(255,79,168,0.08),transparent);display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;}
 #sfx-close{cursor:pointer;color:rgba(255,255,255,0.4);font-size:12px;line-height:1;padding:0 2px;}
 #sfx-close:hover{color:var(--acid);}
-#sfx-body{padding:10px 14px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;font-family:var(--mono);}
+#sfx-body{padding:10px 14px 14px;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:8px;font-family:var(--mono);}
+/* 下端リサイズ（SETTINGS / INSPECTOR と同じ作法。縮小ボタンは持たない） */
+#sfx-resize{height:11px;flex-shrink:0;cursor:row-resize;display:flex;align-items:center;justify-content:center;border-top:1px solid rgba(255,79,168,0.18);background:rgba(255,255,255,0.02);}
+#sfx-resize::after{content:'';width:42px;height:2px;background:rgba(255,255,255,0.2);border-radius:2px;transition:background .1s;}
+#sfx-resize:hover::after,#sfx-resize.active::after{background:var(--acid);box-shadow:0 0 6px rgba(255,79,168,0.5);}
 #sfx-body::-webkit-scrollbar{width:4px;}
 #sfx-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,0.3);}
 .sfx-master{display:flex;align-items:center;gap:8px;color:var(--acid);font-size:10px;letter-spacing:0.2em;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);cursor:pointer;user-select:none;}
@@ -375,9 +383,12 @@ input[type=number]{-moz-appearance:textfield;}
 #settings-panel.floating{box-shadow:0 10px 48px rgba(0,0,0,0.8),0 0 0 1px var(--acid);}
 #settings-panel-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:move;background:linear-gradient(90deg,rgba(255,79,168,0.10),transparent);border-bottom:1px solid var(--border);font-size:9px;letter-spacing:0.3em;color:var(--acid);user-select:none;}
 .set-head-btns{display:flex;align-items:center;gap:7px;}
-#settings-panel-close,#settings-panel-dock{cursor:pointer;color:rgba(255,255,255,0.4);font-size:12px;line-height:1;padding:0 2px;}
-#settings-panel-close:hover,#settings-panel-dock:hover{color:var(--acid);}
-#settings-panel-body{padding:8px 10px;max-height:calc(100dvh - 240px);overflow-y:auto;}
+#settings-panel-collapse,#settings-panel-dock{cursor:pointer;color:rgba(255,255,255,0.4);font-size:12px;line-height:1;padding:0 2px;}
+#settings-panel-collapse:hover,#settings-panel-dock:hover{color:var(--acid);}
+/* INSPECTOR と同じ折りたたみ（✕での閉じるは廃止＝⚙ / , キーで閉じる） */
+#settings-panel.collapsed #settings-panel-body{display:none;}
+#settings-panel.collapsed #settings-resize{display:none;}
+#settings-panel-body{padding:8px 10px;max-height:calc(100dvh - 240px);overflow-y:auto;overscroll-behavior:contain;}
 #settings-panel-body::-webkit-scrollbar{width:4px;}
 #settings-panel-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,0.3);}
 .set-sect{margin-bottom:14px;}
@@ -486,11 +497,11 @@ input[type=number]{-moz-appearance:textfield;}
     <div class="g">
       <!-- 読み込み系 -->
       <button id="btn-import" class="primary" title="JSON / 画像(PNG等) / 音声を読み込み（既存トラックに追加。複数回で重ねられます）。連番PNGを4枚以上まとめて選ぶと1トラックのシーケンス、音声ファイルはBGM/SEトラックになります">IMPORT</button>
-      <button id="btn-paste-json" title="クリップボードのJSONを読み込み（OBANの COPY FOR COMPOSER / EXPORT JSON をそのまま貼り付け）">+ FROM OBAN</button>
+      <button id="btn-paste-json" title="クリップボードのJSONを読み込み（OBANの COPY FOR COMPOSER / EXPORT JSON をそのまま貼り付け）">+ OBAN</button>
       <span style="color:var(--dim)">/</span>
       <!-- トラック追加・設定 -->
-      <button id="btn-camera" title="カメラトラックを追加（1つまで）。X/Y=パン, Z=ドリー(パララックス), ROT=回転, SCL=ズーム">+ CAMERA</button>
-      <button id="btn-null" title="ヌルトラックを追加（描画されない親専用トラック）。カメラや複数トラックの親にして丸ごと調整">+ NULL</button>
+      <button id="btn-camera" title="カメラトラックを追加（1つまで）— Ctrl+Alt+Shift+C（AE準拠）。X/Y=パン, Z=ドリー(パララックス), ROT=回転, SCL=ズーム">+ CAMERA</button>
+      <button id="btn-null" title="ヌルトラックを追加（描画されない親専用トラック）— Ctrl+Alt+Shift+N（AE準拠）。カメラや複数トラックの親にして丸ごと調整">+ NULL</button>
       <button id="btn-fx" title="撮影処理（SATSUEI FX）チェーンを編集（もう一度押すと閉じる） — X">FX</button>
       <button id="btn-fx-preview" title="プレビューに撮影処理を適用（draft品質: MB/DOFなし） — Shift+X">FX PREVIEW</button>
       <button id="btn-settings" title="設定（ガイド/ショートカット）">⚙</button>
@@ -563,7 +574,7 @@ input[type=number]{-moz-appearance:textfield;}
       <div id="tl-wa-in"  class="tl-wa-handle" title="ワークエリア開始 (B)"></div>
       <div id="tl-wa-out" class="tl-wa-handle" title="ワークエリア終了 (N)"></div>
       <div id="tl-ruler-markers"></div>
-      <div id="tl-playhead" style="left:154px"></div>
+      <div id="tl-playhead" style="left:164px"><div id="tl-playhead-grab" title="ドラッグでスクラブ／ダブルクリックでワークエリアを全体⇔元の範囲に切替"></div></div>
     </div>
     <div id="tl-tracks">
       <div id="tl-audio-row">
@@ -622,8 +633,8 @@ input[type=number]{-moz-appearance:textfield;}
 <div id="fx-hud">
   <div id="fx-hud-head"><span>QUICK TRANSFORM</span><span id="fx-hud-close" title="閉じる (Esc)">✕</span></div>
   <div id="fx-hud-actions">
-    <button id="fx-kf-add" title="現フレームに全プロパティのキーを追加">+ ADD KEYFRAME HERE</button>
-    <button id="fx-kf-clear" title="このトラックの全キーを削除">✕ CLEAR ALL KF</button>
+    <button id="fx-kf-add" title="現フレームに全プロパティのキーを追加（複数選択中は選択トラックすべて）">+ ADD KEYFRAME HERE</button>
+    <button id="fx-kf-clear" title="全キーを削除（複数選択中は選択トラックすべて）">✕ CLEAR ALL KF</button>
   </div>
   <div id="fx-hud-body">
     <div class="fx-row" id="fx-parent-row" style="display:none" title="親トラック（編集はインスペクターのPRNTで）"><span class="k">PRNT</span><span id="fx-parent" style="flex:1;text-align:right;color:var(--ice,#7fd4ff);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span></div>
@@ -644,7 +655,7 @@ input[type=number]{-moz-appearance:textfield;}
     <span>SETTINGS</span>
     <span class="set-head-btns">
       <span id="settings-panel-dock" title="左右ドックに戻す（TabでINSPECTORと入替）">⇄</span>
-      <span id="settings-panel-close" title="閉じる（, キーでも）">✕</span>
+      <span id="settings-panel-collapse" title="折りたたみ／展開（閉じるのは ⚙ か , キー）">▾</span>
     </span>
   </div>
   <div id="settings-panel-body">
@@ -688,7 +699,7 @@ input[type=number]{-moz-appearance:textfield;}
         <button id="draft-play-toggle" class="sc-key sg-toggle" title="再生中だけ1/2解像度で描画して軽くする">1/2解像度ドラフト再生</button>
       </div>
     </div>
-    <div class="set-sect">
+    <div class="set-sect" id="set-sect-autosave">
       <div class="set-sect-h">AUTOSAVE</div>
       <button class="set-btn" id="btn-as-clear" title="IndexedDBの自動保存データ（絵＋編集）を消去">自動保存データを消去</button>
     </div>
@@ -740,6 +751,7 @@ input[type=number]{-moz-appearance:textfield;}
   <div id="sfx-panel">
     <div id="sfx-head"><span>SATSUEI FX — 撮影処理チェーン</span><span id="sfx-close" title="閉じる (Esc)">✕</span></div>
     <div id="sfx-body"></div>
+    <div id="sfx-resize" title="ドラッグで高さ調整（エフェクト項目の境目でスナップ）"></div>
   </div>
 </div>
 
@@ -1284,19 +1296,30 @@ function removeKf(prop, frame, kfs){
   kfs[prop] = kfs[prop].filter(k=>k.f!==frame);
 }
 
+// 2026-07-27: 選択中の全トラックに適用する。プライマリは INSPECTOR の入力欄の値、
+// 他のトラックは**その時点の実効値**（getKfValue）でキーを打つ＝見た目を変えずにキーだけ立つ
 function addKfAtCurrent(){
-  const t = selTrack(); if(!t||lockedGuard(t)) return;
-  const f = curLocalFrame(), kfs = t.keyframes;
-  ALL_PROPS.forEach(p=>{
-    const el=$(`#kf-${p}`); const v=el?parseFloat(el.value):NaN;
-    setKf(p,f,isNaN(v)?propDefOf(p):v,kfs);
+  const idxs=selTrackIdxs().filter(i=>state.tracks[i]&&!state.tracks[i].locked);
+  if(!idxs.length){ flashLive(selTrackIdxs().length?'🔒 ロック中です':'トラック未選択'); return; }
+  idxs.forEach(i=>{
+    const t=state.tracks[i], f=state.currentFrame-trackOff(t), kfs=t.keyframes;
+    const isPrim=(i===state.selectedTrack);
+    ALL_PROPS.forEach(p=>{
+      let v;
+      if(isPrim){ const el=$(`#kf-${p}`); v=el?parseFloat(el.value):NaN; }
+      if(v===undefined||isNaN(v)) v=getKfValue(p,f,kfs);
+      setKf(p,f,isNaN(v)?propDefOf(p):v,kfs);
+    });
   });
-  recordHistory(); renderKfDiamonds(state.selectedTrack); drawCurrentFrame();
+  recordHistory(); idxs.forEach(i=>renderKfDiamonds(i)); drawCurrentFrame(); updateKfUI();
+  if(idxs.length>1) flashLive('◆ KEYFRAME × '+idxs.length+' トラック');
 }
 function clearAllKf(){
-  const t = selTrack(); if(!t||lockedGuard(t)) return;
-  t.keyframes = makeEmptyKfs();
-  recordHistory(); renderKfDiamonds(state.selectedTrack); drawCurrentFrame();
+  const idxs=selTrackIdxs().filter(i=>state.tracks[i]&&!state.tracks[i].locked);
+  if(!idxs.length){ flashLive(selTrackIdxs().length?'🔒 ロック中です':'トラック未選択'); return; }
+  idxs.forEach(i=>{ state.tracks[i].keyframes=makeEmptyKfs(); });
+  recordHistory(); idxs.forEach(i=>renderKfDiamonds(i)); drawCurrentFrame(); updateKfUI();
+  flashLive('✕ CLEAR ALL KF'+(idxs.length>1?(' × '+idxs.length+' トラック'):''));
 }
 
 // ── KF 選択モデル（複数選択 / TRACKまたぎ） ──
@@ -1471,24 +1494,50 @@ function freezeSnapCands(exclFrames, exclTrack){
 }
 
 // ── グローバル(ワークエリア)マーカー ──
+// 2026-07-27: マーカーには**出した順の番号 `n`** を振る（AE準拠）。数字キー1〜9でその番号へ飛べる。
+// 配列は frame でソートされるので、番号は配列順ではなく m.n で持たないと並べ替えでズレる。
+// 番号は「空いている最小の正整数」＝削除して打ち直すと空き番号が埋まる
+function nextMarkerNo(){
+  const used=new Set(state.markers.map(m=>m.n).filter(n=>typeof n==='number'));
+  let n=1; while(used.has(n)) n++;
+  return n;
+}
 function toggleGlobalMarker(){
   if(!state.totalFrames) return;
   const f=state.currentFrame;
   const i=state.markers.findIndex(m=>m.frame===f);
-  if(i>=0) state.markers.splice(i,1); else state.markers.push({frame:f,label:''});
+  if(i>=0) state.markers.splice(i,1); else state.markers.push({frame:f,label:'',n:nextMarkerNo()});
   state.markers.sort((a,b)=>a.frame-b.frame);
   recordHistory(); renderGlobalMarkers();
+}
+// 数字キー1〜9: その番号のマーカーへインジケータを飛ばす
+function seekToMarkerNo(n){
+  const m=state.markers.find(x=>x.n===n);
+  if(!m){ flashLive('マーカー '+n+' はありません'); return; }
+  pause(); seek(Math.max(0,Math.min((state.totalFrames||1)-1,m.frame)));
+  flashLive('▸ MARKER '+n+' → F'+(m.frame+1)+(m.label?('  '+m.label):''));
+}
+// 旧データ（n無し）や読み込み直後に、frame順で番号を埋める
+function ensureMarkerNos(){
+  const used=new Set(state.markers.map(m=>m.n).filter(n=>typeof n==='number'));
+  let next=1;
+  state.markers.forEach(m=>{
+    if(typeof m.n==='number') return;
+    while(used.has(next)) next++;
+    m.n=next; used.add(next);
+  });
 }
 function renderGlobalMarkers(){
   const cont=$('#tl-ruler-markers'); if(!cont) return;
   cont.innerHTML='';
   const total=state.totalFrames; if(!total) return;
   const rw=$('#tl-ruler').clientWidth, aw=rw-LABEL_W;
+  ensureMarkerNos(); // 旧データにも番号を振ってから描く
   state.markers.forEach((m,idx)=>{
     const el=document.createElement('div'); el.className='tl-gmarker';
     el.style.left=(LABEL_W+m.frame/total*aw)+'px';
-    el.dataset.label=m.label||('M'+(idx+1));
-    el.title=`コマ${m.frame+1}${m.label?' — '+m.label:''}（ダブルクリックでメモ）`;
+    el.dataset.label=m.label?(m.n+' '+m.label):('M'+m.n); // 出した順の番号を表示（数字キーで飛べる）
+    el.title=`マーカー ${m.n}（数字キー ${m.n<=9?m.n:'—'}）  コマ${m.frame+1}${m.label?' — '+m.label:''}（ダブルクリックでメモ）`;
     let dragActive=false, wasDragged=false, ctrlStart=false;
     el.addEventListener('pointerdown',e=>{ dragActive=true; wasDragged=false; ctrlStart=e.ctrlKey||e.metaKey; el.setPointerCapture(e.pointerId); e.stopPropagation(); e.preventDefault(); });
     el.addEventListener('pointermove',e=>{
@@ -1847,7 +1896,8 @@ function loadJSON(json){
   } else {
     state.workArea={startFrame:0,endFrame:state.totalFrames};
   }
-  state.markers = Array.isArray(json.markers) ? json.markers.filter(m=>typeof m.frame==='number').map(m=>({frame:m.frame|0,label:String(m.label||'')})) : [];
+  state.markers = Array.isArray(json.markers) ? json.markers.filter(m=>typeof m.frame==='number').map(m=>({frame:m.frame|0,label:String(m.label||''),...(typeof m.n==='number'?{n:m.n|0}:{})})) : [];
+  ensureMarkerNos(); // n の無い旧データはここで採番
   state.fx = normalizeFx(json.fx); // fx欠損は makeDefaultFx で補完（SPEC_06 §2）
   dedupeCameras(); sanitizeParents();
   if(Array.isArray(json.obanPanels)) applyObanPlacements(json.obanPanels); // P3b（通常は追加IMPORT側で効く）
@@ -2152,12 +2202,12 @@ function toggleTrackVis(idx){
   drawCurrentFrame();
   recordHistory(); // SPEC_11 P1b: 表示切替もundo対象
 }
-// H: 選択中の全トラックの表示をまとめて切替
-function toggleVisSelected(){
+// H / 行の◉ボタン: 選択中の全トラックの表示をまとめて切替
+function toggleVisSelected(baseIdx){
   const idxs=selTrackIdxs(); if(!idxs.length){ flashLive('トラック未選択'); return; }
   if(idxs.length===1){ toggleTrackVis(idxs[0]); return; }
-  const prim=state.tracks[state.selectedTrack]||state.tracks[idxs[0]];
-  const on=!prim.visible;
+  const base=state.tracks[(baseIdx!=null&&idxs.includes(baseIdx))?baseIdx:state.selectedTrack]||state.tracks[idxs[0]];
+  const on=!base.visible;
   idxs.forEach(i=>{
     const t=state.tracks[i]; if(!t) return; t.visible=on;
     const btn=document.querySelector(`.tl-track[data-track="${i}"] .tl-tbtn`);
@@ -2215,27 +2265,30 @@ function toggleTrackLock(idx){
   flashLive(t.locked?('🔒 LOCKED — '+(t.name||'TRACK')):('🔓 UNLOCKED — '+(t.name||'TRACK')));
 }
 // Ctrl+L: 選択中の全トラックをまとめてロック/解除（プライマリの状態を反転させて全員に適用）
-function toggleLockSelected(){
+// baseIdx: 反転の基準にするトラック（行のボタンを押したときはその行。省略時はプライマリ）
+function toggleLockSelected(baseIdx){
   const idxs=selTrackIdxs(); if(!idxs.length){ flashLive('トラック未選択'); return; }
-  const prim=state.tracks[state.selectedTrack]||state.tracks[idxs[idxs.length-1]];
-  const on=!prim.locked;
+  const base=state.tracks[(baseIdx!=null&&idxs.includes(baseIdx))?baseIdx:state.selectedTrack]||state.tracks[idxs[idxs.length-1]];
+  const on=!base.locked;
   let n=0; idxs.forEach(i=>{ if(setTrackLock(i,on)) n++; });
   if(!n) return;
   recordHistory();
-  flashLive((on?'🔒 LOCKED':'🔓 UNLOCKED')+' × '+n+(idxs.length>1?'（選択トラック）':' — '+(prim.name||'TRACK')));
+  flashLive((on?'🔒 LOCKED':'🔓 UNLOCKED')+' × '+n+(idxs.length>1?'（選択トラック）':' — '+(base.name||'TRACK')));
 }
+// 行のボタンを「選択分すべて」に効かせるか判定：複数選択中で、押した行がその選択に含まれるとき
+function inMultiSel(idx){ const s=selTrackIdxs(); return s.length>1&&s.includes(idx); }
 function toggleTrackSolo(idx){
   const t=state.tracks[idx]; if(!t) return;
   t.solo=!t.solo;
   refreshSoloUI();
   recordHistory(); // SPEC_11 P1b: SOLOもundo対象
 }
-// Alt+S: 選択中の全トラックのソロをまとめて切替
-function toggleSoloSelected(){
+// Alt+S / 行のSボタン: 選択中の全トラックのソロをまとめて切替
+function toggleSoloSelected(baseIdx){
   const idxs=selTrackIdxs().filter(i=>state.tracks[i]&&state.tracks[i].type!=='camera'&&state.tracks[i].type!=='null');
   if(!idxs.length){ flashLive('ソロできるトラックが選択されていません'); return; }
-  const prim=state.tracks[state.selectedTrack];
-  const on=!((prim&&idxs.includes(state.selectedTrack))?prim.solo:state.tracks[idxs[0]].solo);
+  const bi=(baseIdx!=null&&idxs.includes(baseIdx))?baseIdx:(idxs.includes(state.selectedTrack)?state.selectedTrack:idxs[0]);
+  const on=!state.tracks[bi].solo;
   idxs.forEach(i=>{ state.tracks[i].solo=on; });
   refreshSoloUI(); recordHistory();
   flashLive((on?'◉ SOLO ON':'◎ SOLO OFF')+' × '+idxs.length);
@@ -2327,40 +2380,50 @@ function getOrCreateDropIndicator(){
   }
   return ind;
 }
-function updateDropIndicator(clientY, fromStateIdx){
-  const container=$('#tl-tracks'), ind=$('#tl-drop-indicator');
-  if(!ind) return;
-  const N=state.tracks.length;
-  const fromUIIdx=N-1-fromStateIdx;
-  const allEls=[...container.querySelectorAll('.tl-track')];
-  const remaining=allEls.filter((_,i)=>i!==fromUIIdx);
-  const containerRect=container.getBoundingClientRect();
-  let indicatorY=null;
-  for(let i=0;i<remaining.length;i++){
-    const r=remaining[i].getBoundingClientRect();
-    if(clientY<r.top+r.height/2){indicatorY=r.top-containerRect.top;break;}
-  }
-  if(indicatorY===null){
-    const last=remaining[remaining.length-1];
-    indicatorY=last?(last.getBoundingClientRect().bottom-containerRect.top):0;
-  }
-  ind.style.top=indicatorY+'px';
+// 2026-07-27: 並び替えドラッグの軽量化。
+// 行のジオメトリはドラッグ中に変わらない（opacityしか触らない）ので、開始時に一度だけ測って使い回す。
+// 毎 pointermove で全行 getBoundingClientRect していたのが「カーソルに引っ付く」重さの主因だった。
+let gDropGeo=null; // {containerTop, mids:[y...], bottom}
+// ストリップ上のドラッグは1つに決める（'reorder' 縦 / 'marquee' 横）。pointerup で null に戻す
+let gStripGesture=null;
+// この pointerdown で「縦ドラッグ＝並び替え」が待機しているか。
+// 待機していない場所（キー帯・CAMERA行・Alt併用）では縦ドラッグもマーキー選択に回す
+let gStripArmed=false;
+window.addEventListener('pointerdown',()=>{ gStripArmed=false; },true); // capture＝どのハンドラより先にリセット
+window.addEventListener('pointerup',()=>{ gStripArmed=false; });
+const KF_BAND_H=23; // .tl-track-strip::after のキー/マーカー帯の高さ（ここは並び替えで掴まない）
+function measureDropGeo(fromStateIdx){
+  const container=$('#tl-tracks');
+  const N=state.tracks.length, fromUIIdx=N-1-fromStateIdx;
+  const remaining=[...container.querySelectorAll('.tl-track')].filter((_,i)=>i!==fromUIIdx);
+  const cr=container.getBoundingClientRect();
+  gDropGeo={
+    containerTop:cr.top,
+    mids:remaining.map(el=>{const r=el.getBoundingClientRect();return {mid:r.top+r.height/2, top:r.top};}),
+    bottom:remaining.length?remaining[remaining.length-1].getBoundingClientRect().bottom:cr.top,
+  };
+  return gDropGeo;
+}
+// 挿入スロット（UI上の何番目の前に入るか）を、測っておいたジオメトリから求める
+function dropSlotAt(clientY){
+  const g=gDropGeo; if(!g) return 0;
+  for(let i=0;i<g.mids.length;i++) if(clientY<g.mids[i].mid) return i;
+  return g.mids.length;
+}
+function updateDropIndicator(clientY){
+  const g=gDropGeo, ind=$('#tl-drop-indicator');
+  if(!ind||!g) return;
+  const slot=dropSlotAt(clientY);
+  const y=(slot<g.mids.length?g.mids[slot].top:g.bottom)-g.containerTop;
+  ind.style.transform='translateY('+y+'px)'; // top より transform の方が再レイアウトが起きない
 }
 function doTrackReorder(clientY, fromStateIdx){
-  const container=$('#tl-tracks');
-  const allTrackEls=[...container.querySelectorAll('.tl-track')];
   const N=state.tracks.length;
-  const fromUIIdx=N-1-fromStateIdx;
   const track=state.tracks[fromStateIdx];
   if(!track||track.type==='camera'){ rebuildAllTrackUI(); return; } // SPEC_11 P5-5: カメラは並び替え不可
   const selTid=selTrack()?selTrack().tid:null; // 選択は tid で追う（pin でindexがずれるため）
+  const insertUISlot=dropSlotAt(clientY); // ★ゴーストを消した後でも正しい＝測定はドラッグ開始時のもの
   state.tracks.splice(fromStateIdx,1);
-  const remaining=allTrackEls.filter((_,i)=>i!==fromUIIdx);
-  let insertUISlot=remaining.length;
-  for(let i=0;i<remaining.length;i++){
-    const r=remaining[i].getBoundingClientRect();
-    if(clientY<r.top+r.height/2){insertUISlot=i;break;}
-  }
   const insertIdx=Math.max(0,(N-1)-insertUISlot);
   state.tracks.splice(insertIdx,0,track);
   pinCameraTop(); // SPEC_11 P5-5: カメラより上には入れない（カメラを末尾へ戻す＝他は最大2番目まで）
@@ -2378,13 +2441,17 @@ function buildTrackElement(idx){
   const el=document.createElement('div');
   el.className='tl-track'+(idx===state.selectedTrack?' selected':'')+(track.type==='camera'?' tl-cam':'')+(track.locked?' locked':'');
   el.dataset.track=idx;
-  // Shift/Ctrl の複数選択は**ラベル側（⠿/名前/ボタン帯の余白）でだけ**受ける。
-  // ストリップ上の Shift はKFマーキーの「追加選択」に予約されているため（AEと同じ棲み分け）
+  // ラベル側は押した瞬間に確定。ストリップ側は「動かさずに離したらクリック」なので
+  // pointerup（マーキー選択のハンドラ）で確定させる＝Shift+ドラッグのKF追加選択と両立する
   el.addEventListener('pointerdown',e=>{
+    // 2026-07-27: 行のボタン帯（◉/S/🔒/PNG/ANI/Re/✕）は選択を触らない。
+    // ボタン側は click で stopPropagation しているが **pointerdown は素通り**するため、
+    // ここで単体選択に畳んでしまい「複数選択でもボタンは1つずつ」になっていた
+    if(e.target.closest&&e.target.closest('.tl-track-btns')){ if(inMultiSel(idx)) return; }
     const onLabel=!!(e.target.closest&&e.target.closest('.tl-track-label,.tl-drag-handle'));
     if(onLabel&&e.shiftKey) selectTrack(idx,'range');
     else if(onLabel&&(e.ctrlKey||e.metaKey)) selectTrack(idx,'toggle');
-    else if(e.shiftKey) return; // ストリップ上のShift＝マーキー追加。選択は変えない
+    else if(e.shiftKey||e.ctrlKey||e.metaKey) return; // ストリップ上の修飾キーは pointerup で判定
     else selectTrack(idx);
   });
 
@@ -2395,10 +2462,12 @@ function buildTrackElement(idx){
   dragHandle.textContent='⠿';
   // 並び替えドラッグ。⠿ハンドルは即開始、ラベル(「01 TRACK」やその余白)は
   // 4px動かしてから開始＝クリック選択やダブルクリック改名と両立させる。
-  let dhActive=false, dhPending=false, dhStartY=0, dhOrigR=null, dhGhost=null;
+  let dhActive=false, dhPending=false, dhStartY=0, dhStartX=0, dhOrigR=null, dhGhost=null, dhRaf=0, dhLastY=0;
   function dhBegin(){
     dhActive=true; dhPending=false;
+    gStripGesture='reorder'; // マーキー選択に「縦ドラッグは並び替え」と伝える
     dhOrigR=el.getBoundingClientRect();
+    measureDropGeo(idx); // 行のジオメトリはここで一度だけ測る（以後 pointermove では測らない）
     dhGhost=document.createElement('div');
     dhGhost.className='tl-drag-ghost';
     dhGhost.style.left=dhOrigR.left+'px'; dhGhost.style.top=dhOrigR.top+'px';
@@ -2409,6 +2478,8 @@ function buildTrackElement(idx){
     getOrCreateDropIndicator().style.display='block';
   }
   function dhCleanup(){
+    if(gStripGesture==='reorder') gStripGesture=null; // pointercancel 経路の保険
+    if(dhRaf){ cancelAnimationFrame(dhRaf); dhRaf=0; }
     if(dhGhost){ dhGhost.remove(); dhGhost=null; }
     el.style.opacity='';
     const ind=$('#tl-drop-indicator'); if(ind) ind.style.display='none';
@@ -2417,13 +2488,26 @@ function buildTrackElement(idx){
   // ・capture 無し ＝ ラベルの dblclick 改名が死なない（SPEC_11 P5-4 の要件）
   // ・window 追従 ＝ 行の外／rebuild で消えたノードの上でも取りこぼさない
   //   （captureが外れて pointerup を拾えず、ゴーストがカーソルに張り付く不具合の根治）
-  function attachTrackDrag(node, immediate){
+  // opt.vOnly: 明確に「縦」のドラッグでだけ並び替えを開始する（横ドラッグはKFマーキーに譲る）
+  function attachTrackDrag(node, immediate, opt){
+    const o=opt||{};
+    // pointermove は1フレーム1回だけ描く（rAF間引き）。ペンや高頻度マウスで
+    // 1移動ごとに再レイアウトが走ると「カーソルに引っ付く」感触になる
+    const dhPaint=()=>{
+      dhRaf=0;
+      if(!dhActive||!dhGhost) return;
+      dhGhost.style.transform='translateY('+(dhLastY-dhStartY)+'px)'; // top書き換えではなく合成のみ
+      updateDropIndicator(dhLastY);
+    };
     const onMove=e=>{
-      if(dhPending&&Math.abs(e.clientY-dhStartY)>4) dhBegin(); // 4px動いてからドラッグ確定
+      if(dhPending&&gStripGesture!=='marquee'){
+        const dy=Math.abs(e.clientY-dhStartY), dx=Math.abs(e.clientX-dhStartX);
+        if(o.vOnly ? (dy>5&&dy>dx) : dy>4) dhBegin(); // 動いてからドラッグ確定
+      }
       if(!dhActive) return;
       e.preventDefault();
-      dhGhost.style.top=(dhOrigR.top+e.clientY-dhStartY)+'px';
-      updateDropIndicator(e.clientY,idx);
+      dhLastY=e.clientY;
+      if(!dhRaf) dhRaf=requestAnimationFrame(dhPaint);
     };
     const onEnd=e=>{
       window.removeEventListener('pointermove',onMove);
@@ -2432,8 +2516,12 @@ function buildTrackElement(idx){
       dhPending=false;
       if(!dhActive) return;
       dhActive=false;
-      // SPEC_11 P5-3: reorder中に rebuild/例外が挟まってもゴーストを必ず消す
-      try{ if(e.type==='pointerup') doTrackReorder(e.clientY,idx); } finally{ dhCleanup(); }
+      // ★ゴーストは reorder より先に消す。doTrackReorder は rebuildAllTrackUI で
+      //   数十msブロックするので、後片付けを後回しにすると「離すのが遅れる」ように見える。
+      //   挿入位置は dhBegin で測った gDropGeo から求めるのでDOMを消してから計算しても正しい
+      const y=e.clientY;
+      dhCleanup();
+      if(e.type==='pointerup') doTrackReorder(y,idx);
     };
     node.addEventListener('pointerdown',e=>{
       if(e.button!==0&&e.pointerType==='mouse') return;
@@ -2441,7 +2529,9 @@ function buildTrackElement(idx){
         // ボタン群や改名中の入力欄からはドラッグを始めない
         if(e.target.closest('.tl-track-btns')||e.target.tagName==='INPUT') return;
       }
-      dhStartY=e.clientY;
+      if(o.guard&&!o.guard(e)) return;
+      if(o.vOnly) gStripArmed=true; // マーキー側に「縦は並び替えに譲れ」と伝える
+      dhStartY=e.clientY; dhStartX=e.clientX;
       if(immediate){ e.stopPropagation(); e.preventDefault(); dhBegin(); }
       else dhPending=true; // 動き出すまでは通常のクリック扱い
       window.addEventListener('pointermove',onMove);
@@ -2492,14 +2582,15 @@ function buildTrackElement(idx){
   const visBtn=document.createElement('button');
   visBtn.className='tl-tbtn'+(track.visible?'':' vis-off');
   visBtn.textContent=track.visible?'◉':'○';
-  visBtn.title=track.type==='camera'?'カメラ有効/無効':'表示/非表示';
-  visBtn.addEventListener('click',e=>{e.stopPropagation();toggleTrackVis(idx);});
+  visBtn.title=(track.type==='camera'?'カメラ有効/無効':'表示/非表示')+'（複数選択中はまとめて切替）';
+  // 2026-07-27: 行のボタンも複数選択に効かせる（押した行を基準に反転）
+  visBtn.addEventListener('click',e=>{e.stopPropagation(); if(inMultiSel(idx)) toggleVisSelected(idx); else toggleTrackVis(idx);});
 
   const soloBtn=document.createElement('button');
   soloBtn.className='tl-tbtn solo'+(track.solo?' on':'');
   soloBtn.textContent='S';
-  soloBtn.title='ソロ（このトラックのみ表示）';
-  soloBtn.addEventListener('click',e=>{e.stopPropagation();toggleTrackSolo(idx);});
+  soloBtn.title='ソロ（このトラックのみ表示）— Alt+S / 複数選択中はまとめて切替';
+  soloBtn.addEventListener('click',e=>{e.stopPropagation(); if(inMultiSel(idx)) toggleSoloSelected(idx); else toggleTrackSolo(idx);});
 
   // 誤爆しやすい位置なので Shift+クリック必須（素のクリックは案内だけ出す）
   const pngBtn=document.createElement('button');
@@ -2535,14 +2626,14 @@ function buildTrackElement(idx){
   const lockBtn=document.createElement('button');
   lockBtn.className='tl-tbtn lock'+(track.locked?' on':'');
   lockBtn.textContent=track.locked?'🔒':'🔓';
-  lockBtn.title='ロック（選択はできるが編集・削除を禁止）';
-  lockBtn.addEventListener('click',e=>{e.stopPropagation();toggleTrackLock(idx);});
+  lockBtn.title='ロック（選択はできるが編集・削除を禁止）— Ctrl+L / 複数選択中はまとめて切替';
+  lockBtn.addEventListener('click',e=>{e.stopPropagation(); if(inMultiSel(idx)) toggleLockSelected(idx); else toggleTrackLock(idx);});
 
   const delBtn=document.createElement('button');
   delBtn.className='tl-tbtn del';
   delBtn.textContent='✕';
-  delBtn.title='トラック削除';
-  delBtn.addEventListener('click',e=>{e.stopPropagation();removeTrack(idx);});
+  delBtn.title='トラック削除（複数選択中はまとめて削除）';
+  delBtn.addEventListener('click',e=>{e.stopPropagation(); if(inMultiSel(idx)) removeSelectedTracks(); else removeTrack(idx);});
 
   // SPEC_11 P5-2: CAMERA行に親(NULL)選択プルダウン（削除ボタンの左隣）。
   // これで親子関係が行を見ただけで分かり、getCamAt が使う camT.parent を直接読み書きする。
@@ -2599,6 +2690,18 @@ function buildTrackElement(idx){
   const strip=document.createElement('div');
   strip.className='tl-track-strip';
   strip.dataset.track=idx;
+  // 2026-07-27: ストリップ（レイヤーバー）そのものを縦にドラッグ＝並び替え。
+  // ・横ドラッグは従来どおりKFマーキー選択（vOnly で「縦優勢」のときだけ開始）
+  // ・下23pxのキー/マーカー帯は掴まない（キーを触るつもりの操作を奪わないため）
+  // ・Alt+ドラッグ（時間方向のずらし）とは排他
+  if(track.type!=='camera'){
+    attachTrackDrag(strip,false,{vOnly:true, guard:e=>{
+      if(e.altKey) return false;
+      if(e.target.closest('.tl-kf-d,.tl-marker,.tl-trim-handle')) return false;
+      const r=strip.getBoundingClientRect();
+      return (r.bottom-e.clientY)>KF_BAND_H; // キー帯より上だけ
+    }});
+  }
 
   // Cell blocks
   if(total&&track.cellInfos.length){
@@ -3693,7 +3796,7 @@ function buildProjectPayload(){
     workArea:state.workArea||{startFrame:0,endFrame:state.totalFrames},
     ...(state.compFrames?{compFrames:state.compFrames}:{}),
     fx:state.fx, // 撮影処理チェーン（スキーマ共通・変換なしで持ち回る）
-    markers:state.markers.map(m=>({frame:m.frame,label:m.label||''})),
+    markers:state.markers.map(m=>({frame:m.frame,label:m.label||'',n:m.n})), // n=出した順の番号（数字キー用）
     tracks:state.tracks.map(t=>{
       const cells=serializeTrackCells(t);
       return {
@@ -5112,10 +5215,10 @@ const SHORTCUT_ACTIONS=[
   {cat:'トラック',      id:'trackVis', label:'表示 / 非表示（選択分すべて）', def:'H',  run:()=>toggleVisSelected()},
   {cat:'トラック',      id:'trackSolo',label:'ソロ表示（選択分すべて）', def:'S', alt:true, prevent:true, run:()=>toggleSoloSelected()},
   // Alt無し＝レイヤーごと移動 / Alt付き＝トリム（同じキーに2アクション。alt枠ごとに重複判定する）
-  {cat:'トラック',      id:'layerIn',  label:'レイヤーの頭をインジケータへ', def:'[', prevent:true, run:()=>trackToPlayhead('in')},
-  {cat:'トラック',      id:'layerOut', label:'レイヤーの尻をインジケータへ', def:']', prevent:true, run:()=>trackToPlayhead('out')},
-  {cat:'トラック',      id:'trimIn',   label:'トリム IN = 現コマ',   def:'[', alt:true, prevent:true, run:()=>setTrackTrim('in')},
-  {cat:'トラック',      id:'trimOut',  label:'トリム OUT = 現コマ',  def:']', alt:true, prevent:true, run:()=>setTrackTrim('out')},
+  {cat:'トラック',      id:'layerIn',  label:'レイヤーの頭をインジケータへ（選択分すべて）', def:'[', prevent:true, run:()=>trackToPlayhead('in')},
+  {cat:'トラック',      id:'layerOut', label:'レイヤーの尻をインジケータへ（選択分すべて）', def:']', prevent:true, run:()=>trackToPlayhead('out')},
+  {cat:'トラック',      id:'trimIn',   label:'トリム IN = 現コマ（選択分すべて）',  def:'[', alt:true, prevent:true, run:()=>setTrackTrim('in')},
+  {cat:'トラック',      id:'trimOut',  label:'トリム OUT = 現コマ（選択分すべて）', def:']', alt:true, prevent:true, run:()=>setTrackTrim('out')},
 
   {cat:'表示',          id:'fit',      label:'FIT / 2回で100%',      def:'F',         run:()=>fitAction()},
   {cat:'表示',          id:'graph',    label:'ミニグラフ',           def:'G',         run:()=>toggleGraph()},
@@ -5132,7 +5235,10 @@ const SHORTCUT_ACTIONS=[
 ];
 // 修飾キー付きの固定ショートカット（ブラウザ/OSと競合しやすいので再割当なし。一覧表示のみ）
 const FIXED_SHORTCUTS=[
+  {cat:'再生 / 時間',   label:'マーカー1〜9へインジケータを飛ばす（出した順の番号）', key:'1 〜 9'},
   {cat:'ファイル',      label:'インポート',                 key:'Ctrl+I'},
+  {cat:'トラック',      label:'カメラを追加（AE準拠）',     key:'Ctrl+Alt+Shift+C'},
+  {cat:'トラック',      label:'ヌルを追加（AE準拠）',       key:'Ctrl+Alt+Shift+N'},
   {cat:'キーフレーム',  label:'キーをコピー',               key:'Ctrl+C'},
   {cat:'キーフレーム',  label:'キーを切り取り',             key:'Ctrl+X'},
   {cat:'キーフレーム',  label:'キーを貼り付け',             key:'Ctrl+V'},
@@ -5182,45 +5288,78 @@ function playheadToTrackEdge(which){
   pause(); seek(f);
   flashLive((which==='in'?'⇤ LAYER IN → F':'⇥ LAYER OUT → F')+(f+1)+'  '+(t.name||'TRACK'));
 }
+// 2026-07-27: 選択中の全トラックに適用（各トラックが自分の頭/尻をインジケータへ合わせる）
 function trackToPlayhead(which){
-  const t=selTrack(); if(!t){ flashLive('トラック未選択'); return; }
-  if(lockedGuard(t)) return;
-  const off=t.tOffset||0, len=trackLen(t);
-  // トリムしてあれば「トリムのIN/OUT」を、してなければ素材の頭/尻を基準にする
-  const hasTrim=(t.tIn||0)!==0||t.tOut!=null;
-  const head=hasTrim?(t.tIn||0):off;
-  const tail=hasTrim?(t.tOut==null?off+len:t.tOut):(off+len);
-  const delta=(which==='in') ? (state.currentFrame-head) : (state.currentFrame+1-tail);
-  if(!delta){ flashLive(which==='in'?'すでに頭がインジケータ位置です':'すでに尻がインジケータ位置です'); return; }
-  t.tOffset=off+delta; // 基準(head/tail)はトリムでも、ずらすのは常に tOffset からの相対
-  // トリムもレイヤーと一緒に動く。はみ出してもクランプしない（表示側で丸める）
-  if((t.tIn||0)!==0||t.tOut!=null){
-    t.tIn=(t.tIn||0)+delta;
-    if(t.tOut!=null) t.tOut=t.tOut+delta;
-  }
+  const idxs=selTrackIdxs().filter(i=>state.tracks[i]&&!state.tracks[i].locked);
+  if(!idxs.length){ flashLive(selTrackIdxs().length?'🔒 ロック中です':'トラック未選択'); return; }
+  let n=0, lastOff=0;
+  idxs.forEach(i=>{
+    const t=state.tracks[i];
+    const off=t.tOffset||0, len=trackLen(t);
+    // トリムしてあれば「トリムのIN/OUT」を、してなければ素材の頭/尻を基準にする
+    const hasTrim=(t.tIn||0)!==0||t.tOut!=null;
+    const head=hasTrim?(t.tIn||0):off;
+    const tail=hasTrim?(t.tOut==null?off+len:t.tOut):(off+len);
+    const delta=(which==='in') ? (state.currentFrame-head) : (state.currentFrame+1-tail);
+    if(!delta) return;
+    t.tOffset=off+delta; // 基準(head/tail)はトリムでも、ずらすのは常に tOffset からの相対
+    // トリムもレイヤーと一緒に動く。はみ出してもクランプしない（表示側で丸める）
+    if((t.tIn||0)!==0||t.tOut!=null){
+      t.tIn=(t.tIn||0)+delta;
+      if(t.tOut!=null) t.tOut=t.tOut+delta;
+    }
+    n++; lastOff=t.tOffset||0;
+  });
+  if(!n){ flashLive(which==='in'?'すでに頭がインジケータ位置です':'すでに尻がインジケータ位置です'); return; }
   rebuildAllTrackUI(); drawCurrentFrame(); updateKfUI(); recordHistory();
   flashLive((which==='in'?'⇥ レイヤー頭 → F':'⇤ レイヤー尻 → F')+(state.currentFrame+1)
-    +'（OFFSET '+((t.tOffset||0)>=0?'+':'')+(t.tOffset||0)+'）');
+    +(n>1?('  × '+n+' トラック'):('（OFFSET '+(lastOff>=0?'+':'')+lastOff+'）')));
 }
-// 選択トラックのIN/OUTを現フレームに設定（OUT=現フレーム+1＝そのコマまで表示）
+// 選択中の全トラックのIN/OUTを現フレームに設定（OUT=現フレーム+1＝そのコマまで表示）
 function setTrackTrim(which){
-  const t=selTrack(); if(!t){ flashLive('トラック未選択'); return; }
-  if(t.type==='camera'||t.type==='null'){ flashLive('CAMERA/NULLはトリム対象外'); return; }
-  if(t.locked){ flashLive('🔒 ロック中です'); return; }
+  const all=selTrackIdxs();
+  const idxs=all.filter(i=>{ const t=state.tracks[i]; return t&&!t.locked&&t.type!=='camera'&&t.type!=='null'; });
+  if(!idxs.length){ flashLive(all.length?'CAMERA/NULL・ロック中はトリム対象外':'トラック未選択'); return; }
   const total=state.totalFrames||1, f=state.currentFrame;
-  if(which==='in') t.tIn=Math.max(0,Math.min(f,(t.tOut==null?total:t.tOut)-1));
-  else t.tOut=(f+1>=total)?null:Math.max((t.tIn||0)+1,f+1);
-  refreshTrimUI(state.selectedTrack); drawCurrentFrame(); recordHistory();
-  flashLive(which==='in'?('◧ IN = F'+((t.tIn||0)+1)):('◨ OUT = '+(t.tOut==null?'—（末尾まで）':'F'+t.tOut)));
+  idxs.forEach(i=>{
+    const t=state.tracks[i];
+    if(which==='in') t.tIn=Math.max(0,Math.min(f,(t.tOut==null?total:t.tOut)-1));
+    else t.tOut=(f+1>=total)?null:Math.max((t.tIn||0)+1,f+1);
+    refreshTrimUI(i);
+  });
+  drawCurrentFrame(); recordHistory();
+  const t0=state.tracks[idxs[idxs.length-1]];
+  flashLive((which==='in'?('◧ IN = F'+((t0.tIn||0)+1)):('◨ OUT = '+(t0.tOut==null?'—（末尾まで）':'F'+t0.tOut)))
+    +(idxs.length>1?('  × '+idxs.length+' トラック'):''));
 }
-const KEYMAP_LS='composer_keymap_v1';
+// 2026-07-27: v2 へ。P6で既定を大きく入れ替えた（I/O・Q・X・Alt+S）ため、
+// v1 に保存された旧既定（例 opPunch:'O'）が新しい goLayerOut:'O' と衝突して
+// **Qが無反応**になっていた。v1 は読まずに破棄する（カスタム済みなら設定パネルで割り当て直し）
+const KEYMAP_LS='composer_keymap_v2';
 let gKeymap={}, gCaptureId=null;
 function defaultKeymap(){ const m={}; SHORTCUT_ACTIONS.forEach(a=>m[a.id]=a.def); return m; }
+// 同じキーが2つのアクションに割り当たっていたら、既定がそのキーの方を優先して残す。
+// （SHORTCUT_ACTIONS の並び順で先勝ちになり、後ろのアクションが黙って死ぬのを防ぐ保険）
+function dedupeKeymap(){
+  const seen=new Map(); // "alt|KEY" → 先に確保したアクション
+  for(const a of SHORTCUT_ACTIONS){
+    const k=gKeymap[a.id]; if(!k) continue;
+    const sig=(a.alt?'1|':'0|')+k;
+    const prev=seen.get(sig);
+    if(!prev){ seen.set(sig,a); continue; }
+    // 衝突：既定がそのキーの方を残す（両方とも既定でなければ先に定義された方）。負けた方は未割当
+    const keep=(a.def===k&&prev.def!==k)?a:prev;
+    gKeymap[(keep===a?prev:a).id]='';
+    seen.set(sig,keep);
+  }
+}
 function loadKeymap(){
   gKeymap=defaultKeymap();
   try{ const raw=localStorage.getItem(KEYMAP_LS);
     if(raw){ const o=JSON.parse(raw); for(const a of SHORTCUT_ACTIONS){ if(typeof o[a.id]==='string') gKeymap[a.id]=o[a.id]; } }
+    localStorage.removeItem('composer_keymap_v1'); // 旧版は二度と読まない
   }catch(e){}
+  dedupeKeymap();
 }
 function saveKeymap(){ try{ localStorage.setItem(KEYMAP_LS,JSON.stringify(gKeymap)); }catch(e){} }
 function normKey(e){ const k=e.key; if(k===' '||k==='Spacebar') return 'Space'; if(k.length===1) return k.toUpperCase(); return k; }
@@ -5243,6 +5382,12 @@ loadKeymap();
 window.addEventListener('keydown',e=>{
   if(e.ctrlKey&&e.code==='KeyZ'){e.preventDefault();e.shiftKey?redo():undo();return;}
   if(handleShortcutCapture(e)) return;
+  // AE準拠のレイヤー追加（Ctrl+Alt+Shift+C / N）。**Ctrl+C のKFコピーより先に見る**こと
+  if((e.ctrlKey||e.metaKey)&&e.altKey&&e.shiftKey&&(e.code==='KeyC'||e.code==='KeyN')){
+    e.preventDefault();
+    if(e.code==='KeyC') addCameraTrack(); else addNullTrack();
+    return;
+  }
   // 2026-07-26: SETTINGS は Esc で閉じない（作業中に消えるのが不便）。✕ か , で閉じる
   if(e.code==='Escape'){ closeEaseMenu(); kfSelClear(); hideFxHud(); closeSfxModal(); return; }
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyC'&&e.target.tagName!=='INPUT'){ e.preventDefault(); copyKeyframes(); return; }
@@ -5278,6 +5423,10 @@ window.addEventListener('keydown',e=>{
     }
   }
   if(e.ctrlKey||e.metaKey||e.altKey) return;
+  // 数字キー1〜9（テンキーも可）= その番号のマーカーへインジケータを飛ばす（AE準拠）。
+  // 再割当の対象にはしない（1〜9をまとめて1アクションで扱うため）
+  const dm=/^(?:Digit|Numpad)([1-9])$/.exec(e.code||'');
+  if(dm){ e.preventDefault(); seekToMarkerNo(+dm[1]); return; }
   const k=normKey(e);
   for(const a of SHORTCUT_ACTIONS){
     if(a.alt) continue; // Alt必須のアクションは上で処理済み
@@ -5332,6 +5481,25 @@ function rulerScrub(e){
   pause(); seek(f);
 }
 $('#tl-ruler').addEventListener('pointerdown',e=>{scrubbing=true;rulerScrub(e);});
+// 2026-07-27: インジケータの頭をダブルクリック → ワークエリアを「全体」⇔「直前の範囲」でトグル。
+// 掴んでのスクラブも従来どおりできるよう pointerdown はルーラーと同じ処理へ流す
+let gWaPrev=null;
+(function(){
+  const grab=$('#tl-playhead-grab'); if(!grab) return;
+  grab.addEventListener('pointerdown',e=>{ e.stopPropagation(); scrubbing=true; rulerScrub(e); });
+  grab.addEventListener('dblclick',e=>{
+    e.stopPropagation(); e.preventDefault();
+    scrubbing=false;
+    const total=state.totalFrames; if(!total) return;
+    const wa=state.workArea||(state.workArea={startFrame:0,endFrame:total});
+    const isFull=(wa.startFrame===0&&wa.endFrame>=total);
+    if(isFull&&gWaPrev){ state.workArea={startFrame:Math.min(gWaPrev.startFrame,total-1),endFrame:Math.min(gWaPrev.endFrame,total)}; }
+    else { gWaPrev=isFull?gWaPrev:{...wa}; state.workArea={startFrame:0,endFrame:total}; }
+    updateWorkArea();
+    const w=state.workArea;
+    flashLive('⟺ WORK AREA '+(w.startFrame+1)+'–'+w.endFrame+((w.startFrame===0&&w.endFrame>=total)?'（全体）':''));
+  });
+})();
 window.addEventListener('pointermove',e=>{if(scrubbing){ if(!e.buttons){scrubbing=false;return;} rulerScrub(e);} });
 window.addEventListener('pointerup',()=>{scrubbing=false;});
 window.addEventListener('pointercancel',()=>{scrubbing=false;});
@@ -5347,10 +5515,21 @@ window.addEventListener('pointercancel',()=>{scrubbing=false;});
   }
   ['in','out'].forEach(side=>{
     const el=$(`#tl-wa-${side}`);
+    el.title=(side==='in'?'ワークエリア IN（B）':'ワークエリア OUT（N）')+' — ダブルクリックでタイムライン'+(side==='in'?'先頭':'末尾')+'まで戻す';
     el.addEventListener('pointerdown',e=>{
       if(!state.totalFrames) return;
       waDrag=side; el.setPointerCapture(e.pointerId);
       e.stopPropagation(); e.preventDefault();
+    });
+    // 2026-07-27: ハンドルのダブルクリックで端まで開く（両方やれば全体に戻る）
+    el.addEventListener('dblclick',e=>{
+      e.stopPropagation(); e.preventDefault();
+      if(!state.totalFrames) return;
+      waDrag=null;
+      if(side==='in') setWaStart(0); else setWaEnd(state.totalFrames);
+      const wa=state.workArea;
+      flashLive('⟺ WORK AREA '+(wa.startFrame+1)+'–'+wa.endFrame
+        +((wa.startFrame===0&&wa.endFrame===state.totalFrames)?'（全体）':''));
     });
     el.addEventListener('pointermove',e=>{ if(waDrag&&!e.buttons){waDrag=null;return;} waMove(e); });
     el.addEventListener('pointerup',()=>{waDrag=null;});
@@ -5358,31 +5537,57 @@ window.addEventListener('pointercancel',()=>{scrubbing=false;});
   });
 })();
 
-// ── KFマーキー選択（TRACKまたぎのドラッグ矩形選択） ──
+// ── ストリップ上のドラッグ ＝ 横:KFマーキー選択 / 縦:トラック並び替え（並び替え側は attachTrackDrag が処理）──
+// クリック（動かさず離す）はトラック選択＋インジケータ移動。Shift/Ctrl はトラックの複数選択
 (function(){
   const cont=$('#tl-tracks');
-  let active=false, sx=0, sy=0, addMode=false, moved=false;
+  let active=false, sx=0, sy=0, addMode=false, ctrlMode=false, moved=false, downTrack=-1, downOnStrip=false;
   cont.addEventListener('pointerdown',e=>{
     if(e.button!==0) return;
     if(e.altKey) return; // SPEC_11 P3b-2: Alt+ドラッグはトラックのずらし（ストリップ側が処理）
-    if(e.target.closest('.tl-kf-d,.tl-marker,.tl-drag-handle,.tl-tbtn,.tl-track-name,.tl-audio-btn,#tl-audio-strip,.tl-trim-handle')) return;
-    active=true; moved=false; sx=e.clientX; sy=e.clientY; addMode=e.shiftKey;
+    // ラベル帯（⠿/名前/ボタン/余白）は並び替えドラッグの領分。マーキーはストリップ上だけで始める
+    if(e.target.closest('.tl-kf-d,.tl-marker,.tl-drag-handle,.tl-tbtn,.tl-track-label,.tl-track-name,.tl-audio-btn,#tl-audio-strip,.tl-trim-handle')) return;
+    active=true; moved=false; sx=e.clientX; sy=e.clientY; addMode=e.shiftKey; ctrlMode=e.ctrlKey||e.metaKey;
+    const st=e.target.closest('.tl-track-strip');
+    downOnStrip=!!st; downTrack=st?+st.dataset.track:-1;
   });
   window.addEventListener('pointermove',e=>{
     if(!active) return;
+    if(gStripGesture==='reorder') return; // 縦ドラッグは並び替えに譲る
     const w=Math.abs(e.clientX-sx), h=Math.abs(e.clientY-sy);
-    if(w>3||h>3){
-      moved=true;
-      const box=$('#tl-marquee');
-      box.style.display='block';
-      box.style.left=Math.min(sx,e.clientX)+'px'; box.style.top=Math.min(sy,e.clientY)+'px';
-      box.style.width=w+'px'; box.style.height=h+'px';
-    }
+    if(w<=3&&h<=3) return;
+    // 並び替えが待機中（＝掴める場所を押している）で縦優勢なら、まだマーキーを出さない。
+    // キー帯やCAMERA行など待機していない場所では縦ドラッグもマーキーになる（死角を作らない）
+    if(!gStripGesture&&gStripArmed&&h>w) return;
+    gStripGesture='marquee';
+    moved=true;
+    const box=$('#tl-marquee');
+    box.style.display='block';
+    box.style.left=Math.min(sx,e.clientX)+'px'; box.style.top=Math.min(sy,e.clientY)+'px';
+    box.style.width=w+'px'; box.style.height=h+'px';
   });
   window.addEventListener('pointerup',e=>{
+    const wasReorder=(gStripGesture==='reorder');
+    gStripGesture=null;
     if(!active) return; active=false;
     $('#tl-marquee').style.display='none';
-    if(!moved){ if(!addMode) kfSelClear(); return; }
+    if(wasReorder) return; // 並び替えの後始末は attachTrackDrag 側
+    if(!moved){
+      // クリック確定：ストリップならトラック選択＋インジケータをその位置へ
+      if(downOnStrip&&downTrack>=0){
+        if(addMode){ selectTrack(downTrack,'range'); return; }
+        if(ctrlMode){ selectTrack(downTrack,'toggle'); return; }
+        selectTrack(downTrack);
+        const st=document.querySelector(`.tl-track-strip[data-track="${downTrack}"]`);
+        if(st&&state.totalFrames){
+          const r=st.getBoundingClientRect();
+          const f=Math.floor(Math.max(0,Math.min(1,(sx-r.left)/r.width))*state.totalFrames);
+          pause(); seek(Math.min(f,state.totalFrames-1));
+        }
+      }
+      if(!addMode) kfSelClear();
+      return;
+    }
     const r={left:Math.min(sx,e.clientX),right:Math.max(sx,e.clientX),top:Math.min(sy,e.clientY),bottom:Math.max(sy,e.clientY)};
     if(!addMode) kfSel=[];
     document.querySelectorAll('.tl-kf-d').forEach(d=>{
@@ -5519,16 +5724,36 @@ function applyGuideUI(){
   $('#guide-res-w').value=g.resW; $('#guide-res-h').value=g.resH;
   $('#guide-safe-a').value=g.safeA; $('#guide-safe-b').value=g.safeB;
 }
+// 2026-07-27: SETTINGSの既定の高さ ＝ AUTOSAVE セクションの末尾で下端バーをスナップ。
+// 全部展開すると（KEYBOARD SHORTCUTS が長いので）画面外まで伸びて、
+// **下端バーが掴めず・内部スクロールも効かない**状態になっていた。開いた時とドック時に必ず戻す。
+function applySettingsDefaultHeight(){
+  const body=$('#settings-panel-body'), anchor=$('#set-sect-autosave');
+  if(!body||!anchor) return;
+  body.style.height=''; body.style.maxHeight='none';
+  const h=Math.round(anchor.getBoundingClientRect().bottom-body.getBoundingClientRect().top)+10;
+  body.style.height=Math.max(60,Math.min(window.innerHeight-160,h))+'px';
+}
 function toggleSettingsPanel(force){
   const p=$('#settings-panel');
   const show=(typeof force==='boolean')?force:!p.classList.contains('show');
   p.classList.toggle('show',show);
   $('#btn-settings').classList.toggle('primary',show);
   gCaptureId=null;
-  if(show){ buildShortcutList(); applyGuideUI(); }
+  if(show){
+    p.classList.remove('collapsed');
+    buildShortcutList(); applyGuideUI();
+    applySettingsDefaultHeight(); // ★ shortcut list を組んだ後に測る
+  }
 }
 $('#btn-settings').addEventListener('click',()=>toggleSettingsPanel());
-$('#settings-panel-close').addEventListener('click',()=>toggleSettingsPanel(false));
+$('#settings-panel-collapse').addEventListener('click',e=>{
+  e.stopPropagation();
+  const p=$('#settings-panel'); const collapsed=p.classList.toggle('collapsed');
+  // 展開して戻すときは既定の高さ（AUTOSAVEの下でスナップ）にそろえる。
+  // 畳む前に手で伸ばしていた高さがそのまま戻ると、また下端バーが画面外に出てしまうため
+  if(!collapsed) applySettingsDefaultHeight();
+});
 $('#shortcut-reset').addEventListener('click',()=>{
   gKeymap=defaultKeymap(); gCaptureId=null; saveKeymap(); buildShortcutList();
 });
@@ -5562,35 +5787,39 @@ document.querySelectorAll('#settings-panel .sg-preset[data-gw]').forEach(b=>{
 // 設定パネルのドラッグ移動（INSPECTORと同じ makeFloatDrag ＝ 掴んだ時点でドック解除される）
 makeFloatDrag($('#settings-panel'), $('#settings-panel-head'), t=>!!(t&&t.closest&&t.closest('.set-head-btns')));
 $('#settings-panel-dock').addEventListener('click',e=>{ e.stopPropagation(); dockSettings(); });
+// 移動後も既定の高さ（AUTOSAVEの下）に戻す＝下端バーが画面外に行って掴めなくなるのを防ぐ
+$('#settings-panel-head').addEventListener('pointerup',()=>{ if($('#settings-panel').classList.contains('show')) applySettingsDefaultHeight(); });
 // 設定パネル下端リサイズ（項目境目でスナップ。下のセクションを隠せる）
-(function(){
-  const handle=$('#settings-resize'), body=$('#settings-panel-body');
+// ── 下端リサイズバー（SETTINGS / INSPECTOR / SATSUEI FX 共通）──
+// snapSel で指定した子要素の**末尾**にスナップする＝項目の切れ目でぴたっと止まる。
+// clearMaxOn: 掴んだ瞬間に maxHeight を外す対象（パネル本体かbodyかはパネルごとに違う）
+function attachPanelResize(handleSel, bodySel, snapSel, opt){
+  const handle=$(handleSel), body=$(bodySel);
+  if(!handle||!body) return;
+  const o=opt||{};
   let active=false, startY=0, startH=0;
-  function snapTargets(){
-    const t=[]; const bodyTop=body.getBoundingClientRect().top;
-    body.querySelectorAll('.set-sect').forEach(s=>{
-      const r=s.getBoundingClientRect();
-      t.push(r.bottom-bodyTop+10); // セクション末尾でスナップ
-    });
-    return t;
-  }
+  const end=()=>{ active=false; handle.classList.remove('active'); };
   handle.addEventListener('pointerdown',e=>{
     active=true; startY=e.clientY; startH=body.clientHeight;
-    body.style.maxHeight='none';
+    const cm=o.clearMaxOn?$(o.clearMaxOn):body; if(cm) cm.style.maxHeight='none';
     handle.classList.add('active'); handle.setPointerCapture(e.pointerId); e.preventDefault();
   });
   handle.addEventListener('pointermove',e=>{
     if(!active) return;
-    if(!e.buttons){ active=false; handle.classList.remove('active'); return; } // ペン等の保険
+    if(!e.buttons){ end(); return; } // ペン等でpointerupを取り逃した場合の保険
     let h=startH+(e.clientY-startY);
-    const targets=snapTargets();
-    for(const tg of targets){ if(Math.abs(h-tg)<14){ h=tg; break; } }
-    h=Math.max(60,Math.min(window.innerHeight-120,h));
-    body.style.height=h+'px';
+    const bodyTop=body.getBoundingClientRect().top;
+    for(const s of body.querySelectorAll(snapSel)){
+      const tg=s.getBoundingClientRect().bottom-bodyTop+10;
+      if(Math.abs(h-tg)<14){ h=tg; break; }
+    }
+    body.style.height=Math.max(o.min||40,Math.min(window.innerHeight-120,h))+'px';
   });
-  handle.addEventListener('pointerup',()=>{ active=false; handle.classList.remove('active'); });
-  handle.addEventListener('pointercancel',()=>{ active=false; handle.classList.remove('active'); });
-})();
+  handle.addEventListener('pointerup',end);
+  handle.addEventListener('pointercancel',end);
+}
+attachPanelResize('#settings-resize','#settings-panel-body','.set-sect',{min:60});
+attachPanelResize('#sfx-resize','#sfx-body','.sfx-ent,.sfx-master',{min:60,clearMaxOn:'#sfx-panel'});
 
 // インスペクタ（フローティング）のドラッグ移動＋折りたたみ
 (function(){
@@ -5599,34 +5828,7 @@ $('#settings-panel-dock').addEventListener('click',e=>{ e.stopPropagation(); doc
   // ヘッダ右のボタン群（⇄ドック / ▾折りたたみ）からはドラッグを始めない＝クリックを潰さない
   makeFloatDrag(panel, $('#inspector-head'), t=>!!(t&&t.closest&&t.closest('.insp-head-btns')));
   collapse.addEventListener('click',e=>{ e.stopPropagation(); panel.classList.toggle('collapsed'); });
-  // 下端リサイズ（設定パネルと同方式・セクション境目でスナップ）
-  const handle=$('#inspector-resize'), body=$('#inspector-body');
-  let active=false, startY=0, startH=0;
-  function snapTargets(){
-    const t=[]; const bodyTop=body.getBoundingClientRect().top;
-    body.querySelectorAll('.insp-section').forEach(s=>{
-      const r=s.getBoundingClientRect();
-      t.push(r.bottom-bodyTop+10); // セクション末尾でスナップ
-    });
-    return t;
-  }
-  function endResize(){ active=false; handle.classList.remove('active'); }
-  handle.addEventListener('pointerdown',e=>{
-    active=true; startY=e.clientY; startH=body.clientHeight;
-    panel.style.maxHeight='none';
-    handle.classList.add('active'); handle.setPointerCapture(e.pointerId); e.preventDefault();
-  });
-  handle.addEventListener('pointermove',e=>{
-    if(!active) return;
-    if(!e.buttons){ endResize(); return; } // ペン等の保険
-    let h=startH+(e.clientY-startY);
-    const targets=snapTargets();
-    for(const tg of targets){ if(Math.abs(h-tg)<14){ h=tg; break; } }
-    h=Math.max(40,Math.min(window.innerHeight-120,h));
-    body.style.height=h+'px';
-  });
-  handle.addEventListener('pointerup',endResize);
-  handle.addEventListener('pointercancel',endResize);
+  attachPanelResize('#inspector-resize','#inspector-body','.insp-section',{min:40,clearMaxOn:'#inspector'});
 })();
 
 // ===== INSPECTOR ドッキング（左右） / Tabで左右入替（ANIMATORのパレット準拠）=====
@@ -5654,9 +5856,11 @@ function dockSettings(){
   panel.classList.remove('floating');
   panel.style.left=''; panel.style.right=''; panel.style.top=''; panel.style.bottom='';
   panel.style.transform=''; panel.style.maxHeight='';
-  const body=$('#settings-panel-body'); if(body) body.style.height=''; // リサイズで固定した高さを解除
   panel.classList.toggle('dock-left', side==='left');
   panel.classList.toggle('dock-right', side!=='left');
+  // 手で伸ばした高さは捨てて既定（AUTOSAVEの下）に戻す。表示中でないと測れないので出ているときだけ
+  if(panel.classList.contains('show')) applySettingsDefaultHeight();
+  else { const body=$('#settings-panel-body'); if(body) body.style.height=''; }
 }
 function toggleInspectorSide(){
   dockInspector(gInspSide==='right'?'left':'right');

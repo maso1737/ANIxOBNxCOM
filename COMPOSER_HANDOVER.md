@@ -18,6 +18,40 @@ COMPOSER v0.7（単一HTML）の続き開発用ハンドオフ。
 - **FRAME/TIME 直接入力**: `#tc-frame`/`#tc-time` クリックでinput→Enterでseek。`updateTransport()` は入力中なら上書きしない
 - **SETTINGS**: 左右ドック対応。側は常に INSPECTOR の反対（`dockSettings()` が `gInspSide` から決める）。`Tab` で両方入替。ヘッダに ⇄。**Escでは閉じない**
 
+【2026-07-27 調整（SPEC_11 P6 追補）】
+- **SETTINGSの既定の高さ** = `applySettingsDefaultHeight()`（AUTOSAVEセクション末尾+10pxに下端バーをスナップ）。開いた時／ドック時／ヘッダのpointerup（移動後）に適用。**`buildShortcutList()` の後に測る**こと
+- **SETTINGSの ✕ は廃止 → ▾ 折りたたみ**（`#settings-panel-collapse`）。閉じるのは ⚙ か `,`
+- **行のボタン（◉/S/🔒/✕）も複数選択に効く**: `inMultiSel(idx)` で振り分け。**反転の基準は押した行**なので `toggleVisSelected/SoloSelected/LockSelected` は `baseIdx` を取る
+- **キーマップは `composer_keymap_v2`**（v1は読まずに削除）。旧既定 `opPunch:'O'` が新設 `goLayerOut:'O'` と衝突して**Qが無反応**だったため。
+  `dedupeKeymap()` が同一alt枠のキー重複を解消（既定がそのキーの方を残す）。**既定キーを変えたらLSのバージョンも上げる**
+- **ワークエリアのハンドルWクリック** = IN→先頭 / OUT→末尾（両方で全体に戻る）
+- **並び替えドラッグ**: ジオメトリは `measureDropGeo()` で開始時に1回だけ測る／ゴースト・インジケータは `transform`+rAF／
+  **pointerup では `dhCleanup()` を `doTrackReorder()` より先に**（reorderのrebuildでブロックする間ゴーストが残って「引っ付く」ため）
+
+【2026-07-27 調整2（SPEC_11 P6 追補2）】
+- **ストリップ上のジェスチャは `gStripGesture` で一本化**（`'reorder'` 縦 / `'marquee'` 横 / null）:
+  クリック=トラック選択+インジケータ移動／Shift・Ctrl+クリック=複数選択（**pointerupで判定**）／
+  縦ドラッグ=並び替え（`attachTrackDrag(strip,false,{vOnly:true,guard})`）／横ドラッグ=KFマーキー／Alt+ドラッグ=時間ずらし。
+  guard はキー帯（下 `KF_BAND_H`=23px）・ダイヤ/マーカー/トリム上・CAMERA・altKey を弾く。
+  `gStripArmed` は window の **capture** でリセット→stripのpointerdownで立てる（マーキーはこれを見て縦を譲る）。
+  **マーキーの除外セレクタに `.tl-track-label` は必須**（ラベルからの並び替えがマーキーに先取りされて動かなくなる）
+- **`Ctrl+Alt+Shift+C / N` = カメラ / ヌル追加（AE準拠）。keydown で `Ctrl+C` より先に判定すること**
+- **インジケータの頭 `#tl-playhead-grab`（15×14px）をWクリック → ワークエリア 全体⇔直前（`gWaPrev`）**。
+  `#tl-playhead` 自体は pointer-events:none のまま（線全体を当たり判定にするとルーラーのクリックを食う）
+- **リサイズバーは `attachPanelResize(handleSel,bodySel,snapSel,{min,clearMaxOn})` に集約**（SETTINGS/INSPECTOR/SATSUEI FX）。
+  FXにも下端バー `#sfx-resize` を追加（スナップは `.sfx-ent,.sfx-master`／縮小ボタンは無し）
+- SETTINGS は**折りたたみ→展開でも既定の高さに戻す**／トップバー表記は `+ OBAN`
+
+【2026-07-27 調整3（SPEC_11 P6 追補3）】
+- **行のボタンは pointerdown で選択を畳まないこと**。`click` の stopPropagation だけでは行の pointerdown に届いてしまい、
+  複数選択が単体に潰れて「ボタンは1つずつ」になる。`.tl-track-btns` 内かつ `inMultiSel(idx)` なら return
+- **選択分すべてに効く操作**（追加）: `[` `]` / `Alt+[` `Alt+]` / `+ ADD KEYFRAME HERE` / `✕ CLEAR ALL KF`。
+  `addKfAtCurrent` はプライマリのみINSPECTORの入力値、他は `getKfValue` の実効値。
+  **フレームは `state.currentFrame - trackOff(t)` をトラックごとに計算する**（`curLocalFrame()` は選択トラック固定なので使えない）
+- **マーカーの番号 `m.n`＝出した順**（`nextMarkerNo`＝空き番号の最小、`ensureMarkerNos` が旧データを採番）。
+  配列は frame ソートされるので添字では番号にならない。PROJECT_v2 に直列化・undoでも保持。
+  **数字キー1〜9 / テンキーでその番号へ**（`seekToMarkerNo`。`e.code` の Digit/Numpad で判定・再割当対象外）
+
 【2026-07 追加（SPEC_11 P0/P1/P1b）】
 - 座標規約: フレームf左端= LABEL_W + frameFrac(f)*幅（frameFrac=f/total）。**total-1を分母にしない**。全UI（ルーラー/PH/WA/ダイヤ/ブロック/グラフ）統一
 - 自動保存: IndexedDB `composer_autosave_v1`（cells=絵・import/LIVE時のみ ／ meta=cells抜きpayload・recordHistory毎debounce 2s）。起動時に復元バー（復元=置き換え/破棄/✕=温存）。LIVE自動ロードが先行してもバーは出す。⚙パネルにCLEARボタン。音声本体は対象外
@@ -95,7 +129,7 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - イーズ一括：インスペクターのEASEボタン（クリック=中0.5 / Shift=最大1.0）。選択優先
 
 ■ マーカー（グローバル/ワークエリア）
-- state.markers = [{frame,label}]（旧：トラック単位。現在はM=ルーラー上のグローバルマーカー）
+- state.markers = [{frame,label,n}]（旧：トラック単位。現在はM=ルーラー上のグローバルマーカー。`n`=出した順の番号＝数字キー1〜9で飛べる）
 - renderGlobalMarkers()：#tl-ruler-markers に配置。ドラッグ移動 / クリックseek / ダブルクリックでメモ(prompt) / Ctrl(Cmd)+クリックで削除(AE準拠)
 - PROJECT_v2 top-level markers として保存/復元、undoスナップに gmarkers
 - 旧 per-track markers(renderMarkers) は読込互換で残置
