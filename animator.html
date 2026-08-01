@@ -433,6 +433,44 @@ html,body{
 #proj-panel-body{padding:8px 10px;max-height:66vh;overflow-y:auto;}
 #proj-panel-body::-webkit-scrollbar{width:4px;}
 #proj-panel-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,0.3);}
+/* TIMELAPSE パネル（proj-panel と同系デザイン） */
+#tl-panel{
+  position:fixed;top:80px;right:24px;width:340px;
+  background:rgba(16,7,34,0.97);
+  border:1px solid var(--border-bright);
+  box-shadow:0 8px 40px rgba(0,0,0,0.7),0 0 0 1px rgba(0,0,0,0.4);
+  z-index:122;font-family:var(--mono);color:#fff;
+  display:none;
+}
+#tl-panel.show{display:block;}
+#tl-panel-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;cursor:move;
+  background:linear-gradient(90deg,rgba(255,79,168,0.10),transparent);
+  border-bottom:1px solid var(--border);
+  font-size:9px;letter-spacing:0.3em;color:var(--acid);
+  user-select:none;
+}
+#tl-panel-close{cursor:pointer;color:rgba(255,255,255,0.4);font-size:12px;line-height:1;padding:0 2px;}
+#tl-panel-close:hover{color:var(--acid);}
+#tl-panel-body{padding:8px 10px;max-height:66vh;overflow-y:auto;}
+#tl-panel-body::-webkit-scrollbar{width:4px;}
+#tl-panel-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,0.3);}
+#tl-stage{position:relative;background:#000;border:1px solid var(--border);margin-bottom:6px;line-height:0;}
+#tl-preview{display:block;width:100%;height:auto;}
+#tl-empty{
+  position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  text-align:center;font-size:8px;line-height:1.8;color:rgba(255,255,255,0.42);
+  padding:14px;letter-spacing:0.08em;
+}
+#tl-stage.empty #tl-empty{display:flex;}
+#tl-scrub{flex:1;min-width:0;height:3px;accent-color:var(--acid);cursor:pointer;}
+#tl-pos{font-size:8px;color:rgba(255,255,255,0.5);min-width:62px;text-align:right;letter-spacing:0.05em;}
+#tl-panel select{
+  background:rgba(255,255,255,0.05);border:1px solid var(--border);
+  color:rgba(255,255,255,0.85);font-family:var(--mono);font-size:9px;
+  padding:3px 4px;letter-spacing:0.04em;
+}
 #snap-name{
   flex:1;min-width:0;background:rgba(255,255,255,0.05);
   border:1px solid var(--border);color:#fff;
@@ -582,8 +620,8 @@ html,body{
 #palette-resize::after{content:'';width:26px;height:2px;background:rgba(255,255,255,0.25);}
 #palette-pnl.floating #palette-resize{display:flex;}
 /* パネル 下端リサイズグリップ（設定/REF共通） */
-#settings-resize,#ref-resize{height:11px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--border);background:rgba(255,255,255,0.02);}
-#settings-resize::after,#ref-resize::after{content:'';width:28px;height:2px;background:rgba(255,255,255,0.25);}
+#settings-resize,#ref-resize,#tl-resize{height:11px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--border);background:rgba(255,255,255,0.02);}
+#settings-resize::after,#ref-resize::after,#tl-resize::after{content:'';width:28px;height:2px;background:rgba(255,255,255,0.25);}
 #app.palette-float{ grid-template-columns:72px 1fr 0; }
 #app.palette-float.swapped{
   grid-template-columns:0 1fr 72px;
@@ -1642,6 +1680,11 @@ input[type=range]::-moz-range-thumb{
       </div>
     </div>
     <div class="ref-sect">
+      <div class="ref-sect-h">TIMELAPSE（作画タイムラプス）</div>
+      <div class="sc-hint">描いている過程の自動記録。再生・設定・全消しはパネルで行います（トップバー TL のWクリックでも開きます）</div>
+      <button id="tl-open-settings" class="ref-btn" style="width:100%;padding:5px 0;">TIMELAPSE パネルを開く</button>
+    </div>
+    <div class="ref-sect">
       <div class="ref-sect-h">KEYBOARD SHORTCUTS</div>
       <div class="sc-hint">キーをクリック → 新しいキーを押して変更（ESCで取消）</div>
       <div id="shortcut-list"></div>
@@ -1666,6 +1709,77 @@ input[type=range]::-moz-range-thumb{
     <div id="snap-list"></div>
     <div id="snap-storage" class="sc-hint" style="margin-top:8px;margin-bottom:0;"></div>
   </div>
+</div>
+
+<!-- TIMELAPSE PANEL（作画タイムラプスの再生・設定。SPEC_14 P1） -->
+<div id="tl-panel">
+  <div id="tl-panel-head">
+    <span>TIMELAPSE</span>
+    <span id="tl-panel-close" title="閉じる">✕</span>
+  </div>
+  <div id="tl-panel-body">
+    <div class="ref-sect">
+      <div class="ref-sect-h">PLAYBACK</div>
+      <div id="tl-stage" class="empty">
+        <canvas id="tl-preview" width="480" height="270"></canvas>
+        <div id="tl-empty">まだ記録がありません<br>TL を ● にして描くと自動で撮られます</div>
+      </div>
+      <div class="sg-row">
+        <button id="tl-play" class="sc-key" style="min-width:40px;" title="再生 / 停止">▶</button>
+        <input type="range" id="tl-scrub" min="0" max="0" value="0" step="1" title="スクラブ">
+        <span id="tl-pos">0 / 0</span>
+      </div>
+      <div class="sg-row">
+        <span class="sc-label">FPS</span>
+        <button class="sc-key tl-fps" data-fps="6" style="min-width:34px;">6</button>
+        <button class="sc-key tl-fps" data-fps="12" style="min-width:34px;">12</button>
+        <button class="sc-key tl-fps" data-fps="24" style="min-width:34px;">24</button>
+        <button class="sc-key tl-fps" data-fps="60" style="min-width:34px;">60</button>
+      </div>
+      <div class="sg-row">
+        <span class="sc-label">並べ替え</span>
+        <button class="sc-key tl-order" data-order="work" style="min-width:66px;">WORK</button>
+        <button class="sc-key tl-order" data-order="cell" style="min-width:66px;">CELL</button>
+      </div>
+      <div class="sc-hint" id="tl-order-hint"></div>
+      <div class="sc-hint" id="tl-info" style="margin-bottom:0;"></div>
+    </div>
+    <div class="ref-sect">
+      <div class="ref-sect-h">RECORDING</div>
+      <div class="sg-row">
+        <span class="sc-label">記録</span>
+        <button id="tl-rec-toggle" class="sc-key sg-toggle" title="記録のON/OFF（トップバーの TL と同じ）">ON</button>
+      </div>
+      <div class="sg-row">
+        <span class="sc-label">記録間隔</span>
+        <select id="tl-interval" title="変化があったとき、この間隔以上あけて1枚撮ります">
+          <option value="1000">1秒</option>
+          <option value="2000">2秒</option>
+          <option value="5000">5秒</option>
+        </select>
+      </div>
+      <div class="sg-row">
+        <span class="sc-label">上限枚数</span>
+        <select id="tl-max" title="これを超えると古いものから捨てます">
+          <option value="500">500枚</option>
+          <option value="1500">1500枚</option>
+          <option value="3000">3000枚</option>
+          <option value="6000">6000枚</option>
+        </select>
+      </div>
+      <div class="sg-row">
+        <span class="sc-label">記録解像度</span>
+        <select id="tl-res" title="長辺の画素数">
+          <option value="1280">720p</option>
+          <option value="1920">1080p</option>
+        </select>
+      </div>
+      <div class="sc-hint" id="tl-budget"></div>
+      <button id="tl-clear" class="ref-btn" style="width:100%;padding:5px 0;">CLEAR（記録を全消し）</button>
+      <div class="sc-hint" style="margin-top:6px;margin-bottom:0;">消えるのはタイムラプスの記録だけです。作画データ（コマ・タイムライン）は消えません</div>
+    </div>
+  </div>
+  <div id="tl-resize" title="ドラッグで高さ調整（下のセクションを隠せます）"></div>
 </div>
 
 <!-- EXPORT OVERLAY（進捗＋キャンセル。SEQ PNG / VIDEO 共通） -->
@@ -6711,6 +6825,7 @@ async function tlShoot(){
     if(!tlMeta.startedAt) tlMeta.startedAt = shot.t;
     await tlTrim();
     await tlPutMeta();
+    if(tlPanelIsOpen()) tlListAppend(shot);   // 開いたままでも一覧が古びないよう1枚足す
     updateTLUI();
   }catch(e){
     console.warn('timelapse shot failed', e);
@@ -6744,7 +6859,8 @@ function updateTLUI(){
   const mb = tlMeta ? (tlMeta.bytes / 1048576).toFixed(1) : '0.0';
   b.title = (on ? '作画タイムラプス記録中' : '作画タイムラプス記録OFF')
     + `（${n}枚 · ${mb}MB / 上限${tlMeta ? tlMeta.settings.maxShots : TL_DEFAULTS.maxShots}枚）`
-    + '\nクリックでON/OFF。OFFにしても既存の記録は消えません';
+    + '\nクリックでON/OFF・Wクリックで再生パネル。OFFにしても既存の記録は消えません';
+  if(tlPanelIsOpen()) tlApplyPanelUI();
 }
 
 document.getElementById('btn-tl').addEventListener('click', () => {
@@ -6755,8 +6871,312 @@ document.getElementById('btn-tl').addEventListener('click', () => {
   updateTLUI();
 });
 
+// ============================================================
+// TIMELAPSE パネル（SPEC_14 P1 — アプリ内再生・並べ替え・設定・CLEAR）
+//   記録は1系統なので、ここで WORK(作業順) / CELL(コマ別) に並べ替えて見せる。
+// ============================================================
+const TL_LS_ORDER = 'animator_tl_order_v1';
+const TL_LS_FPS   = 'animator_tl_fps_v1';
+const TL_BMP_MAX  = 240;    // デコード済みビットマップのキャッシュ上限
+const TL_PREFETCH = 10;     // 再生中に先読みする枚数
+const TL_WORST_KB = 190;    // 最悪見積り（全面ベタ・SPEC_14 §5 実測）
+let tlList = [];            // 表示順に並べ替えたショット（blobを持つ・デコードは遅延）
+let tlOrder = 'cell';
+let tlFps = 12;
+let tlIdx = 0;
+let tlPlaying = false;
+let tlPlayT0 = 0, tlPlayFrom = 0, tlRaf = 0;
+let tlBmp = new Map();      // seq → ImageBitmap
+let tlPvCtx = null;
+let tlAspect = 16 / 9;
+
+function tlPanelIsOpen(){
+  const p = document.getElementById('tl-panel');
+  return !!(p && p.classList.contains('show'));
+}
+function tlSortList(){
+  // WORK = 撮った順そのまま / CELL = コマ別に束ねてから撮った順
+  tlList.sort(tlOrder === 'cell'
+    ? (a, b) => (a.frameIdx - b.frameIdx) || (a.seq - b.seq)
+    : (a, b) => a.seq - b.seq);
+}
+async function tlLoadList(){
+  tlList = [];
+  if(!db || !db.objectStoreNames.contains(CFG.STORE_TL_SHOT)) return;
+  tlList = await new Promise(res => {
+    try{
+      const tx = db.transaction(CFG.STORE_TL_SHOT, 'readonly');
+      const q = tx.objectStore(CFG.STORE_TL_SHOT).getAll();
+      q.onsuccess = () => res(q.result || []);
+      q.onerror   = () => res([]);
+    }catch(e){ res([]); }
+  });
+  // レターボックスの基準は「先頭ショットの縦横比」（解像度を途中で変えても引き伸ばさない）
+  if(tlList.length){
+    const first = tlList.reduce((a, b) => (a.seq <= b.seq ? a : b));
+    tlAspect = (first.w && first.h) ? (first.w / first.h) : (16 / 9);
+  }
+  tlSortList();
+}
+// 記録中にパネルを開いていても一覧が古びないよう、撮った1枚をその場で足す
+function tlListAppend(shot){
+  tlList.push(shot);
+  if(tlMeta) tlList = tlList.filter(s => s.seq >= tlMeta.seqTail);
+  tlSortList();
+  if(!tlPlaying) tlIdx = Math.min(tlIdx, Math.max(0, tlList.length - 1));
+  tlSyncTransport();
+  tlRenderInfo();
+}
+function tlBmpPut(seq, bmp){
+  tlBmp.set(seq, bmp);
+  while(tlBmp.size > TL_BMP_MAX){
+    const k = tlBmp.keys().next().value;
+    const b = tlBmp.get(k);
+    tlBmp.delete(k);
+    if(b && b.close) b.close();
+  }
+}
+function tlBmpDrop(){
+  for(const b of tlBmp.values()) if(b && b.close) b.close();
+  tlBmp.clear();
+}
+// キャッシュにあれば即返す。無ければデコードを走らせて、済んだら描き直す
+function tlBmpGet(i){
+  const s = tlList[i];
+  if(!s) return null;
+  const hit = tlBmp.get(s.seq);
+  if(hit) return hit;
+  if(s._loading) return null;
+  s._loading = true;
+  createImageBitmap(s.blob).then(bmp => {
+    s._loading = false;
+    tlBmpPut(s.seq, bmp);
+    if(tlIdx === i) tlDrawAt(i);
+  }).catch(() => { s._loading = false; });
+  return null;
+}
+function tlDrawAt(i){
+  const cv = document.getElementById('tl-preview');
+  if(!cv) return;
+  if(!tlPvCtx) tlPvCtx = cv.getContext('2d');
+  const W = 480, H = Math.max(2, Math.round(W / (tlAspect || 16 / 9)));
+  if(cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+  const bmp = tlBmpGet(i);
+  if(!bmp) return;   // デコード待ち。前の絵を残す（チラつかせない）
+  tlPvCtx.fillStyle = '#000';
+  tlPvCtx.fillRect(0, 0, W, H);
+  // レターボックス（contain）。解像度が混在しても引き伸ばさない
+  const s = Math.min(W / bmp.width, H / bmp.height);
+  const dw = bmp.width * s, dh = bmp.height * s;
+  tlPvCtx.drawImage(bmp, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  for(let k = 1; k <= TL_PREFETCH; k++) tlBmpGet((i + k) % tlList.length);
+}
+function tlSeek(i){
+  if(!tlList.length){ tlIdx = 0; tlSyncTransport(); return; }
+  tlIdx = Math.max(0, Math.min(tlList.length - 1, i | 0));
+  tlDrawAt(tlIdx);
+  tlSyncTransport();
+}
+function tlSyncTransport(){
+  const sc = document.getElementById('tl-scrub');
+  const pos = document.getElementById('tl-pos');
+  const play = document.getElementById('tl-play');
+  const stg = document.getElementById('tl-stage');
+  const n = tlList.length;
+  if(sc){ sc.max = Math.max(0, n - 1); if(document.activeElement !== sc) sc.value = tlIdx; sc.disabled = !n; }
+  if(pos) pos.textContent = n ? `${tlIdx + 1} / ${n}` : '0 / 0';
+  if(play){ play.textContent = tlPlaying ? '■' : '▶'; play.disabled = !n; play.classList.toggle('on', tlPlaying); }
+  if(stg) stg.classList.toggle('empty', !n);
+}
+function tlPlayStep(){
+  if(!tlPlaying) return;
+  const adv = Math.floor((performance.now() - tlPlayT0) / (1000 / tlFps));
+  const i = tlList.length ? (tlPlayFrom + adv) % tlList.length : 0;
+  if(i !== tlIdx){ tlIdx = i; tlDrawAt(tlIdx); tlSyncTransport(); }
+  tlRaf = requestAnimationFrame(tlPlayStep);
+}
+function tlPlayStop(){
+  if(!tlPlaying) return;
+  tlPlaying = false;
+  if(tlRaf) cancelAnimationFrame(tlRaf);
+  tlRaf = 0;
+  tlSyncTransport();
+}
+function tlPlayStart(){
+  if(tlPlaying || !tlList.length) return;
+  tlPlaying = true;
+  tlPlayFrom = (tlIdx >= tlList.length - 1) ? 0 : tlIdx;
+  tlPlayT0 = performance.now();
+  tlSyncTransport();
+  tlRaf = requestAnimationFrame(tlPlayStep);
+}
+function tlFmtBytes(b){
+  return b >= 1048576 ? (b / 1048576).toFixed(1) + 'MB' : Math.max(0, Math.round(b / 1024)) + 'KB';
+}
+function tlRenderInfo(){
+  const el = document.getElementById('tl-info');
+  const bg = document.getElementById('tl-budget');
+  if(el){
+    const n = tlList.length;
+    if(!n){
+      el.textContent = '記録 0枚';
+    } else {
+      const ts = tlList.map(s => s.t).filter(t => t);
+      const span = ts.length ? (Math.max(...ts) - Math.min(...ts)) : 0;
+      const mins = Math.max(1, Math.round(span / 60000));
+      const secs = (n / tlFps).toFixed(1);
+      el.textContent = `${n}枚 · 作業 約${mins}分ぶん · ${tlFmtBytes(tlMeta ? tlMeta.bytes : 0)}`
+        + ` / 再生 ${secs}秒（${tlFps}fps）`;
+    }
+  }
+  if(bg && tlMeta){
+    const worst = tlMeta.settings.maxShots * TL_WORST_KB / 1024;
+    bg.textContent = `現在 ${tlFmtBytes(tlMeta.bytes)} / この上限での最悪見積り 約${Math.round(worst)}MB`
+      + '（全面ベタばかり描いた場合。通常の作画なら1/10以下です）';
+  }
+}
+function tlOrderHint(){
+  const el = document.getElementById('tl-order-hint');
+  if(!el) return;
+  el.textContent = tlOrder === 'cell'
+    ? 'CELL＝コマ別。1コマずつ線が増える過程が続けて見えます（手描きだと伝わりやすい）'
+    : 'WORK＝作業順そのまま。コマを行き来した実際の流れが見えます（コマ間で絵は飛びます）';
+}
+function tlApplyPanelUI(){
+  document.querySelectorAll('.tl-fps').forEach(b => b.classList.toggle('on', +b.dataset.fps === tlFps));
+  document.querySelectorAll('.tl-order').forEach(b => b.classList.toggle('on', b.dataset.order === tlOrder));
+  const rec = document.getElementById('tl-rec-toggle');
+  if(rec){
+    const on = tlEnabled();
+    rec.textContent = AUTOSAVE_OFF ? '別窓' : (on ? 'ON' : 'OFF');
+    rec.classList.toggle('on', on);
+    rec.disabled = AUTOSAVE_OFF;
+  }
+  const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = String(v); };
+  if(tlMeta){
+    set('tl-interval', tlMeta.settings.intervalMs);
+    set('tl-max', tlMeta.settings.maxShots);
+    set('tl-res', tlMeta.settings.longEdge);
+  }
+  // 別窓（?ro=1）は「見るだけ」。効かないコントロールは押せなくして悩ませない
+  ['tl-interval','tl-max','tl-res','tl-clear'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el){
+      el.disabled = AUTOSAVE_OFF || !tlMeta;
+      el.style.opacity = el.disabled ? '0.4' : '';
+      if(id === 'tl-clear') el.title = AUTOSAVE_OFF ? '別窓（参照用）では記録を消せません。本窓で操作してください' : '';
+    }
+  });
+  tlOrderHint();
+  tlRenderInfo();
+}
+async function tlPanelToggle(force){
+  const p = document.getElementById('tl-panel');
+  const show = (typeof force === 'boolean') ? force : !p.classList.contains('show');
+  p.classList.toggle('show', show);
+  if(!show){ tlPlayStop(); tlBmpDrop(); tlList = []; tlSyncTransport(); return; }
+  await tlLoadList();
+  tlIdx = Math.max(0, tlList.length - 1);
+  tlApplyPanelUI();
+  tlSyncTransport();
+  tlDrawAt(tlIdx);
+}
+async function tlSettingChanged(){
+  if(!tlMeta || AUTOSAVE_OFF) return;
+  tlMeta.settings.intervalMs = +document.getElementById('tl-interval').value || 2000;
+  tlMeta.settings.maxShots   = +document.getElementById('tl-max').value || 1500;
+  tlMeta.settings.longEdge   = +document.getElementById('tl-res').value || 1280;
+  await tlTrim();          // 上限を下げたときはその場で古いぶんを捨てる
+  await tlPutMeta();
+  if(tlPanelIsOpen()){
+    tlPlayStop();
+    await tlLoadList();
+    tlIdx = Math.max(0, Math.min(tlIdx, tlList.length - 1));
+    tlSyncTransport();
+    tlDrawAt(tlIdx);
+  }
+  tlApplyPanelUI();
+  updateTLUI();
+}
+async function tlClearAll(){
+  if(!tlMeta || AUTOSAVE_OFF) return;
+  const n = tlMeta.count;
+  const ok = await modalConfirm(`タイムラプスの記録 ${n}枚（${tlFmtBytes(tlMeta.bytes)}）をすべて消します。\n作画データ（コマ・タイムライン）は消えません。\n続行しますか？`);
+  if(!ok) return;
+  tlPlayStop();
+  await new Promise(res => {
+    try{
+      const tx = db.transaction(CFG.STORE_TL_SHOT, 'readwrite');
+      tx.objectStore(CFG.STORE_TL_SHOT).clear();
+      tx.oncomplete = () => res();
+      tx.onerror    = () => res();
+    }catch(e){ res(); }
+  });
+  tlMeta.seqHead = 0; tlMeta.seqTail = 1; tlMeta.count = 0; tlMeta.bytes = 0; tlMeta.startedAt = 0;
+  await tlPutMeta();
+  tlBmpDrop();
+  tlList = []; tlIdx = 0;
+  tlSyncTransport();
+  tlApplyPanelUI();
+  updateTLUI();
+}
+
+// ── パネルの配線 ──
+document.getElementById('tl-panel-close').addEventListener('click', () => tlPanelToggle(false));
+document.getElementById('btn-tl').addEventListener('dblclick', () => tlPanelToggle(true));
+document.getElementById('tl-open-settings').addEventListener('click', () => tlPanelToggle(true));
+document.getElementById('tl-play').addEventListener('click', () => { tlPlaying ? tlPlayStop() : tlPlayStart(); });
+document.getElementById('tl-scrub').addEventListener('input', e => { tlPlayStop(); tlSeek(+e.target.value); });
+document.querySelectorAll('.tl-fps').forEach(b => b.addEventListener('click', () => {
+  tlFps = +b.dataset.fps;
+  try{ localStorage.setItem(TL_LS_FPS, String(tlFps)); }catch(e){}
+  if(tlPlaying){ tlPlayFrom = tlIdx; tlPlayT0 = performance.now(); }
+  tlApplyPanelUI();
+}));
+document.querySelectorAll('.tl-order').forEach(b => b.addEventListener('click', () => {
+  if(tlOrder === b.dataset.order) return;
+  tlOrder = b.dataset.order;
+  try{ localStorage.setItem(TL_LS_ORDER, tlOrder); }catch(e){}
+  const wasPlaying = tlPlaying;
+  tlPlayStop();
+  tlSortList();
+  tlIdx = 0;
+  tlApplyPanelUI();
+  tlSyncTransport();
+  tlDrawAt(tlIdx);
+  if(wasPlaying) tlPlayStart();
+}));
+document.getElementById('tl-rec-toggle').addEventListener('click', () => document.getElementById('btn-tl').click());
+['tl-interval','tl-max','tl-res'].forEach(id =>
+  document.getElementById(id).addEventListener('change', tlSettingChanged));
+document.getElementById('tl-clear').addEventListener('click', tlClearAll);
+// パネルのドラッグ移動（proj-panel と同パターン）
+(function(){
+  const panel = document.getElementById('tl-panel');
+  const head = document.getElementById('tl-panel-head');
+  let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  head.addEventListener('pointerdown', e => {
+    if(e.target.id === 'tl-panel-close') return;
+    dragging = true;
+    const r = panel.getBoundingClientRect();
+    sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+    panel.style.left = ox + 'px'; panel.style.top = oy + 'px'; panel.style.right = 'auto';
+    head.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  head.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    panel.style.left = (ox + e.clientX - sx) + 'px';
+    panel.style.top = Math.max(0, oy + e.clientY - sy) + 'px';
+  });
+  head.addEventListener('pointerup', () => { dragging = false; });
+})();
+
 async function tlInit(){
   tlMimeType = tlDetectMime();
+  try{
+    const o = localStorage.getItem(TL_LS_ORDER); if(o === 'work' || o === 'cell') tlOrder = o;
+    const f = +localStorage.getItem(TL_LS_FPS);  if([6,12,24,60].includes(f)) tlFps = f;
+  }catch(e){}
   if(!db || !db.objectStoreNames.contains(CFG.STORE_TL_META)){ updateTLUI(); return; }
   const saved = await tlGetMeta();
   tlMeta = saved || { version: 1, startedAt: 0, seqHead: 0, seqTail: 1, count: 0, bytes: 0, settings: null };
@@ -7893,6 +8313,8 @@ const _setBody = document.getElementById('settings-panel-body');
 makeVResize(document.getElementById('settings-resize'), _setBody, { min:60, max:()=>panelMaxH(_setBody), snap:(h)=>sectionSnapH(_setBody, h) });
 const _refBody = document.getElementById('ref-panel-body');
 if(_refBody) makeVResize(document.getElementById('ref-resize'), _refBody, { min:60, max:()=>panelMaxH(_refBody), snap:(h)=>sectionSnapH(_refBody, h) });
+const _tlBody = document.getElementById('tl-panel-body');
+if(_tlBody) makeVResize(document.getElementById('tl-resize'), _tlBody, { min:60, max:()=>panelMaxH(_tlBody), snap:(h)=>sectionSnapH(_tlBody, h) });
 const _palEl = document.getElementById('palette');
 makeVResize(document.getElementById('palette-resize'), _palEl, { min:60, max:()=>panelMaxH(_palEl) });
 
@@ -7927,8 +8349,8 @@ window.addEventListener('keydown', e => {
   if((e.ctrlKey||e.metaKey) && (e.key === 'c' || e.key === 'C')){ e.preventDefault(); copySelectedFrames(); return; }
   if((e.ctrlKey||e.metaKey) && (e.key === 'v' || e.key === 'V')){ e.preventDefault(); pasteFramesAfterCurrent(); return; }
   if(e.ctrlKey || e.metaKey || e.altKey) return; // その他の修飾付きは無視
-  // 固定: Escape=選択解除 / Backspace=削除（Deleteの別名）
-  if(e.key === 'Escape'){ clearFrameSelection(); return; }
+  // 固定: Escape=（タイムラプス再生中ならまず停止→）選択解除 / Backspace=削除（Deleteの別名）
+  if(e.key === 'Escape'){ if(tlPlaying){ tlPlayStop(); return; } clearFrameSelection(); return; }
   if(e.key === 'Backspace'){ e.preventDefault(); SC_BY_ID.delFrame.run(); return; }
   // 可変ショートカット（keymap照合）
   const k = normKey(e);

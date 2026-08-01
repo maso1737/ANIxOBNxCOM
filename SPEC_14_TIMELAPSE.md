@@ -167,8 +167,34 @@ DB v5 マイグレーション（`tl_meta`/`tl_shot` 追加・既存データ不
 - P1 が使うキー: `tl_shot` は `seq` キーの連番、`getAllKeys()`/`openCursor` で昇順に取れる。
   `frameIdx` は撮影時の `state.currentFrame`（実測で確認済み）
 
-### P1 — アプリ内再生
+### P1 — アプリ内再生 ✅ 2026-08-01 実装済み
 TIMELAPSEパネル・プレビュー・トランスポート・**WORK/CELL 並べ替え**・情報表示・設定・CLEAR。
+
+**実装メモ**:
+- 開き方は **`TL` ボタンのWクリック**（`dblclick`。click 2回＝記録トグルが往復するので実質無害）
+  と **設定パネル → TIMELAPSE → 「TIMELAPSE パネルを開く」**（`#tl-open-settings`）の2つ
+- シンボル: `tlList`（表示順に並べ替えたショット配列）/ `tlOrder` `tlFps` `tlIdx` `tlPlaying`
+  `tlBmp`（seq→ImageBitmap のLRU・上限 `TL_BMP_MAX=240`）、
+  関数 `tlPanelIsOpen` `tlSortList` `tlLoadList` `tlListAppend` `tlBmpGet` `tlDrawAt` `tlSeek`
+  `tlSyncTransport` `tlPlayStart/Step/Stop` `tlRenderInfo` `tlApplyPanelUI` `tlPanelToggle`
+  `tlSettingChanged` `tlClearAll`
+- **並べ替えは `tlSortList()` の比較関数1つ**。CELL は `(frameIdx, seq)`、WORK は `(seq)`。
+  記録側は何も変えない＝同じ記録から2通り出る（§3のとおり）
+- **デコードは遅延**。`tlBmpGet(i)` はキャッシュにあれば同期で返し、無ければ `createImageBitmap` を
+  走らせて済んだら描き直す。再生中は `TL_PREFETCH=10` 枚先読み。前の絵を残すのでチラつかない
+- **レターボックス**：基準は先頭ショット（最小 `seq`）の縦横比 `tlAspect`。プレビューcanvasは幅480固定で
+  高さをアスペクトから決め、各ショットは contain で中央に描く（解像度が混在しても引き伸ばさない）
+- 記録中にパネルを開いたままでも古びないよう、`tlShoot()` から `tlListAppend(shot)` で1枚足す
+- 上限枚数を下げたときは `tlSettingChanged()` がその場で `tlTrim()` する
+- 別窓（`?ro=1`）は**見るだけ**（再生はできる）。記録トグル・3つのselect・CLEAR は `disabled`＋半透明にして、
+  「効かないのか壊れているのか」で悩ませない
+- ESC は **再生中ならまず停止**、そうでなければ従来どおりフレーム選択解除
+- **再生の駆動は `requestAnimationFrame`**。ブラウザ非表示時は止まる（見ていないので許容）
+
+### P2 で足すもの（このパネルに載せる）
+`EXPORT VIDEO` ボタンを RECORDING セクションの上あたりに追加し、`tlList`（＝並べ替え済み）を
+そのまま実時間で `tlDrawAt` 相当に流して `MediaRecorder` に載せる。進捗は `showExportOv()`。
+ファイル名は `timelapse_<work|cell>_<yyyymmdd-hhmm>.webm`。
 
 ### P2 — 動画書き出し
 WebM/MP4。既存 EXPORT VIDEO のパイプラインを流用。進捗＋キャンセル。

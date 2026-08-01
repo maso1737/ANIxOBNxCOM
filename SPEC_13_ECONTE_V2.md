@@ -53,7 +53,72 @@ EDITへの遷移（サムネ/クリップのダブルクリック・✎）と復
 ## 2. BOARD 強化（V2-B）
 
 1. **Ctrl+V ペースト**（PC）: `window.addEventListener('paste')` → `clipboardData.items` から
-   `image/*` を取り出し `addPhotoFromImage()`（ビュー中央へ）。STUDIO表示中のみ・入力欄フォーカス中は無視
+   `image/*` を取り出し `addPhotoFromImage()`（ビュー中央へ）。STUDIO表示中のみ・入力欄フォーカス中は無視。
+   **貼った写真への REF 紐づけは §2-1a でこの経路に同乗させる**
+
+### 2-1a. REF BOARD 連携（`photo.ref`）— 送信側は実装済み
+
+`Tools/ref-board/ref-board.html`（**移動しない**。cross-project の参照インボックスで、
+public repo である本リポジトリには入れない）側は **2026-08-01 に実装済み**。
+econte 側は「受け取って写真に貼る」だけでよい。
+
+**なぜ V2-B に同乗させるか**: 後から足すと、それまでに貼ったスクショを手で貼り直すことになる。
+フィールド1個・保存1語なのでここで入れる。
+
+#### データ（econte 側で足すのはこれだけ）
+
+```js
+// photos[] の要素に1つ追加（現行 {id,name,img,blob,x,y,w,h}）
+ref: { refId, url, svc, title, memo, tags:[] } | null
+```
+
+- `saveAll()` の `phItems` に `ref: p.ref || null` を1語追加。`loadAll()` も同様。
+  **IndexedDB のスキーマ変更は不要**（既存データは `undefined` → null 扱いで無害）
+- **`cut` 側には持たせない**。カットの参照一覧が要る場面（カラースクリプト等）は
+  `bakeRect` に重なる `photos[].ref` を**その場で集める＝導出値**。
+  SPEC_10 の「同期を作らない」原則をここでも崩さないこと
+
+#### 受信（クリップ棚）
+
+```js
+const LS_CLIP = 'refboard.clip.v1';    // 後から econte を開いた場合の受け皿
+const BC_NAME = 'refboard_live';       // 同一オリジンなら即時（tdr_live と同じ手口）
+```
+
+送られてくるペイロード（実測値・そのまま）:
+
+```json
+{ "type":"clip", "v":1, "ts":1785594954892,
+  "item":{ "refId":"ms9qq2vb79dtr",
+           "url":"https://x.com/digiusagi/status/2082983714846548072",
+           "svc":"x", "title":"ライン調整", "memo":"プラグイン", "tags":["アニメ","AE"] } }
+```
+
+- `localStorage[LS_CLIP]` にも**同じ形**（`{v,ts,item}`・`type` 無し）で残る。
+  起動時に読み、`BroadcastChannel` は開いている間の即時反映用。**両方見ること**
+- `v!==1` は無視。`ts` が **24時間以上前のものは無視**（貼り忘れの誤爆防止）
+- econte → ref-board へ返す通知（任意だが入れる）:
+  - `{type:'clip-used', v:1, ts}` … 写真に紐づけた。**ref-board 側は受信して棚を空にする実装済み**
+  - `{type:'clip-clear', v:1, ts}` … ユーザーが econte 側で解除した
+  - 受信して棚を消したときは `localStorage.removeItem(LS_CLIP)` も行う（両側で同じ状態にする）
+
+#### UI（最小）
+
+- STUDIO の BOARD 上部に細い帯: `CLIP: ライン調整 — 次に貼る画像に付けます [解除]`（クリップがある時だけ）
+- ペースト/インポートで写真が増えたら、その写真に `ref` を入れて棚を空にする（`clip-used` を送る）。
+  **複数枚を一度に貼った場合は先頭1枚だけ**に付ける
+- 選択中の写真パネルに **🔗**: `ref` があれば `window.open(ref.url)`、無ければ現在のクリップを紐づけ
+  （＝既存スクショの後付けもここで済む）
+- `ref` 付きの写真は BOARD 上で角に小さいマーカー（`--ice`）を描く。`renderBoard()` に数行
+
+#### 前提（重要）
+
+`BroadcastChannel` / `localStorage` の共有は**同一オリジンのときだけ**成立する。
+ルート CLAUDE.md の運用どおり `python -m http.server 8000` をルートで立て、
+`localhost:8000/Tools/ref-board/…` と `localhost:8000/ANIxOBNxCOM/econte.html` で開けば成立する。
+file:// 直開きでは繋がらないので、**フォールバックとして「クリップJSONを貼り付け」**を用意する
+（ref-board 側の帯にある **⧉** が同じ JSON をクリップボードへ出す。econte 側は
+IMPORT メニューあたりに `{v,ts,item}` を受け取る入口を1つ置けばよい）。
 2. **HEIC読み込み**（PC）: accept に `.heic,.heif` 追加。まず `createImageBitmap(file)` を試し
    （iPad/新Safariはネイティブで通る）、失敗したら **heic2any をCDNから遅延ロード**して
    JPEG Blobへ変換（単一HTML方針の例外はCDNのみ＝JSZipと同じ扱い）
@@ -241,7 +306,7 @@ cut.src === null（空コマ） → cam:[] / bakeRect:null
 | フェーズ | 内容 | 規模 |
 |---|---|---|
 | **V2-A** | STUDIO統合レイアウト＋フォーカス同期＋フルスクリーン＋パレット挙動変更＋TOOL左右入替＋iPadダブルタップ | 大（ただし既存部品の再配置が主） |
-| **V2-B** | BOARD強化（ペースト/HEIC/回転/モノクロ輝度/CUT枠編集/統合Undoログ） | 中 |
+| **V2-B** | BOARD強化（ペースト/HEIC/回転/モノクロ輝度/CUT枠編集/統合Undoログ）＋**REF BOARD連携 `photo.ref`（§2-1a・送信側は実装済み）** | 中 |
 | **V2-C** | baseAlphaトレース透かし＋EDITピンチズーム＋指=操作・ペン=描画＋2本指UNDO | 中 |
 | **V2-D1** | カメラ枠列 `cam[]`＋`bakeRect` 自動算出＋BOARD枠列編集UI＋`drawCamFrame`（**ベイクは1280×720のまま**） | 中 |
 | **V2-D2** | 可変ベイク解像度（`CONTE_W/H` 直参照の総点検）＋遅延デコードLRU＋サムネキャッシュ＋はみ出し警告 | 大（データ形式が変わる） |
@@ -257,6 +322,7 @@ cut.src === null（空コマ） → cam:[] / bakeRect:null
 ## 7. 変更されるSPEC_10の記述（実装時にSPEC_10へ追記すること）
 
 - 3ビュー（BOARD/SHEET/TIMELINE）→ STUDIO+EDIT の2ビューへ
+- `photos[]` に `ref`（REF BOARD の元リンク）を追加… V2-B 以降（§2-1a）
 - パレット「色選択で塗りツールへ切替」→ 切替しない（本アプリ独自仕様）
 - `cut.src`（単一矩形）→ `cut.cam[]`（カメラ枠列）＋ `cut.bakeRect`… V2-D1以降
 - `cut.durF` 手入力 → `Σ cam[].dur` の読み取り専用（FIXカットのみ直接入力）… V2-D1以降
