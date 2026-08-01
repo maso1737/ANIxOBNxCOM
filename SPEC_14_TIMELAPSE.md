@@ -145,11 +145,27 @@ ANIMATOR は多コマなので、Procreate のような単一キャンバス前�
 
 ## 8. 実装フェーズ
 
-### P0 — 記録エンジン（これ単体で「撮れている」が完成）
+### P0 — 記録エンジン（これ単体で「撮れている」が完成）✅ 2026-08-01 実装済み
 DB v5 マイグレーション（`tl_meta`/`tl_shot` 追加・既存データ不変）・`tlDirty` フック・
 `tlTick()` 撮影ループ・オフスクリーン合成・WebPエンコード・リングバッファ・
 トップバー `TL` トグル・`AUTOSAVE_OFF` ガード。
 **受け入れ**: しばらく描いて `tl_shot` に枚数が増え、上限を超えると古いものから消える。描き味は不変。
+
+**実装メモ（P1/P2 が読む前提）**:
+- シンボル: `tlMeta` / `tlDirty` / `tlLastShotAt` / `tlBusy` / `tlTimer` / `tlMimeType` / `tlCv` `tlCtx`、
+  関数 `tlDetectMime` `tlAvailable` `tlEnabled` `tlGetMeta` `tlPutMeta` `tlComposeShot` `tlTrim`
+  `tlShoot` `tlTick` `updateTLUI` `tlInit`。**`tlHistory`/`tlHistIdx`/`TL_HIST_MAX` は
+  「タイムライン履歴」で完全に別物**。grep するとき混ざるので注意
+- `tlDirty` は `markFrameDirty()` の中で立てる（`endStroke` ではない＝FILL/投げ縄も拾う）
+- 起動時 `tlInit()` の末尾で `tlDirty=false` / `tlLastShotAt=Date.now()` に落とす。
+  読込・復元中の `markFrameDirty` を編集とみなさないため（**開いただけでは撮らない**）
+- `tlShoot()` は**合成した直後**に `tlDirty=false` にする（エンコード中に入った編集は次の1枚で拾う）
+- 記録ON/OFFの正は localStorage `animator_tl_on_v1`。`tlMeta.settings.on` は起動時にそれで上書きされる
+- 別窓（`?ro=1`）はボタンが **`TL －`**（クリック無効・`setInterval` も張らない・`tl_meta` も書かない）
+- DB v5 化にあわせて `openDB()` に `onblocked` ログと `db.onversionchange → close()` を追加
+  （旧バージョンで開きっぱなしのタブがアップグレードを止めるのを避ける）
+- P1 が使うキー: `tl_shot` は `seq` キーの連番、`getAllKeys()`/`openCursor` で昇順に取れる。
+  `frameIdx` は撮影時の `state.currentFrame`（実測で確認済み）
 
 ### P1 — アプリ内再生
 TIMELAPSEパネル・プレビュー・トランスポート・**WORK/CELL 並べ替え**・情報表示・設定・CLEAR。

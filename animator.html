@@ -1340,6 +1340,7 @@ input[type=range]::-moz-range-thumb{
       <span class="sep">/</span>
       <button id="btn-send-composer" title="COMPOSERを別ウィンドウで開く（ANIMATORは開いたまま・LIVE連携）／OBANへは OBAN側の + FROM ANIMATOR から">→ COMPOSER</button>
       <button id="btn-live" title="LIVE連携（COMPOSER/OBANが開くと自動でライブ反映）。OBANへは OBAN側の + FROM ANIMATOR から">LIVE ○</button>
+      <button id="btn-tl" title="作画タイムラプス記録 ON/OFF">TL ○</button>
       <button id="btn-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
       <button id="btn-home" title="ランディングページに戻る">HOME</button>
     </div>
@@ -1710,13 +1711,17 @@ const CFG = {
   MAX_DURATION_SEC: 15,
   // IndexedDB
   DB_NAME: 'animator',
-  DB_VERSION: 4,
+  DB_VERSION: 5,
   STORE_FRAMES: 'frames',
   STORE_META:   'meta',
   STORE_REFS:   'refs',
   // スナップショット保存箱（v4〜）: メタは一覧用に軽量、本体はPROJECT_v1 JSON
   STORE_SNAP_META: 'snap_meta',
   STORE_SNAP_DATA: 'snap_data',
+  // 作画タイムラプス（v5〜・SPEC_14）: frames/meta と混ぜないための専用ストア。
+  // CLEAR が clear() 1回で済み、容量計算も tl_meta.bytes の加減算だけで完結する。
+  STORE_TL_META: 'tl_meta',   // 単一レコード key='tl'
+  STORE_TL_SHOT: 'tl_shot',   // key = seq（単調増加）
 };
 
 // ── 別窓運用（→ANM 代替動線）──
@@ -6222,8 +6227,22 @@ function openDB(){
       if(!_db.objectStoreNames.contains(CFG.STORE_SNAP_DATA)){
         _db.createObjectStore(CFG.STORE_SNAP_DATA);
       }
+      // v5: 作画タイムラプス（既存ストアには触らない＝作画データは不変）
+      if(!_db.objectStoreNames.contains(CFG.STORE_TL_META)){
+        _db.createObjectStore(CFG.STORE_TL_META);
+      }
+      if(!_db.objectStoreNames.contains(CFG.STORE_TL_SHOT)){
+        _db.createObjectStore(CFG.STORE_TL_SHOT);
+      }
     };
-    req.onsuccess = e => resolve(e.target.result);
+    // 別窓（?ro=1）運用で旧バージョンのタブが残っているとアップグレードが止まるので、
+    // 「開いている側が譲る」ようにしておく（versionchange で自分の接続を閉じる）
+    req.onblocked = () => console.warn('IndexedDB upgrade blocked: 他のANIMATORタブを閉じてください');
+    req.onsuccess = e => {
+      const _db = e.target.result;
+      _db.onversionchange = () => { try{ _db.close(); }catch(err){} };
+      resolve(_db);
+    };
     req.onerror   = e => reject(e.target.error);
   });
 }
@@ -6537,6 +6556,7 @@ function markFrameDirty(f){
   if(!f) return;
   f.dirty = true;
   state.pendingSaveFrames.add(f.id);
+  tlDirty = true;   // SPEC_14: 絵の確定点はすべてここを通る（endStrokeに付けるとFILL/投げ縄が抜ける）
   scheduleSave();
 }
 function markMetaDirty(){
@@ -6548,6 +6568,211 @@ function scheduleSave(){
   setSaveState('dirty');
   if(state.saveTimer) clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(flushSave, CFG.AUTOSAVE_DELAY);
+}
+
+// ============================================================
+// TIMELAPSE 記録エンジン (SPEC_14 P0)
+//   撮り方は1系統＝「その瞬間に表示中のコマ」をオフスクリーン合成して撮る。
+//   ショットが frameIdx を持つので、再生時に WORK(作業順)/CELL(コマ別) の2通りへ
+//   並べ替えられる（P1）。記録側では見せ方を判断しない。
+//   ※ tlHistory / tlHistIdx は「タイムライン履歴」で別物。混同しないこと。
+// ============================================================
+const TL_LS_ON = 'animator_tl_on_v1';
+const TL_DEFAULTS = { on: true, intervalMs: 2000, maxShots: 1500, longEdge: 1280, quality: 0.72 };
+const TL_POLL_MS = 500;    // rAFは裏タブで完全に止まるので使わない（setIntervalの間引きは許容）
+let tlMeta      = null;    // TL_META（key='tl' の単一レコード）
+let tlDirty     = false;   // 前回撮影以降に絵が変わったか（markFrameDirty が立てる）
+let tlLastShotAt = 0;      // 前回撮影時刻
+let tlBusy      = false;   // エンコード中は次をスキップ（描画を待たせない）
+let tlTimer     = null;
+let tlMimeType  = 'image/webp';
+let tlCv = null, tlCtx = null;
+
+// WebP対応判定は起動時に1回だけ。返さない環境は JPEG フォールバック
+function tlDetectMime(){
+  try{
+    const c = document.createElement('canvas'); c.width = c.height = 1;
+    if(c.toDataURL('image/webp').indexOf('data:image/webp') === 0) return 'image/webp';
+  }catch(e){}
+  return 'image/jpeg';
+}
+function tlAvailable(){
+  return !!(db && tlMeta && !AUTOSAVE_OFF && db.objectStoreNames.contains(CFG.STORE_TL_SHOT));
+}
+function tlEnabled(){ return tlAvailable() && !!tlMeta.settings.on; }
+
+// ── DB I/O ──
+function tlGetMeta(){
+  return new Promise(res => {
+    try{
+      const tx = db.transaction(CFG.STORE_TL_META, 'readonly');
+      const r = tx.objectStore(CFG.STORE_TL_META).get('tl');
+      r.onsuccess = () => res(r.result || null);
+      r.onerror   = () => res(null);
+    }catch(e){ res(null); }
+  });
+}
+function tlPutMeta(){
+  if(!tlAvailable()) return Promise.resolve();
+  return new Promise(res => {
+    try{
+      const tx = db.transaction(CFG.STORE_TL_META, 'readwrite');
+      tx.objectStore(CFG.STORE_TL_META).put(tlMeta, 'tl');
+      tx.oncomplete = () => res();
+      tx.onerror    = () => res();
+    }catch(e){ res(); }
+  });
+}
+
+// ── 合成（§3）──
+// bg / frame(下絵) / onion×2 / draw だけを合成する。
+// guide（解像度枠・セーフ・ミラー軸）と REF画像 / REF ANIMATOR は絶対に入れない。
+function tlComposeShot(){
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  const s = Math.min(1, tlMeta.settings.longEdge / Math.max(W, H));
+  const w = Math.max(2, Math.round(W * s)), h = Math.max(2, Math.round(H * s));
+  if(!tlCv){ tlCv = document.createElement('canvas'); tlCtx = tlCv.getContext('2d'); }
+  if(tlCv.width !== w || tlCv.height !== h){ tlCv.width = w; tlCv.height = h; }
+  const ctx = tlCtx;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(bgCanvas, 0, 0, w, h);   // 背景（bgBright反映）
+  ctx.scale(s, s);                       // 以降は作業解像度のまま描いて縮小に載せる
+  const fl = state.frameLayer;
+  if(fl.visible){
+    ctx.save();
+    ctx.globalAlpha = fl.editMode ? Math.max(0.6, fl.opacity) : fl.opacity;
+    ctx.translate(fl.x, fl.y);           // 表示と同じ transform（toFrameLocal の逆変換）
+    ctx.scale(fl.scale || 1, fl.scale || 1);
+    ctx.drawImage(frameLayerCanvas, 0, 0);
+    ctx.restore();
+  }
+  if(state.onionOn){
+    ctx.globalAlpha = 0.35;              // #onion-prev/#onion-next の CSS opacity と同値
+    ctx.drawImage(onionPrev, 0, 0);
+    ctx.drawImage(onionNext, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+  ctx.drawImage(drawCanvas, 0, 0);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return { w, h };
+}
+
+// ── リングバッファ（上限超過ぶんを seqTail から古い順に捨てる）──
+async function tlTrim(){
+  const max = tlMeta.settings.maxShots | 0;
+  if(max <= 0 || tlMeta.count <= max) return;
+  const n  = tlMeta.count - max;
+  const to = tlMeta.seqTail + n - 1;
+  let freed = 0;
+  await new Promise(res => {
+    try{
+      const tx = db.transaction(CFG.STORE_TL_SHOT, 'readwrite');
+      const cur = tx.objectStore(CFG.STORE_TL_SHOT).openCursor(IDBKeyRange.bound(tlMeta.seqTail, to));
+      cur.onsuccess = e => {
+        const c = e.target.result;
+        if(!c) return;
+        if(c.value && c.value.blob) freed += c.value.blob.size;
+        c.delete();
+        c.continue();
+      };
+      tx.oncomplete = () => res();
+      tx.onerror    = () => res();
+    }catch(e){ res(); }
+  });
+  tlMeta.seqTail = to + 1;
+  tlMeta.count   = Math.max(0, tlMeta.count - n);
+  tlMeta.bytes   = Math.max(0, tlMeta.bytes - freed);
+}
+
+async function tlShoot(){
+  const f = curFrame();
+  if(!f) return;
+  tlBusy = true;
+  try{
+    const { w, h } = tlComposeShot();
+    // 合成した瞬間の絵で「変化あり」を消す。エンコード中に入った編集は次の1枚で拾う
+    tlDirty = false;
+    tlLastShotAt = Date.now();
+    const blob = await new Promise(res => tlCv.toBlob(res, tlMimeType, tlMeta.settings.quality));
+    if(!blob) return;
+    const seq  = tlMeta.seqHead + 1;
+    const shot = { seq, t: Date.now(), frameId: f.id, frameIdx: state.currentFrame, w, h, blob };
+    await new Promise((res, rej) => {
+      const tx = db.transaction(CFG.STORE_TL_SHOT, 'readwrite');
+      tx.objectStore(CFG.STORE_TL_SHOT).put(shot, seq);
+      tx.oncomplete = () => res();
+      tx.onerror    = () => rej(tx.error);
+    });
+    tlMeta.seqHead = seq;
+    tlMeta.count  += 1;
+    tlMeta.bytes  += blob.size;
+    if(!tlMeta.startedAt) tlMeta.startedAt = shot.t;
+    await tlTrim();
+    await tlPutMeta();
+    updateTLUI();
+  }catch(e){
+    console.warn('timelapse shot failed', e);
+  }finally{
+    tlBusy = false;
+  }
+}
+
+// §4「変化があったときだけ、一定間隔」— 3条件すべてを満たしたときだけ1枚撮る
+function tlTick(){
+  if(!tlEnabled() || tlBusy) return;
+  if(!tlDirty) return;                                                   // ② 変化なし＝撮らない
+  if(drawing || lassoing) return;                                        // ③ ストローク途中は撮らない
+  if(Date.now() - tlLastShotAt < tlMeta.settings.intervalMs) return;     // ① 間隔
+  tlShoot();
+}
+
+function updateTLUI(){
+  const b = document.getElementById('btn-tl');
+  if(!b) return;
+  if(AUTOSAVE_OFF){
+    b.classList.remove('on');
+    b.textContent = 'TL －';
+    b.title = '別窓（参照用）ではタイムラプスを記録しません（本窓の記録に混ざるため）';
+    return;
+  }
+  const on = tlEnabled();
+  b.classList.toggle('on', on);
+  b.textContent = on ? 'TL ●' : 'TL ○';
+  const n  = tlMeta ? tlMeta.count : 0;
+  const mb = tlMeta ? (tlMeta.bytes / 1048576).toFixed(1) : '0.0';
+  b.title = (on ? '作画タイムラプス記録中' : '作画タイムラプス記録OFF')
+    + `（${n}枚 · ${mb}MB / 上限${tlMeta ? tlMeta.settings.maxShots : TL_DEFAULTS.maxShots}枚）`
+    + '\nクリックでON/OFF。OFFにしても既存の記録は消えません';
+}
+
+document.getElementById('btn-tl').addEventListener('click', () => {
+  if(AUTOSAVE_OFF || !tlMeta) return;
+  tlMeta.settings.on = !tlMeta.settings.on;
+  try{ localStorage.setItem(TL_LS_ON, tlMeta.settings.on ? '1' : '0'); }catch(e){}
+  tlPutMeta();
+  updateTLUI();
+});
+
+async function tlInit(){
+  tlMimeType = tlDetectMime();
+  if(!db || !db.objectStoreNames.contains(CFG.STORE_TL_META)){ updateTLUI(); return; }
+  const saved = await tlGetMeta();
+  tlMeta = saved || { version: 1, startedAt: 0, seqHead: 0, seqTail: 1, count: 0, bytes: 0, settings: null };
+  tlMeta.settings = Object.assign({}, TL_DEFAULTS, tlMeta.settings || {});
+  // 記録ON/OFFの正は localStorage（既定ON）。トグルはブラウザ単位で覚える
+  let ls = null;
+  try{ ls = localStorage.getItem(TL_LS_ON); }catch(e){}
+  tlMeta.settings.on = (ls === null) ? true : (ls === '1');
+  if(AUTOSAVE_OFF){ updateTLUI(); return; }   // §4: 別窓では記録もメタ書き込みもしない
+  await tlPutMeta();
+  // 読込・復元中の markFrameDirty で立った分は編集ではないので捨てる（開いただけで撮らない）
+  tlDirty = false;
+  tlLastShotAt = Date.now();
+  if(tlTimer) clearInterval(tlTimer);
+  tlTimer = setInterval(tlTick, TL_POLL_MS);
+  updateTLUI();
 }
 
 // ============================================================
@@ -7798,6 +8023,7 @@ window.addEventListener('resize', () => {
   resetGlobalHistory(); // 起動直後はUndo対象なし（基準のみ）
   setupLiveSync();      // COMPOSERとのライブ連携（BroadcastChannel）
   updateLiveUI();
+  await tlInit();       // 作画タイムラプス記録エンジン（SPEC_14・既定ON / 別窓は記録しない）
   updateResLabel();     // 読込後の作業キャンバスサイズをラベルに反映
   fitToStage();         // 復元サイズに合わせて再フィット（applyZoom内でrenderGuides/renderRefImgも実行）
   applyGuideUI();
