@@ -467,10 +467,12 @@ html,body{
 #tl-scrub{flex:1;min-width:0;height:3px;accent-color:var(--acid);cursor:pointer;}
 #tl-pos{font-size:8px;color:rgba(255,255,255,0.5);min-width:62px;text-align:right;letter-spacing:0.05em;}
 #tl-panel select{
-  background:rgba(255,255,255,0.05);border:1px solid var(--border);
+  background:#241041;border:1px solid var(--border);
   color:rgba(255,255,255,0.85);font-family:var(--mono);font-size:9px;
   padding:3px 4px;letter-spacing:0.04em;
 }
+/* ドロップダウンで開く一覧はOS側の白背景を引き継ぐので、明示的に暗色を指定する */
+#tl-panel select option{background:#241041;color:rgba(255,255,255,0.9);}
 #snap-name{
   flex:1;min-width:0;background:rgba(255,255,255,0.05);
   border:1px solid var(--border);color:#fff;
@@ -1742,7 +1744,8 @@ input[type=range]::-moz-range-thumb{
         <button class="sc-key tl-order" data-order="cell" style="min-width:66px;">CELL</button>
       </div>
       <div class="sc-hint" id="tl-order-hint"></div>
-      <div class="sc-hint" id="tl-info" style="margin-bottom:0;"></div>
+      <div class="sc-hint" id="tl-info"></div>
+      <button id="tl-export" class="ref-btn" style="width:100%;padding:5px 0;">EXPORT VIDEO（並べ替えたとおりに書き出し）</button>
     </div>
     <div class="ref-sect">
       <div class="ref-sect-h">RECORDING</div>
@@ -6963,7 +6966,7 @@ function tlDrawAt(i){
   if(cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
   const bmp = tlBmpGet(i);
   if(!bmp) return;   // デコード待ち。前の絵を残す（チラつかせない）
-  tlPvCtx.fillStyle = '#000';
+  tlPvCtx.fillStyle = '#fff';   // 帯の色は書き出し(tlExportVideo)と揃える＝紙の白
   tlPvCtx.fillRect(0, 0, W, H);
   // レターボックス（contain）。解像度が混在しても引き伸ばさない
   const s = Math.min(W / bmp.width, H / bmp.height);
@@ -6987,6 +6990,12 @@ function tlSyncTransport(){
   if(pos) pos.textContent = n ? `${tlIdx + 1} / ${n}` : '0 / 0';
   if(play){ play.textContent = tlPlaying ? '■' : '▶'; play.disabled = !n; play.classList.toggle('on', tlPlaying); }
   if(stg) stg.classList.toggle('empty', !n);
+  const exp = document.getElementById('tl-export');
+  if(exp){
+    exp.disabled = !n;
+    exp.style.opacity = n ? '' : '0.4';
+    exp.title = n ? `いま選んでいる並べ替え（${tlOrder === 'cell' ? 'CELL' : 'WORK'}）と FPS(${tlFps}) のまま書き出します` : '記録がありません';
+  }
 }
 function tlPlayStep(){
   if(!tlPlaying) return;
@@ -7098,6 +7107,90 @@ async function tlSettingChanged(){
   tlApplyPanelUI();
   updateTLUI();
 }
+// ── 動画書き出し（SPEC_14 P2）──
+// 既存 exportVideo() と同じ実時間レンダリング。並べ替え（WORK/CELL）はそのまま映像の順序になる。
+async function tlExportVideo(){
+  if(!tlList.length){ await modalAlert('書き出す記録がありません'); return; }
+  const mime = pickVideoMime();
+  if(!mime){ await modalAlert('このブラウザは動画書き出し(MediaRecorder)に未対応です'); return; }
+  const n = tlList.length;
+  const secs = (n / tlFps).toFixed(1);
+  const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+  const orderName = tlOrder === 'cell' ? 'CELL（コマ別）' : 'WORK（作業順）';
+  const ok = await modalConfirm(`タイムラプス ${n}枚を ${orderName} の順で ${ext.toUpperCase()} に書き出します（${tlFps}fps・約${secs}秒）。\n実時間レンダリングのため約${secs}秒かかります。続行しますか？`);
+  if(!ok) return;
+  tlPlayStop();
+
+  // 出力サイズは先頭ショット基準。混在解像度はレターボックスで収める（引き伸ばさない）
+  const base = tlList.reduce((a, b) => (a.seq <= b.seq ? a : b));
+  const W = base.w || 1280, H = base.h || Math.round(W / (tlAspect || 16 / 9));
+  const ex = document.createElement('canvas'); ex.width = W; ex.height = H;
+  const exCtx = ex.getContext('2d');
+
+  showExportOv('EXPORTING TIMELAPSE (' + ext.toUpperCase() + ')');
+  // 実時間レンダリングでデコード待ちにならないよう、先頭ぶんを先に用意しておく
+  setExportOv(0, 'デコード準備中…');
+  for(let i = 0; i < Math.min(n, TL_BMP_MAX); i++){
+    if(gExportCancel) break;
+    tlBmpGet(i);
+  }
+  await new Promise(r => setTimeout(r, 400));
+
+  let last = null;
+  const drawIdx = (i) => {
+    const bmp = tlBmpGet(i) || last;
+    if(!bmp) return;
+    last = bmp;
+    exCtx.fillStyle = '#fff';
+    exCtx.fillRect(0, 0, W, H);
+    const s = Math.min(W / bmp.width, H / bmp.height);
+    const dw = bmp.width * s, dh = bmp.height * s;
+    exCtx.drawImage(bmp, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  };
+
+  const stream = ex.captureStream(tlFps);
+  let rec;
+  try{ rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12000000 }); }
+  catch(e){ hideExportOv(); await modalAlert('MediaRecorderの初期化に失敗しました: ' + e.message); return; }
+  const chunks = [];
+  rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+  const recStopped = new Promise(res => { rec.onstop = res; });
+
+  drawIdx(0);
+  rec.start(1000);
+  const t0 = performance.now();
+  const tickMs = 1000 / tlFps;
+  const totalMs = n * tickMs;
+  let canceled = false;
+  await new Promise(res => {
+    const step = () => {
+      if(gExportCancel){ canceled = true; res(); return; }
+      const elapsed = performance.now() - t0;
+      const i = Math.min(n - 1, Math.floor(elapsed / tickMs));
+      drawIdx(i);                                      // 同じ枚でも描き直してストリームへ確実に流す
+      for(let k = 1; k <= TL_PREFETCH * 2; k++) tlBmpGet(Math.min(n - 1, i + k));
+      setExportOv((i + 1) / n * 100, `${i + 1} / ${n}`);
+      if(elapsed >= totalMs){ res(); return; }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+  rec.stop();
+  await recStopped;
+  hideExportOv();
+  if(canceled || chunks.length === 0) return;
+  const blob = new Blob(chunks, { type: mime.split(';')[0] });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date();
+  const p = v => String(v).padStart(2, '0');
+  const ts = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+  a.href = url;
+  a.download = `timelapse_${tlOrder}_${ts}.${ext}`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function tlClearAll(){
   if(!tlMeta || AUTOSAVE_OFF) return;
   const n = tlMeta.count;
@@ -7132,6 +7225,7 @@ document.querySelectorAll('.tl-fps').forEach(b => b.addEventListener('click', ()
   try{ localStorage.setItem(TL_LS_FPS, String(tlFps)); }catch(e){}
   if(tlPlaying){ tlPlayFrom = tlIdx; tlPlayT0 = performance.now(); }
   tlApplyPanelUI();
+  tlSyncTransport();
 }));
 document.querySelectorAll('.tl-order').forEach(b => b.addEventListener('click', () => {
   if(tlOrder === b.dataset.order) return;
@@ -7150,6 +7244,7 @@ document.getElementById('tl-rec-toggle').addEventListener('click', () => documen
 ['tl-interval','tl-max','tl-res'].forEach(id =>
   document.getElementById(id).addEventListener('change', tlSettingChanged));
 document.getElementById('tl-clear').addEventListener('click', tlClearAll);
+document.getElementById('tl-export').addEventListener('click', tlExportVideo);
 // パネルのドラッグ移動（proj-panel と同パターン）
 (function(){
   const panel = document.getElementById('tl-panel');

@@ -196,8 +196,22 @@ TIMELAPSEパネル・プレビュー・トランスポート・**WORK/CELL 並�
 そのまま実時間で `tlDrawAt` 相当に流して `MediaRecorder` に載せる。進捗は `showExportOv()`。
 ファイル名は `timelapse_<work|cell>_<yyyymmdd-hhmm>.webm`。
 
-### P2 — 動画書き出し
+### P2 — 動画書き出し ✅ 2026-08-01 実装済み
 WebM/MP4。既存 EXPORT VIDEO のパイプラインを流用。進捗＋キャンセル。
+
+**実装メモ**:
+- `tlExportVideo()`（PLAYBACKセクションの `#tl-export` ボタン）。**いま画面で選んでいる並べ替えと FPS が
+  そのまま映像になる**＝プレビューで確認してから押す動線。記録0枚のときは `disabled`＋半透明
+- 出力サイズは**先頭ショット（最小 `seq`）の w/h**。混在解像度は contain で中央に置き、
+  余白は**白**（＝紙の白。プレビューの帯色も揃えてある）
+- 実時間レンダリング直前に先頭 `TL_BMP_MAX` 枚のデコードを先に走らせ、ループ中も `TL_PREFETCH*2` 枚先読み。
+  間に合わなかったフレームは**直前の絵を保持**する（黒コマを出さない）
+- 進捗は `showExportOv()`/`setExportOv()`、キャンセルは `gExportCancel`（既存と共通）
+- ファイル名 `timelapse_<work|cell>_<yyyymmdd-hhmm>.<webm|mp4>`（`pickVideoMime()` の結果で拡張子が決まる）
+
+> **検証時の注意**: ブラウザが非表示・非コンポジット状態だと `canvas.captureStream()` がフレームを
+> 出さず、尺が極端に短い動画になる。これは**既存の `exportVideo()` でも同じ**（対照実験で確認済み）。
+> 自動検証で尺を測るときは、この制約を織り込むこと。
 
 ### P3（任意・将来）
 区間トリム（不要な冒頭・末尾を捨てる）/「コマ完成時だけ1枚」の間引きモード。

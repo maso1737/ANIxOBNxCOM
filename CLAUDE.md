@@ -29,7 +29,7 @@
 - `SPEC_10_ECONTE.md` — プリプロツール仕様（cuts[]単一データ・BOARD/SHEET/TIMELINE設計。P0+P1実装済み、P2=animator連携/カラースクリプト）
 - `SPEC_13_ECONTE_V2.md` — ECONTE V2「STUDIO」仕様（1画面統合・BOARD強化・**大判カメラ枠列＋可変ベイク**・MP4書き出し・カラースクリプト・iPad操作。V2-A〜D3未着手）。※§5は2026-07に差し替え済み（旧「のりしろ1.2x固定＋カメラプリセット」は廃止）
 - `SPEC_11_COMPOSER_POLISH.md` — COMPOSER磨き込み仕様（**P0〜P6 すべて実装済み**。残タスクなし）
-- `SPEC_14_TIMELAPSE.md` — ANIMATOR 作画タイムラプス仕様（自動記録・専用ストア tl_shot・リングバッファ・**WORK/CELL 2通りの見せ方**・WebM書き出し。**P0=記録エンジン・P1=アプリ内再生パネル 実装済み / 残るは P2=動画書き出しのみ**）
+- `SPEC_14_TIMELAPSE.md` — ANIMATOR 作画タイムラプス仕様（自動記録・専用ストア tl_shot・リングバッファ・**WORK/CELL 2通りの見せ方**・WebM書き出し。**P0〜P2 すべて実装済み。残タスクなし**（P3=区間トリム等は任意・将来））
 - `SPEC_12_PARALLAX_TAKE_BRIDGE.md` — PARALLAX_LAB×OBAN TAKEブリッジ仕様（TAKE JSONを貼ると3流儀で同一カメラワークを再生＝差分検証機。**実装先は `LP_motion-graphics/PARALLAX_LAB/`**、本リポジトリ側はTAKE形式互換の意識のみ。P0/P1/P2未着手）
 
 GitHub: https://github.com/maso1737/animation-paint
