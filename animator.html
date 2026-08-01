@@ -440,7 +440,7 @@ html,body{
 }
 #snap-name:focus{outline:none;border-color:var(--acid);}
 .snap-item{
-  display:flex;align-items:center;gap:6px;
+  display:flex;align-items:center;gap:4px;
   padding:6px 4px;border-bottom:1px solid rgba(255,255,255,0.06);
 }
 .snap-info{flex:1;min-width:0;}
@@ -448,8 +448,8 @@ html,body{
 .snap-sub{font-size:8px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;margin-top:2px;}
 .snap-btn{
   background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.6);
-  font-family:var(--mono);font-size:9px;padding:3px 7px;cursor:pointer;border-radius:2px;
-  min-height:26px;
+  font-family:var(--mono);font-size:9px;padding:3px 5px;cursor:pointer;border-radius:2px;
+  min-height:26px;white-space:nowrap;
 }
 .snap-btn:hover{border-color:var(--acid);color:var(--acid);}
 .snap-btn.danger:hover{border-color:#ff5555;color:#ff5555;}
@@ -712,6 +712,33 @@ input[type=range]::-moz-range-thumb{
   line-height:1.6;
   margin-bottom:20px;
   font-family:var(--jp);
+  white-space:pre-line; /* メッセージ中の \n を改行として出す（textContent代入のため） */
+}
+.modal-box.wide{max-width:560px;}
+/* 選択リスト付きモーダル（+ FROM SAVED 等）。項目が多いときは内部スクロール */
+#modal-list{
+  display:none;
+  max-height:46vh;overflow-y:auto;
+  border:1px solid var(--border);
+  margin-bottom:16px;
+}
+.modal-list-item{
+  display:block;width:100%;text-align:left;
+  background:transparent;border:0;border-bottom:1px solid var(--border);
+  padding:8px 10px;cursor:pointer;
+  transition:background 0.15s;
+}
+.modal-list-item:last-child{border-bottom:0;}
+.modal-list-item:hover{background:rgba(255,79,168,0.1);}
+.mli-t{
+  display:block;
+  font-family:var(--jp);font-size:12px;color:var(--white);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.mli-s{
+  display:block;margin-top:2px;
+  font-family:var(--mono);font-size:9px;letter-spacing:0.08em;
+  color:rgba(255,255,255,0.45);
 }
 .modal-btns{
   display:flex;gap:8px;justify-content:flex-end;
@@ -1191,6 +1218,8 @@ input[type=range]::-moz-range-thumb{
 #bottombar .save-state.saved{color:rgba(255,79,168,0.6);}
 #bottombar .save-state.dirty{color:var(--neon);}
 #bottombar .save-state.saving{color:rgba(255,255,255,0.6);}
+/* ?ro=1 で開いた別窓：自動保存しないことを常時明示する */
+#bottombar .save-state.manual{color:#ffb347;text-shadow:0 0 6px rgba(255,179,71,0.5);}
 
 /* タッチ最適化 */
 @media (pointer:coarse){
@@ -1648,8 +1677,9 @@ input[type=range]::-moz-range-thumb{
 
 <!-- MODAL DIALOG -->
 <div id="modal-overlay">
-  <div class="modal-box">
+  <div class="modal-box" id="modal-box">
     <div class="modal-msg" id="modal-msg"></div>
+    <div id="modal-list"></div>
     <div class="modal-btns" id="modal-btns"></div>
   </div>
 </div>
@@ -1688,6 +1718,13 @@ const CFG = {
   STORE_SNAP_META: 'snap_meta',
   STORE_SNAP_DATA: 'snap_data',
 };
+
+// ── 別窓運用（→ANM 代替動線）──
+// autosave は DB_NAME:'animator' の frames/meta ストア「1組だけ」を使う設計で、projectIdごとの
+// 分離が無い。ANIMATORを2窓開くと両方が同じストアへ書き込み、後から保存した窓が相手の作業を潰す。
+// そこで PROJ の「別窓」から開いた窓は ?ro=1 を付け、その窓の自動保存を止める（＝閲覧・手動保存のみ）。
+// 残したいときは PROJ の ＋保存（スナップショット＝別キー）か EXPORT JSON を使う。
+const AUTOSAVE_OFF = new URLSearchParams(location.search).get('ro') === '1';
 
 // 48色パレット (アニメ塗りでよく使う系統)
 const PALETTE_48 = [
@@ -1842,12 +1879,30 @@ function updateInkSwatches(){
 // MODAL DIALOG (confirm/alertの代替)
 // iPadのHTMLビューアアプリで confirm() がブロックされる対策
 // ============================================================
-function showModal({msg, buttons}){
+// list を渡すとメッセージの下に選択リストを出す（項目クリックでその value を resolve）
+function showModal({msg, buttons, list}){
   return new Promise(resolve => {
     const overlay = document.getElementById('modal-overlay');
     const msgEl = document.getElementById('modal-msg');
+    const listEl = document.getElementById('modal-list');
     const btnsEl = document.getElementById('modal-btns');
     msgEl.textContent = msg;
+    const items = list || [];
+    document.getElementById('modal-box').classList.toggle('wide', items.length > 0);
+    listEl.style.display = items.length ? 'block' : 'none';
+    listEl.innerHTML = '';
+    items.forEach(it => {
+      const row = document.createElement('button');
+      row.className = 'modal-list-item';
+      const t = document.createElement('span'); t.className = 'mli-t'; t.textContent = it.label;
+      const s = document.createElement('span'); s.className = 'mli-s'; s.textContent = it.sub || '';
+      row.append(t, s);
+      row.addEventListener('click', () => {
+        overlay.classList.remove('show');
+        resolve(it.value);
+      });
+      listEl.appendChild(row);
+    });
     btnsEl.innerHTML = '';
     buttons.forEach(b => {
       const btn = document.createElement('button');
@@ -2325,6 +2380,7 @@ async function exGetAll(){
 // ── REF 永続化 (IndexedDB STORE_REFS) ──
 let _refSaveTimer = null;
 function saveRefs(){
+  if(AUTOSAVE_OFF) return; // refs も本窓と共用の単一レコードなので別窓からは書かない
   clearTimeout(_refSaveTimer);
   _refSaveTimer = setTimeout(async () => {
     if(!db) return;
@@ -2417,24 +2473,46 @@ document.getElementById('ref-json-input').addEventListener('change', async e => 
     catch(err){ modalAlert('連番PNG読み込み失敗: ' + (err.message||err)); }
   }
 });
+// + FROM SAVED: PROJECTS保存箱（snap_meta）と共有DB（tdr_exchange）の両方を候補にする。
+// 共有DBだけだと「→ COMPOSER を一度も押していない＝常に空」で使い道が分からないため。
 document.getElementById('ref-add-saved').addEventListener('click', async () => {
-  const all = await exGetAll();
   const mine = state.projectId;
-  const cands = all.filter(rec => rec && rec.projectId !== mine && Array.isArray(rec.cells) && rec.cells.length);
-  if(!cands.length){ modalAlert('共有DBに利用できるプロジェクトがありません'); return; }
+  const [snaps, exAll] = await Promise.all([
+    snapList().catch(() => []),
+    exGetAll(),
+  ]);
+  const items = [];
+  for(const m of snaps){
+    items.push({
+      label: m.name,
+      sub: `保存箱 · ${fmtWhen(m.savedAt)} · ${m.cellCount}コマ · ${m.width}×${m.height}`,
+      value: { kind:'snap', id:m.id, name:m.name },
+    });
+  }
+  for(const rec of exAll){
+    if(!rec || !Array.isArray(rec.cells) || !rec.cells.length) continue;
+    if(rec.projectId === mine) continue;
+    const when = rec.exportedAt ? fmtWhen(Date.parse(rec.exportedAt)) : '';
+    items.push({
+      label: String(rec.name || rec.projectId || 'SHARED'),
+      sub: `共有DB · ${when} · ${rec.cellCount || rec.cells.length}コマ · ${rec.width}×${rec.height}`,
+      value: { kind:'ex', rec },
+    });
+  }
+  if(!items.length){
+    await modalAlert('参照に追加できるプロジェクトがありません。\n\nPROJ で現在の作業を保存するか、→ COMPOSER を一度押すと候補に出ます。\nファイルから足す場合は + JSON / PNG をどうぞ。');
+    return;
+  }
   const pick = await showModal({
-    msg: '参照に追加するプロジェクトを選択',
-    buttons: [
-      ...cands.slice(0, 6).map(rec => ({
-        label: (String(rec.projectId||'').slice(0,10)) + ' · ' + (rec.cellCount||rec.cells.length) + 'cell',
-        value: rec.projectId,
-      })),
-      { label: 'CANCEL', value: null },
-    ],
+    msg: '参照に追加するプロジェクト',
+    list: items,
+    buttons: [{ label: 'CANCEL', value: null }],
   });
   if(!pick) return;
-  const rec = cands.find(c => c.projectId === pick);
-  if(rec) await addRefAnimator(rec, 'SAVED');
+  if(pick.kind === 'ex'){ await addRefAnimator(pick.rec, 'SAVED'); return; }
+  const json = await snapGetData(pick.id);
+  if(!json){ await modalAlert('スナップショットのデータが見つかりませんでした'); return; }
+  await addRefAnimator(json, pick.name);
 });
 
 // パネルのドラッグ移動
@@ -6153,6 +6231,7 @@ function openDB(){
 // dirtyフレームだけを差分保存
 async function flushSave(){
   if(!db) return;
+  if(AUTOSAVE_OFF){ setSaveState('manual'); return; } // 別窓は frames/meta を書かない
   setSaveState('saving');
   try{
     // カレントフレームの最新内容を取り込む
@@ -6445,6 +6524,12 @@ async function loadProject(){
 
 function setSaveState(s){
   const el = document.getElementById('save-state');
+  if(AUTOSAVE_OFF){
+    el.className = 'save-state manual';
+    el.textContent = 'AUTOSAVE OFF';
+    el.title = '別窓（参照用）のため自動保存しません。残すときは PROJ の ＋保存 か EXPORT JSON を使ってください';
+    return;
+  }
   el.className = 'save-state ' + s;
   el.textContent = s.toUpperCase();
 }
@@ -6459,6 +6544,7 @@ function markMetaDirty(){
   scheduleSave();
 }
 function scheduleSave(){
+  if(AUTOSAVE_OFF){ setSaveState('manual'); return; } // 別窓は書かない（本窓のautosaveを守る）
   setSaveState('dirty');
   if(state.saveTimer) clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(flushSave, CFG.AUTOSAVE_DELAY);
@@ -7346,6 +7432,12 @@ function fmtBytes(n){
   if(n >= 1024) return Math.round(n / 1024) + 'KB';
   return n + 'B';
 }
+function fmtWhen(ts){
+  if(!ts) return '';
+  const d = new Date(ts);
+  if(isNaN(d)) return '';
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
 // ブラウザのストレージ使用量/上限を表示（対応ブラウザのみ）
 async function updateStorageInfo(){
   const el = document.getElementById('snap-storage');
@@ -7374,14 +7466,14 @@ async function renderSnapList(){
   for(const m of items){
     const row = document.createElement('div');
     row.className = 'snap-item';
-    const d = new Date(m.savedAt);
-    const when = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const when = fmtWhen(m.savedAt);
     row.innerHTML = `
       <div class="snap-info">
         <div class="snap-title"></div>
         <div class="snap-sub">${when} · ${m.cellCount}コマ · ${m.width}×${m.height} · ${fmtBytes(m.bytes||0)}</div>
       </div>
       <button class="snap-btn" data-act="open">開く</button>
+      <button class="snap-btn" data-act="win" title="別ウィンドウで開く（この窓の作業はそのまま／別窓は自動保存OFF＝閲覧・手描き確認用）">別窓</button>
       <button class="snap-btn" data-act="dup" title="スナップショットを複製">複製</button>
       <button class="snap-btn danger" data-act="del">削除</button>`;
     row.querySelector('.snap-title').textContent = m.name; // XSS防止のためtextContentで
@@ -7394,6 +7486,17 @@ async function renderSnapList(){
         await applyProjectJSON(json);
         toggleProjPanel(false);
       }catch(e){ await modalAlert('復元に失敗しました: ' + e.message); }
+    });
+    // → ANM 代替動線: 別ANIMATORを別ウィンドウで開く（→ COMPOSER と同じ window.open 方式）。
+    // ?ro=1 で開くので、この窓が本窓の autosave を上書きする事故は起きない。
+    row.querySelector('[data-act="win"]').addEventListener('click', async () => {
+      const url = `animator.html?snap=${encodeURIComponent(m.id)}&ro=1`;
+      const sw = screen.availWidth || window.innerWidth;
+      const sh = screen.availHeight || window.innerHeight;
+      const w = Math.floor(sw / 2);
+      const win = window.open(url, 'tdr_anim_' + m.id, `width=${w},height=${sh},left=${sw - w},top=0`);
+      if(!win){ await modalAlert('別ウィンドウを開けませんでした。\nブラウザのポップアップ許可が必要です。'); return; }
+      try{ win.focus(); }catch(e){}
     });
     row.querySelector('[data-act="dup"]').addEventListener('click', async () => {
       try{ await snapDuplicate(m.id); renderSnapList(); }
@@ -7643,7 +7746,17 @@ window.addEventListener('resize', () => {
         }
       }catch(e){ console.warn('exchange load failed', e); }
     }
-    if(!loadedFromExchange){
+    // ?snap=<id> は PROJ「別窓」から開かれた窓。保存箱のスナップショットを読む
+    // （?ro=1 が併走するので、この窓は autosave しない＝本窓の作業を潰さない）
+    const urlSnap = new URLSearchParams(location.search).get('snap');
+    let loadedFromSnap = false;
+    if(urlSnap){
+      try{
+        const json = await snapGetData(urlSnap);
+        if(json){ await applyProjectJSON(json); loadedFromSnap = true; }
+      }catch(e){ console.warn('snapshot load failed', e); }
+    }
+    if(!loadedFromExchange && !loadedFromSnap){
       const loaded = await loadProject();
       if(!loaded){
         state.frames = [createBlankFrame()];

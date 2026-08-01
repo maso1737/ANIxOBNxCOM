@@ -169,6 +169,16 @@ body.dragover #drop{outline:2px dashed var(--acid);outline-offset:-24px}
   padding:8px 16px;font-size:9px;letter-spacing:.18em;font-family:var(--mono);
 }
 
+/* ---------- confirm modal（native confirm の置き換え） ---------- */
+#cf-modal{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.7)}
+#cf-modal.show{display:flex}
+#cf-box{border:1px solid var(--acid);background:rgba(16,7,34,.98);box-shadow:0 0 24px rgba(255,79,168,.2);
+  min-width:280px;max-width:420px;padding:20px}
+#cf-msg{font-family:var(--jp);font-size:12px;color:var(--white);line-height:1.7;white-space:pre-line;margin-bottom:18px}
+#cf-btns{display:flex;gap:8px;justify-content:flex-end}
+#cf-ok{border-color:var(--acid);color:var(--acid)}
+#cf-ok:hover{background:rgba(255,79,168,.12)}
+
 /* ---------- SATSUEI FX modal (V2-C — 撮影系=琥珀/amber) ---------- */
 #fx-modal{
   position:fixed;right:14px;top:88px;width:min(340px,34vw);z-index:70;display:none;
@@ -328,6 +338,17 @@ body.cleanview{cursor:none}
 </div>
 
 <div id="toast"></div>
+
+<!-- ==================== CONFIRM MODAL ==================== -->
+<div id="cf-modal">
+  <div id="cf-box">
+    <div id="cf-msg"></div>
+    <div id="cf-btns">
+      <button class="btn" id="cf-cancel">CANCEL</button>
+      <button class="btn" id="cf-ok">OK</button>
+    </div>
+  </div>
+</div>
 
 <!-- ==================== SATSUEI FX MODAL (V2-C / SPEC_06 P2) ==================== -->
 <div id="fx-modal">
@@ -924,6 +945,30 @@ function load(){
   }catch(e){}
 }
 function toast(msg){const t=$('#toast');t.textContent=msg;t.style.display='block';toastT=4;}
+
+// アプリ内confirm（native confirm 禁止の規律。Enter=OK / Esc=CANCEL）。
+// 開いている間はキーをcaptureで飲み、背後のショートカットを発火させない。
+function modalConfirm(msg){
+  return new Promise(res=>{
+    const ov=$('#cf-modal');
+    $('#cf-msg').textContent=msg;
+    const done=v=>{
+      ov.classList.remove('show');
+      document.removeEventListener('keydown',onKey,true);
+      res(v);
+    };
+    const onKey=e=>{
+      e.stopPropagation();
+      if(e.key==='Escape'){e.preventDefault();done(false);}
+      else if(e.key==='Enter'){e.preventDefault();done(true);}
+    };
+    $('#cf-ok').onclick=()=>done(true);
+    $('#cf-cancel').onclick=()=>done(false);
+    document.addEventListener('keydown',onKey,true);
+    ov.classList.add('show');
+    $('#cf-ok').focus();
+  });
+}
 
 /* ---------- panels ---------- */
 function loadImg(f){
@@ -2193,8 +2238,8 @@ $('#set-close').addEventListener('click',()=>toggleSetModal(false));
   document.addEventListener('fullscreenchange',sync);
   document.addEventListener('webkitfullscreenchange',sync);
 })();
-$('#b-clear').addEventListener('click',()=>{
-  if(!confirm('プロジェクトを空にします。よろしいですか？'))return;
+$('#b-clear').addEventListener('click',async()=>{
+  if(!await modalConfirm('プロジェクトを空にします。よろしいですか？'))return;
   PROJECT=migrate({version:2,name:'oban',panels:[],frames:[],take:{version:1,name:'take-A',kf:[]}});
   ctxFrame=null;maskEdit.on=false;maskEdit.f=null;selKf=-1;
   sel=null;renderChip();renderCrumb();rebuild();$('#drop').classList.remove('hide');
@@ -2567,12 +2612,12 @@ function frame(nowMs){
 requestAnimationFrame(frame);
 ${S}</body></html>`;
 }
-$('#b-export').addEventListener('click',()=>{
+$('#b-export').addEventListener('click',async()=>{
   if(!PROJECT.panels.length){toast('パネルがありません — まず画像をドロップ');return;}
   if(!PROJECT.take.kf.length){toast('TAKEが空です — 2.TAKE で C=CAPTURE してから書き出し');return;}
   const apb=apBakeData();   // SPEC_07 B2: ap-seqをビューアへ同梱
   const mb=apb.bytes/1048576;
-  if(mb>50&&!confirm('ANIMATORベイクが約'+mb.toFixed(0)+'MBになります。書き出しを続けますか？'))return;
+  if(mb>50&&!await modalConfirm('ANIMATORベイクが約'+mb.toFixed(0)+'MBになります。書き出しを続けますか？'))return;
   const blob=new Blob([viewerHTML(apb.bake)],{type:'text/html'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);

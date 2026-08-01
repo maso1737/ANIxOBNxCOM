@@ -127,5 +127,7 @@ Node構文チェック＋DOMスタブスモーク済み。ビューアはテン�
 ## 制限（v1スコープ / SPEC_01 §5どおり）
 
 - 音・テキスト組版・モバイルなし（連番はV2-Bのファイルseq＋SPEC_07のANIMATOR直結で対応済み）
-- CLEARはnative confirm（modalConfirm化はTODO）
+- ~~CLEARはnative confirm~~ → **2026-07-27 modalConfirm化済み**。`modalConfirm(msg)`（`#cf-modal`）を追加し、
+  CLEAR とEXPORTの「ベイク50MB超」確認の2箇所を置き換え。Enter=OK / Esc=CANCEL、開いている間は
+  keydown を capture で飲んで背後のショートカット（`1`/`2`/`C` 等）を発火させない
 - ビューアはビルダーのコード複製（共有ライブラリ化しない方針どおり）。テンプレートを変えたら両方のスモークを回すこと

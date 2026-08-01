@@ -26,16 +26,41 @@ _新チャット冒頭にこのファイルを貼り付けてください_
 
 ### 未着手・次チャット候補
 
-**すぐできる（小〜中）**
-- **→ANM 代替動線**：別ANIMATORを安全に別ウィンドウで開く（→COMPOSERと同方式）。現状は IMPORT JSON で手動。
-
 **中規模フェーズ**
-- **INDEX ページにANIMATOR一覧**：IndexedDB のプロジェクト一覧を index.html に表示し、開く/REF参照に追加できる動線。`+ FROM SAVED` の使いにくさを解消する（→「FROM SAVED について」参照）。
 - **ANIMATOR↔COMPOSER 複数窓LIVE管理**：複数ANIMATORを別窓で同時開きのとき、どれがCOMPOSERとLIVE連携するかの帰属管理。
+  **2026-07-27 判断: 当面は現状維持**（`tdr_live` は projectId 一致で全窓ブロードキャスト。
+  上の「→ANM 保留」により そもそも2窓運用を推奨していないので実害が出ていない）。
+  将来案として検討したのは次の3つ:
+  1. **現状維持**（projectId一致なら全窓が送る）＝採用中
+  2. **アクティブ窓のみ送信**：最後にフォーカスされたANIMATORだけがLIVE更新を送る。誤爆は防げるが
+     「裏の窓で直したのに反映されない」が新しい混乱になりうる
+  3. **COMPOSER側でトラックごとに送信元を明示**：`tdr_live` のメッセージに窓ID（起動時に採番した
+     `winId`）を載せ、COMPOSERのトラック行に「どの窓と同期中か」を表示＋プルダウンで選ばせる。
+     いちばん正直で誤解が無いが、**送信側（animator）・受信側（composer）・保存形式の3点セット改修**が要る。
+     採用するなら「→ANM 代替動線」を解決した後（2窓運用が安全になってから）が順当。
 
 **将来フェーズ（大規模）**
 - **線のコピペ＆選択移動/回転/スケール**（Ctrl矩形・Alt投げ縄）：大規模・見送り中。
 - **ドックマネージャ（UI配置）**：設計コストが大きい。今はフローティング/リサイズで代替。
+
+**✅ 2026-07-27 完了**
+- **→ANM 代替動線（option 2 = 別窓は autosave OFF）**：PROJ 保存箱の各行に **`別窓`** ボタンを追加。
+  `animator.html?snap=<snapId>&ro=1` を `window.open`（窓名 `tdr_anim_<snapId>`＝再クリックで同じ窓を使い回し）。
+  - `AUTOSAVE_OFF = URLSearchParams(location.search).get('ro')==='1'` を**スクリプト冒頭のconstで確定**
+  - `scheduleSave()` / `flushSave()` / `saveRefs()` が `AUTOSAVE_OFF` で早期return
+    ＝**frames/meta/refs のどれも書かない**（この3つが本窓と共用の単一レコードだから）
+  - `setSaveState()` は常に `AUTOSAVE OFF`（琥珀色 `.save-state.manual`）を表示。title に代替手段を明記
+  - 起動時 `?snap=<id>` → `snapGetData()` → `applyProjectJSON()`。`?id=`（exchange）と排他
+  - **LIVEも自動送信されない**（送信は `flushSave` 末尾の `broadcastProjectDebounced()` 経由のため）。
+    別窓から送りたいときは LIVE ボタンを手で押す＝`broadcastProjectNow()` は直接呼ばれるので動く
+  - 残すときは PROJ の ＋保存（スナップショット＝別キーなので衝突しない）か EXPORT JSON
+  - **option 1（autosave を projectIdキーに分離・DB v5）は見送り**。理由は下の「autosaveの容量実測」参照
+- **OBAN: CLEAR/50MB確認の modalConfirm 化**（native confirm 廃止。`#cf-modal`。詳細は OBAN_BUILDER_HANDOVER）
+- **`+ FROM SAVED` の使いにくさ解消**：候補を **PROJECTS保存箱（`snap_meta`）＋共有DB（`tdr_exchange`）の両方**から
+  集めるようにし、名前・日時・コマ数・解像度つきのスクロールリストで選べるようにした（旧: 共有DBのみ＝
+  「→ COMPOSER を一度も押していないと常に空」・ラベルはprojectId先頭10文字・**先頭6件で打ち切り**）。
+  `showModal({list})` を追加（`#modal-list`）。空のときは理由と次の一手を書いたメッセージを出す。
+  ※ index.html 側へのANIMATOR一覧掲出は**やらない**（発注者判断。animator内で完結させる）。
 
 ---
 
@@ -253,10 +278,38 @@ FILLツールには2方式があり `state.fillMode`（`'flood'`|`'lasso'`）で
 - **操作経路**: `drawCanvas` の pointerdown で `fillMode==='lasso'` なら `lassoBegin/Move/End`。輪郭プレビューは `guideCtx`（ガイド層）に破線描画→離すと `renderGuides()` で消去。Undoは塗り確定時に1手 push。FRAMEレイヤー編集中は頂点を `toFrameLocal()` 経由で写像。
 - **入力**: pen/mouse は `drawCanvas` 経由（＝iPadは Apple Pencil で囲う）。指はパン維持（従来設計どおり）。ミラーは floodFill 同様に非適用。
 
-## FROM SAVED について
-`+ FROM SAVED` は、**同じブラウザ内で → COMPOSER 等を経由して送信した共有DB（`tdr_exchange`）に残っているプロジェクト一覧**から参照を追加する機能。
-- 最初は空で分かりにくい（同ブラウザ内でプロジェクトを → COMPOSER 送信して初めて候補に出る）
-- 将来的には **index ページにANIMATOR一覧** を出して、そこから開く/REF参照に追加できる動線が理想（別フェーズ）
+## autosave の容量実測（2026-07-27・2048×1152）
+
+option 1（projectIdキー分離）を検討するにあたって実測した数字。**判断の根拠なので消さないこと。**
+
+| 項目 | 実測値 |
+|---|---|
+| 生データ 1コマ | 9.0MB（W×H×4 の Uint8ClampedArray） |
+| 実際にDBに載る 1コマ・線画中心 | **0.42MB**（IndexedDBが圧縮＝約1/21） |
+| 実際にDBに載る 1コマ・**トーン全面＋ベタ15%** | **0.64MB**（約1/14） |
+| 1コマだけ書き込み（差分保存） | 30ms |
+| 9コマ一括書き込み | 110ms（≒12ms/コマ） |
+| ブラウザのクォータ | 5.2GB |
+
+**結論**:
+- **速度はプロジェクト数と無関係**。`flushSave()` は `pendingSaveFrames` の差分のみ書き、
+  `loadProject()` は `meta.frameOrder` を元に `fs.get(id)` の**ピンポイント取得**（全件走査していない）。
+  キーに projectId を足しても書き込み量・取得回数は変わらない
+- **容量も当初の想定ほど怖くない**。「トーンのベタ塗り多用＝生9MB/コマ」という初期見積りは
+  **圧縮を勘定に入れていない誤りで、実測は0.64MB**。3秒(72コマ)のトーン多用カットでも **≒46MB/本**、
+  クォータ5.2GBに対して100本以上入る。**手動削除UIは当面不要**
+- したがって option 1 の重さは実行速度ではなく **DB v5マイグレーション＋掃除導線の設計コスト**。
+  そこが本体なので、まず option 2（別窓 autosave OFF）で2窓運用を開通させる方針を採った
+
+## FROM SAVED について（2026-07-27 改修済み）
+`+ FROM SAVED` は、**同じブラウザ内に残っているプロジェクト**から参照（REF）を追加する機能。候補は2系統:
+- **保存箱**: PROJECTS パネル（topbar PROJ）で保存したスナップショット（`snap_meta`/`snap_data`）
+- **共有DB**: → COMPOSER 等を経由して `tdr_exchange` に入ったレコード（自分自身の projectId は除外）
+
+一覧は `showModal({list})` のスクロールリストで、`名前` ＋ `出所 · 日時 · コマ数 · 解像度` を表示。全件出す（件数上限なし）。
+候補ゼロのときは「PROJ で保存するか → COMPOSER を一度押す」と次の一手を書いたメッセージを出す。
+- 旧仕様の問題（解消済み）: 共有DBのみが対象で**→ COMPOSERを押すまで常に空**・ラベルがprojectId先頭10文字・**先頭6件で打ち切り**
+- index ページへのANIMATOR一覧掲出は**やらない**方針に決定（animator内で完結させる）
 
 ---
 
