@@ -628,6 +628,23 @@ html,body{
 #palette-resize{display:none;height:11px;cursor:ns-resize;align-items:center;justify-content:center;border-top:1px solid var(--border);background:rgba(255,255,255,0.02);flex:0 0 auto;}
 #palette-resize::after{content:'';width:26px;height:2px;background:rgba(255,255,255,0.25);}
 #palette-pnl.floating #palette-resize{display:flex;}
+/* ── フローティングパネル本文は文字を選択・コピーできる（SETTINGS/REF/TIMELAPSE/PROJECTS共通）──
+   body 全体の user-select:none を打ち消す。見出しバー（ドラッグ用）は none のまま。 */
+#settings-panel-body,#ref-panel-body,#tl-panel-body,#proj-panel-body{
+  -webkit-user-select:text;user-select:text;cursor:text;
+}
+/* ボタン/スライダーは従来どおり（ドラッグで文字が選ばれて誤操作にならないように）。
+   数値・テキスト入力は編集できないと困るので選択可のままにする */
+#settings-panel-body button,#settings-panel-body input[type=range],
+#ref-panel-body button,#ref-panel-body input[type=range],
+#tl-panel-body button,#tl-panel-body input[type=range],
+#proj-panel-body button,#proj-panel-body input[type=range]{
+  -webkit-user-select:none;user-select:none;cursor:pointer;
+}
+/* 選択中は白抜き＝小さい文字でも読める */
+#settings-panel-body ::selection,#ref-panel-body ::selection,
+#tl-panel-body ::selection,#proj-panel-body ::selection{background:var(--acid);color:#fff;}
+
 /* パネル 下端リサイズグリップ（設定/REF共通） */
 #settings-resize,#ref-resize,#tl-resize{height:11px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--border);background:rgba(255,255,255,0.02);}
 #settings-resize::after,#ref-resize::after,#tl-resize::after{content:'';width:28px;height:2px;background:rgba(255,255,255,0.25);}
@@ -2587,7 +2604,7 @@ function toggleRefPanel(force){
   // REFパネルの開閉とキャンバス上の参照表示を連動（閉じる=一括非表示, EDITもOFF）
   state.refMasterShow = show;
   applyRefMaster();
-  if(show) buildRefList();
+  if(show){ raisePanelById('ref-panel'); buildRefList(); }
   markMetaDirty();
 }
 
@@ -5109,8 +5126,12 @@ let lastR = 1;
 // ── Shift 修飾（PSD準拠）──
 //  Shift+クリック   … 直前ストロークの終点から今の点まで直線を引く（クリック→クリックで連結）
 //  Shift+ドラッグ   … 押した位置を原点に、水平 or 垂直へ拘束
+//  ※連結線は pointerup まで保留する。動かさずに離した＝クリックのときだけ引く。
+//    ドラッグした場合は「拘束した1本を新しく引きたい」意図なので、前の点とは繋がない。
 let strokeAnchor = null;   // 直前ストロークの終点（作業座標）
 let shiftOrigin  = null;   // 拘束の原点（クライアント座標）
+let pendingLine  = null;   // {cx,cy} 保留中の連結線（動かさず離したら確定）
+const SHIFT_DRAG_PX = 4;   // これを超えて動いたら「ドラッグ」＝連結しない
 function clearStrokeAnchor(){ strokeAnchor = null; }
 function snapToAxis(cx, cy){
   const dx = Math.abs(cx - shiftOrigin.cx), dy = Math.abs(cy - shiftOrigin.cy);
@@ -5203,6 +5224,11 @@ function continueStroke(clientX, clientY, pressure, noSmooth){
 }
 function endStroke(){
   if(!drawing) return;
+  // 動かさずに離した Shift+クリック → ここで初めて前の終点から直線を引く
+  if(pendingLine && strokeAnchor){
+    strokeLineFromAnchor(pendingLine.cx, pendingLine.cy);
+  }
+  pendingLine = null;
   drawing = false;
   drawingPointerId = null;
   strokeBuffer = [];
@@ -5296,14 +5322,10 @@ drawCanvas.addEventListener('pointerdown', e => {
   } else {
     const brush = (state.tool === 'pen' || state.tool === 'erase');
     shiftOrigin = (e.shiftKey && brush) ? { cx: e.clientX, cy: e.clientY } : null;
-    if(e.shiftKey && brush && strokeAnchor){
-      // Shift+クリック: 前の終点から直線。そのままドラッグすれば拘束付きで描き続けられる
-      if(state.frameLayer.editMode) ensureFlBaseline();
-      drawing = true;
-      strokeLineFromAnchor(e.clientX, e.clientY);
-    } else {
-      startStroke(e.clientX, e.clientY, e.pressure);
-    }
+    // Shift+クリックの連結線は「動かさずに離した」ときだけ引く（pointerup で確定）。
+    // Shift+ドラッグは水平/垂直の新しい1本なので、前の点からは繋がない。
+    pendingLine = (e.shiftKey && brush && strokeAnchor) ? { cx: e.clientX, cy: e.clientY } : null;
+    startStroke(e.clientX, e.clientY, e.pressure);
   }
 });
 
@@ -5322,6 +5344,10 @@ drawCanvas.addEventListener('pointermove', e => {
   if(drawing && e.pointerId === drawingPointerId){
     e.preventDefault();
     const con = !!(shiftOrigin && e.shiftKey);   // Shift+ドラッグ = 水平/垂直に拘束
+    // 少しでもドラッグしたら「クリック」ではない → 前の点との連結はしない
+    if(pendingLine && Math.hypot(e.clientX - pendingLine.cx, e.clientY - pendingLine.cy) > SHIFT_DRAG_PX){
+      pendingLine = null;
+    }
     // Apple Pencil等の高レート入力（240Hz）を間引かず全点使う。非対応環境はそのまま1点
     const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
     const pts = (coalesced && coalesced.length) ? coalesced : [e];
@@ -7320,6 +7346,7 @@ async function tlPanelToggle(force){
   const show = (typeof force === 'boolean') ? force : !p.classList.contains('show');
   p.classList.toggle('show', show);
   if(!show){ tlPlayStop(); tlBmpDrop(); tlList = []; tlSyncTransport(); return; }
+  raisePanelById('tl-panel');   // フローティングパレット等の下に潜らないよう最前面へ
   await tlLoadList();
   tlIdx = Math.max(0, tlList.length - 1);
   tlApplyPanelUI();
@@ -8483,7 +8510,7 @@ function toggleSettingsPanel(force){
   p.classList.toggle('show',show);
   document.getElementById('btn-settings').classList.toggle('on',show);
   gCaptureId=null;
-  if(show){ buildShortcutList(); applyGuideUI(); applyCanvasSizeUI(); }
+  if(show){ raisePanelById('settings-panel'); buildShortcutList(); applyGuideUI(); applyCanvasSizeUI(); }
 }
 // キー取得モードの処理（true=このキーイベントを消費した）
 function handleShortcutCapture(e){
@@ -8620,7 +8647,7 @@ function toggleProjPanel(force){
   const show = (typeof force === 'boolean') ? force : !p.classList.contains('show');
   p.classList.toggle('show', show);
   document.getElementById('btn-proj').classList.toggle('on', show);
-  if(show){ renderSnapList(); updateStorageInfo(); }
+  if(show){ raisePanelById('proj-panel'); renderSnapList(); updateStorageInfo(); }
 }
 document.getElementById('btn-proj').addEventListener('click', () => toggleProjPanel());
 document.getElementById('proj-panel-close').addEventListener('click', () => toggleProjPanel(false));
@@ -8780,7 +8807,10 @@ makeVResize(document.getElementById('palette-resize'), _palEl, { min:60, max:()=
 // ── フローティングパネル: クリックしたものを最前面に ──
 let gPanelZ = 140;
 function raisePanel(el){ if(el) el.style.zIndex = ++gPanelZ; }
-['palette-pnl','settings-panel','ref-panel'].forEach(id=>{
+function raisePanelById(id){ raisePanel(document.getElementById(id)); }
+// TIMELAPSE / PROJECTS も対象。漏れているとフローティングパレット（クリックで前面に来る）に
+// 隠れてしまう ＝ 開いたのに見えない、という事故になる
+['palette-pnl','settings-panel','ref-panel','tl-panel','proj-panel'].forEach(id=>{
   const el=document.getElementById(id);
   if(el) el.addEventListener('pointerdown', ()=>raisePanel(el), true);
 });

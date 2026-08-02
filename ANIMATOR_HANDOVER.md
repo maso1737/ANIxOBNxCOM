@@ -38,16 +38,28 @@ _新チャット冒頭にこのファイルを貼り付けてください_
 - **パレット→下書**: `selectPalSlot()` も Altスポイトと同じ規則に統一。主線(黒)選択中は
   `setActiveInkColor()` が false を返すので `focusRoughInk()` へ回す（消しゴム中は除外）。
   ペン中でもツールを奪わずに「選んだ色＝いま描ける色」になる。
-- **Shift修飾（PSD準拠）**: `strokeAnchor`（直前ストロークの終点・作業座標）と
-  `shiftOrigin`（拘束の原点・クライアント座標）。Shift+クリックで `strokeLineFromAnchor()` が
-  直線を1本引いて起点を更新、そのままドラッグすれば `snapToAxis()` で水平/垂直に拘束。
-  拘束中は `continueStroke(..., noSmooth=true)` で生値を使うが、補正フィルタ自体は進めて
-  Shiftを離した瞬間に飛ばないようにしている。`switchToFrame()` でアンカーはクリア。
+- **Shift修飾（PSD準拠＋改良）**: `strokeAnchor`（直前ストロークの終点・作業座標）と
+  `shiftOrigin`（拘束の原点・クライアント座標）。拘束中は `continueStroke(..., noSmooth=true)` で
+  生値を使うが、補正フィルタ自体は進めて Shiftを離した瞬間に飛ばないようにしている。
+  `switchToFrame()` でアンカーはクリア。
+  **連結線は pointerup まで保留する**（`pendingLine`／閾値 `SHIFT_DRAG_PX`=4px）のが PSD との違い。
+  動かさず離した＝クリックのときだけ `strokeLineFromAnchor()` を呼ぶので、
+  Shift+ドラッグ（水平/垂直の新しい1本を引きたいとき）に前の点から斜め線が伸びる事故が起きない。
+  PSD はここで必ず繋いでしまう＝ユーザーの不満点だったので、意図的に挙動を変えている。
 - **長押しリセット**: 下書/指示ボタンを600ms長押しで `resetInkSlot()`（`INK_DEFAULT` と
   トーン色 `#000000` へ）。成立後500msは `gInkLongPressUntil` で click を食う（スロット選択の誤爆防止）。
 - **↑↓の二役**: `gPalFocus`（パレットセルをクリックで true、`#palette-pnl` 外の pointerdown で false）。
   true のときだけ `palStep()` で色送り、それ以外は前/次のコマ送り。REFパネル表示中の↑↓は従来どおり最優先。
 - **SETTINGS**: 再割当できない固定ジェスチャ一覧（`.sc-fixed`）を KEYBOARD SHORTCUTS の下に追加。
+- **パネル本文の文字を選択・コピー可に**: `#settings-panel-body` / `#ref-panel-body` /
+  `#tl-panel-body` / `#proj-panel-body` で body 全体の `user-select:none` を打ち消す。
+  `::selection` は acid 背景＋白文字（小さい説明文でも読める）。**見出しバーは none のまま**
+  （ドラッグ移動のハンドルなので選択されると掴めなくなる）。ボタンと `input[type=range]` も none。
+- **パネルの前後関係（z-index）**: `raisePanel()` の対象に `tl-panel` / `proj-panel` を追加し、
+  各パネルの「開く」処理で `raisePanelById()` を呼ぶようにした。
+  以前は CSS の固定 z-index（tl=122）に対し、フローティングパレットがクリックで 141 以上へ上がるため
+  **TIMELAPSE を開いてもパレットの下に隠れる**事故があった（2026-08-02 報告）。
+  静的 z-index に頼らず「開いた／触った順」で前面へ、が正しい形。
 - **TOPバー**: 「EDIT MODE」を廃止し、左に `ANIMATOR / IMPORT JSON EXPORT JSON / TIMELAPSE ●` を配置。
   `btn-tl` のラベルは `TL ○` → `TIMELAPSE ○`（`updateTLUI()` の3箇所）。ボタンは `white-space:nowrap`。
 
