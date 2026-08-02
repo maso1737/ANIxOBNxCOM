@@ -527,6 +527,13 @@ html,body{
 .sc-key.capturing{border-color:var(--acid);color:var(--acid);background:rgba(255,79,168,0.12);}
 .sc-key.unbound{color:rgba(255,255,255,0.3);}
 .sc-key.on{border-color:var(--acid);color:var(--acid);background:rgba(255,79,168,0.12);}
+/* 再割当できない固定ジェスチャの表示（.sc-key と同じ幅で並ぶが押せない） */
+.sc-fixed{
+  min-width:54px;text-align:center;
+  border:1px dashed rgba(255,255,255,0.16);
+  color:rgba(255,255,255,0.5);font-family:var(--mono);font-size:9px;
+  padding:3px 8px;line-height:1.4;letter-spacing:0.08em;
+}
 .sg-row{display:flex;align-items:center;gap:6px;padding:4px 2px;}
 .sg-toggle{min-width:64px;}
 .sg-num{
@@ -1352,7 +1359,7 @@ input[type=range]::-moz-range-thumb{
 #topbar button{letter-spacing:0.07em;padding:4px 7px;}
 #topbar{letter-spacing:0.18em;}
 .tool .lbl{font-family:var(--bank);letter-spacing:0.04em;line-height:1;font-size:9px;}
-#topbar span{white-space:nowrap;}
+#topbar span,#topbar button{white-space:nowrap;}
 .pnl-h{font-family:var(--bank);letter-spacing:0.3em;color:rgba(255,210,122,0.8);}
 .ref-sect-h{font-family:var(--bank);}
 
@@ -1403,7 +1410,11 @@ input[type=range]::-moz-range-thumb{
     <div class="left">
       <span class="title" id="btn-proj" title="クリックでプロジェクト保存箱（スナップショットの一覧・復元・複製）">ANIMATOR</span>
       <span class="sep">/</span>
-      <span>EDIT MODE</span>
+      <button id="btn-import-json" title="JSONファイルを読み込み（既存プロジェクトを置換）">IMPORT JSON</button>
+      <button id="btn-export-json" title="全フレームをJSONで書き出し（COMPOSER連携用）">EXPORT JSON</button>
+      <input type="file" id="json-file-input" accept="application/json,.json" style="display:none;">
+      <span class="sep">/</span>
+      <button id="btn-tl" title="作画タイムラプス記録 ON/OFF">TIMELAPSE ○</button>
     </div>
     <div class="right">
       <button id="btn-flip" title="キャンバス左右反転（表示のみ・X）">FLIP</button>
@@ -1415,13 +1426,9 @@ input[type=range]::-moz-range-thumb{
       <button id="btn-export" title="現在のコマを1枚PNGで書き出し / Shift+クリック: BG透明で書き出し">PNG</button>
       <button id="btn-export-seq" title="全コマをBG透過の連番PNGでZIP書き出し（AE合成用）">SEQ PNG</button>
       <button id="btn-export-mov" title="全体をmp4で書き出し（実時間）">VIDEO</button>
-      <button id="btn-export-json" title="全フレームをJSONで書き出し（COMPOSER連携用）">EXPORT JSON</button>
-      <button id="btn-import-json" title="JSONファイルを読み込み（既存プロジェクトを置換）">IMPORT JSON</button>
-      <input type="file" id="json-file-input" accept="application/json,.json" style="display:none;">
       <span class="sep">/</span>
       <button id="btn-send-composer" title="COMPOSERを別ウィンドウで開く（ANIMATORは開いたまま・LIVE連携）／OBANへは OBAN側の + FROM ANIMATOR から">→ COMPOSER</button>
       <button id="btn-live" title="LIVE連携（COMPOSER/OBANが開くと自動でライブ反映）。OBANへは OBAN側の + FROM ANIMATOR から">LIVE ○</button>
-      <button id="btn-tl" title="作画タイムラプス記録 ON/OFF">TL ○</button>
       <button id="btn-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
       <button id="btn-home" title="ランディングページに戻る">HOME</button>
     </div>
@@ -1429,7 +1436,7 @@ input[type=range]::-moz-range-thumb{
 
   <!-- LEFT TOOLBAR -->
   <div id="toolbar">
-    <button class="tool on" data-tool="pen" title="ペン (B)">
+    <button class="tool on" data-tool="pen" title="ペン (P) / Shift+クリック=直線・Shift+ドラッグ=水平垂直">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M3 21l4-1 11-11-3-3L4 17l-1 4z"></path>
         <path d="M14 6l3 3"></path>
@@ -1740,6 +1747,15 @@ input[type=range]::-moz-range-thumb{
       <div id="shortcut-list"></div>
       <button id="shortcut-reset" class="ref-btn" style="width:100%;margin-top:8px;padding:5px 0;">RESET DEFAULTS</button>
     </div>
+    <div class="ref-sect">
+      <div class="ref-sect-h">MOUSE / PEN（固定・再割当不可）</div>
+      <div class="sc-row"><span class="sc-label">ブラシサイズ変更</span><span class="sc-fixed">右ドラッグ</span></div>
+      <div class="sc-row"><span class="sc-label">スポイト</span><span class="sc-fixed">Alt+クリック</span></div>
+      <div class="sc-row"><span class="sc-label">直線（前の終点から）</span><span class="sc-fixed">Shift+クリック</span></div>
+      <div class="sc-row"><span class="sc-label">水平／垂直に拘束</span><span class="sc-fixed">Shift+ドラッグ</span></div>
+      <div class="sc-row"><span class="sc-label">下書／指示の色を既定に戻す</span><span class="sc-fixed">長押し</span></div>
+      <div class="sc-row"><span class="sc-label">パレット選択後の色送り</span><span class="sc-fixed">↑ / ↓</span></div>
+    </div>
   </div>
   <div id="settings-resize" title="ドラッグで高さ調整（下のセクションを隠せます）"></div>
 </div>
@@ -1922,6 +1938,9 @@ const INK = {
   blue:   '#A8D8FF',  // 下書き用うすい水色
   orange: '#FFB060',  // 指示用オレンジ
 };
+// 出荷時の色（長押しリセットの戻し先）。loadInk が INK を上書きする前に控える。
+const INK_DEFAULT = { blue: INK.blue, orange: INK.orange };
+const TONE_DEFAULT_COLOR = '#000000';
 const INK_LS = 'animator_ink_v1';
 (function loadInk(){
   try{
@@ -2048,6 +2067,17 @@ function setActiveInkColor(hex){
   saveInk();
   updateInkSwatches();
   return true;
+}
+
+// 下書/指示スロットの色を出荷時に戻す（ボタン長押し）。トーン色も一緒に戻す。
+function resetInkSlot(c){
+  if(c !== 'blue' && c !== 'orange') return;
+  INK[c] = INK_DEFAULT[c];
+  const tk = (c === 'blue') ? 'tone1' : 'tone2';
+  TONE[tk].color = TONE_DEFAULT_COLOR;
+  buildTone(tk);
+  saveInk();
+  applyInkUIForTool();
 }
 
 // 下書/指示ボタンの背景を現在のインク色に同期（トーンモード中は網点タイルを表示）
@@ -4024,6 +4054,7 @@ function switchToFrame(idx){
   if(drawing){
     endStroke();
   }
+  clearStrokeAnchor();   // コマをまたいで Shift+クリックが繋がらないように
   // カレントフレームの最新状態を保存
   const cur = curFrame();
   if(cur) syncFrameFromCanvas(cur);
@@ -5075,6 +5106,39 @@ function pressureRadius(pressure){
   return Math.max(0.7, maxR * applyPressureCurve(p));
 }
 let lastR = 1;
+// ── Shift 修飾（PSD準拠）──
+//  Shift+クリック   … 直前ストロークの終点から今の点まで直線を引く（クリック→クリックで連結）
+//  Shift+ドラッグ   … 押した位置を原点に、水平 or 垂直へ拘束
+let strokeAnchor = null;   // 直前ストロークの終点（作業座標）
+let shiftOrigin  = null;   // 拘束の原点（クライアント座標）
+function clearStrokeAnchor(){ strokeAnchor = null; }
+function snapToAxis(cx, cy){
+  const dx = Math.abs(cx - shiftOrigin.cx), dy = Math.abs(cy - shiftOrigin.cy);
+  return dx >= dy ? { cx, cy: shiftOrigin.cy } : { cx: shiftOrigin.cx, cy };
+}
+// アンカーから直線を1本引き、そこを新しい起点にする（続けてドラッグすれば手描きが繋がる）
+function strokeLineFromAnchor(clientX, clientY){
+  const { x, y } = toCanvasCoord(clientX, clientY);
+  const em  = state.frameLayer.editMode;
+  const a   = em ? toFrameLocal(strokeAnchor.x, strokeAnchor.y) : { x: strokeAnchor.x, y: strokeAnchor.y };
+  const b   = em ? toFrameLocal(x, y) : { x, y };
+  const ctx = activeDrawCtx();
+  const mLine = () => {
+    const p = mirrorPt(strokeAnchor.x, strokeAnchor.y), q = mirrorPt(x, y);
+    return em ? [toFrameLocal(p.x, p.y), toFrameLocal(q.x, q.y)] : [p, q];
+  };
+  if(state.tool === 'erase'){
+    eraseLine(ctx, a.x, a.y, b.x, b.y, currentToolSize());
+    if(state.mirrorOn){ const [p, q] = mLine(); eraseLine(ctx, p.x, p.y, q.x, q.y, currentToolSize()); }
+  } else {
+    drawLine(ctx, a.x, a.y, b.x, b.y, currentToolSize(), inkStyle());
+    if(state.mirrorOn){ const [p, q] = mLine(); drawLine(ctx, p.x, p.y, q.x, q.y, currentToolSize(), inkStyle()); }
+  }
+  lastX = b.x; lastY = b.y; lastWX = x; lastWY = y;
+  lastR = Math.max(0.7, currentToolSize() / 2);
+  stabResetTo(x, y);
+  strokeAnchor = { x, y };
+}
 function startStroke(clientX, clientY, pressure){
   // FRAMEレイヤー編集中は最初の1ストロークもUndoできるよう編集前に基準を確保
   if(state.frameLayer.editMode) ensureFlBaseline();
@@ -5102,9 +5166,11 @@ function startStroke(clientX, clientY, pressure){
     if(state.mirrorOn){ const m = mp(x, y); eraseDot(ctx, m.x, m.y, currentToolSize()); }
   }
 }
-function continueStroke(clientX, clientY, pressure){
+function continueStroke(clientX, clientY, pressure, noSmooth){
   const raw = toCanvasCoord(clientX, clientY);
-  const sm = smoothPoint(raw.x, raw.y);
+  // 補正フィルタは常に進める（拘束を解いた瞬間に飛ばないように）が、拘束中は生値を使う
+  const sm0 = smoothPoint(raw.x, raw.y);
+  const sm = noSmooth ? raw : sm0;
   const em = state.frameLayer.editMode;
   const dc = em ? toFrameLocal(sm.x, sm.y) : { x: sm.x, y: sm.y };
   const x = dc.x, y = dc.y;
@@ -5140,6 +5206,8 @@ function endStroke(){
   drawing = false;
   drawingPointerId = null;
   strokeBuffer = [];
+  shiftOrigin = null;
+  strokeAnchor = { x: lastWX, y: lastWY };   // 次の Shift+クリックの起点
   if(state.frameLayer.editMode){
     pushFrameLayerHistory();
   } else {
@@ -5226,7 +5294,16 @@ drawCanvas.addEventListener('pointerdown', e => {
       else pushHistory();
     }
   } else {
-    startStroke(e.clientX, e.clientY, e.pressure);
+    const brush = (state.tool === 'pen' || state.tool === 'erase');
+    shiftOrigin = (e.shiftKey && brush) ? { cx: e.clientX, cy: e.clientY } : null;
+    if(e.shiftKey && brush && strokeAnchor){
+      // Shift+クリック: 前の終点から直線。そのままドラッグすれば拘束付きで描き続けられる
+      if(state.frameLayer.editMode) ensureFlBaseline();
+      drawing = true;
+      strokeLineFromAnchor(e.clientX, e.clientY);
+    } else {
+      startStroke(e.clientX, e.clientY, e.pressure);
+    }
   }
 });
 
@@ -5244,12 +5321,13 @@ drawCanvas.addEventListener('pointermove', e => {
   }
   if(drawing && e.pointerId === drawingPointerId){
     e.preventDefault();
+    const con = !!(shiftOrigin && e.shiftKey);   // Shift+ドラッグ = 水平/垂直に拘束
     // Apple Pencil等の高レート入力（240Hz）を間引かず全点使う。非対応環境はそのまま1点
     const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
-    if(coalesced && coalesced.length){
-      for(const ce of coalesced) continueStroke(ce.clientX, ce.clientY, ce.pressure);
-    } else {
-      continueStroke(e.clientX, e.clientY, e.pressure);
+    const pts = (coalesced && coalesced.length) ? coalesced : [e];
+    for(const ce of pts){
+      const p = con ? snapToAxis(ce.clientX, ce.clientY) : { cx: ce.clientX, cy: ce.clientY };
+      continueStroke(p.cx, p.cy, ce.pressure, con);
     }
   }
 });
@@ -5483,8 +5561,11 @@ function refreshPenSizeUI(){
 }
 refreshPenSizeUI();  // 保存済みの太ブラシ値をボタンに反映
 
+// 長押しリセットが成立した直後の click（＝スロット選択）を食うための時刻
+let gInkLongPressUntil = 0;
 document.querySelectorAll('.tb-ink').forEach(btn => {
   btn.addEventListener('click', () => {
+    if(performance.now() < gInkLongPressUntil) return;  // 長押しリセット直後
     if(gOniSlot) selectOniSlot(null);   // インクを選んだらONIONチップ選択は解除
     state.inkColor = slotInk(btn.dataset.c);
     // ERASE / FILL 中はインクだけ差し替えてツールは維持（うっかりブラシで塗るのを防ぐ）。
@@ -5507,6 +5588,28 @@ document.querySelectorAll('.tb-ink').forEach(btn => {
     saveInk();
     applyInkUIForTool();
   });
+});
+
+// 下書/指示ボタン 長押し（600ms）→ その色を出荷時の色に戻す
+document.querySelectorAll('.tb-ink').forEach(btn => {
+  const c = btn.dataset.c;
+  if(c !== 'blue' && c !== 'orange') return;
+  let timer = null, sx = 0, sy = 0;
+  const cancel = () => { if(timer){ clearTimeout(timer); timer = null; } };
+  btn.addEventListener('pointerdown', e => {
+    sx = e.clientX; sy = e.clientY;
+    cancel();
+    timer = setTimeout(() => {
+      timer = null;
+      gInkLongPressUntil = performance.now() + 500;  // 直後の click を無効化
+      resetInkSlot(c);
+      btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 420);
+    }, 600);
+  });
+  btn.addEventListener('pointermove', e => {
+    if(timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel();
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(ev => btn.addEventListener(ev, cancel));
 });
 
 // ── FILL PALETTE（カスタム可・データ駆動）──
@@ -5536,8 +5639,10 @@ function selectPalSlot(i){
   // ONIONカラーチップが選択中なら、パレット色はそちらへ入れて終わり（インクは触らない）
   if(gOniSlot){ setOnionColor(gOniSlot, gPalette[i]); renderPalette(); return; }
   // 下書/指示（トーン含む）が選択中なら、そのインク色もパレット色に同期。
-  // ブラシ・FILLどちらでも「選んだ色＝いま描ける色」になる。主線は黒固定なので対象外。
-  setActiveInkColor(gPalette[i]);
+  // ブラシ・FILLどちらでも「選んだ色＝いま描ける色」になる。
+  // 主線(黒)は色が固定で変化が見えないので、Altスポイトと同じく下書スロットへ移してそこへ入れる
+  // （＝ペン中にパレットを触っても「選んだ色で描ける」状態になる）。
+  if(!setActiveInkColor(gPalette[i]) && state.tool !== 'erase') focusRoughInk(gPalette[i]);
   renderPalette();
   // ブラシ系（PEN/ERASE）を使っている最中は色を選んでもツールを奪わない。
   // それ以外（選択/スポイト等）のときだけ FILL へ自動切替。
@@ -5552,11 +5657,25 @@ function renderPalette(){
     cell.className = 'pal-cell' + (i===gPalSlot ? ' on' : '');
     cell.style.background = c;
     cell.dataset.c = c;
-    cell.title = c + '（クリックで選択／スポイトでこのスロットに上書き）';
-    cell.addEventListener('click', () => selectPalSlot(i));
+    cell.title = c + '（クリックで選択／スポイトでこのスロットに上書き。選択後は ↑↓ で色送り）';
+    cell.addEventListener('click', () => { gPalFocus = true; selectPalSlot(i); });
     palEl.appendChild(cell);
   });
 }
+// パレットをクリックした直後だけ ↑↓ を「色送り」に使う（それ以外は前/次のコマ送り）。
+// パレット外をクリックしたら解除＝キーの意味が勝手に変わり続けないようにする。
+let gPalFocus = false;
+function palStep(d){
+  if(!gPalette.length) return;
+  const i = (gPalSlot + d + gPalette.length) % gPalette.length;
+  selectPalSlot(i);
+  gPalFocus = true;   // selectPalSlot 経由でも色送りモードは維持
+  const cell = palEl.children[i];
+  if(cell && cell.scrollIntoView) cell.scrollIntoView({block:'nearest'});
+}
+document.addEventListener('pointerdown', e => {
+  if(gPalFocus && !(e.target.closest && e.target.closest('#palette-pnl'))) gPalFocus = false;
+}, true);
 loadPalette();
 state.fillColor = gPalette[gPalSlot] || '#000000';
 renderPalette();
@@ -6968,13 +7087,13 @@ function updateTLUI(){
   if(!b) return;
   if(AUTOSAVE_OFF){
     b.classList.remove('on');
-    b.textContent = 'TL －';
+    b.textContent = 'TIMELAPSE －';
     b.title = '別窓（参照用）ではタイムラプスを記録しません（本窓の記録に混ざるため）';
     return;
   }
   const on = tlEnabled();
   b.classList.toggle('on', on);
-  b.textContent = on ? 'TL ●' : 'TL ○';
+  b.textContent = on ? 'TIMELAPSE ●' : 'TIMELAPSE ○';
   const n  = tlMeta ? tlMeta.count : 0;
   const mb = tlMeta ? (tlMeta.bytes / 1048576).toFixed(1) : '0.0';
   b.title = (on ? '作画タイムラプス記録中' : '作画タイムラプス記録OFF')
@@ -8683,6 +8802,13 @@ window.addEventListener('keydown', e => {
     return;
   }
   if(e.target.tagName === 'INPUT') return;
+  // ↑↓: パレットをクリックした直後だけ「色送り」、それ以外は前/次のコマ送り
+  if((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !(e.ctrlKey || e.metaKey || e.altKey)){
+    e.preventDefault();
+    if(gPalFocus) palStep(e.key === 'ArrowDown' ? 1 : -1);
+    else document.getElementById(e.key === 'ArrowUp' ? 'strip-prev' : 'strip-next')?.click();
+    return;
+  }
   // Ctrl/Cmd 系（固定）
   if((e.ctrlKey||e.metaKey) && e.key === 'z'){ e.preventDefault(); undo(); return; }
   if((e.ctrlKey||e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))){ e.preventDefault(); redo(); return; }

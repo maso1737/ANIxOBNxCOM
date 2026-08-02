@@ -33,7 +33,25 @@ _新チャット冒頭にこのファイルを貼り付けてください_
   共通の**濃度スライダー**。設定は `animator_onion_v1`（localStorage）。
   描画は `drawOnionSide()` が近い順に最大5枚を `0.55^k` で重ねる。`onionTint()` のキャッシュキーは色hex。
 
-### 2026-07 リファクタ＆機能追加の要点
+### 2026-08-02 ブラッシュアップ 第2弾（Shift修飾／長押し／↑↓／TOPバー）
+
+- **パレット→下書**: `selectPalSlot()` も Altスポイトと同じ規則に統一。主線(黒)選択中は
+  `setActiveInkColor()` が false を返すので `focusRoughInk()` へ回す（消しゴム中は除外）。
+  ペン中でもツールを奪わずに「選んだ色＝いま描ける色」になる。
+- **Shift修飾（PSD準拠）**: `strokeAnchor`（直前ストロークの終点・作業座標）と
+  `shiftOrigin`（拘束の原点・クライアント座標）。Shift+クリックで `strokeLineFromAnchor()` が
+  直線を1本引いて起点を更新、そのままドラッグすれば `snapToAxis()` で水平/垂直に拘束。
+  拘束中は `continueStroke(..., noSmooth=true)` で生値を使うが、補正フィルタ自体は進めて
+  Shiftを離した瞬間に飛ばないようにしている。`switchToFrame()` でアンカーはクリア。
+- **長押しリセット**: 下書/指示ボタンを600ms長押しで `resetInkSlot()`（`INK_DEFAULT` と
+  トーン色 `#000000` へ）。成立後500msは `gInkLongPressUntil` で click を食う（スロット選択の誤爆防止）。
+- **↑↓の二役**: `gPalFocus`（パレットセルをクリックで true、`#palette-pnl` 外の pointerdown で false）。
+  true のときだけ `palStep()` で色送り、それ以外は前/次のコマ送り。REFパネル表示中の↑↓は従来どおり最優先。
+- **SETTINGS**: 再割当できない固定ジェスチャ一覧（`.sc-fixed`）を KEYBOARD SHORTCUTS の下に追加。
+- **TOPバー**: 「EDIT MODE」を廃止し、左に `ANIMATOR / IMPORT JSON EXPORT JSON / TIMELAPSE ●` を配置。
+  `btn-tl` のラベルは `TL ○` → `TIMELAPSE ○`（`updateTLUI()` の3箇所）。ボタンは `white-space:nowrap`。
+
+### 2026-08-02 ブラッシュアップ（インク／ワークエリア／ONION）
 - **共通化ヘルパー**（重複統合。既存挙動は不変）:
   - animator: `bresenham()`（drawLine/drawLineRadius/eraseLine の共通歩行）/ `refreshFrameUI()`（strip/onion/stats/pos/dur/timetrack の6連更新）/ `fillCircleRows()`（円ドットを水平スパン塗り。πr²回→約2r回の呼び出し削減）
   - composer: `bindPropInputs()`（kf-/fx- プロパティ入力配線）/ `makeFloatDrag()`（フローティングパネルのドラッグ）/ `exportZipPNG()`（ZIP書き出し骨格）
