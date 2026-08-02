@@ -51,52 +51,78 @@ body{
 .btn.ex:hover{background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#04121a}
 #bar-total{margin-left:auto;color:var(--gold);letter-spacing:.12em}
 #save-dot{color:var(--grey);min-width:52px;text-align:right}
-/* ---------- views ---------- */
+/* ---------- views（V2-A: STUDIO / EDIT の2つ） ---------- */
 .view{position:fixed;left:0;right:0;top:42px;bottom:0;display:none}
 .view.on{display:block}
-/* ---------- BOARD ---------- */
+#view-studio{display:none;flex-direction:column}
+#view-studio.on{display:flex}
+#studio-main{flex:1;display:flex;min-height:0}
+/* ---------- STUDIO 左: BOARD ---------- */
+#studio-board{position:relative;width:40%;min-width:240px;flex:none;border-right:1px solid var(--border);overflow:hidden}
 #board-cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
 #board-tools{
   position:absolute;left:12px;top:12px;display:flex;flex-direction:column;gap:6px;
-  background:var(--panel2);border:1px solid var(--border);padding:10px;z-index:10;
+  background:rgba(21,9,39,.86);border:1px solid var(--border);padding:9px;z-index:10;
+  backdrop-filter:blur(3px);
 }
-#board-tools .row{display:flex;gap:6px;align-items:center}
-#board-hint{color:var(--grey);font-size:9px;letter-spacing:.06em;max-width:230px;line-height:1.6;font-family:var(--jp)}
+#board-tools .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#board-hint{color:var(--grey);font-size:9px;letter-spacing:.06em;max-width:212px;line-height:1.6;font-family:var(--jp)}
 #zoom-label{color:var(--gold);font-size:9px;letter-spacing:.1em}
-/* ---------- SHEET ---------- */
-#view-sheet{overflow-y:auto;-webkit-overflow-scrolling:touch}
-#sheet-wrap{max-width:1060px;margin:0 auto;padding:18px 14px 80px}
-#sheet-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-#sheet-total{color:var(--gold);letter-spacing:.12em;font-size:10px}
-.cut-row{
-  display:flex;gap:12px;align-items:stretch;background:var(--panel2);
-  border:1px solid var(--border);padding:10px;margin-bottom:10px;
+/* ---------- STUDIO 中央: プレビュー＋現在カット編集 ---------- */
+#studio-center{flex:1;display:flex;flex-direction:column;min-width:0}
+#cur-box{
+  flex:none;background:var(--panel);border-top:1px solid var(--border);
+  padding:7px 10px;display:flex;flex-direction:column;gap:6px;
 }
-.cut-no{
-  font-family:var(--bank);font-size:15px;letter-spacing:.1em;color:var(--acid);
-  min-width:44px;display:flex;align-items:center;justify-content:center;
-}
-.cut-thumb{
-  width:200px;height:112px;background:#333;object-fit:contain;border:1px solid var(--border);
-  cursor:pointer;flex:none;
-}
-.cut-mid{flex:1;display:flex;flex-direction:column;gap:6px}
-.cut-note{
-  flex:1;background:var(--black);border:1px solid var(--border);color:var(--white);
-  font-family:var(--jp);font-size:12px;line-height:1.6;padding:7px;resize:none;min-height:80px;
+#cur-row{display:flex;align-items:center;gap:8px}
+#cur-cut-label{font-family:var(--bank);font-size:14px;letter-spacing:.14em;color:var(--ice);min-width:34px}
+#cur-dur{
+  width:60px;background:var(--black);border:1px solid var(--border);color:var(--gold);
+  font-family:var(--mono);font-size:11px;text-align:center;padding:4px 3px;
   -webkit-user-select:text;user-select:text;
 }
-.cut-note:focus{outline:none;border-color:var(--border-bright)}
-.cut-side{display:flex;flex-direction:column;gap:6px;align-items:flex-end;justify-content:space-between}
-.cut-dur{
-  width:64px;background:var(--black);border:1px solid var(--border);color:var(--gold);
-  font-family:var(--mono);font-size:12px;text-align:center;padding:5px 3px;
+#cur-dur-f{color:var(--grey);font-size:9px}
+#cur-note{
+  height:58px;background:var(--black);border:1px solid var(--border);color:var(--white);
+  font-family:var(--jp);font-size:12px;line-height:1.6;padding:6px;resize:none;
   -webkit-user-select:text;user-select:text;
 }
-.cut-dur:focus{outline:none;border-color:var(--border-bright)}
-.cut-durf{color:var(--grey);font-size:9px;margin-left:5px}
-.cut-btns{display:flex;gap:4px}
-.cut-btns .btn{padding:5px 8px;font-size:10px}
+#cur-dur:focus,#cur-note:focus{outline:none;border-color:var(--border-bright)}
+#cur-dur:disabled,#cur-note:disabled{opacity:.35}
+/* ---------- STUDIO 右: SHEETパネル ---------- */
+#studio-sheet{
+  width:22%;min-width:200px;max-width:360px;flex:none;background:var(--panel2);
+  border-left:1px solid var(--border);display:flex;flex-direction:column;
+}
+#studio-sheet.hidden{display:none}
+#sheet-head{flex:none;display:flex;align-items:center;gap:8px;padding:8px 8px 6px;border-bottom:1px solid var(--border)}
+#sheet-head .btn{padding:5px 8px}
+#sheet-total{color:var(--gold);letter-spacing:.08em;font-size:9px}
+#sheet-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px}
+.sp-row{
+  border:1px solid var(--border);background:rgba(7,3,15,.35);
+  padding:5px;margin-bottom:5px;cursor:pointer;transition:border-color .12s;
+}
+.sp-row:hover{border-color:var(--border-bright)}
+.sp-row.focus{border-color:var(--ice);background:rgba(90,233,255,.09);box-shadow:0 0 10px rgba(90,233,255,.18)}
+.sp-head{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.sp-no{font-family:var(--bank);font-size:12px;letter-spacing:.08em;color:var(--acid)}
+.sp-dur{
+  width:48px;background:var(--black);border:1px solid var(--border);color:var(--gold);
+  font-family:var(--mono);font-size:10px;text-align:center;padding:2px;
+  -webkit-user-select:text;user-select:text;
+}
+.sp-dur:focus{outline:none;border-color:var(--border-bright)}
+.sp-btns{display:flex;gap:2px;margin-left:auto}
+.sp-btns .btn{padding:2px 4px;font-size:9px;line-height:1.2}
+.sp-body{display:flex;gap:6px}
+.sp-thumb{width:88px;height:50px;flex:none;background:#333;object-fit:contain;border:1px solid var(--border)}
+.sp-note{
+  flex:1;min-width:0;font-family:var(--jp);font-size:10px;line-height:1.5;
+  color:rgba(248,239,255,.72);overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+}
+.sp-note.empty{color:var(--dim)}
 /* ---------- EDIT ---------- */
 #view-edit{display:none;flex-direction:column}
 #view-edit.on{display:flex}
@@ -112,6 +138,8 @@ body{
 }
 #edit-dur-f{color:var(--grey);font-size:9px}
 #edit-main{flex:1;display:flex;min-height:0}
+#edit-main.side-right{flex-direction:row-reverse}
+#edit-main.side-right #edit-side{border-right:none;border-left:1px solid var(--border)}
 #edit-side{
   width:236px;flex:none;overflow-y:auto;background:var(--panel2);
   border-right:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:12px;
@@ -141,9 +169,7 @@ body{
   background:radial-gradient(ellipse 60% 60% at 50% 40%,rgba(184,80,255,0.07),transparent 70%);
 }
 #edit-cv{background:#888;box-shadow:0 0 30px rgba(0,0,0,.6);touch-action:none;cursor:crosshair}
-/* ---------- TIMELINE ---------- */
-#view-tl{display:none;flex-direction:column}
-#view-tl.on{display:flex}
+/* ---------- TIMELINE（STUDIO中央のプレビュー＋最下段の帯） ---------- */
 #tl-stage{
   flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden;
   background:radial-gradient(ellipse 60% 60% at 50% 40%,rgba(90,233,255,0.06),transparent 70%);
@@ -159,11 +185,15 @@ body{
   display:flex;flex-direction:column;gap:7px;backdrop-filter:blur(3px);
 }
 #tl-minitools.hidden{display:none}
+#tl-minitools.right{left:auto;right:10px}
 #tl-minitools .etool{padding:5px 7px;font-size:8px}
 #tl-minitools .palette{grid-template-columns:repeat(8,1fr);gap:2px}
 #tl-minitools .pal-cell{border-width:1px}
 #tl-mini-swatch{width:100%;height:16px;border:1px solid var(--border)}
+#tl-mini-btns{display:flex;gap:4px}
+#tl-mini-btns .btn{padding:3px 6px;font-size:8px;flex:1}
 #btn-tl-tools{position:absolute;left:10px;top:10px;z-index:6}
+#btn-tl-tools.right{left:auto;right:10px}
 #tl-bottom{flex:none;background:var(--panel);border-top:1px solid var(--border);padding:8px 12px 6px;display:flex;flex-direction:column;gap:7px}
 #tl-transport{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 #tl-cutlabel{font-family:var(--bank);color:var(--ice);font-size:13px;letter-spacing:.12em;min-width:34px;text-align:center}
@@ -183,7 +213,10 @@ body{
 .tl-clip-dur{font-size:9px;color:var(--gold)}
 .tl-clip-h{position:absolute;right:0;top:0;bottom:0;width:12px;cursor:ew-resize;background:linear-gradient(90deg,transparent,rgba(255,210,122,.55))}
 #tl-playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--ice);pointer-events:none;box-shadow:0 0 8px rgba(90,233,255,.8)}
-#tl-hint{color:var(--grey);font-size:9px;font-family:var(--jp);letter-spacing:.04em}
+#tl-hint{
+  color:var(--grey);font-size:9px;font-family:var(--jp);letter-spacing:.04em;
+  flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
 /* ---------- toast / modal ---------- */
 #toast{
   position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:200;
@@ -208,48 +241,121 @@ body{
 
 <div id="bar">
   <span class="title">E<b>CONTE</b></span>
-  <button class="btn mode on" id="btn-view-board">BOARD</button>
-  <button class="btn mode" id="btn-view-sheet">SHEET</button>
-  <button class="btn mode" id="btn-view-tl">TIMELINE</button>
+  <button class="btn mode on" id="btn-view-studio">STUDIO</button>
+  <button class="btn mode" id="btn-view-edit" title="現在カットを加筆EDITで開く">EDIT</button>
   <button class="btn ex" id="btn-import">+ IMPORT PHOTO</button>
   <input type="file" id="file-input" accept="image/*" multiple style="display:none;">
+  <label id="burnin-label"><input type="checkbox" id="chk-burnin"> C#/尺 焼き込み</label>
+  <button class="btn ex" id="btn-export" title="実時間で再生しながら録画します（タブを前面のまま待つ）">EXPORT VIDEO</button>
   <span id="bar-total">0 CUTS</span>
   <span id="save-dot"></span>
+  <button class="btn mode on" id="btn-sheet-toggle" title="右のSHEETパネルを開閉">≡</button>
+  <button class="btn" id="btn-fs" title="フルスクリーン切替">⛶</button>
   <button class="btn" id="btn-home" title="ランディングページに戻る">HOME</button>
 </div>
 
-<!-- ================= BOARD ================= -->
-<div class="view on" id="view-board">
-  <canvas id="board-cv"></canvas>
-  <div id="board-tools">
-    <div class="row">
-      <button class="btn mode on" id="btn-tool-move">MOVE</button>
-      <button class="btn mode" id="btn-tool-cut">CUT 16:9</button>
-    </div>
-    <div class="row">
-      <button class="btn" id="btn-board-fit">FIT</button>
-      <button class="btn" id="btn-photo-del" disabled>DEL PHOTO</button>
-      <span id="zoom-label">50%</span>
-    </div>
-    <div id="board-hint">写真をD&amp;D / IMPORTで読み込み。MOVE=写真移動（空白=パン・ホイール/ピンチ=ズーム）。CUT=矩形ドラッグで絵コンテのコマ化（16:9）。</div>
-  </div>
-</div>
+<!-- ================= STUDIO（BOARD + プレビュー + SHEETパネル + TIMELINE帯） ================= -->
+<div class="view on" id="view-studio">
+  <div id="studio-main">
 
-<!-- ================= SHEET ================= -->
-<div class="view" id="view-sheet">
-  <div id="sheet-wrap">
-    <div id="sheet-head">
-      <button class="btn ex" id="btn-add-empty">+ 空コマ追加</button>
-      <span id="sheet-total"></span>
+    <!-- 左: BOARD -->
+    <div id="studio-board">
+      <canvas id="board-cv"></canvas>
+      <div id="board-tools">
+        <div class="row">
+          <button class="btn mode on" id="btn-tool-move">MOVE</button>
+          <button class="btn mode" id="btn-tool-cut">CUT 16:9</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="btn-board-fit">FIT</button>
+          <button class="btn" id="btn-photo-del" disabled>DEL PHOTO</button>
+          <span id="zoom-label">50%</span>
+        </div>
+        <div id="board-hint">写真をD&amp;D / IMPORTで読み込み。MOVE=写真移動（空白ドラッグ=パン・Alt/中ボタン=常にパン・ホイール/ピンチ=ズーム）。CUT=矩形ドラッグで絵コンテのコマ化（16:9）。</div>
+      </div>
     </div>
-    <div id="sheet-list"></div>
+
+    <!-- 中央: プレビュー＋現在カットの編集欄 -->
+    <div id="studio-center">
+      <div id="tl-stage">
+        <canvas id="tl-cv" width="1280" height="720"></canvas>
+        <div id="tl-empty">カットがありません（BOARDで矩形ドラッグ、または右パネルで空コマ追加）</div>
+        <div id="tl-minitools">
+          <div class="etools">
+            <div class="etool on" data-tool="pen" title="ペン (B)">PEN</div>
+            <div class="etool" data-tool="eraser" title="消しゴム (E)">ERASE</div>
+            <div class="etool" data-tool="fill" title="塗りつぶし (G)">FILL</div>
+            <div class="etool" data-tool="eyedrop" title="スポイト (I / Alt+クリック)">EYE</div>
+          </div>
+          <div class="sld-row">
+            <input type="range" id="tl-brush" min="1" max="64" value="6" title="ブラシサイズ">
+            <span class="sld-val" id="tl-brush-val">6</span>
+          </div>
+          <div id="tl-mini-swatch" title="現在色（スポイトで選択スロットに上書き）"></div>
+          <div class="palette" id="tl-palette"></div>
+          <div class="pal-btns">
+            <button class="btn" id="btn-tl-pal-add" title="色スロットを追加">＋</button>
+            <button class="btn" id="btn-tl-pal-del" title="選択中の色スロットを削除">−</button>
+            <button class="btn" id="btn-tl-pal-save" title="パレットをJSONで書き出し">⇩</button>
+            <button class="btn" id="btn-tl-pal-load" title="パレットJSONを読み込み">⇧</button>
+          </div>
+          <div id="tl-mini-btns">
+            <button class="btn" id="btn-tl-tools-hide" title="ツールバーを隠す">HIDE ▲</button>
+            <button class="btn" id="btn-ui-side-mini" title="TOOLパネルを左右入替">⇄</button>
+          </div>
+        </div>
+        <button class="btn" id="btn-tl-tools" title="ペイントツールを表示" style="display:none;padding:4px 8px;font-size:8px">✎ TOOLS</button>
+      </div>
+      <div id="cur-box">
+        <div id="cur-row">
+          <span id="cur-cut-label">—</span>
+          <span style="color:var(--grey)">尺</span>
+          <input id="cur-dur" value="" title="秒+コマ（24fps）例: 3+12">
+          <span id="cur-dur-f"></span>
+          <span style="flex:1"></span>
+          <button class="btn" id="btn-cur-edit" title="このカットを加筆EDITで開く">&#9998; EDIT</button>
+        </div>
+        <textarea id="cur-note" placeholder="内容・セリフ"></textarea>
+      </div>
+    </div>
+
+    <!-- 右: SHEETパネル -->
+    <div id="studio-sheet">
+      <div id="sheet-head">
+        <button class="btn ex" id="btn-add-empty">+ 空コマ</button>
+        <span id="sheet-total"></span>
+      </div>
+      <div id="sheet-list"></div>
+    </div>
+
+  </div>
+
+  <!-- 下: TIMELINE帯（全幅） -->
+  <div id="tl-bottom">
+    <div id="tl-transport">
+      <button class="btn" id="btn-tl-first" title="先頭 (Home)">&#9198;</button>
+      <button class="btn" id="btn-tl-prevcut" title="前のカット頭 (J)">&#9664;&#10072;</button>
+      <button class="btn mode" id="btn-play" title="再生 / 停止 (Space)">▶</button>
+      <button class="btn" id="btn-tl-nextcut" title="次のカット頭 (K)">&#10072;&#9654;</button>
+      <button class="btn" id="btn-tl-last" title="末尾 (End)">&#9197;</button>
+      <span id="tl-cutlabel">—</span>
+      <span id="tl-time">0+00 / 0+00</span>
+      <button class="btn mode on" id="btn-loop" title="ループ切替 (L)">LOOP</button>
+      <span style="flex:1"></span>
+      <span id="tl-hint">帯クリック=seek ／ クリップ右端ドラッグ=尺変更 ／ クリップをダブルクリック/ダブルタップ=加筆EDIT ／ Space=再生 ←→=コマ送り J/K=カット頭 L=ループ</span>
+    </div>
+    <div id="tl-strip">
+      <canvas id="tl-ruler-cv"></canvas>
+      <div id="tl-clips"></div>
+      <div id="tl-playhead"></div>
+    </div>
   </div>
 </div>
 
 <!-- ================= EDIT ================= -->
 <div class="view" id="view-edit">
   <div id="edit-top">
-    <button class="btn" id="btn-edit-back">&#9666; SHEET</button>
+    <button class="btn" id="btn-edit-back">&#9666; STUDIO</button>
     <button class="btn" id="btn-cut-prev">&#9664;</button>
     <span id="edit-cut-label">C1</span>
     <button class="btn" id="btn-cut-next">&#9654;</button>
@@ -257,6 +363,7 @@ body{
     <input id="edit-dur" value="2+0" title="秒+コマ（24fps）例: 3+12">
     <span id="edit-dur-f">48f</span>
     <span style="flex:1"></span>
+    <button class="btn" id="btn-ui-side" title="TOOLパネルを左右入替">&#8646; TOOL</button>
     <button class="btn" id="btn-clear-draw" title="加筆レイヤーを消去（Undo可）">CLEAR DRAW</button>
     <button class="btn" id="btn-clear-base" title="切り出しベース画像を破棄（Undo不可）">CLEAR BASE</button>
   </div>
@@ -314,51 +421,6 @@ body{
   </div>
 </div>
 
-<!-- ================= TIMELINE ================= -->
-<div class="view" id="view-tl">
-  <div id="tl-stage">
-    <canvas id="tl-cv" width="1280" height="720"></canvas>
-    <div id="tl-empty">カットがありません（BOARDで矩形ドラッグ、またはSHEETで空コマ追加）</div>
-    <div id="tl-minitools">
-      <div class="etools">
-        <div class="etool on" data-tool="pen" title="ペン (B)">PEN</div>
-        <div class="etool" data-tool="eraser" title="消しゴム (E)">ERASE</div>
-        <div class="etool" data-tool="fill" title="塗りつぶし (G)">FILL</div>
-        <div class="etool" data-tool="eyedrop" title="スポイト (I / Alt+クリック)">EYE</div>
-      </div>
-      <div class="sld-row">
-        <input type="range" id="tl-brush" min="1" max="64" value="6" title="ブラシサイズ">
-        <span class="sld-val" id="tl-brush-val">6</span>
-      </div>
-      <div id="tl-mini-swatch" title="現在色（スポイトで選択スロットに上書き）"></div>
-      <div class="palette" id="tl-palette"></div>
-      <button class="btn" id="btn-tl-tools-hide" title="ツールバーを隠す" style="padding:3px 6px;font-size:8px">HIDE ▲</button>
-    </div>
-    <button class="btn" id="btn-tl-tools" title="ペイントツールを表示" style="display:none;padding:4px 8px;font-size:8px">✎ TOOLS</button>
-  </div>
-  <div id="tl-bottom">
-    <div id="tl-transport">
-      <button class="btn" id="btn-tl-first" title="先頭 (Home)">&#9198;</button>
-      <button class="btn" id="btn-tl-prevcut" title="前のカット頭 (J)">&#9664;&#10072;</button>
-      <button class="btn mode" id="btn-play" title="再生 / 停止 (Space)">▶</button>
-      <button class="btn" id="btn-tl-nextcut" title="次のカット頭 (K)">&#10072;&#9654;</button>
-      <button class="btn" id="btn-tl-last" title="末尾 (End)">&#9197;</button>
-      <span id="tl-cutlabel">—</span>
-      <span id="tl-time">0+00 / 0+00</span>
-      <button class="btn mode on" id="btn-loop" title="ループ切替 (L)">LOOP</button>
-      <span style="flex:1"></span>
-      <label id="burnin-label"><input type="checkbox" id="chk-burnin"> C#/尺 焼き込み</label>
-      <button class="btn ex" id="btn-export" title="実時間で再生しながら録画します（タブを前面のまま待つ）">EXPORT VIDEO</button>
-    </div>
-    <div id="tl-strip">
-      <canvas id="tl-ruler-cv"></canvas>
-      <div id="tl-clips"></div>
-      <div id="tl-playhead"></div>
-    </div>
-    <div id="tl-hint">左上ツールバーで PEN/ERASE/FILL/EYE・色・太さを選び、プレビューに直接ペイント（そのカットの加筆へ＝絵コンテに反映）／ クリップ右端ドラッグ=尺変更 ／ 帯クリック=seek ／ クリップをダブルクリック=加筆EDIT ／ Space=再生 ←→=コマ送り J/K=カット頭 L=ループ</div>
-  </div>
-</div>
-
 <div id="toast"></div>
 <div id="modal-ovl">
   <div id="modal-box">
@@ -373,11 +435,14 @@ body{
 <script>
 'use strict';
 /* ============================================================
-   ECONTE P0 — SPEC_10
-   核心: cuts[] が唯一のデータ。BOARD/SHEET/EDIT は同じ配列のビュー。
+   ECONTE — SPEC_10 P0/P1 + SPEC_13 V2-A
+   核心: cuts[] が唯一のデータ。STUDIO の BOARD / プレビュー / SHEETパネル /
+   TIMELINE帯 はすべて同じ配列の別ビュー（同期処理は書かない）。
+   V2-A: 旧 BOARD/SHEET/TIMELINE の3ビューを STUDIO 1画面へ統合。
    ============================================================ */
 const CONTE_W = 1280, CONTE_H = 720, FPS = 24;
 const PAL_LS = 'econte_palette_v1';
+const UI_LS = 'econte_ui_v1';
 const $ = sel => document.querySelector(sel);
 
 const PALETTE_48 = [
@@ -390,20 +455,21 @@ const PALETTE_48 = [
 ];
 
 const state = {
-  view: 'board',
+  view: 'studio',        // studio | edit（V2-Aで2ビューに統合）
   tool: 'move',          // BOARD: move | cut
   etool: 'pen',          // EDIT: pen | eraser | fill | eyedrop
   fillColor: '#000000',
   brush: 6,
   curCut: -1,
   selPhoto: null,
-  backView: 'sheet',
   tl: { frame: 0, playing: false, loop: true, lastTs: 0, acc: 0 },
   board: { x: -800, y: -450, z: 0.5 }
 };
 let photos = [];   // {id,name,img,blob,x,y,w,h} — BOARD座標
 let cuts = [];     // SPEC_10 cutモデル
 let db = null;
+let gFocusCut = -1;                          // 現在カット = cutIndexAt(tl.frame).i の導出値
+let gUi = { side: 'left', sheet: true };     // TOOLパネルの左右 / 右SHEETパネルの開閉
 
 function uid(){ return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function clamp(v, a, b){ return Math.min(b, Math.max(a, v)); }
@@ -545,7 +611,8 @@ async function loadAll(){
       }
       cuts.push({ id: c.id, src: c.src || null, baseC, drawC, bg: (typeof c.bg === 'number' ? c.bg : 232),
                   durF: c.durF || FPS * 2, note: c.note || '',
-                  baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null, dirtyBase: false, dirtyDraw: false });
+                  baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null,
+                  dirtyBase: false, dirtyDraw: false, thumb: null });
     }
     const metas = await idbGetAll('meta');
     const m = metas.find(x => x.k === 'main');
@@ -555,22 +622,50 @@ async function loadAll(){
   }
 }
 
-/* ---------------- view switching ---------------- */
+/* ---------------- view switching（STUDIO / EDIT） ---------------- */
 function setView(v){
-  if(state.view === 'tl' && v !== 'tl') pause();
+  if(v !== 'studio') pause();   // 再生の取り残し防止（TIMELINE帯はSTUDIOにしかない）
   state.view = v;
-  $('#view-board').classList.toggle('on', v === 'board');
-  $('#view-sheet').classList.toggle('on', v === 'sheet');
+  $('#view-studio').classList.toggle('on', v === 'studio');
   $('#view-edit').classList.toggle('on', v === 'edit');
-  $('#view-tl').classList.toggle('on', v === 'tl');
-  const barHi = (v === 'edit') ? (state.backView === 'tl' ? 'tl' : 'sheet') : v;
-  $('#btn-view-board').classList.toggle('on', barHi === 'board');
-  $('#btn-view-sheet').classList.toggle('on', barHi === 'sheet');
-  $('#btn-view-tl').classList.toggle('on', barHi === 'tl');
-  if(v === 'board'){ resizeBoard(); renderBoard(); }
-  if(v === 'sheet'){ renderSheet(); }
+  $('#btn-view-studio').classList.toggle('on', v === 'studio');
+  $('#btn-view-edit').classList.toggle('on', v === 'edit');
+  if(v === 'studio'){ renderSheetPanel(); layoutStudio(); renderStudioSync(true); }
   if(v === 'edit'){ fitEditCanvas(); renderEditCanvas(); }
-  if(v === 'tl'){ fitTLCanvas(); layoutTL(); renderTL(); }
+}
+function layoutStudio(){
+  resizeBoard(); renderBoard();
+  fitTLCanvas(); layoutTL(); renderTL();
+}
+
+/* --- STUDIO フォーカス同期（V2-A の核・SPEC_13 §1） ---
+   「現在カット」= cutIndexAt(tl.frame).i の1つの導出値に、右パネル行 / 中央下の編集欄 /
+   BOARDのCUT枠ハイライト がすべて従う。DOMの全再構築はしない（class付替と値だけ）。 */
+function renderStudioSync(force){
+  if(state.view !== 'studio') return;
+  const ca = cutIndexAt(state.tl.frame);
+  const i = ca ? ca.i : -1;
+  const changed = force || i !== gFocusCut;
+  gFocusCut = i;
+  if(changed){
+    const rows = $('#sheet-list').children;
+    for(let k = 0; k < rows.length; k++) rows[k].classList.toggle('focus', k === i);
+    if(rows[i]) rows[i].scrollIntoView({ block: 'nearest' });
+    renderBoard();   // BOARD上の該当CUT枠の色を変える
+  }
+  const cut = cuts[i];
+  const lab = $('#cur-cut-label'), durEl = $('#cur-dur'), durF = $('#cur-dur-f'), note = $('#cur-note');
+  const has = !!cut;
+  durEl.disabled = !has;
+  note.disabled = !has;
+  $('#btn-cur-edit').disabled = !has;
+  lab.textContent = has ? 'C' + (i + 1) : '—';
+  durF.textContent = has ? cut.durF + 'f' : '';
+  // 再生中にフォーカス中の入力欄を書き換えない（入力が飛ぶため）
+  const dv = has ? fmtDur(cut.durF) : '';
+  if(document.activeElement !== durEl && durEl.value !== dv) durEl.value = dv;
+  const nv = has ? cut.note : '';
+  if(document.activeElement !== note && note.value !== nv) note.value = nv;
 }
 
 /* ---------------- BOARD ---------------- */
@@ -628,10 +723,11 @@ function renderBoard(){
   boardCtx.font = (13 / b.z) + 'px monospace';
   cuts.forEach((c, i) => {
     if(!c.src) return;
-    boardCtx.strokeStyle = 'rgba(255,210,122,0.75)';
-    boardCtx.lineWidth = 1.5 / b.z;
+    const foc = (i === gFocusCut);   // 現在カット（プレイヘッド位置）だけ色を変える
+    boardCtx.strokeStyle = foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.75)';
+    boardCtx.lineWidth = (foc ? 2.5 : 1.5) / b.z;
     boardCtx.strokeRect(c.src.x, c.src.y, c.src.w, c.src.h);
-    boardCtx.fillStyle = 'rgba(255,210,122,0.9)';
+    boardCtx.fillStyle = foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.9)';
     boardCtx.fillText('C' + (i + 1), c.src.x + 4 / b.z, c.src.y + 15 / b.z);
   });
   // dragging rect
@@ -674,7 +770,6 @@ function boardFit(){
 /* --- board pointers (pan / photo drag / cut rect / pinch) --- */
 const bPtrs = new Map();
 let bDrag = null;
-let spaceHeld = false;
 function hitPhoto(bx, by){
   for(let i = photos.length - 1; i >= 0; i--){
     const p = photos[i];
@@ -692,7 +787,8 @@ function bDown(e){
     return;
   }
   const bp = screenToBoard(e.clientX, e.clientY);
-  const pan = spaceHeld || e.button === 1;
+  // V2-A: STUDIO統合で Space は再生/停止に取られたため、強制パンは Alt / 中ボタン
+  const pan = e.altKey || e.button === 1;
   if(!pan && state.tool === 'cut'){
     bDrag = { mode: 'rect', start: bp, cur: bp };
   }else if(!pan && state.tool === 'move'){
@@ -811,32 +907,33 @@ function bakeCut(src){
 }
 function createCutFromRect(src){
   const cut = { id: uid(), src, baseC: bakeCut(src), drawC: blankCanvas(), bg: 232,
-                durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: true, dirtyDraw: true };
+                durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: true, dirtyDraw: true, thumb: null };
   cuts.push(cut);
-  toast('C' + cuts.length + ' を追加しました（SHEETで確認）');
-  updateTotals();
+  toast('C' + cuts.length + ' を追加しました（右パネルで確認）');
+  refreshStudio();
   scheduleSave();
   return cut;
 }
 function addEmptyCut(){
   const cut = { id: uid(), src: null, baseC: null, drawC: blankCanvas(), bg: 232,
-                durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: false, dirtyDraw: true };
+                durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: false, dirtyDraw: true, thumb: null };
   cuts.push(cut);
-  renderSheet();
+  refreshStudio();
   scheduleSave();
 }
 function moveCut(i, d){
   const j = i + d;
   if(j < 0 || j >= cuts.length) return;
   const t = cuts[i]; cuts[i] = cuts[j]; cuts[j] = t;
-  renderSheet();
+  refreshStudio();
   scheduleSave();
 }
 async function deleteCut(i){
   const ok = await modalConfirm('C' + (i + 1) + ' を削除しますか？（Undo不可）');
   if(!ok) return;
   cuts.splice(i, 1);
-  renderSheet();
+  if(state.curCut >= cuts.length) state.curCut = cuts.length - 1;
+  refreshStudio();
   scheduleSave();
 }
 function rebakeCut(i){
@@ -844,9 +941,16 @@ function rebakeCut(i){
   if(!c.src){ toast('このコマは空コマです（切り出し元なし）'); return; }
   c.baseC = bakeCut(c.src);
   c.dirtyBase = true;
-  renderSheet();
+  c.thumb = null;
+  refreshRow(i);
+  renderPaintViews();
   toast('C' + (i + 1) + ' をBOARDから再切り出ししました');
   scheduleSave();
+}
+/* カット数・並び・尺が変わったときの STUDIO 一括更新（右パネル＋TL帯＋フォーカス） */
+function refreshStudio(){
+  renderSheetPanel();   // updateTotals() を内包
+  if(state.view === 'studio'){ layoutTL(); renderTL(); renderStudioSync(true); }
 }
 function compositeTo(ctx, cut){
   const v = cut.bg;
@@ -864,6 +968,12 @@ function cutThumb(cut){
   t.getContext('2d').drawImage(c, 0, 0, 256, 144);
   return t.toDataURL('image/jpeg', 0.75);
 }
+/* 右パネルが常時表示になったので、サムネは cut.thumb にキャッシュして
+   絵が変わったとき（cut.thumb = null）だけ作り直す。 */
+function cutThumbSrc(cut){
+  if(!cut.thumb) cut.thumb = cutThumb(cut);
+  return cut.thumb;
+}
 function updateTotals(){
   const total = cuts.reduce((a, c) => a + c.durF, 0);
   const txt = cuts.length + ' CUTS · ' + fmtDur(total) + ' (' + (total / FPS).toFixed(1) + 's)';
@@ -871,80 +981,98 @@ function updateTotals(){
   $('#sheet-total').textContent = 'TOTAL ' + txt;
 }
 
-/* ---------------- SHEET ---------------- */
+/* ---------------- SHEETパネル（STUDIO右・レイヤー一覧風） ---------------- */
+function setCutDur(i, f){
+  const cut = cuts[i];
+  if(!cut) return;
+  cut.durF = f;
+  refreshRow(i);
+  if(state.view === 'studio'){ layoutTL(); renderTL(); renderStudioSync(true); }
+  if(state.curCut === i){
+    $('#edit-dur').value = fmtDur(f);
+    $('#edit-dur-f').textContent = f + 'f';
+  }
+  updateTotals();
+  scheduleSave();
+}
 function makeSheetRow(cut, i){
   const row = document.createElement('div');
-  row.className = 'cut-row';
+  row.className = 'sp-row';
+  row.title = 'クリック=このカット頭へ ／ ダブルクリック（タップ）=加筆EDIT';
 
-  const no = document.createElement('div');
-  no.className = 'cut-no';
+  const head = document.createElement('div');
+  head.className = 'sp-head';
+  const no = document.createElement('span');
+  no.className = 'sp-no';
   no.textContent = 'C' + (i + 1);
-  row.appendChild(no);
-
-  const thumb = document.createElement('img');
-  thumb.className = 'cut-thumb';
-  thumb.src = cutThumb(cut);
-  thumb.title = 'クリックで加筆（EDIT）';
-  thumb.addEventListener('click', () => { state.backView = 'sheet'; openEdit(i); });
-  row.appendChild(thumb);
-
-  const mid = document.createElement('div');
-  mid.className = 'cut-mid';
-  const note = document.createElement('textarea');
-  note.className = 'cut-note';
-  note.placeholder = '内容・セリフ';
-  note.value = cut.note;
-  note.addEventListener('input', () => { cut.note = note.value; scheduleSave(); });
-  mid.appendChild(note);
-  row.appendChild(mid);
-
-  const side = document.createElement('div');
-  side.className = 'cut-side';
-  const durWrap = document.createElement('div');
   const dur = document.createElement('input');
-  dur.className = 'cut-dur';
+  dur.className = 'sp-dur';
   dur.value = fmtDur(cut.durF);
   dur.title = '秒+コマ（24fps）例: 3+12';
-  const durf = document.createElement('span');
-  durf.className = 'cut-durf';
-  durf.textContent = cut.durF + 'f';
+  dur.addEventListener('click', ev => ev.stopPropagation());
   dur.addEventListener('change', () => {
     const f = parseDur(dur.value);
     if(f === null || f <= 0){ dur.value = fmtDur(cut.durF); return; }
-    cut.durF = f;
-    dur.value = fmtDur(f);
-    durf.textContent = f + 'f';
-    updateTotals();
-    scheduleSave();
+    setCutDur(i, f);
   });
-  durWrap.appendChild(dur);
-  durWrap.appendChild(durf);
-  side.appendChild(durWrap);
-
   const btns = document.createElement('div');
-  btns.className = 'cut-btns';
+  btns.className = 'sp-btns';
   const mk = (label, title, fn) => {
     const bt = document.createElement('button');
     bt.className = 'btn';
     bt.textContent = label;
     bt.title = title;
-    bt.addEventListener('click', fn);
+    bt.addEventListener('click', ev => { ev.stopPropagation(); fn(); });
     btns.appendChild(bt);
   };
-  mk('✎', '加筆（EDIT）', () => { state.backView = 'sheet'; openEdit(i); });
   mk('▲', '上へ', () => moveCut(i, -1));
   mk('▼', '下へ', () => moveCut(i, 1));
   mk('⟳', 'BOARDの切り出し元から再ベイク', () => rebakeCut(i));
   mk('✕', '削除', () => deleteCut(i));
-  side.appendChild(btns);
-  row.appendChild(side);
+  head.appendChild(no); head.appendChild(dur); head.appendChild(btns);
+
+  const body = document.createElement('div');
+  body.className = 'sp-body';
+  const thumb = document.createElement('img');
+  thumb.className = 'sp-thumb';
+  thumb.alt = '';
+  thumb.src = cutThumbSrc(cut);
+  const note = document.createElement('div');
+  note.className = 'sp-note' + (cut.note ? '' : ' empty');
+  note.textContent = cut.note || '内容・セリフ';
+  body.appendChild(thumb); body.appendChild(note);
+
+  row.appendChild(head); row.appendChild(body);
+  row.addEventListener('click', () => { pause(); seek(cutStartFrame(i)); });
+  row.addEventListener('dblclick', () => openEdit(i));
+  bindDoubleTap(row, () => openEdit(i));   // iPad: ネイティブdblclickが来ないことがある
   return row;
 }
-function renderSheet(){
+function renderSheetPanel(){
   const list = $('#sheet-list');
   list.innerHTML = '';
-  cuts.forEach((c, i) => list.appendChild(makeSheetRow(c, i)));
+  cuts.forEach((c, i) => {
+    const row = makeSheetRow(c, i);
+    if(i === gFocusCut) row.classList.add('focus');
+    list.appendChild(row);
+  });
   updateTotals();
+}
+/* 1行だけの軽量更新（描画後・尺変更後） */
+function refreshRow(i){
+  const cut = cuts[i];
+  const row = $('#sheet-list').children[i];
+  if(!cut || !row) return;
+  const im = row.querySelector('.sp-thumb');
+  const src = cutThumbSrc(cut);
+  if(im && im.getAttribute('src') !== src) im.setAttribute('src', src);
+  const du = row.querySelector('.sp-dur');
+  if(du && document.activeElement !== du) du.value = fmtDur(cut.durF);
+  const nt = row.querySelector('.sp-note');
+  if(nt){
+    nt.textContent = cut.note || '内容・セリフ';
+    nt.classList.toggle('empty', !cut.note);
+  }
 }
 
 /* ---------------- EDIT ---------------- */
@@ -966,16 +1094,16 @@ function renderEditCanvas(){
 }
 function openEdit(i){
   if(!cuts.length) return;
+  pause();
   i = clamp(i, 0, cuts.length - 1);
   state.curCut = i;
-  undoStack = []; redoStack = [];
+  undoStack = []; redoStack = [];   // カットをまたぐundo破損防止
   const cut = cuts[i];
   $('#edit-cut-label').textContent = 'C' + (i + 1);
   $('#edit-dur').value = fmtDur(cut.durF);
   $('#edit-dur-f').textContent = cut.durF + 'f';
   $('#bg-slider').value = cut.bg;
   $('#bg-val').textContent = cut.bg;
-  $('#btn-edit-back').innerHTML = '&#9666; ' + (state.backView === 'tl' ? 'TIMELINE' : 'SHEET');
   setView('edit');
 }
 function setETool(t){
@@ -997,9 +1125,11 @@ function setCutBg(v){
   const cut = cuts[state.curCut];
   if(!cut) return;
   cut.bg = clamp(Math.round(v), 0, 255);
+  cut.thumb = null;
   $('#bg-slider').value = cut.bg;
   $('#bg-val').textContent = cut.bg;
-  renderEditCanvas();
+  renderPaintViews();
+  refreshRow(state.curCut);
   scheduleSave();
 }
 function toCanvasCoord(clientX, clientY, cv){
@@ -1020,7 +1150,9 @@ function doUndo(){
   redoStack.push(ctx.getImageData(0, 0, CONTE_W, CONTE_H));
   ctx.putImageData(undoStack.pop(), 0, 0);
   cut.dirtyDraw = true;
+  cut.thumb = null;
   renderPaintViews();
+  refreshRow(state.curCut);
   scheduleSave();
 }
 function doRedo(){
@@ -1030,7 +1162,9 @@ function doRedo(){
   undoStack.push(ctx.getImageData(0, 0, CONTE_W, CONTE_H));
   ctx.putImageData(redoStack.pop(), 0, 0);
   cut.dirtyDraw = true;
+  cut.thumb = null;
   renderPaintViews();
+  refreshRow(state.curCut);
   scheduleSave();
 }
 function strokeSeg(a, b){
@@ -1049,6 +1183,7 @@ function strokeSeg(a, b){
   ctx.stroke();
   ctx.restore();
   cut.dirtyDraw = true;
+  cut.thumb = null;
 }
 function floodFill(cx, cy){
   const cut = cuts[state.curCut];
@@ -1085,6 +1220,7 @@ function floodFill(cx, cy){
   }
   dctx.putImageData(di, 0, 0);
   cut.dirtyDraw = true;
+  cut.thumb = null;
 }
 
 /* --- palette (canon: animator-color-palette skill) --- */
@@ -1112,7 +1248,9 @@ function selectPalSlot(i){
   state.fillColor = gPalette[i];
   updateSwatch();
   renderPalette();
-  setETool('fill');
+  // SPEC_13 §3-3: 色を選んでもツールは変えない。
+  // animator-color-palette スキルの正準（選択で塗りツールへ切替）からの意図的な逸脱。
+  // 絵コンテはペンで描きながら色だけ拾う頻度が高いため。
 }
 function renderPalette(){
   ['#palette', '#tl-palette'].forEach(pid => {
@@ -1160,7 +1298,7 @@ function eyedropAt(clientX, clientY, cv){
 /* --- paint pointers（EDITキャンバスとTIMELINEプレビューで共用） --- */
 let stroking = false, strokeLast = null, paintCv = null;
 function renderPaintViews(){
-  if(state.view === 'tl') renderTL();
+  if(state.view === 'studio') renderTL();
   else renderEditCanvas();
 }
 function paintDown(e, cv){
@@ -1179,6 +1317,7 @@ function paintDown(e, cv){
     const cut = cuts[state.curCut];
     if(cut) cut.dirtyDraw = true;
     renderPaintViews();
+    refreshRow(state.curCut);
     scheduleSave();
     return;
   }
@@ -1199,6 +1338,7 @@ function paintUp(){
   paintCv = null;
   if(!stroking) return;
   stroking = false;
+  refreshRow(state.curCut);   // 右パネルのサムネを更新
   scheduleSave();
 }
 async function clearBase(){
@@ -1209,7 +1349,9 @@ async function clearBase(){
   cut.baseC = null;
   cut.baseBlob = null;
   cut.dirtyBase = true;
-  renderEditCanvas();
+  cut.thumb = null;
+  renderPaintViews();
+  refreshRow(state.curCut);
   scheduleSave();
 }
 function clearDraw(){
@@ -1218,7 +1360,9 @@ function clearDraw(){
   pushUndo();
   ctx2d(cut.drawC).clearRect(0, 0, CONTE_W, CONTE_H);
   cut.dirtyDraw = true;
-  renderEditCanvas();
+  cut.thumb = null;
+  renderPaintViews();
+  refreshRow(state.curCut);
   scheduleSave();
 }
 
@@ -1252,13 +1396,13 @@ function renderTL(){
   if(!T){
     tlCtx.fillStyle = '#1a1a22';
     tlCtx.fillRect(0, 0, CONTE_W, CONTE_H);
-    updateTLHud();
-    return;
+  }else{
+    const ca = cutIndexAt(state.tl.frame);
+    compositeTo(tlCtx, cuts[ca.i]);
+    if($('#chk-burnin').checked) drawBurnin(ca);
   }
-  const ca = cutIndexAt(state.tl.frame);
-  compositeTo(tlCtx, cuts[ca.i]);
-  if($('#chk-burnin').checked) drawBurnin(ca);
   updateTLHud();
+  renderStudioSync();   // STUDIO 3ペインのフォーカス同期（SPEC_13 §1）
 }
 function drawBurnin(ca){
   const cut = cuts[ca.i];
@@ -1327,7 +1471,8 @@ function layoutTL(){
     const du = document.createElement('span'); du.className = 'tl-clip-dur'; du.textContent = fmtDur(c.durF);
     const h = document.createElement('div'); h.className = 'tl-clip-h'; h.title = 'ドラッグで尺を変更（SHEETに即反映）';
     el.appendChild(no); el.appendChild(du); el.appendChild(h);
-    el.addEventListener('dblclick', () => { pause(); state.backView = 'tl'; openEdit(i); });
+    el.addEventListener('dblclick', () => openEdit(i));
+    bindDoubleTap(el, () => openEdit(i));   // iPad: ネイティブdblclickが来ないことがある
     h.addEventListener('pointerdown', ev => {
       ev.stopPropagation(); ev.preventDefault();
       h.setPointerCapture(ev.pointerId);
@@ -1348,6 +1493,7 @@ function clipDragMove(ev){
   if(nd !== cuts[g.i].durF){
     cuts[g.i].durF = nd;
     liveClipWidths(g.px);
+    refreshRow(g.i);   // 右パネルの尺表示も追従（同期処理ではなく同じ配列を読み直すだけ）
   }
 }
 function liveClipWidths(px){
@@ -1449,6 +1595,7 @@ function exportVideo(){
   if(!T){ toast('カットがありません'); return; }
   const mime = pickMime();
   if(!mime){ toast('このブラウザは録画に未対応です'); return; }
+  if(state.view !== 'studio') setView('studio');   // 録画元は STUDIO のプレビュー
   pause();
   seek(0);
   gRecChunks = [];
@@ -1532,20 +1679,79 @@ function normKey(e){
   return k;
 }
 
+/* ---------------- UI設定（TOOLパネル左右・右パネル開閉）SPEC_13 §3-2 ---------------- */
+function loadUi(){
+  try{
+    const o = JSON.parse(localStorage.getItem(UI_LS) || '{}');
+    if(o.side === 'left' || o.side === 'right') gUi.side = o.side;
+    if(typeof o.sheet === 'boolean') gUi.sheet = o.sheet;
+  }catch(e){}
+}
+function saveUi(){
+  try{ localStorage.setItem(UI_LS, JSON.stringify(gUi)); }catch(e){}
+}
+function applyUi(){
+  const right = gUi.side === 'right';
+  $('#edit-main').classList.toggle('side-right', right);
+  $('#tl-minitools').classList.toggle('right', right);
+  $('#btn-tl-tools').classList.toggle('right', right);
+  $('#studio-sheet').classList.toggle('hidden', !gUi.sheet);
+  $('#btn-sheet-toggle').classList.toggle('on', gUi.sheet);
+}
+function toggleUiSide(){
+  gUi.side = (gUi.side === 'left') ? 'right' : 'left';
+  applyUi();
+  saveUi();
+  toast('TOOLパネル: ' + (gUi.side === 'left' ? '左' : '右'));
+}
+function toggleSheetPanel(){
+  gUi.sheet = !gUi.sheet;
+  applyUi();
+  saveUi();
+  if(state.view === 'studio') layoutStudio();
+}
+function toggleFullscreen(){
+  const el = document.documentElement;
+  const cur = document.fullscreenElement || document.webkitFullscreenElement;
+  if(cur){
+    const ex = document.exitFullscreen || document.webkitExitFullscreen;
+    if(ex) ex.call(document);
+    return;
+  }
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if(!req){ toast('この環境ではフルスクリーンにできません'); return; }
+  const r = req.call(el);
+  if(r && r.catch) r.catch(() => toast('フルスクリーンにできませんでした'));
+}
+
+/* --- iPad: ネイティブ dblclick が飛ばないことがあるので pointerup 2回で拾う（SPEC_13 §4-1） --- */
+function bindDoubleTap(el, fn){
+  let lt = 0, lx = 0, ly = 0;
+  el.addEventListener('pointerup', e => {
+    if(e.pointerType === 'mouse') return;   // マウスはネイティブ dblclick に任せる（二重発火防止）
+    const t = e.timeStamp || Date.now();
+    if(t - lt < 350 && Math.hypot(e.clientX - lx, e.clientY - ly) < 24){
+      lt = 0;
+      fn(e);
+      return;
+    }
+    lt = t; lx = e.clientX; ly = e.clientY;
+  });
+}
+
 /* ---------------- keyboard ---------------- */
 function onKey(e){
   if($('#modal-ovl').classList.contains('on')) return;
   const tag = (e.target && e.target.tagName) || '';
   if(tag === 'INPUT' || tag === 'TEXTAREA') return;
-  if(e.code === 'Space' && state.view === 'board'){ spaceHeld = true; e.preventDefault(); return; }
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
     e.preventDefault();
     if(e.shiftKey) doRedo(); else doUndo();
     return;
   }
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){ e.preventDefault(); doRedo(); return; }
-  if(state.view === 'tl'){
-    const nk = normKey(e);
+  if(state.view === 'studio'){
+    const nk = normKey(e);   // Space/←→/Home/End/J/K/L はトランスポート
     for(const a of SHORTCUT_ACTIONS){
       if(gKeymap[a.id] && gKeymap[a.id] === nk){
         if(a.prevent) e.preventDefault();
@@ -1553,26 +1759,30 @@ function onKey(e){
         return;
       }
     }
-  }
-  if(state.view === 'edit' || state.view === 'tl'){
-    const k = e.key.toLowerCase();
-    if(k === 'b') setETool('pen');
-    else if(k === 'e') setETool('eraser');
-    else if(k === 'g') setETool('fill');
-    else if(k === 'i') setETool('eyedrop');
-    else if(k === '['){ setBrush(state.brush - 2); }
-    else if(k === ']'){ setBrush(state.brush + 2); }
-  }else if(state.view === 'board'){
     if(e.key === 'Delete' || e.key === 'Backspace'){
-      if(state.selPhoto) deleteSelPhoto();
+      if(state.selPhoto){ deleteSelPhoto(); return; }
     }
   }
+  const k = e.key.toLowerCase();   // ペイント系は STUDIO / EDIT 両方で有効
+  if(k === 'b') setETool('pen');
+  else if(k === 'e') setETool('eraser');
+  else if(k === 'g') setETool('fill');
+  else if(k === 'i') setETool('eyedrop');
+  else if(k === '['){ setBrush(state.brush - 2); }
+  else if(k === ']'){ setBrush(state.brush + 2); }
 }
 
 /* ---------------- wiring / init ---------------- */
 function wire(){
-  $('#btn-view-board').addEventListener('click', () => setView('board'));
-  $('#btn-view-sheet').addEventListener('click', () => setView('sheet'));
+  $('#btn-view-studio').addEventListener('click', () => setView('studio'));
+  $('#btn-view-edit').addEventListener('click', () => {
+    if(!cuts.length){ toast('カットがありません'); return; }
+    openEdit(gFocusCut >= 0 ? gFocusCut : 0);
+  });
+  $('#btn-fs').addEventListener('click', toggleFullscreen);
+  $('#btn-sheet-toggle').addEventListener('click', toggleSheetPanel);
+  $('#btn-ui-side').addEventListener('click', toggleUiSide);
+  $('#btn-ui-side-mini').addEventListener('click', toggleUiSide);
   $('#btn-home').addEventListener('click', () => { location.href = 'index.html'; });
   $('#btn-import').addEventListener('click', () => $('#file-input').click());
   $('#file-input').addEventListener('change', e => {
@@ -1600,7 +1810,7 @@ function wire(){
     e.preventDefault();
     boardZoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0012));
   }, { passive: false });
-  const bv = $('#view-board');
+  const bv = $('#studio-board');
   bv.addEventListener('dragover', e => e.preventDefault());
   bv.addEventListener('drop', e => {
     e.preventDefault();
@@ -1608,10 +1818,26 @@ function wire(){
       importFiles([...e.dataTransfer.files], screenToBoard(e.clientX, e.clientY));
     }
   });
-  // SHEET
+  // SHEETパネル
   $('#btn-add-empty').addEventListener('click', addEmptyCut);
+  // STUDIO中央: 現在カットの編集欄
+  $('#btn-cur-edit').addEventListener('click', () => { if(gFocusCut >= 0) openEdit(gFocusCut); });
+  $('#cur-dur').addEventListener('change', () => {
+    const cut = cuts[gFocusCut];
+    if(!cut) return;
+    const f = parseDur($('#cur-dur').value);
+    if(f === null || f <= 0){ $('#cur-dur').value = fmtDur(cut.durF); return; }
+    setCutDur(gFocusCut, f);
+  });
+  $('#cur-note').addEventListener('input', () => {
+    const cut = cuts[gFocusCut];
+    if(!cut) return;
+    cut.note = $('#cur-note').value;
+    refreshRow(gFocusCut);
+    scheduleSave();
+  });
   // EDIT
-  $('#btn-edit-back').addEventListener('click', () => setView(state.backView === 'tl' ? 'tl' : 'sheet'));
+  $('#btn-edit-back').addEventListener('click', () => setView('studio'));
   $('#btn-cut-prev').addEventListener('click', () => openEdit(state.curCut - 1));
   $('#btn-cut-next').addEventListener('click', () => openEdit(state.curCut + 1));
   $('#edit-dur').addEventListener('change', () => {
@@ -1619,11 +1845,7 @@ function wire(){
     if(!cut) return;
     const f = parseDur($('#edit-dur').value);
     if(f === null || f <= 0){ $('#edit-dur').value = fmtDur(cut.durF); return; }
-    cut.durF = f;
-    $('#edit-dur').value = fmtDur(f);
-    $('#edit-dur-f').textContent = f + 'f';
-    updateTotals();
-    scheduleSave();
+    setCutDur(state.curCut, f);
   });
   $('#btn-clear-draw').addEventListener('click', clearDraw);
   $('#btn-clear-base').addEventListener('click', clearBase);
@@ -1641,8 +1863,7 @@ function wire(){
   editCv.addEventListener('pointermove', paintMove);
   editCv.addEventListener('pointerup', paintUp);
   editCv.addEventListener('pointercancel', paintUp);
-  // TIMELINE
-  $('#btn-view-tl').addEventListener('click', () => setView('tl'));
+  // TIMELINE帯
   $('#btn-play').addEventListener('click', togglePlay);
   $('#btn-tl-first').addEventListener('click', () => { pause(); seek(0); });
   $('#btn-tl-last').addEventListener('click', () => { pause(); seek(totalFrames() - 1); });
@@ -1676,17 +1897,17 @@ function wire(){
   tlCv.addEventListener('pointermove', paintMove);
   tlCv.addEventListener('pointerup', paintUp);
   tlCv.addEventListener('pointercancel', paintUp);
-  // palette buttons (canon)
-  $('#btn-pal-add').addEventListener('click', () => {
+  // palette buttons (canon) — EDITサイド と STUDIOミニツールの両方に同じ4ボタンを出す
+  const palAdd = () => {
     gPalette.push('#808080');
     gPalSlot = gPalette.length - 1;
     state.fillColor = gPalette[gPalSlot];
     updateSwatch();
     savePalette();
     renderPalette();
-    setETool('fill');
-  });
-  $('#btn-pal-del').addEventListener('click', () => {
+    // §3-3 と同じ理由でツールは変えない
+  };
+  const palDel = () => {
     if(gPalette.length <= 1) return;
     gPalette.splice(gPalSlot, 1);
     gPalSlot = Math.min(gPalSlot, gPalette.length - 1);
@@ -1694,16 +1915,24 @@ function wire(){
     updateSwatch();
     savePalette();
     renderPalette();
-  });
-  $('#btn-pal-save').addEventListener('click', () => {
+  };
+  const palSave = () => {
     const blob = new Blob([JSON.stringify({ format: 'PALETTE_v1', colors: gPalette }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     a.href = url; a.download = 'econte_palette_' + ts + '.json'; a.click();
     URL.revokeObjectURL(url);
-  });
-  $('#btn-pal-load').addEventListener('click', () => $('#pal-file-input').click());
+  };
+  const palLoad = () => $('#pal-file-input').click();
+  $('#btn-pal-add').addEventListener('click', palAdd);
+  $('#btn-pal-del').addEventListener('click', palDel);
+  $('#btn-pal-save').addEventListener('click', palSave);
+  $('#btn-pal-load').addEventListener('click', palLoad);
+  $('#btn-tl-pal-add').addEventListener('click', palAdd);
+  $('#btn-tl-pal-del').addEventListener('click', palDel);
+  $('#btn-tl-pal-save').addEventListener('click', palSave);
+  $('#btn-tl-pal-load').addEventListener('click', palLoad);
   $('#pal-file-input').addEventListener('change', async e => {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
@@ -1725,18 +1954,21 @@ function wire(){
   $('#modal-cancel').addEventListener('click', () => modalClose(false));
   // keyboard
   window.addEventListener('keydown', onKey);
-  window.addEventListener('keyup', e => { if(e.code === 'Space') spaceHeld = false; });
-  window.addEventListener('resize', () => {
-    if(state.view === 'board'){ resizeBoard(); renderBoard(); }
-    if(state.view === 'edit'){ fitEditCanvas(); }
-    if(state.view === 'tl'){ fitTLCanvas(); layoutTL(); renderTL(); }
-  });
+  const relayout = () => {
+    if(state.view === 'studio') layoutStudio();
+    else fitEditCanvas();
+  };
+  window.addEventListener('resize', relayout);
+  document.addEventListener('fullscreenchange', relayout);
+  document.addEventListener('webkitfullscreenchange', relayout);
 }
 
 async function init(){
   wire();
   loadKeymap();
   loadPalette();
+  loadUi();
+  applyUi();
   state.fillColor = gPalette[gPalSlot] || '#000000';
   updateSwatch();
   renderPalette();
@@ -1745,7 +1977,7 @@ async function init(){
     await loadAll();
   }catch(e){ console.error('DB init failed', e); }
   updateTotals();
-  setView('board');
+  setView('studio');
   if(!photos.length && !cuts.length){
     toast('紙のネーム/ラフの写真をD&D または IMPORT で読み込んでください');
   }
@@ -1756,8 +1988,12 @@ init();
 // デバッグ/検証用フック（single-html-verify系。UIには出ない）
 window.__ECONTE__ = {
   state, photos, cuts,
-  addPhotoFromImage, createCutFromRect, addEmptyCut, bakeCut,
-  renderBoard, renderSheet, renderEditCanvas, openEdit, setView, setETool,
+  get focusCut(){ return gFocusCut; },
+  get ui(){ return gUi; },
+  addPhotoFromImage, createCutFromRect, addEmptyCut, bakeCut, rebakeCut, deleteCut, moveCut,
+  renderBoard, renderSheetPanel, renderEditCanvas, openEdit, setView, setETool,
+  renderStudioSync, layoutStudio, refreshStudio, refreshRow, setCutDur, cutThumbSrc,
+  toggleUiSide, toggleSheetPanel, toggleFullscreen, applyUi,
   fmtDur, parseDur, floodFill, sampleCompositeColor, saveAll, boardFit, updateTotals,
   totalFrames, cutIndexAt, cutStartFrame, seek, play, pause, togglePlay, seekCut, toggleLoop,
   layoutTL, renderTL, fitTLCanvas, exportVideo, finishExport, cancelExport, loadKeymap

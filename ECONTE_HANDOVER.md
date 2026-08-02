@@ -7,16 +7,33 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ■ データモデル（実体）
-- `cuts[]` = グローバル配列。要素 `{id,src,baseC,drawC,bg,durF,note}`。canvasは1280×720固定（`CONTE_W/H`, `FPS=24`）
+- `cuts[]` = グローバル配列。要素 `{id,src,baseC,drawC,bg,durF,note,thumb}`。canvasは1280×720固定（`CONTE_W/H`, `FPS=24`）
+  - `thumb` = 右パネル用サムネのdataURLキャッシュ（V2-A）。**絵が変わる処理では必ず `cut.thumb = null`**
+    （strokeSeg / floodFill / doUndo / doRedo / clearDraw / clearBase / setCutBg / rebakeCut）。保存対象外
 - `photos[]` = BOARD座標の写真配列（別データ・cutsとは独立）
-- `state.view` = 'board'|'sheet'|'edit'|'tl'。`state.backView` = EDITから戻る先（'sheet'|'tl'。ダブルクリック元を記憶）
+- `state.view` = **'studio'|'edit'**（V2-Aで2値に統合。`backView` は廃止）
+- `gFocusCut` = 現在カット＝`cutIndexAt(state.tl.frame).i` の導出値。**これを持ち回るのではなく毎回導出する**
+- `gUi = {side:'left'|'right', sheet:bool}` = TOOLパネル左右＋右パネル開閉（localStorage `econte_ui_v1`）
 - `state.tl` = TIMELINE専用状態 `{frame,playing,loop,lastTs,acc}`（cutsではなくビュー側の状態）
 - 保存: IndexedDB `econte_db_v1`（store: photos/cuts/meta）。`scheduleSave()`でdebounce、
   ビットマップは`dirtyDraw`等のフラグが立ったカットのみ再エンコード
 
+■ STUDIO（V2-A・1画面統合）
+- レイアウト: `#studio-main`(flex) = `#studio-board`(40%) / `#studio-center`(プレビュー＋`#cur-box`) /
+  `#studio-sheet`(22%・min200px・`≡`で開閉)、その下に全幅の `#tl-bottom`（TIMELINE帯）
+- **フォーカス同期は `renderStudioSync(force)` 1本**。`renderTL()` の末尾から毎回呼ばれる。
+  DOMの全再構築はせず、①`.focus` class の付け替え＋`scrollIntoView` ②`renderBoard()`（枠の色）
+  ③中央の尺/TEXT欄の値、だけを触る。**①②はフォーカス index が変わったときだけ**
+- **入力欄の書き換えは `document.activeElement` を見てスキップ**（再生中に入力が飛ぶのを防ぐ）
+- カット数・並び・尺が変わる操作は `refreshStudio()`（右パネル再構築＋TL帯再レイアウト＋同期）、
+  1カットの絵/尺だけなら `refreshRow(i)`（サムネ・尺・noteの軽量更新）を使い分ける
+- `setCutDur(i,f)` が尺変更の唯一の入口（中央欄・右パネル欄・EDIT上部の3か所から呼ぶ）
+- **Space はトランスポート（再生/停止）に取られたので、BOARDの強制パンは Alt / 中ボタン**
+  （旧: Space長押し。`spaceHeld` は削除済み）
+
 ■ ビュー切替（`setView(v)`）
-- `v==='tl'`以外に切り替わる瞬間 `pause()` を呼ぶ（TIMELINE再生中の取り残し防止）
-- トップバーのハイライトは実ビューでなく`barHi`（EDIT中は`backView`を見て元ビューを光らせる）
+- `v!=='studio'` の瞬間に `pause()` を呼ぶ（再生の取り残し防止）
+- EDITから戻る先は常に STUDIO（`#btn-edit-back` は固定ラベル）
 
 ■ BOARD（考える場）
 - `bDown/bMove/bUp` がMOVE/CUTツール共用のポインタハンドラ
@@ -57,6 +74,14 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 
 ■ FILLパレット
 - `animator-color-palette`スキルの正準を移植。localStorageキーは`econte_palette_v1`（他ツールと衝突しない専用キー）
+- **V2-Aで正準から意図的に逸脱**: `selectPalSlot()` は `setETool('fill')` を呼ばない（＝色を選んでもツールは変わらない）。
+  `＋`（スロット追加）も同様。スキルの canon と差分が出る点なのでコード側にもコメントを残してある
+- ミニツール側にも同じ4ボタン（＋ − ⇩ ⇧）がある。ハンドラは `wire()` 内の `palAdd/palDel/palSave/palLoad` を共有
+
+■ iPad ダブルタップ（V2-A・SPEC_13 §4-1）
+- `bindDoubleTap(el, fn)` = pointerup 2回が 350ms以内・24px以内。右パネル行とTLクリップに `dblclick` と併用で張る
+- **`pointerType === 'mouse'` は即return**（ネイティブdblclickに任せる＝二重発火防止）。
+  新しくダブルクリック起動の操作を足すときはこの2本立てを守ること
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 【既知の落とし穴】
@@ -64,6 +89,10 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   （`editCv`決め打りに戻すとTIMELINEプレビューでのペイントが壊れる）
 - TIMELINE⇔EDITを行き来する処理でundo/redoスタックをクリアし忘れると、
   別カットのスナップショットを誤って適用してしまう
+- `renderStudioSync()` の中から `renderTL()` を呼んではいけない（`renderTL` の末尾から呼ばれているので無限再帰）
+- 絵を変える処理で `cut.thumb = null` を忘れると、右パネルのサムネだけ古いまま静かにズレる
+- **検証時の注意**: 合成 `PointerEvent` では `setPointerCapture` が NotFoundError を投げるため、
+  `bDown`/クリップ尺ハンドルが途中で止まる。自動検証では一時的に no-op に差し替えること（実機は無関係）
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 【V2-D（大判カメラ枠列）に着手する人へ・先読み必須】
@@ -96,7 +125,11 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
 - P2（animator連携`tdr_live`参加・カラースクリプト一覧PNG）: 未着手
   ※カラースクリプトの仕様は SPEC_13 §5h で確定（**枠単位**で並べる。カット単位ではない）
 - P3（manga-plate FRAME接続・OBANコマ送り）: 構想のみ
-- V2-A〜V2-D3（SPEC_13）: 未着手
+- **V2-A（SPEC_13）: 実装済み（2026-08-02）** — STUDIO統合／フォーカス同期／フルスクリーン／
+  パレット挙動変更／TOOL左右入替／iPadダブルタップ。サムネキャッシュ（§5d の一部）を先取り。
+  ミニツールのパレット4ボタン（§3-4）も同時に入れた
+- V2-B〜V2-D3: 未着手。**V2-B は §2-1a（REF BOARD連携 `photo.ref`）を D1前提で読むと手戻る**ので、
+  §2-1a を先に読むこと（送信側 `Tools/ref-board/ref-board.html` は実装済み）
 
 【変更後チェック】
 node tools/check.js（6ファイル一括。econte.html含む）

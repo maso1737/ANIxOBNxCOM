@@ -9,6 +9,12 @@
 別ビューにする。画・尺・コメントはどのビューで触っても同じデータに書くため、
 ビュー間の「反映処理」は存在しない（＝同期バグが構造的に起きない）。
 
+> **V2-A（SPEC_13 §1）で3ビューは1画面 STUDIO に統合済み**（2026-08-02）。
+> `state.view` は **`studio` | `edit`** の2値。BOARD / プレビュー / SHEETパネル / TIMELINE帯は
+> STUDIO内のペインになった（＝ビューが減っただけで、上の核心設計は変わらない）。
+> 「現在カット」は `cutIndexAt(state.tl.frame).i` の**唯一の導出値**で、
+> 右パネルの `.focus` 行・中央下の尺/TEXT欄・BOARDのCUT枠ハイライトが全部これに従う（`renderStudioSync()`）。
+
 ```
 cut = {
   id,                    // 一意ID（採番はカット順から自動: C1, C2, ...）
@@ -34,6 +40,8 @@ cut = {
 
 - **P0（実装済み）**: BOARD＋SHEET＋EDIT（描画）＋IndexedDB保存
 - **P1（実装済み）**: TIMELINE（composer-timeline-kit 移植・クリップ尺⇔SHEET尺・再生・動画書き出し）
+- **V2-A（実装済み・2026-08-02）**: STUDIO 1画面統合＋フォーカス同期＋フルスクリーン＋
+  パレット挙動変更＋TOOL左右入替＋iPadダブルタップ（SPEC_13 §1/§3-2,3-3/§4-1）
 - **P2**: animator連携（SPEC_07 `tdr_live` 語彙参加・REF送り）＋カラースクリプト一覧PNG
 - **P3（構想）**: manga-plate FRAME接続・OBANコマ送り
 
@@ -46,9 +54,11 @@ cut = {
 - **プレビューに直接ペイント可**: PEN/ERASE/FILL/EYEがそのまま効き、プレイヘッド位置の
   カットの drawC に入る（＝「動画コンテに描いて絵コンテに反映」。同一データなので自動）。
 - 再生: rAFベース `tick`（kit準拠）。LOOPトグル。24fps。
-- ショートカット（`econte_keymap_v1`・kit準拠レジストリ。TIMELINEビューで有効）:
+- ショートカット（`econte_keymap_v1`・kit準拠レジストリ。**V2-A以降は STUDIO ビューで有効**）:
   Space=再生/停止 ／ ←→=±1コマ(Shift=10) ／ Home/End ／ J/K=前後カット頭 ／ L=ループ。
   再割当UIはP2以降（localStorageの手書き編集は可能）。
+  **V2-A で Space がトランスポートに移ったため、BOARDの強制パンは Alt / 中ボタン**
+  （空白ドラッグ＝パンは従来どおり）。
 - **EXPORT VIDEO**: `canvas.captureStream(24)`＋MediaRecorder で**実時間再生を録画**
   （WebM vp9→vp8→mp4の順でフォールバック。Safariはmp4になる想定）。
   「C#/尺 焼き込み」チェックでプレビュー＝書き出しにオーバーレイ（WYSIWYG）。
@@ -68,11 +78,15 @@ cut = {
 - SHEET側の **⟳（再ベイク）** で、同じ `src` から現在のBOARD内容を再切り出し
   （「枠があと」「切り直したい」に対応）。
 
-### SHEET — 絵コンテ表
+### SHEET — 絵コンテ表（V2-A以降は STUDIO 右の縦パネル）
 
-- 行フォーマット: `C# | 画（サムネ）| 内容・セリフ | 尺(秒+コマ)`。
-- ＋空コマ追加 / ▲▼並べ替え（自動リナンバー）/ ✕削除 / ⟳再ベイク / ✎EDIT。
+- 行フォーマット: `C# | 尺 | ▲▼⟳✕` ＋ `サムネ | 内容・セリフ(2行省略)`。
+  行クリック＝そのカット頭へ seek、ダブルクリック（iPadはダブルタップ）＝EDIT。
+- ＋空コマ追加 / ▲▼並べ替え（自動リナンバー）/ ✕削除 / ⟳再ベイク。
 - 尺インプットは `3+12` 形式をパース（不正入力は元値へ復帰）。合計尺を常時表示。
+- 常時表示になったため**サムネは `cut.thumb` にキャッシュ**し、絵が変わったとき（`cut.thumb = null`）
+  だけ作り直す。加筆・undo/redo・CLEAR・bg変更・再ベイクの各所で null にすること
+  （SPEC_13 §5d のサムネキャッシュを V2-A で先取り。LRUはV2-D2のまま）。
 
 ### EDIT — 加筆（animator系・仕上げではない）
 
@@ -81,6 +95,10 @@ cut = {
   手振れ補正なし。ブラシサイズ 1–64。
 - **FILLパレット＋Altスポイト**: animator正準（skill `animator-color-palette`）を移植。
   localStorage キーは `econte_palette_v1`。スポイトは合成色サンプリング＋選択スロット上書き。
+  **V2-A で正準から意図的に逸脱**: 色を選んでも塗りツールに切り替わらない（SPEC_13 §3-3）。
+  ペンで描きながら色だけ拾う頻度が高いため。`＋`（スロット追加）も同様に切り替えない。
+- **TOOLパネルの左右入替**（V2-A・SPEC_13 §3-2）: `gUi = {side, sheet}`／localStorage `econte_ui_v1`。
+  EDITサイドバー（`#edit-main.side-right`）と STUDIOミニツール（`.right`）が同時に反転する。
 - 下地グレー: スライダー(0–255)＋白/グレー/黒プリセット。白ペイントも可能。
 - UNDO/REDO（drawC スナップショット、カット毎、上限30）。CLEAR DRAW / CLEAR BASE
   （BASEはモーダル確認・Undo対象外）。◀▶で前後カットへ。
