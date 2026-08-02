@@ -1241,6 +1241,47 @@ input[type=range]::-moz-range-thumb{
 #onion-prev{filter:hue-rotate(0deg);}
 #onion-next{filter:hue-rotate(0deg);}
 
+/* ONION コントロール（枚数●／カラーチップ／濃度スライダー） */
+#oni-ctl{
+  display:flex;align-items:center;gap:5px;
+  padding:2px 7px;
+  border:1px solid var(--border);border-radius:2px;
+  background:rgba(255,255,255,0.02);
+  opacity:0.45;transition:opacity 0.15s;
+}
+#oni-ctl.on{opacity:1;}
+#oni-ctl .oni-lbl{
+  font-size:8px;letter-spacing:0.12em;
+  color:rgba(255,210,122,0.7);font-family:var(--bank);
+}
+/* 枚数ボタン：●の中に枚数。Wクリックで 1→5 を巡回 */
+.oni-n{
+  width:22px;height:20px;padding:0;
+  background:transparent;border:1px solid var(--border);border-radius:50%;
+  color:var(--ice);font-family:var(--mono);font-size:10px;line-height:1;
+  cursor:pointer;transition:all 0.12s;
+  display:flex;align-items:center;justify-content:center;
+}
+.oni-n:hover{border-color:rgba(90,233,255,0.6);}
+/* カラーチップ：クリックで選択 → Altクリック(スポイト)/パレットで色が入る */
+.oni-sw{
+  width:20px;height:20px;padding:0;
+  border:1px solid var(--border);border-radius:50%;
+  cursor:pointer;transition:all 0.12s;
+}
+.oni-sw:hover{border-color:rgba(255,210,122,0.7);}
+.oni-sw.sel{
+  border-color:var(--acid);
+  box-shadow:0 0 0 2px rgba(255,79,168,0.45),0 0 8px rgba(255,79,168,0.5);
+}
+#oni-opa{width:64px;flex:0 0 64px;}
+#oni-opa-val{
+  font-family:var(--mono);font-size:9px;color:var(--ice);
+  min-width:26px;text-align:right;
+}
+/* 主線Altクリックで下書スロットへ飛んだときの一瞬のフラッシュ */
+.tb-ink.flash{box-shadow:0 0 0 2px var(--acid),0 0 12px rgba(255,79,168,0.8);}
+
 #bottombar{
   grid-column:1/-1;
   display:flex;align-items:center;justify-content:space-between;
@@ -1546,9 +1587,16 @@ input[type=range]::-moz-range-thumb{
       <span class="frame-pos" id="dur-info" title="クリック: コマ⇔秒 / Shift+クリック: 最大尺変更" style="cursor: pointer;">072 コマ</span>
       <div class="right">
         <button id="btn-onion" title="オニオンスキン (O)" class="">ONION</button>
-        <button id="btn-add-frame" title="新規フレーム (N)">+ FRAME</button>
-        <button id="btn-dup-frame" title="複製 (D)">DUPLICATE</button>
-        <button id="btn-del-frame" title="削除 (Del)">DELETE</button>
+        <div id="oni-ctl">
+          <span class="oni-lbl">前</span>
+          <button class="oni-n" id="oni-n-prev" title="前のONION枚数（Wクリックで 1→5 を巡回）">1</button>
+          <button class="oni-sw" id="oni-sw-prev" title="前ONIONの色（クリックで選択 → Altクリックのスポイト/パレットで色が入る）"></button>
+          <span class="oni-lbl">後</span>
+          <button class="oni-sw" id="oni-sw-next" title="後ONIONの色（クリックで選択 → Altクリックのスポイト/パレットで色が入る）"></button>
+          <button class="oni-n" id="oni-n-next" title="後のONION枚数（Wクリックで 1→5 を巡回）">1</button>
+          <input type="range" id="oni-opa" min="5" max="100" step="1" value="35" title="ONION 濃度">
+          <span id="oni-opa-val">35%</span>
+        </div>
       </div>
     </div>
 
@@ -1891,6 +1939,32 @@ function saveInk(){
     toneMode: { blue: toneMode.blue, orange: toneMode.orange },
   })); }catch(e){}
 }
+
+// ── ONION 設定（前後の枚数 / 前後のティント色 / 濃度。localStorage保持）──
+// prevN/nextN は 1..5。色は「チップを選択→Altクリック（スポイト）/パレット」で入る。
+const ONION = {
+  prevN: 1, nextN: 1,
+  prevColor: '#DC3C3C',   // 旧実装の rgb(220,60,60)
+  nextColor: '#3C78DC',   // 旧実装の rgb(60,120,220)
+  opacity: 0.35,          // 旧実装の CSS opacity と同値
+};
+const ONION_MAX = 5;
+const ONION_LS = 'animator_onion_v1';
+(function loadOnionCfg(){
+  try{
+    const o = JSON.parse(localStorage.getItem(ONION_LS) || 'null');
+    if(o && typeof o === 'object'){
+      if(o.prevN) ONION.prevN = Math.max(1, Math.min(ONION_MAX, o.prevN|0));
+      if(o.nextN) ONION.nextN = Math.max(1, Math.min(ONION_MAX, o.nextN|0));
+      if(typeof o.prevColor === 'string') ONION.prevColor = o.prevColor;
+      if(typeof o.nextColor === 'string') ONION.nextColor = o.nextColor;
+      if(typeof o.opacity === 'number') ONION.opacity = Math.max(0.05, Math.min(1, o.opacity));
+    }
+  }catch(e){}
+})();
+function saveOnionCfg(){ try{ localStorage.setItem(ONION_LS, JSON.stringify(ONION)); }catch(e){} }
+// 選択中のONIONカラーチップ（null | 'prev' | 'next'）。選択中はAltスポイト/パレットの行き先になる。
+let gOniSlot = null;
 
 // ── SCREEN TONE（下書/指示ボタンのWクリックで dot10%/dot40% トーンインクに切替）──
 // パターンはキャンバス原点固定＝塗り足しても網点がズレず繋がる（現実の貼りトーンと同じ）。
@@ -3597,6 +3671,30 @@ function inkPickActive(){
   return (state.inkColor === 'blue' || state.inkColor === 'orange' || isToneInk(state.inkColor)) &&
          (state.tool === 'pen' || state.tool === 'fill' || state.tool === 'eyedrop');
 }
+// 主線(黒)は色が固定なのでスポイトしても変化が見えない。
+// → 下書スロットへフォーカスを移し、拾った色をそこへ入れる（＝変化が目に見える）。
+function focusRoughInk(hex){
+  state.inkColor = slotInk('blue');
+  setActiveInkColor(hex);
+  applyInkUIForTool();
+  const btn = document.querySelector('.tb-ink[data-c="blue"]');
+  if(btn){ btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 420); }
+}
+// ONIONカラーチップが選択中なら、その側のティント色を取り込む
+function eyedropOnion(clientX, clientY){
+  const {x, y} = toCanvasCoord(clientX, clientY);
+  const hex = sampleCompositeColor(x, y);
+  if(!hex) return;
+  setOnionColor(gOniSlot, hex);
+}
+// Altクリック / スポイトツールの行き先を一元決定する
+function eyedropDispatch(clientX, clientY){
+  if(gOniSlot){ eyedropOnion(clientX, clientY); return; }        // ONIONチップ選択中が最優先
+  if(inkPickActive()){ eyedropInk(clientX, clientY); return; }   // 下書/指示/トーン
+  eyedropAt(clientX, clientY);                                    // FILL PALETTE へ取り込み
+  // 主線(黒)のときだけ、続けて下書スロットへフォーカス＋色入れ
+  if(state.inkColor === 'black' && state.tool !== 'erase') focusRoughInk(state.fillColor);
+}
 
 // ============================================================
 // HISTORY (Undo/Redo) — カレントフレーム単位
@@ -4623,30 +4721,49 @@ function syncTimeTrackScroll(){
 // ONION SKIN
 // 前後フレームを半透明で表示
 // ============================================================
+// 枚数を重ねるための作業キャンバス（ImageData→drawImage で globalAlpha を効かせる）
+let onionTmpCv = null, onionTmpCtx = null;
+function onionTmp(){
+  if(!onionTmpCv){ onionTmpCv = document.createElement('canvas'); onionTmpCtx = onionTmpCv.getContext('2d'); }
+  if(onionTmpCv.width !== CFG.WORK_W || onionTmpCv.height !== CFG.WORK_H){
+    onionTmpCv.width = CFG.WORK_W; onionTmpCv.height = CFG.WORK_H;
+  }
+  return onionTmpCv;
+}
+// dir=-1（前）/ +1（後）の側を、近い順に最大 n 枚ぶん重ねて描く
+function drawOnionSide(ctx, dir){
+  ctx.clearRect(0,0,CFG.WORK_W,CFG.WORK_H);
+  const n     = Math.max(1, Math.min(ONION_MAX, (dir < 0 ? ONION.prevN : ONION.nextN)));
+  const color = (dir < 0) ? ONION.prevColor : ONION.nextColor;
+  // drawフレームのみ拾う（空ブロック・非表示は飛ばす）
+  const picks = [];
+  for(let i = state.currentFrame + dir; i >= 0 && i < state.frames.length && picks.length < n; i += dir){
+    const f = state.frames[i];
+    if(f.kind === 'draw' && !f.hidden) picks.push(f);
+  }
+  if(!picks.length) return;
+  const tmp = onionTmp();
+  // 遠い→近い の順に重ねる（近いコマほど濃く残る）
+  for(let k = picks.length - 1; k >= 0; k--){
+    onionTmpCtx.putImageData(onionTint(picks[k].drawData, color), 0, 0);
+    ctx.globalAlpha = Math.pow(0.55, k);   // 1枚目=1.0, 2枚目=0.55, 3枚目=0.30 …
+    ctx.drawImage(tmp, 0, 0);
+  }
+  ctx.globalAlpha = 1;
+}
 function updateOnion(){
   if(!state.onionOn){
     onionPrevCtx.clearRect(0,0,CFG.WORK_W,CFG.WORK_H);
     onionNextCtx.clearRect(0,0,CFG.WORK_W,CFG.WORK_H);
     return;
   }
-  // 前: drawフレームのみを探す（空ブロック・非表示は飛ばす）
-  onionPrevCtx.clearRect(0,0,CFG.WORK_W,CFG.WORK_H);
-  let prevDraw = null;
-  for(let i = state.currentFrame - 1; i >= 0; i--){
-    if(state.frames[i].kind === 'draw' && !state.frames[i].hidden){ prevDraw = state.frames[i]; break; }
-  }
-  if(prevDraw){
-    onionPrevCtx.putImageData(onionTint(prevDraw.drawData, 'prev'), 0, 0);
-  }
-  // 後: drawフレームのみを探す（非表示は飛ばす）
-  onionNextCtx.clearRect(0,0,CFG.WORK_W,CFG.WORK_H);
-  let nextDraw = null;
-  for(let i = state.currentFrame + 1; i < state.frames.length; i++){
-    if(state.frames[i].kind === 'draw' && !state.frames[i].hidden){ nextDraw = state.frames[i]; break; }
-  }
-  if(nextDraw){
-    onionNextCtx.putImageData(onionTint(nextDraw.drawData, 'next'), 0, 0);
-  }
+  drawOnionSide(onionPrevCtx, -1);
+  drawOnionSide(onionNextCtx, +1);
+}
+// ONION 濃度を実キャンバスへ反映（CSS の opacity:0.35 を上書き）
+function applyOnionOpacity(){
+  onionPrev.style.opacity = ONION.opacity;
+  onionNext.style.opacity = ONION.opacity;
 }
 
 // drawDataのうち不透明ピクセルを指定色に置き換えた新しいImageData配列を返す
@@ -4661,15 +4778,14 @@ function tintImageData(srcData, r, g, b){
 }
 // ティント済みImageDataのキャッシュ。drawDataは編集のたびに新しい配列が割り当てられるため、
 // 配列自体をWeakMapのキーにすると内容変更で自動的にキャッシュが外れる（明示的な無効化不要）
-const gOnionTintCache = new WeakMap(); // drawData -> {prev?: ImageData, next?: ImageData}
-function onionTint(drawData, which){
+const gOnionTintCache = new WeakMap(); // drawData -> {'#RRGGBB': ImageData}
+function onionTint(drawData, hex){
   let e = gOnionTintCache.get(drawData);
-  if(e && e[which]) return e[which];
-  const img = which === 'prev'
-    ? new ImageData(tintImageData(drawData, 220, 60, 60), CFG.WORK_W, CFG.WORK_H)
-    : new ImageData(tintImageData(drawData, 60, 120, 220), CFG.WORK_W, CFG.WORK_H);
+  if(e && e[hex]) return e[hex];
+  const c = hexToRgb(hex) || {r:220,g:60,b:60};
+  const img = new ImageData(tintImageData(drawData, c.r, c.g, c.b), CFG.WORK_W, CFG.WORK_H);
   if(!e){ e = {}; gOnionTintCache.set(drawData, e); }
-  e[which] = img;
+  e[hex] = img;
   return img;
 }
 
@@ -4827,8 +4943,7 @@ stage.addEventListener('pointerdown', e => {
     if(refImgActive()){
       refDragBegin(e.clientX, e.clientY);
     } else if(state.tool === 'eyedrop'){
-      if(inkPickActive()) eyedropInk(e.clientX, e.clientY);
-      else eyedropAt(e.clientX, e.clientY);
+      eyedropDispatch(e.clientX, e.clientY);
     } else {
       // 指=パンのみ。描画・消去・塗りつぶしはペン(Apple Pencil)で行う。
       // → 消しゴム/塗りで指が動作を奪い、2本指タップ(Undo/Redo)が効かない問題を回避
@@ -5098,8 +5213,7 @@ drawCanvas.addEventListener('pointerdown', e => {
   drawingPointerId = e.pointerId;
   if(refImgActive()){ refDragBegin(e.clientX, e.clientY); return; } // 参照画像の移動モード
   if(state.tool === 'eyedrop' || e.altKey){
-    if(inkPickActive()) eyedropInk(e.clientX, e.clientY);
-    else eyedropAt(e.clientX, e.clientY);
+    eyedropDispatch(e.clientX, e.clientY);
   } else if(state.tool === 'fill'){
     if(state.fillMode === 'lasso'){
       lassoBegin(e.clientX, e.clientY);   // 囲って一括塗り（塗りは lassoEnd で確定）
@@ -5371,6 +5485,7 @@ refreshPenSizeUI();  // 保存済みの太ブラシ値をボタンに反映
 
 document.querySelectorAll('.tb-ink').forEach(btn => {
   btn.addEventListener('click', () => {
+    if(gOniSlot) selectOniSlot(null);   // インクを選んだらONIONチップ選択は解除
     state.inkColor = slotInk(btn.dataset.c);
     // ERASE / FILL 中はインクだけ差し替えてツールは維持（うっかりブラシで塗るのを防ぐ）。
     // それ以外（＝ツール未確定状態）のときだけPENへ自動切替。
@@ -5418,6 +5533,8 @@ function savePalette(){ try{ localStorage.setItem(PAL_LS, JSON.stringify({format
 function selectPalSlot(i){
   gPalSlot = i;
   state.fillColor = gPalette[i];
+  // ONIONカラーチップが選択中なら、パレット色はそちらへ入れて終わり（インクは触らない）
+  if(gOniSlot){ setOnionColor(gOniSlot, gPalette[i]); renderPalette(); return; }
   // 下書/指示（トーン含む）が選択中なら、そのインク色もパレット色に同期。
   // ブラシ・FILLどちらでも「選んだ色＝いま描ける色」になる。主線は黒固定なので対象外。
   setActiveInkColor(gPalette[i]);
@@ -6766,7 +6883,7 @@ function tlComposeShot(){
     ctx.restore();
   }
   if(state.onionOn){
-    ctx.globalAlpha = 0.35;              // #onion-prev/#onion-next の CSS opacity と同値
+    ctx.globalAlpha = ONION.opacity;     // #onion-prev/#onion-next の表示 opacity と同値
     ctx.drawImage(onionPrev, 0, 0);
     ctx.drawImage(onionNext, 0, 0);
     ctx.globalAlpha = 1;
@@ -7332,9 +7449,23 @@ function setupWorkArea(){
 
   function setupHandleDrag(el, side){
     let active = null;
+    // Wクリック/Wタップ → 先頭ハンドルはタイムライン先頭、後ろハンドルは最後尾へフィット
+    // （pointerdown で preventDefault しているため dblclick に頼らず自前で検出する）
+    let dblT = 0;
     el.addEventListener('pointerdown', e => {
       e.stopPropagation();
       e.preventDefault();
+      const now = performance.now();
+      if(now - dblT < 350){
+        dblT = 0;
+        active = null;
+        el.classList.remove('active');
+        if(side === 'L') state.workStart = 0;
+        else             state.workEnd   = totalTicks();
+        commitWorkArea();
+        return;
+      }
+      dblT = now;
       el.setPointerCapture(e.pointerId);
       el.classList.add('active');
       active = { startX: e.clientX, origStart: state.workStart, origEnd: state.workEnd };
@@ -7356,7 +7487,7 @@ function setupWorkArea(){
       if(!active) return;
       active = null;
       el.classList.remove('active');
-      markMetaDirty();
+      commitWorkArea();   // markMetaDirty＋「直近の部分範囲」を記憶
     }
     el.addEventListener('pointerup', endDrag);
     el.addEventListener('pointercancel', endDrag);
@@ -7401,7 +7532,7 @@ function setupWorkArea(){
   function endBodyDrag(){
     if(!bodyDrag) return;
     bodyDrag = null;
-    markMetaDirty();
+    commitWorkArea();
   }
   body.addEventListener('pointerup', endBodyDrag);
   body.addEventListener('pointercancel', endBodyDrag);
@@ -7450,15 +7581,54 @@ function setupWorkArea(){
     if(now - trackDblT < 350){
       state.workStart = 0;
       state.workEnd = totalTicks();
-      updateTimeTrack();
-      updateDurInfo();
-      markMetaDirty();
+      commitWorkArea();
       trackDblT = 0;
     } else {
       trackDblT = now;
     }
   }, { passive: true });
 
+}
+
+// ── ワークエリア操作の共通ヘルパ（B/N・Wクリック から共用）──
+// インジケータ（再生ヘッド）の位置＝現在フレームの開始ティック
+function playheadTick(){
+  return state.frames.slice(0, state.currentFrame).reduce((s, f) => s + f.duration, 0);
+}
+// 直近の「部分ワークエリア」を覚えておく（インジケータWクリックの切替先）
+let gWaUser = null;
+function commitWorkArea(){
+  ensureWorkAreaValid();
+  if(!workAreaIsFull() && state.workEnd > state.workStart){
+    gWaUser = { start: state.workStart, end: state.workEnd };
+  }
+  updateTimeTrack();
+  updateDurInfo();
+  markMetaDirty();
+}
+// IN = インジケータ位置へ
+function setWaInAtPlayhead(){
+  state.workStart = Math.max(0, Math.min(playheadTick(), Math.max(0, state.workEnd - 1)));
+  commitWorkArea();
+}
+// OUT = インジケータのあるコマの終端へ（そのコマを含む範囲になる）
+function setWaOutAtPlayhead(){
+  const end = playheadTick() + (state.frames[state.currentFrame]?.duration || 1);
+  state.workEnd = Math.max(state.workStart + 1, Math.min(totalTicks(), end));
+  commitWorkArea();
+}
+// B/Nで作った範囲 ⇔ 全範囲 を行き来する
+function toggleWorkAreaFull(){
+  const total = totalTicks();
+  if(workAreaIsFull()){
+    if(!gWaUser || gWaUser.end <= gWaUser.start) return;   // 戻す先がない
+    state.workStart = Math.max(0, Math.min(total - 1, gWaUser.start));
+    state.workEnd   = Math.max(state.workStart + 1, Math.min(total, gWaUser.end));
+  } else {
+    state.workStart = 0;
+    state.workEnd   = total;
+  }
+  commitWorkArea();
 }
 
 // ワークエリアを「総コマ数に合わせる」
@@ -7504,10 +7674,20 @@ function setupCursorScrub(){
     cursor.style.left = tickToPx(tick) + 'px';
   }
 
+  // インジケータのWクリック/Wタップ → B/Nで作った範囲 ⇔ ワークエリア全体 を切替
+  let dblT = 0;
   cursor.addEventListener('pointerdown', e => {
     if(state.playing) return; // 再生中は無効
     e.preventDefault();
     e.stopPropagation();
+    const now = performance.now();
+    if(now - dblT < 350){
+      dblT = 0;
+      dragging = false;
+      toggleWorkAreaFull();
+      return;
+    }
+    dblT = now;
     dragging = true;
     cursor.setPointerCapture(e.pointerId);
     scrubToClientX(e.clientX);
@@ -7659,8 +7839,55 @@ document.getElementById('fps-input').addEventListener('change', e => {
 document.getElementById('btn-onion').addEventListener('click', e => {
   state.onionOn = !state.onionOn;
   e.target.classList.toggle('on', state.onionOn);
+  if(!state.onionOn) selectOniSlot(null);
   updateOnion();
+  renderOniCtl();
 });
+
+// ── ONION コントロール（枚数● / カラーチップ / 濃度）──
+function setOnionColor(side, hex){
+  if(side === 'prev') ONION.prevColor = hex;
+  else if(side === 'next') ONION.nextColor = hex;
+  else return;
+  saveOnionCfg();
+  renderOniCtl();
+  updateOnion();
+}
+function selectOniSlot(side){
+  gOniSlot = (gOniSlot === side) ? null : side;   // 同じチップを再クリックで解除
+  renderOniCtl();
+}
+function cycleOnionN(side){
+  if(side === 'prev') ONION.prevN = (ONION.prevN % ONION_MAX) + 1;
+  else                ONION.nextN = (ONION.nextN % ONION_MAX) + 1;
+  saveOnionCfg();
+  renderOniCtl();
+  updateOnion();
+}
+function renderOniCtl(){
+  const ctl = document.getElementById('oni-ctl');
+  if(ctl) ctl.classList.toggle('on', state.onionOn);
+  const nP = document.getElementById('oni-n-prev'), nN = document.getElementById('oni-n-next');
+  if(nP) nP.textContent = ONION.prevN;
+  if(nN) nN.textContent = ONION.nextN;
+  const sP = document.getElementById('oni-sw-prev'), sN = document.getElementById('oni-sw-next');
+  if(sP){ sP.style.background = ONION.prevColor; sP.classList.toggle('sel', gOniSlot === 'prev'); }
+  if(sN){ sN.style.background = ONION.nextColor; sN.classList.toggle('sel', gOniSlot === 'next'); }
+  const op = document.getElementById('oni-opa'), ov = document.getElementById('oni-opa-val');
+  if(op) op.value = Math.round(ONION.opacity * 100);
+  if(ov) ov.textContent = Math.round(ONION.opacity * 100) + '%';
+}
+onDoubleActivate(document.getElementById('oni-n-prev'), () => cycleOnionN('prev'));
+onDoubleActivate(document.getElementById('oni-n-next'), () => cycleOnionN('next'));
+document.getElementById('oni-sw-prev').addEventListener('click', () => selectOniSlot('prev'));
+document.getElementById('oni-sw-next').addEventListener('click', () => selectOniSlot('next'));
+document.getElementById('oni-opa').addEventListener('input', e => {
+  ONION.opacity = Math.max(0.05, Math.min(1, (parseInt(e.target.value, 10) || 35) / 100));
+  applyOnionOpacity();
+  document.getElementById('oni-opa-val').textContent = Math.round(ONION.opacity * 100) + '%';
+});
+document.getElementById('oni-opa').addEventListener('change', () => saveOnionCfg());
+
 // LOOPボタンは廃止（常時LOOP）
 document.getElementById('tb-undo').addEventListener('click', () => undo());
 document.getElementById('tb-redo').addEventListener('click', () => redo());
@@ -7921,9 +8148,7 @@ document.getElementById('refimg-opacity').addEventListener('input', e => {
   renderRefImg();
 });
 document.getElementById('refimg-opacity').addEventListener('change', () => { markMetaDirty(); scheduleSave(); });
-document.getElementById('btn-add-frame').addEventListener('click', () => addFrame(false));
-document.getElementById('btn-dup-frame').addEventListener('click', () => addFrame(true));
-document.getElementById('btn-del-frame').addEventListener('click', deleteCurrentFrame);
+// ＋FRAME / DUPLICATE / DELETE ボタンは撤去（ストリップ末尾の「+ TAP」とショートカット D / Del で操作）
 
 // フレーム分割（現在フレームを前半/後半2コマに分割）
 function splitCurrentFrame(splitAt){
@@ -8033,15 +8258,20 @@ document.getElementById('frame-strip').addEventListener('wheel', e => {
 // ============================================================
 // 単発キーのアクション定義（Ctrl系のUndo/Redo/Copy/Pasteは固定で別処理）
 const SHORTCUT_ACTIONS = [
-  { id:'pen',       label:'ペン',               def:'B',          run:()=>document.querySelector('.tool[data-tool="pen"]')?.click() },
+  { id:'pen',       label:'ペン',               def:'P',          run:()=>document.querySelector('.tool[data-tool="pen"]')?.click() },
   { id:'erase',     label:'消しゴム',           def:'E',          run:()=>document.querySelector('.tool[data-tool="erase"]')?.click() },
   { id:'fill',      label:'塗りつぶし',         def:'G',          run:()=>document.querySelector('.tool[data-tool="fill"]')?.click() },
-  { id:'size1',     label:'サイズ 1px',         def:'1',          run:()=>document.querySelector('.tb-pen[data-size="1"]')?.click() },
-  { id:'size2',     label:'サイズ 2px',         def:'2',          run:()=>document.querySelector('.tb-pen[data-size="2"]')?.click() },
-  { id:'size3',     label:'サイズ 20px',        def:'3',          run:()=>document.querySelector('.tb-pen[data-size="20"]')?.click() },
+  { id:'inkMain',   label:'インク 主線',        def:'1',          run:()=>document.querySelector('.tb-ink[data-c="black"]')?.click() },
+  { id:'inkRough',  label:'インク 下書',        def:'2',          run:()=>document.querySelector('.tb-ink[data-c="blue"]')?.click() },
+  { id:'inkNote',   label:'インク 指示',        def:'3',          run:()=>document.querySelector('.tb-ink[data-c="orange"]')?.click() },
+  { id:'size1',     label:'サイズ 1px',         def:'',           run:()=>document.querySelector('.tb-pen[data-size="1"]')?.click() },
+  { id:'size2',     label:'サイズ 2px',         def:'',           run:()=>document.querySelector('.tb-pen[data-size="2"]')?.click() },
+  { id:'size3',     label:'サイズ 20px',        def:'',           run:()=>document.querySelector('.tb-pen[data-size="20"]')?.click() },
   { id:'onion',     label:'オニオンスキン',     def:'O',          run:()=>document.getElementById('btn-onion')?.click() },
-  { id:'newFrame',  label:'新規フレーム',       def:'N',          run:()=>document.getElementById('btn-add-frame')?.click() },
-  { id:'dupFrame',  label:'フレーム複製',       def:'D',          run:()=>document.getElementById('btn-dup-frame')?.click() },
+  { id:'waIn',      label:'ワークエリア IN（インジケータ位置）', def:'B', run:()=>setWaInAtPlayhead() },
+  { id:'waOut',     label:'ワークエリア OUT（インジケータ位置）',def:'N', run:()=>setWaOutAtPlayhead() },
+  { id:'newFrame',  label:'新規フレーム',       def:'',           run:()=>addFrame(false) },
+  { id:'dupFrame',  label:'フレーム複製',       def:'D',          run:()=>addFrame(true) },
   { id:'split',     label:'SPLIT（分割）',      def:'S',          run:()=>splitAtPlayhead() },
   { id:'workReset', label:'ワークエリア=選択FRAME/全範囲', def:'W', run:()=>{
       const sel = state.selectedFrameIds;
@@ -8076,15 +8306,30 @@ const KEYMAP_LS = 'animator_keymap_v1';
 let gKeymap = {};        // {actionId: key}
 let gCaptureId = null;   // キー取得中のアクションID
 
+// v2: 1/2/3 をインク（主線/下書/指示）へ、B/N をワークエリア IN/OUT へ振り直した。
+// 旧保存(v1)には 1/2/3=ブラシサイズ・B=ペン・N=新規フレーム が入っているため、
+// 新既定と衝突するキーだけ捨てて残りのカスタムは引き継ぐ。
+const KEYMAP_VER = 2;
+const KEYMAP_V2_RESERVED = new Set(['1','2','3','B','N']);
+const KEYMAP_V2_REASSIGNED = new Set(['pen','size1','size2','size3','newFrame','inkMain','inkRough','inkNote','waIn','waOut']);
 function defaultKeymap(){ const m={}; SHORTCUT_ACTIONS.forEach(a=>m[a.id]=a.def); return m; }
 function loadKeymap(){
   gKeymap = defaultKeymap();
   try{
     const raw = localStorage.getItem(KEYMAP_LS);
-    if(raw){ const o=JSON.parse(raw); for(const a of SHORTCUT_ACTIONS){ if(typeof o[a.id]==='string') gKeymap[a.id]=o[a.id]; } }
+    if(raw){
+      const o = JSON.parse(raw);
+      const ver = (o && typeof o.__v === 'number') ? o.__v : 1;
+      for(const a of SHORTCUT_ACTIONS){
+        if(typeof o[a.id] !== 'string') continue;
+        if(ver < KEYMAP_VER && (KEYMAP_V2_REASSIGNED.has(a.id) || KEYMAP_V2_RESERVED.has(o[a.id]))) continue;
+        gKeymap[a.id] = o[a.id];
+      }
+      if(ver < KEYMAP_VER) saveKeymap();
+    }
   }catch(e){}
 }
-function saveKeymap(){ try{ localStorage.setItem(KEYMAP_LS, JSON.stringify(gKeymap)); }catch(e){} }
+function saveKeymap(){ try{ localStorage.setItem(KEYMAP_LS, JSON.stringify(Object.assign({__v:KEYMAP_VER}, gKeymap))); }catch(e){} }
 
 // e.key を正規化（'a'→'A', ' '→'Space', 矢印/Tab等はそのまま）
 function normKey(e){
@@ -8547,6 +8792,8 @@ window.addEventListener('resize', () => {
   applyRefMaster();    // REF表示マスター（パネル連動）を反映
   applyRefImgUI();     // 参照画像UIを反映
   updateInkSwatches(); // 下書/指示インクのカスタム色をボタンへ反映
+  applyOnionOpacity(); // ONION 濃度（保存値）を実キャンバスへ
+  renderOniCtl();      // ONION 枚数●／カラーチップ／濃度スライダーの表示同期
   // SPEC_07 B3: OBANの EDIT IN ANIMATOR（?open=<projectId>）— LIVEを自動ONにして即ブロードキャスト。
   // autosaveが同一プロジェクトならそのまま、違えば EXCHANGE DB から確認つきで読込（無断上書きしない）
   const openId = new URLSearchParams(location.search).get('open');
