@@ -18,23 +18,30 @@
 ```
 cut = {
   id,                    // 一意ID（採番はカット順から自動: C1, C2, ...）
-  src: {x,y,w,h}|null,   // BOARD座標での切り出し元矩形（再ベイク可能。空コマは null）
-  baseC: canvas|null,    // 切り出しベイク（1280×720）。CLEAR BASE で破棄可
-  drawC: canvas,         // 加筆レイヤー（1280×720・透過）
+  cam: [{k,x,y,w,h,dur,ease,key}],  // カメラ枠列（V2-D1）。BOARD座標・16:9固定。空コマは []
+  bakeRect: {x,y,w,h}|null,         // ベイク範囲 = fit16_9(union(cam[]) × bakeExpand)
+  bakeW, bakeH,          // ベイクのピクセル寸法（V2-D1では 1280×720 固定・D2で可変）
+  bakeExpand: 1.02,      // 枠ぎりぎりが不安なときの手動保険（1.0〜1.5）
+  baseC: canvas|null,    // bakeRect のベイク。CLEAR BASE で破棄可
+  drawC: canvas,         // 加筆レイヤー（baseCと同じベイク空間・透過）
   bg: 0..255,            // 下地グレー（255=白）
-  durF: int,             // 尺（コマ数, 24fps）。表示は「秒+コマ」（例 3+12）
+  baseAlpha: 0..1,       // トレース透かし（V2-C）
+  durF: int,             // 尺（コマ数, 24fps）。**枠列カットでは Σcam[].dur の導出値**
   note: string           // 内容・セリフ
 }
 ```
+
+> **`cut.src` は V2-D1 で廃止**（`cam[0]` に吸収）。旧データは読み込み時に自動変換される（§5i）。
 
 - コンテ解像度は **1280×720（16:9）固定**。`CONTE_W/CONTE_H`。
 - 尺の表記は作画慣習の **秒+コマ（24fps）**。`"3+12"` ⇔ 84f。整数のみは秒扱い。
 - 規模目安: 15秒〜2分 ≒ カット10〜60。iPadで余裕の範囲。
 
-> **V2-D（SPEC_13 §5）で大判対応のため上記が変わる**:
-> `src`（単一矩形）→ `cam[]`（カメラ枠列・A→B→C…）＋ `bakeRect`（枠の和集合＝ベイク範囲）、
-> キャンバスは **カット毎に可変**（`bakeW/bakeH`）。`CONTE_W/H` は「本番枠＝出力解像度」の意味になる。
-> `durF` は `Σ cam[].dur` の導出値へ。**PANした先に画が無い問題の構造的解決**がこの変更の目的。
+> **V2-D1（実装済み）**: `src` → `cam[]`＋`bakeRect`、`durF` は導出値、再生は `drawCamFrame()`。
+> **PANした先に画が無い問題の構造的解決**（定義上すべての枠が bakeRect の内側）。
+> **V2-D2（未着手）** でキャンバスが **カット毎に可変**（`bakeW/bakeH`）になり、
+> `CONTE_W/H` は「本番枠＝出力解像度」の意味に純化する。D1時点の bakeW/bakeH は 1280×720 固定なので、
+> 大きくPANするカットは**解像度が足りないだけ**（動作はする）。
 
 ## フェーズ
 
@@ -47,6 +54,9 @@ cut = {
   併せてペイン境界のスプリッタ（AE風の幅変更）を追加
 - **V2-C（実装済み・2026-08-02）**: トレース透かし `cut.baseAlpha`＋EDITズーム/パン＋
   指=操作・ペン=描画＋2本指UNDO/3本指REDO（SPEC_13 §3-1・§3-5・§4-2・§4-3）
+- **V2-D1（実装済み・2026-08-02）**: カメラ枠列 `cut.cam[]`＋`bakeRect` 自動算出＋
+  BOARD枠列編集UI＋`drawCamFrame()`＋meta.ver 1→2 マイグレーション（SPEC_13 §5a/§5b/§5i）。
+  **ベイクは1280×720のまま**（可変化は D2）
 - **P2**: animator連携（SPEC_07 `tdr_live` 語彙参加・REF送り）＋カラースクリプト一覧PNG
 - **P3（構想）**: manga-plate FRAME接続・OBANコマ送り
 
@@ -89,8 +99,11 @@ cut = {
 - **CUT枠の編集（V2-B）**: MOVEツールで**枠線かC#ラベル**をクリックして選択（写真より優先。
   枠の内側は写真操作を邪魔しない）。選択枠は 内側ドラッグ=移動 / 角ハンドル=リサイズ(16:9固定) /
   Delete=削除。離した瞬間に自動で再ベイク（`dirtyBase`）。
-  実装は **`cam[]` の1要素を編集する形**（`camCount/camRect/setCamRect`）で書いてあり、
-  V2-D1 の枠列はこの層を増やすだけで載る。
+- **カメラ枠列の編集（V2-D1）**: 枠を選ぶとBOARDパネルに枠列が出る。
+  `＋枠` で次の枠（B, C…）を作り、BOARD上でドラッグして行き先を決める＝
+  **B枠がAより小さい=T.U. / 位置違い=PAN / 両方=PAN+T.U.**（プリセットは持たない）。
+  各行で **dur（次の枠までのコマ数）/ ease（LINEAR・EASE・HOLD）/ ★（カラースクリプトに出す枠）/ 削除**。
+  通しフレーム（0f / 72f …）は表示のみ。`余` スライダーが `bakeExpand`（1.00〜1.50）。
 - SHEET側の **⟳（再ベイク）** で、同じ `src` から現在のBOARD内容を再切り出し
   （「枠があと」「切り直したい」に対応）。
 - **統合Undoログ（V2-B）**: `gLog = [{type, undo(), redo()}]`。type は photo-add / photo-move /
@@ -156,7 +169,8 @@ cut = {
 ## 保存（IndexedDB `econte_db_v1`）
 
 - store `photos`: {id, name, x,y,w,h, blob, rot, filter, ref}
-- store `cuts`: {id, order, src, bg, baseAlpha, durF, note, baseBlob, drawBlob}
+- store `cuts`: {id, order, cam, bakeRect, bakeW, bakeH, bakeExpand, bg, baseAlpha, durF, note, baseBlob, drawBlob}
+  （`src` は V2-D1 で廃止。旧レコードは読み込み時に自動変換して `meta.ver = 2` を書く）
 - store `meta`: BOARD視点(pan/zoom)・選択状態
 - debounce保存。ビットマップは dirty のカットのみ再エンコード。
 

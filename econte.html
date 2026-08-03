@@ -93,6 +93,26 @@ body{
 .mini-note{color:var(--dim);font-size:9px;font-family:var(--jp);line-height:1.5;max-width:212px}
 #photo-ref-tx{color:var(--ice);font-size:9px;font-family:var(--jp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:120px}
 #cutframe-label{font-family:var(--bank);font-size:13px;letter-spacing:.1em;color:var(--acid)}
+/* 枠列（cam[]）の行 */
+#cam-list{display:flex;flex-direction:column;gap:3px}
+.cam-row{display:flex;align-items:center;gap:3px;padding:2px;border:1px solid transparent;cursor:pointer}
+.cam-row.on{border-color:var(--acid);background:rgba(255,79,168,.10)}
+.cam-k{font-family:var(--bank);font-size:11px;color:var(--ice);min-width:14px}
+.cam-at{color:var(--dim);font-size:8px;min-width:30px}
+.cam-dur{
+  width:40px;background:var(--black);border:1px solid var(--border);color:var(--gold);
+  font-family:var(--mono);font-size:10px;text-align:center;padding:2px;
+  -webkit-user-select:text;user-select:text;
+}
+.cam-dur:focus{outline:none;border-color:var(--border-bright)}
+.cam-dur:disabled{opacity:.25}
+.cam-ease{
+  background:var(--black);border:1px solid var(--border);color:rgba(255,255,255,.8);
+  font-family:var(--mono);font-size:9px;padding:2px 1px;max-width:62px;
+}
+.cam-ease:disabled{opacity:.25}
+.cam-row .btn{padding:2px 4px;font-size:9px;line-height:1.2}
+.cam-key.on{border-color:var(--gold);color:var(--gold)}
 /* ---------- STUDIO 中央: プレビュー＋現在カット編集 ---------- */
 #studio-center{flex:1;display:flex;flex-direction:column;min-width:0}
 #cur-box{
@@ -330,15 +350,22 @@ body{
           </div>
           <div id="photo-ref-tx"></div>
         </div>
-        <!-- 選択中のCUT枠 -->
+        <!-- 選択中のCUT枠列 -->
         <div id="cutframe-panel">
-          <div class="pnl-t">CUT 枠</div>
+          <div class="pnl-t">CUT 枠列（カメラ）</div>
           <div class="row">
             <span id="cutframe-label">C1</span>
+            <button class="btn" id="btn-cam-add" title="枠を追加（B枠＝T.U./PANの行き先）">＋枠</button>
             <button class="btn" id="btn-cutframe-edit" title="加筆EDITで開く">&#9998;</button>
             <button class="btn" id="btn-cutframe-del" title="このカットを削除 (Delete)">&#10005;</button>
           </div>
-          <div class="mini-note">枠内ドラッグ=移動 ／ 角=リサイズ(16:9) ／ 離すと自動で再ベイク</div>
+          <div id="cam-list"></div>
+          <div class="sld-row" id="cam-expand-row">
+            <span class="sld-k">余</span>
+            <input type="range" id="cam-expand" min="100" max="150" value="102" title="ベイク範囲の余白（枠ぎりぎりが不安なとき）">
+            <span class="sld-val" id="cam-expand-val">1.02</span>
+          </div>
+          <div class="mini-note">枠内ドラッグ=移動 ／ 角=リサイズ(16:9) ／ 離すと自動で再ベイク。<b>尺は枠ごと</b>（次の枠までのコマ数）。</div>
         </div>
         <div id="board-hint">写真をD&amp;D / IMPORT / Ctrl+Vで読み込み。MOVE=写真移動（空白ドラッグ=パン・Alt/中ボタン=常にパン・ホイール/ピンチ=ズーム）。CUT枠は枠線かC#ラベルをクリックで選択。CUT=矩形ドラッグで絵コンテのコマ化（16:9）。</div>
       </div>
@@ -683,8 +710,13 @@ async function saveAll(){
       const c = cuts[i];
       if(c.dirtyBase){ c.baseBlob = c.baseC ? await canvasToBlob(c.baseC) : null; c.dirtyBase = false; }
       if(c.dirtyDraw){ c.drawBlob = await canvasToBlob(c.drawC); c.dirtyDraw = false; }
-      cutItems.push({ id: c.id, order: i, src: c.src, bg: c.bg, durF: c.durF, note: c.note,
+      cutItems.push({ id: c.id, order: i, bg: c.bg, durF: c.durF, note: c.note,
                       baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : 1),
+                      cam: (c.cam || []).map(k => ({ k: k.k, x: k.x, y: k.y, w: k.w, h: k.h,
+                                                     dur: k.dur | 0, ease: k.ease || 'LINEAR',
+                                                     key: !!k.key, keyUser: !!k.keyUser })),
+                      bakeRect: c.bakeRect || null, bakeW: c.bakeW || CONTE_W, bakeH: c.bakeH || CONTE_H,
+                      bakeExpand: c.bakeExpand || 1.02,
                       baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null });
     }
     await idbClearPut('photos', phItems);
@@ -696,7 +728,23 @@ async function saveAll(){
     console.error('saveAll failed', e);
   }
 }
+/* meta.ver 1 → 2（SPEC_13 §5i）。cut.src → cam[0] / bakeRect = src。
+   bakeRect が src と同じなので **ビットマップの再エンコードは起きない**（既存の1280×720がそのまま生きる） */
+function migrateCutV2(cut, raw){
+  if(cut.cam) return false;
+  if(raw && raw.src){
+    cut.cam = [mkCam(raw.src, 0)];
+    cut.bakeRect = { x: raw.src.x, y: raw.src.y, w: raw.src.w, h: raw.src.h };
+  }else{
+    cut.cam = [];
+    cut.bakeRect = null;
+  }
+  cut.bakeW = CONTE_W; cut.bakeH = CONTE_H;
+  relabelCam(cut);
+  return true;
+}
 async function loadAll(){
+  let migrated = 0;
   try{
     const phItems = await idbGetAll('photos');
     for(const p of phItems){
@@ -719,15 +767,24 @@ async function loadAll(){
         const bi = await blobToImage(c.baseBlob);
         ctx2d(baseC).drawImage(bi, 0, 0);
       }
-      cuts.push({ id: c.id, src: c.src || null, baseC, drawC, bg: (typeof c.bg === 'number' ? c.bg : 232),
-                  baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : 1),
-                  durF: c.durF || FPS * 2, note: c.note || '',
-                  baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null,
-                  dirtyBase: false, dirtyDraw: false, thumb: null });
+      const cut = { id: c.id, baseC, drawC, bg: (typeof c.bg === 'number' ? c.bg : 232),
+                    baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : 1),
+                    durF: c.durF || FPS * 2, note: c.note || '',
+                    cam: c.cam || null, bakeRect: c.bakeRect || null,
+                    bakeW: c.bakeW || CONTE_W, bakeH: c.bakeH || CONTE_H,
+                    bakeExpand: c.bakeExpand || 1.02,
+                    baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null,
+                    dirtyBase: false, dirtyDraw: false, thumb: null };
+      if(migrateCutV2(cut, c)) migrated++;
+      cuts.push(cut);
     }
     const metas = await idbGetAll('meta');
     const m = metas.find(x => x.k === 'main');
     if(m && m.board){ state.board.x = m.board.x; state.board.y = m.board.y; state.board.z = m.board.z; }
+    if(migrated){
+      await idbClearPut('meta', [{ k: 'main', board: { x: state.board.x, y: state.board.y, z: state.board.z }, ver: 2 }]);
+      toast(migrated + ' カットを枠列（cam[]）形式に変換しました');
+    }
   }catch(e){
     console.error('loadAll failed', e);
   }
@@ -768,11 +825,13 @@ function renderStudioSync(force){
   const cut = cuts[i];
   const lab = $('#cur-cut-label'), durEl = $('#cur-dur'), durF = $('#cur-dur-f'), note = $('#cur-note');
   const has = !!cut;
-  durEl.disabled = !has;
+  const cam = has && isCamCut(cut);
+  durEl.disabled = !has || cam;   // 枠列カットの尺は導出値なので直接入力させない
+  durEl.title = cam ? '枠列カットの尺は Σ枠の尺（BOARDの枠列パネルで編集）' : '秒+コマ（24fps）例: 3+12';
   note.disabled = !has;
   $('#btn-cur-edit').disabled = !has;
   lab.textContent = has ? 'C' + (i + 1) : '—';
-  durF.textContent = has ? cut.durF + 'f' : '';
+  durF.textContent = has ? (cut.durF + 'f' + (cam ? ' ／ ' + cut.cam.map(c => c.k).join('→') : '')) : '';
   // 再生中にフォーカス中の入力欄を書き換えない（入力が飛ぶため）
   const dv = has ? fmtDur(cut.durF) : '';
   if(document.activeElement !== durEl && durEl.value !== dv) durEl.value = dv;
@@ -1052,14 +1111,12 @@ function bUp(e){
     const r = camRect(cut, sel.k);
     const n = { x: r.x, y: r.y, w: r.w, h: r.h };
     if(n.x !== o.x || n.y !== o.y || n.w !== o.w){
-      // 枠を動かしたら焼き直す（SPEC_13 §5b: 操作としては何も増やさない）
+      // 枠を動かしたら bakeRect を再計算して焼き直す（SPEC_13 §5b: 操作としては何も増やさない）
       rebakeFromCam(cut);
       pushLog({ type: 'cut-rect',
                 undo(){ setCamRect(cut, sel.k, o); rebakeFromCam(cut); },
                 redo(){ setCamRect(cut, sel.k, n); rebakeFromCam(cut); } });
-      refreshRow(sel.i);
-      renderPaintViews();
-      scheduleSave();
+      afterCamChange(sel.i);
     }
   }
   bDrag = null;
@@ -1220,7 +1277,149 @@ function syncBoardPanels(){
   }
   const sc = state.selCut;
   $('#cutframe-panel').classList.toggle('on', !!sc);
-  if(sc) $('#cutframe-label').textContent = camLabel(sc.i, sc.k);
+  if(sc){
+    $('#cutframe-label').textContent = camLabel(sc.i, sc.k);
+    renderCamList();
+  }
+}
+
+/* ---------------- 枠列の編集UI（SPEC_13 §5a） ---------------- */
+function renderCamList(){
+  const sc = state.selCut;
+  const list = $('#cam-list');
+  list.innerHTML = '';
+  if(!sc) return;
+  const cut = cuts[sc.i];
+  if(!cut) return;
+  const cam = cut.cam || [];
+  const last = cam.length - 1;
+  cam.forEach((c, k) => {
+    const row = document.createElement('div');
+    row.className = 'cam-row' + (k === sc.k ? ' on' : '');
+    row.title = 'クリックでこの枠を選択（BOARD上でも選ばれます）';
+    row.addEventListener('click', () => selectCutFrame({ i: sc.i, k }));
+
+    const lb = document.createElement('span');
+    lb.className = 'cam-k';
+    lb.textContent = c.k;
+
+    const at = document.createElement('span');
+    at.className = 'cam-at';
+    at.textContent = camStartFrame(cut, k) + 'f';   // 通しフレームは表示のみ
+
+    const dur = document.createElement('input');
+    dur.className = 'cam-dur';
+    dur.value = (k === last) ? '' : Math.max(1, c.dur | 0);
+    dur.disabled = (k === last);                    // 最終枠に dur は無い
+    dur.title = (k === last) ? '最終枠に尺はありません' : '次の枠までのコマ数';
+    dur.addEventListener('click', ev => ev.stopPropagation());
+    dur.addEventListener('change', () => {
+      const n = parseInt(dur.value, 10);
+      if(!(n > 0)){ dur.value = Math.max(1, c.dur | 0); return; }
+      setCamDur(sc.i, k, n);
+    });
+
+    const ea = document.createElement('select');
+    ea.className = 'cam-ease';
+    ea.disabled = (k === last);
+    ea.title = 'LINEAR=等速 / EASE=前後をなめらか / HOLD=この枠で止まる（タメ）';
+    EASES.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      if((c.ease || 'LINEAR') === v) o.selected = true;
+      ea.appendChild(o);
+    });
+    ea.addEventListener('click', ev => ev.stopPropagation());
+    ea.addEventListener('change', () => { c.ease = ea.value; renderPaintViews(); scheduleSave(); });
+
+    const key = document.createElement('button');
+    key.className = 'btn cam-key' + (c.key ? ' on' : '');
+    key.textContent = '★';
+    key.title = 'カラースクリプト一覧に出す枠（既定は始点と終点）';
+    key.addEventListener('click', ev => {
+      ev.stopPropagation();
+      c.key = !c.key; c.keyUser = true;
+      renderCamList();
+      scheduleSave();
+    });
+
+    const del = document.createElement('button');
+    del.className = 'btn';
+    del.textContent = '✕';
+    del.title = 'この枠を削除';
+    del.disabled = cam.length <= 1;
+    del.addEventListener('click', ev => { ev.stopPropagation(); delCamFrame(sc.i, k); });
+
+    row.appendChild(lb); row.appendChild(at); row.appendChild(dur);
+    row.appendChild(ea); row.appendChild(key); row.appendChild(del);
+    list.appendChild(row);
+  });
+  const ex = Math.round((cut.bakeExpand || 1.02) * 100);
+  $('#cam-expand').value = ex;
+  $('#cam-expand-val').textContent = (ex / 100).toFixed(2);
+}
+/* 枠を追加: 選択枠を少しずらして後ろへ挿入。FIXカットの尺は cam[0].dur に引き継ぐ */
+function addCamFrame(){
+  const sc = state.selCut;
+  if(!sc) return;
+  const cut = cuts[sc.i];
+  const cam = cut.cam;
+  const src = cam[sc.k];
+  const before = snapshotCam(cut);
+  const n = { k: '', x: src.x + src.w * 0.12, y: src.y + src.h * 0.12,
+              w: src.w * 0.72, h: src.h * 0.72, dur: 0, ease: 'LINEAR', key: false };
+  const at = sc.k + 1;
+  const wasFix = cam.length === 1;
+  cam.splice(at, 0, n);
+  if(wasFix) cam[0].dur = cut.durF || FPS * 2;      // FIX の尺をそのまま A→B の尺にする
+  else if(!(cam[at - 1].dur > 0)) cam[at - 1].dur = FPS * 2;
+  if(!(n.dur > 0) && at < cam.length - 1) n.dur = FPS * 2;
+  rebakeFromCam(cut);
+  const after = snapshotCam(cut);
+  pushLog({ type: 'cut-rect',
+            undo(){ restoreCam(cut, before); rebakeFromCam(cut); },
+            redo(){ restoreCam(cut, after); rebakeFromCam(cut); } });
+  state.selCut = { i: sc.i, k: at };
+  afterCamChange(sc.i);
+  toast(camLabel(sc.i, at) + ' 枠を追加しました（枠をドラッグして行き先を決める）');
+}
+function delCamFrame(i, k){
+  const cut = cuts[i];
+  if(!cut || cut.cam.length <= 1) return;
+  const before = snapshotCam(cut);
+  cut.cam.splice(k, 1);
+  rebakeFromCam(cut);
+  const after = snapshotCam(cut);
+  pushLog({ type: 'cut-rect',
+            undo(){ restoreCam(cut, before); rebakeFromCam(cut); },
+            redo(){ restoreCam(cut, after); rebakeFromCam(cut); } });
+  state.selCut = { i, k: Math.min(k, cut.cam.length - 1) };
+  afterCamChange(i);
+}
+function setCamDur(i, k, n){
+  const cut = cuts[i];
+  if(!cut || !cut.cam[k]) return;
+  cut.cam[k].dur = clamp(n, 1, FPS * 600);
+  recalcDur(cut);
+  afterCamChange(i);
+}
+function setBakeExpand(i, v){
+  const cut = cuts[i];
+  if(!cut) return;
+  cut.bakeExpand = clamp(v, 1, 1.5);
+  rebakeFromCam(cut);
+  afterCamChange(i);
+}
+function snapshotCam(cut){ return JSON.parse(JSON.stringify(cut.cam || [])); }
+function snapshotRestore(a){ return JSON.parse(JSON.stringify(a)); }
+function restoreCam(cut, snap){ cut.cam = snapshotRestore(snap); }
+function afterCamChange(i){
+  renderCamList();
+  renderBoard();
+  refreshRow(i);
+  refreshStudio();
+  renderPaintViews();
+  scheduleSave();
 }
 
 /* ---------------- REF BOARD 連携（クリップ棚・SPEC_13 §2-1a） ----------------
@@ -1324,15 +1523,77 @@ function logStep(from, to, dir){
 function logUndo(){ logStep(gLog, gLogRedo, 'undo'); }
 function logRedo(){ logStep(gLogRedo, gLog, 'redo'); }
 
-/* ---------------- カメラ枠アクセサ（V2-D1 で cut.cam[] になる場所） ----------------
-   SPEC_13 §5a: 枠1つ = cam[] の1要素。V2-B時点では「cam.length === 1（= cut.src）」しか
-   無いだけ、という形で書いておく。ヒットテスト／移動／リサイズは全部この層を通すこと。 */
+/* ---------------- カメラ枠列 cut.cam[]（SPEC_13 §5a / §5b・V2-D1） ----------------
+   cam[i] = {k,x,y,w,h,dur,ease,key}。dur = **次の枠までのコマ数**（最終枠には無い）。
+   座標はBOARD座標・16:9固定。cut.src は廃止して cam[0] に吸収した。
+   ベイク範囲 bakeRect = fit16_9(union(cam[]) を bakeExpand 倍) なので、
+   **定義上すべての枠は bakeRect の内側**＝「PAN先に画がない」が原理的に起きない。 */
 const CAM_HANDLE = 10;   // 角ハンドルの一辺（画面px）
 const CAM_EDGE = 8;      // 枠線の当たり幅（画面px）
-function camCount(cut){ return cut && cut.src ? 1 : 0; }
-function camRect(cut, k){ return (cut && k === 0) ? cut.src : null; }
-function setCamRect(cut, k, r){ if(cut && k === 0) cut.src = { x: r.x, y: r.y, w: r.w, h: r.h }; }
-function camLabel(i, k){ return 'C' + (i + 1) + (camCount(cuts[i]) > 1 ? '-' + 'ABCDEFGHIJKL'[k] : ''); }
+const CAM_KEYS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const EASES = ['LINEAR', 'EASE', 'HOLD'];
+function camCount(cut){ return (cut && cut.cam) ? cut.cam.length : 0; }
+function camRect(cut, k){ return (cut && cut.cam && cut.cam[k]) ? cut.cam[k] : null; }
+function setCamRect(cut, k, r){
+  const c = camRect(cut, k);
+  if(!c) return;
+  c.x = r.x; c.y = r.y; c.w = r.w; c.h = r.h;
+}
+function camLabel(i, k){ return 'C' + (i + 1) + (camCount(cuts[i]) > 1 ? '-' + CAM_KEYS[k] : ''); }
+function mkCam(r, dur){
+  return { k: 'A', x: r.x, y: r.y, w: r.w, h: r.h, dur: dur || 0, ease: 'LINEAR', key: true };
+}
+/* A,B,C… の採番と key の既定（始点と終点だけ true）。ユーザーが触った枠は keyUser で守る */
+function relabelCam(cut){
+  const cam = cut.cam || [];
+  cam.forEach((c, i) => {
+    c.k = CAM_KEYS[i] || ('#' + (i + 1));
+    if(!c.keyUser) c.key = (i === 0 || i === cam.length - 1);
+  });
+}
+/* durF は Σ cam[].dur の導出値（枠列カット）。FIXカット(cam<=1)だけ直接入力 */
+function recalcDur(cut){
+  const cam = cut.cam || [];
+  if(cam.length >= 2){
+    let s = 0;
+    for(let i = 0; i < cam.length - 1; i++) s += Math.max(1, cam[i].dur | 0);
+    cut.durF = s;
+  }
+  return cut.durF;
+}
+function isCamCut(cut){ return camCount(cut) >= 2; }
+/* 枠の和集合を bakeExpand 倍して 16:9 に外接させる */
+function calcBakeRect(cut){
+  const cam = cut.cam || [];
+  if(!cam.length) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for(const c of cam){
+    x0 = Math.min(x0, c.x); y0 = Math.min(y0, c.y);
+    x1 = Math.max(x1, c.x + c.w); y1 = Math.max(y1, c.y + c.h);
+  }
+  const e = clamp(cut.bakeExpand || 1.02, 1, 1.5);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  let w = (x1 - x0) * e, h = (y1 - y0) * e;
+  if(w / h < CONTE_W / CONTE_H) w = h * CONTE_W / CONTE_H; else h = w * CONTE_H / CONTE_W;
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+/* bakeRect が動いたら、加筆(drawC)も新しいベイク空間へ載せ替える
+   （加筆は「紙の上」に描いてあるので、枠を動かしても絵に貼り付いたままにする） */
+function remapDraw(cut, oldRect, oldW, oldH){
+  const nr = cut.bakeRect;
+  if(!nr || !oldRect) return;
+  if(oldRect.x === nr.x && oldRect.y === nr.y && oldRect.w === nr.w) return;
+  const tmp = document.createElement('canvas');
+  tmp.width = cut.bakeW; tmp.height = cut.bakeH;
+  const ctx = ctx2d(tmp);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(cut.drawC, 0, 0, oldW, oldH,
+                (oldRect.x - nr.x) / nr.w * cut.bakeW, (oldRect.y - nr.y) / nr.h * cut.bakeH,
+                oldRect.w / nr.w * cut.bakeW, oldRect.h / nr.h * cut.bakeH);
+  cut.drawC = tmp;
+  cut.dirtyDraw = true;
+}
 function camCorners(r){
   return [{ x: r.x, y: r.y, n: 'nw' }, { x: r.x + r.w, y: r.y, n: 'ne' },
           { x: r.x, y: r.y + r.h, n: 'sw' }, { x: r.x + r.w, y: r.y + r.h, n: 'se' }];
@@ -1373,13 +1634,94 @@ function selectCutFrame(sel){
   syncBoardPanels();
   renderBoard();
 }
-/* 枠から焼き直す（V2-D1以降は bakeRect の再計算がここに入る） */
+/* 枠 → bakeRect 再計算 → 再ベイク（ベイク経路はここ一本に集約する）
+   V2-D1 ではベイクサイズは 1280×720 のまま。可変になるのは V2-D2。 */
 function rebakeFromCam(cut){
-  const r = camRect(cut, 0);
-  if(!r) return;
-  cut.baseC = bakeCut(r);
+  if(!cut) return;
+  const oldRect = cut.bakeRect, oldW = cut.bakeW || CONTE_W, oldH = cut.bakeH || CONTE_H;
+  const nr = calcBakeRect(cut);
+  cut.bakeRect = nr;
+  cut.bakeW = CONTE_W;
+  cut.bakeH = CONTE_H;
+  relabelCam(cut);
+  recalcDur(cut);
+  if(!nr){
+    cut.baseC = null;
+    cut.baseBlob = null;
+    cut.dirtyBase = true;
+    cut.thumb = null;
+    return;
+  }
+  remapDraw(cut, oldRect, oldW, oldH);
+  cut.baseC = bakeCut(nr);
   cut.dirtyBase = true;
   cut.thumb = null;
+}
+/* --- 再生位置 → カメラ矩形（ease補間・SPEC_13 §5a） --- */
+function easeT(t, mode){
+  if(mode === 'HOLD') return 0;                 // その枠で止まる＝タメ
+  if(mode === 'EASE') return t * t * (3 - 2 * t);
+  return t;                                     // LINEAR
+}
+function lerpRect(a, b, t){
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t,
+           w: a.w + (b.w - a.w) * t, h: a.h + (b.h - a.h) * t };
+}
+function camAt(cut, f){
+  const cam = (cut && cut.cam) || [];
+  if(!cam.length) return null;
+  if(cam.length === 1) return cam[0];
+  let acc = 0;
+  for(let i = 0; i < cam.length - 1; i++){
+    const d = Math.max(1, cam[i].dur | 0);
+    if(f < acc + d) return lerpRect(cam[i], cam[i + 1], easeT((f - acc) / d, cam[i].ease));
+    acc += d;
+  }
+  return cam[cam.length - 1];
+}
+/* 枠の通しフレーム（表示用: A 0f / B 60f / C 120f） */
+function camStartFrame(cut, k){
+  let acc = 0;
+  for(let i = 0; i < k && i < cut.cam.length - 1; i++) acc += Math.max(1, cut.cam[i].dur | 0);
+  return acc;
+}
+/* --- 出力1280×720へ描く（プレビュー／サムネ／書き出しの共通入口・SPEC_13 §5a） --- */
+function drawCamFrame(ctx, cut, f){
+  const v = cut.bg;
+  ctx.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
+  ctx.fillRect(0, 0, CONTE_W, CONTE_H);
+  const r = isCamCut(cut) ? camAt(cut, f) : null;
+  const br = cut.bakeRect;
+  const bw = cut.bakeW || CONTE_W, bh = cut.bakeH || CONTE_H;
+  if(!r || !br){
+    // FIX カット（枠1つ以下）は従来どおり全面
+    if(cut.baseC){
+      const a = baseAlphaOf(cut);
+      if(a < 1){ ctx.save(); ctx.globalAlpha = a; ctx.drawImage(cut.baseC, 0, 0, CONTE_W, CONTE_H); ctx.restore(); }
+      else ctx.drawImage(cut.baseC, 0, 0, CONTE_W, CONTE_H);
+    }
+    ctx.drawImage(cut.drawC, 0, 0, CONTE_W, CONTE_H);
+    return;
+  }
+  const sx = (r.x - br.x) / br.w * bw, sy = (r.y - br.y) / br.h * bh;
+  const sw = r.w / br.w * bw,          sh = r.h / br.h * bh;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  if(cut.baseC){
+    const a = baseAlphaOf(cut);
+    if(a < 1){ ctx.save(); ctx.globalAlpha = a; ctx.drawImage(cut.baseC, sx, sy, sw, sh, 0, 0, CONTE_W, CONTE_H); ctx.restore(); }
+    else ctx.drawImage(cut.baseC, sx, sy, sw, sh, 0, 0, CONTE_W, CONTE_H);
+  }
+  ctx.drawImage(cut.drawC, sx, sy, sw, sh, 0, 0, CONTE_W, CONTE_H);
+}
+/* 出力座標(0..1280) → ベイク空間座標。枠列カットのプレビューに直接描くときに要る */
+function camToBake(cut, f, x, y){
+  if(!isCamCut(cut) || !cut.bakeRect) return { x, y };
+  const r = camAt(cut, f), br = cut.bakeRect;
+  const bw = cut.bakeW || CONTE_W, bh = cut.bakeH || CONTE_H;
+  const sx = (r.x - br.x) / br.w * bw, sy = (r.y - br.y) / br.h * bh;
+  const sw = r.w / br.w * bw,          sh = r.h / br.h * bh;
+  return { x: sx + x / CONTE_W * sw, y: sy + y / CONTE_H * sh };
 }
 
 /* ---------------- cuts ---------------- */
@@ -1395,7 +1737,9 @@ function bakeCut(src){
   return c;
 }
 function createCutFromRect(src){
-  const cut = { id: uid(), src, baseC: bakeCut(src), drawC: blankCanvas(), bg: 232, baseAlpha: 1,
+  const cut = { id: uid(), cam: [mkCam(src, 0)], bakeRect: { x: src.x, y: src.y, w: src.w, h: src.h },
+                bakeW: CONTE_W, bakeH: CONTE_H, bakeExpand: 1.02,
+                baseC: bakeCut(src), drawC: blankCanvas(), bg: 232, baseAlpha: 1,
                 durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: true, dirtyDraw: true, thumb: null };
   cuts.push(cut);
   let slot = cuts.length - 1;   // 並べ替え後でも元の位置に戻す
@@ -1408,7 +1752,8 @@ function createCutFromRect(src){
   return cut;
 }
 function addEmptyCut(){
-  const cut = { id: uid(), src: null, baseC: null, drawC: blankCanvas(), bg: 232, baseAlpha: 1,
+  const cut = { id: uid(), cam: [], bakeRect: null, bakeW: CONTE_W, bakeH: CONTE_H, bakeExpand: 1.02,
+                baseC: null, drawC: blankCanvas(), bg: 232, baseAlpha: 1,
                 durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: false, dirtyDraw: true, thumb: null };
   cuts.push(cut);
   let slot = cuts.length - 1;
@@ -1501,7 +1846,7 @@ function syncBaseAlphaUI(){
 function cutThumb(cut){
   const c = document.createElement('canvas');
   c.width = CONTE_W; c.height = CONTE_H;
-  compositeTo(c.getContext('2d'), cut);
+  drawCamFrame(c.getContext('2d'), cut, 0);   // §5h: CUT単位のサムネは A枠の切り出し
   const t = document.createElement('canvas');
   t.width = 256; t.height = 144;
   t.getContext('2d').drawImage(c, 0, 0, 256, 144);
@@ -1524,6 +1869,12 @@ function updateTotals(){
 function setCutDur(i, f){
   const cut = cuts[i];
   if(!cut) return;
+  if(isCamCut(cut)){   // 枠列カットの durF は Σcam[].dur の導出値（SPEC_13 §5a）
+    toast('枠列カットの尺は枠ごとに設定します（BOARDの枠列パネル）');
+    renderStudioSync(true);
+    refreshRow(i);
+    return;
+  }
   cut.durF = f;
   refreshRow(i);
   if(state.view === 'studio'){ layoutTL(); renderTL(); renderStudioSync(true); }
@@ -1543,11 +1894,12 @@ function makeSheetRow(cut, i){
   head.className = 'sp-head';
   const no = document.createElement('span');
   no.className = 'sp-no';
-  no.textContent = 'C' + (i + 1);
+  no.textContent = 'C' + (i + 1) + (isCamCut(cut) ? ' ' + cut.cam.map(c => c.k).join('→') : '');
   const dur = document.createElement('input');
   dur.className = 'sp-dur';
   dur.value = fmtDur(cut.durF);
-  dur.title = '秒+コマ（24fps）例: 3+12';
+  dur.disabled = isCamCut(cut);
+  dur.title = isCamCut(cut) ? '枠列カットの尺は Σ枠の尺' : '秒+コマ（24fps）例: 3+12';
   dur.addEventListener('click', ev => ev.stopPropagation());
   dur.addEventListener('change', () => {
     const f = parseDur(dur.value);
@@ -1606,7 +1958,9 @@ function refreshRow(i){
   const src = cutThumbSrc(cut);
   if(im && im.getAttribute('src') !== src) im.setAttribute('src', src);
   const du = row.querySelector('.sp-dur');
-  if(du && document.activeElement !== du) du.value = fmtDur(cut.durF);
+  if(du && document.activeElement !== du){ du.value = fmtDur(cut.durF); du.disabled = isCamCut(cut); }
+  const no = row.querySelector('.sp-no');
+  if(no) no.textContent = 'C' + (i + 1) + (isCamCut(cut) ? ' ' + cut.cam.map(c => c.k).join('→') : '');
   const nt = row.querySelector('.sp-note');
   if(nt){
     nt.textContent = cut.note || '内容・セリフ';
@@ -1657,7 +2011,38 @@ function editZoomAt(clientX, clientY, factor){
 function renderEditCanvas(){
   const cut = cuts[state.curCut];
   if(!cut) return;
-  compositeTo(editCtx, cut);
+  compositeTo(editCtx, cut);   // EDITはベイク空間（＝紙のまま）を編集する
+  drawCamGuide(editCtx, cut);
+}
+/* 枠列カットは「どこが画面に入るか」が見えないと描けないので、EDIT表示にだけ枠を重ねる。
+   editCv は表示用キャンバスなので drawC は汚れない（floodFill/スポイトは別経路） */
+function drawCamGuide(ctx, cut){
+  if(!isCamCut(cut) || !cut.bakeRect) return;
+  const br = cut.bakeRect, bw = cut.bakeW || CONTE_W, bh = cut.bakeH || CONTE_H;
+  const toPx = r => ({ x: (r.x - br.x) / br.w * bw, y: (r.y - br.y) / br.h * bh,
+                       w: r.w / br.w * bw, h: r.h / br.h * bh });
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.font = 'bold 22px monospace';
+  const pts = [];
+  cut.cam.forEach((c, i) => {
+    const p = toPx(c);
+    ctx.strokeStyle = i === 0 ? 'rgba(90,233,255,0.85)' : 'rgba(255,79,168,0.75)';
+    ctx.setLineDash(i === 0 ? [] : [10, 6]);
+    ctx.strokeRect(p.x, p.y, p.w, p.h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = i === 0 ? 'rgba(90,233,255,0.95)' : 'rgba(255,79,168,0.9)';
+    ctx.fillText(c.k, p.x + 8, p.y + 26);
+    pts.push({ x: p.x + p.w / 2, y: p.y + p.h / 2 });
+  });
+  if(pts.length > 1){
+    ctx.strokeStyle = 'rgba(255,210,122,0.7)';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for(let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 function openEdit(i){
   if(!cuts.length) return;
@@ -1666,8 +2051,9 @@ function openEdit(i){
   state.curCut = i;
   undoStack = []; redoStack = [];   // カットをまたぐundo破損防止
   const cut = cuts[i];
-  $('#edit-cut-label').textContent = 'C' + (i + 1);
+  $('#edit-cut-label').textContent = 'C' + (i + 1) + (isCamCut(cut) ? ' ' + cut.cam.map(c => c.k).join('→') : '');
   $('#edit-dur').value = fmtDur(cut.durF);
+  $('#edit-dur').disabled = isCamCut(cut);
   $('#edit-dur-f').textContent = cut.durF + 'f';
   $('#bg-slider').value = cut.bg;
   $('#bg-val').textContent = cut.bg;
@@ -1703,6 +2089,17 @@ function setCutBg(v){
 function toCanvasCoord(clientX, clientY, cv){
   const r = (cv || editCv).getBoundingClientRect();
   return { x: (clientX - r.left) / r.width * CONTE_W, y: (clientY - r.top) / r.height * CONTE_H };
+}
+/* ペイント先は常に drawC＝ベイク空間。STUDIOプレビュー(tlCv)はカメラを通っているので戻す。
+   EDITキャンバスはベイク空間そのものなので変換不要（V2-D1） */
+function paintCoord(clientX, clientY, cv){
+  const p = toCanvasCoord(clientX, clientY, cv);
+  const cut = cuts[state.curCut];
+  if(cv === tlCv && cut && isCamCut(cut)){
+    const ca = cutIndexAt(state.tl.frame);
+    return camToBake(cut, ca ? ca.local : 0, p.x, p.y);
+  }
+  return p;
 }
 function pushUndo(){
   const cut = cuts[state.curCut];
@@ -1873,7 +2270,7 @@ function sampleCompositeColor(cx, cy){
   return rgbToHex(cut.bg, cut.bg, cut.bg);
 }
 function eyedropAt(clientX, clientY, cv){
-  const { x, y } = toCanvasCoord(clientX, clientY, cv);
+  const { x, y } = paintCoord(clientX, clientY, cv);
   const hex = sampleCompositeColor(x, y);
   if(!hex) return;
   state.fillColor = hex;
@@ -1898,7 +2295,7 @@ function paintDown(e, cv){
   e.preventDefault();
   cv.setPointerCapture(e.pointerId);
   paintCv = cv;
-  const p = toCanvasCoord(e.clientX, e.clientY, cv);
+  const p = paintCoord(e.clientX, e.clientY, cv);
   if(state.etool === 'eyedrop' || e.altKey){
     eyedropAt(e.clientX, e.clientY, cv);
     return;
@@ -1922,7 +2319,7 @@ function paintDown(e, cv){
 }
 function paintMove(e){
   if(!stroking || !paintCv) return;
-  const p = toCanvasCoord(e.clientX, e.clientY, paintCv);
+  const p = paintCoord(e.clientX, e.clientY, paintCv);
   strokeSeg(strokeLast, p);
   strokeLast = p;
   renderPaintViews();
@@ -1992,7 +2389,7 @@ function renderTL(){
     tlCtx.fillRect(0, 0, CONTE_W, CONTE_H);
   }else{
     const ca = cutIndexAt(state.tl.frame);
-    compositeTo(tlCtx, cuts[ca.i]);
+    drawCamFrame(tlCtx, cuts[ca.i], ca.local);   // 枠列カットはここでカメラが効く
     if($('#chk-burnin').checked) drawBurnin(ca);
   }
   updateTLHud();
@@ -2547,6 +2944,13 @@ function wire(){
   $('#photo-contrast').addEventListener('change', e => setPhotoFilter('contrast', +e.target.value / 100, true));
   $('#btn-cutframe-edit').addEventListener('click', () => { if(state.selCut) openEdit(state.selCut.i); });
   $('#btn-cutframe-del').addEventListener('click', () => { if(state.selCut) deleteCut(state.selCut.i); });
+  $('#btn-cam-add').addEventListener('click', addCamFrame);
+  $('#cam-expand').addEventListener('input', e => {
+    $('#cam-expand-val').textContent = (+e.target.value / 100).toFixed(2);
+  });
+  $('#cam-expand').addEventListener('change', e => {
+    if(state.selCut) setBakeExpand(state.selCut.i, +e.target.value / 100);
+  });
   // REF BOARD クリップ
   $('#btn-clip-clear').addEventListener('click', clipClear);
   $('#btn-clip-paste').addEventListener('click', clipPasteJson);
@@ -2791,6 +3195,8 @@ window.__ECONTE__ = {
   setBaseAlpha, baseAlphaOf, syncBaseAlphaUI, activeCutIndex, editFit, editZoomAt, applyEditView,
   fitEditCanvas, undoActive, redoActive, cancelGestures,
   camCount, camRect, setCamRect, camLabel, hitCutFrame, hitCutHandle, selectCutFrame, rebakeFromCam,
+  camAt, drawCamFrame, camToBake, calcBakeRect, recalcDur, isCamCut, addCamFrame, delCamFrame,
+  setCamDur, setBakeExpand, renderCamList, camStartFrame, relabelCam, easeT, migrateCutV2, drawCamGuide,
   clipSet, clipClear, clipConsume, clipPasteJson, renderClipBar, logUndo, logRedo, isHeic, decodeHeic,
   fmtDur, parseDur, floodFill, sampleCompositeColor, saveAll, boardFit, updateTotals,
   totalFrames, cutIndexAt, cutStartFrame, seek, play, pause, togglePlay, seekCut, toggleLoop,

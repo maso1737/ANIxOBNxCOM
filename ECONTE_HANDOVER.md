@@ -38,6 +38,27 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 - `v!=='studio'` の瞬間に `pause()` を呼ぶ（再生の取り残し防止）
 - EDITから戻る先は常に STUDIO（`#btn-edit-back` は固定ラベル）
 
+■ カメラ枠列 cam[]（V2-D1・SPEC_13 §5a/§5b）
+- `cut.cam[i] = {k,x,y,w,h,dur,ease,key,keyUser}`。**dur = 次の枠までのコマ数**（最終枠には無い）
+- `cut.durF` は枠列カットでは **Σcam[].dur の導出値**。`recalcDur(cut)` 経由でしか変わらない。
+  **`durF` に直接代入しないこと**（`setCutDur()` は枠列カットを弾いてトーストを出す）
+- `bakeRect = fit16_9(union(cam[]) × bakeExpand)`。枠を動かすたび `rebakeFromCam()` が
+  再計算→再ベイクする。**定義上すべての枠が bakeRect の内側**（PAN先に画が無い事故が構造的に起きない）
+- **bakeRect が動いたら `remapDraw()` が加筆(drawC)を新しいベイク空間へ載せ替える**。
+  これが無いと枠を動かした瞬間に加筆と絵がズレる。リサンプルが入るので何度も動かすと甘くはなる
+- 描画の入口は3つに分かれた。**混同すると静かに壊れる**:
+  - `compositeTo(ctx, cut)` … ベイク空間そのまま（EDIT表示・floodFillの判定元・スポイト）
+  - `drawCamFrame(ctx, cut, localF)` … 出力1280×720（STUDIOプレビュー・サムネ・動画書き出し）
+  - `drawCamGuide(ctx, cut)` … EDIT表示にだけ枠を重ねる（表示専用。drawC は汚さない）
+- **プレビューに直接描くときは `paintCoord()` を通す**（出力座標→ベイク空間へ戻す `camToBake`）。
+  `toCanvasCoord()` を直に使うと枠列カットで描画位置がズレる
+- ease は `easeT()`（LINEAR / EASE=smoothstep / HOLD=その枠で止まる＝タメ）
+- `key` はカラースクリプト一覧（§5h・D3）に出す枠。既定は始点と終点だけ true。
+  ユーザーが★を触ると `keyUser` が立ち、以後 `relabelCam()` の既定計算から守られる
+- **V2-D2 でここが可変解像度になる**: `bakeW/bakeH` は今 1280×720 固定だが、
+  `drawCamFrame`/`camToBake`/`remapDraw` は最初から bakeW/bakeH 参照で書いてあるので、
+  D2 は「どこから寸法を取るか」を変えるだけで済む
+
 ■ BOARD（考える場）
 - `bDown/bMove/bUp` がMOVE/CUTツール共用のポインタハンドラ。V2-Bで判定順が
   **①選択枠の角ハンドル → ②枠線/C#ラベル（写真より優先）→ ③写真 → ④パン** になった
@@ -187,8 +208,13 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
   統合Undoログ／REF BOARD連携 `photo.ref`。ペイン境界のスプリッタ（AE風の幅変更）も同時に追加
 - **V2-C: 実装済み（2026-08-02）** — `cut.baseAlpha` トレース透かし／EDITズーム・パン／
   指=操作・ペン=描画／2本指UNDO・3本指REDO
-- V2-D1〜D3: 未着手。**V2-D1 は V2-B の枠編集UIをそのまま枠列へ拡張する**
-  （`camCount/camRect/setCamRect` を `cam[]` 実体に差し替え、`rebakeFromCam` に bakeRect 再計算を足す）
+- **V2-D1: 実装済み（2026-08-02）** — `cut.cam[]`／`bakeRect` 自動算出／枠列編集UI／
+  `drawCamFrame()`／meta.ver 1→2 マイグレーション。**ベイクは1280×720のまま**
+- V2-D2 / V2-D3: 未着手。
+  - **D2 は唯一の不可逆なデータ変更**（可変ベイク解像度＋遅延デコードLRU）。
+    着手前にIndexedDBの構造変更をユーザーに一言確認する。**遅延デコードは D2 と同時に入れる**
+    （後回しにすると大判カットを作った瞬間に落ちる）
+  - D3 は INFO帯＋MP4書き出し＋カラースクリプト一覧PNG（`cam[].key` で間引く）
 
 【変更後チェック】
 node tools/check.js（6ファイル一括。econte.html含む）
