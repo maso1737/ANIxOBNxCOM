@@ -237,6 +237,34 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - **AE JSX（P4-4）**: カメラに加えて各トラックを平面/ヌルの3Dレイヤーで生成。solidは**composer px そのままのサイズ**で作り、スケールに `sx=comp.width/D.W` を掛けて合わせる（アンカー=`[w/2+ax, h/2+ay]`、Position=`comp中央+(x+ax)*sx`）。Z=`z*sx` でカメラのZoom設定と組み合わせると composer の `PERSP_FOCAL` 透視と一致する。**親付きレイヤーの子Zだけは AE のカメラ透視で解釈されるため厳密には一致しない**（Z=0の子は一致・JSX冒頭のコメントに明記）
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
+【2026-08-02 追加（SPEC_11 P7）】
+- **出力サイズは可変**: `state.out={mode:'x1'|'x2'|'long3840'|'custom', long, bleed}`（PROJECT_v2＋undo対象）。
+  `outScale()`→`outSize(bleed)` が **アスペクトを保った** w/h を返す。書き出し中の実サイズは
+  **`beginRender(bleed)` が `gOutW`/`gOutH`/`gRenderBleed` に置き、`endRender()` で戻す**（旧 `OUT_W/OUT_H` 定数は廃止）。
+  **書き出し関数を足すときは必ず beginRender/endRender で挟む**（挟み忘れると前回のサイズとのりしろ状態を引きずる）
+- **`drawOneTrack` のスケールは `sx=tw/(state.width*(gRenderBleed?1.2:1))`, `sy=sx` の1本**。
+  旧 `sy=th/state.height` は 16:9 以外のコンポを変形させていた。**縦横で別のスケールを使わないこと**
+- **のりしろ**（`BLEED_K=1.2`）は「キャンバスだけ広げ、レイヤーの拡大率は据え置く」。ガイドは追加せず
+  CANVAS GUIDES の `本番枠(1/1.2)` ボタンで見る。**AE JSX は常にのりしろ込み**（`D.W/H` がのりしろサイズ＝AE側で同サイズのコンポを作れば sx=1）
+- **Zソート（既定ON・トグル無し）**: `drawFrame` は `tracksInDrawOrder(frame,cam)` の順に描く。
+  実効Zは `perspAt()`（親チェーン込みの合成透視倍率）→`depthAt()` で逆算。**安定ソートなので Z=0 が並ぶ通常運用は配列順のまま**。
+  さらに **Zキーが1本も無ければ並べ替えをスキップ**する早期リターンがあるので毎フレームのコストもゼロ。
+  AE は連続した3Dレイヤーをカメラ距離順に描くので、これで AE と一致する（JSXは変更不要）
+- **PNG連番の出力先**: `gPngDest`（`composer_png_dest_v1`。端末ごとの設定＝プロジェクトには保存しない）。
+  `folder` なら `pickExportDir()`→`showDirectoryPicker` でフォルダへ1枚ずつ（メモリに溜めないので尺の上限が実質消える）。
+  未対応/例外は ZIP へ自動フォールバック、AbortError（ユーザーがキャンセル）は書き出し中止。書き出しは `toBlob`（base64の+33%が無い）。
+  **`#btn-export` の click → `exportPNG` → `exportZipPNG` → `pickExportDir` までは await を挟まない同期チェーン**にすること
+  （ユーザー操作の直後でないとピッカーが開けない。途中に await を足すと無言で ZIP に落ちる）
+- **タイムラインの時間軸ズーム**: `state.tlView={start,span}`（span=0＝全体。**保存もundoもしない表示状態**）。
+  **X座標は `frameFrac(f)` / `pxToFrame(px,幅)` の2関数だけを通す**（`f/total` を直書きすると必ずズレる）。
+  1コマ幅は `幅/tlSpan()`。`;` と ⤢ ボタンで WA⇔全体、Alt+ホイール＝カーソル基点ズーム、Shift/横ホイール＝横スクロール。
+  ズーム中は `updatePlayhead()` がインジケータを追って表示範囲を送るが、**`setTlView()` の再描画中は `gTlFollowing` で追従を止める**
+  （止めないと「Alt+ホイールでズームしても即インジケータ位置へ戻る」）
+- **`LABEL_W` は4点セット**: `.tl-track-label` 138px / `LABEL_W` 164 / `#tl-audio-label` 138px / **`#tl-ruler` の `padding-left` 164px**。
+  最後の1つは P6-1 のとき取り残されていて、ルーラーの目盛だけ 10px ずれていた（P7-5 で修正）
+- **INSPECTOR = トラック編集 ＋ 最下段の OUTPUT**（コンポ全体設定）にルール改訂。2026-07-25 の「OUTPUT廃止」は SETTINGS が一杯のため撤回
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 【コードの注意点】
 - KF関数はkfsパラメータ明示。op=0は isNaN(v)?1:v で判定
 - ALL_PROPS にprop追加時は #kf-*/#fx-*/#dot-*/#fx-dot-* のUIも要追加（updateKfUI/Fxがループ参照）

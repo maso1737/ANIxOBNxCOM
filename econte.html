@@ -57,17 +57,42 @@ body{
 #view-studio{display:none;flex-direction:column}
 #view-studio.on{display:flex}
 #studio-main{flex:1;display:flex;min-height:0}
+/* ペイン境界のスプリッタ（ドラッグで幅変更・ダブルクリックで既定へ） */
+.splitter{
+  flex:none;width:5px;cursor:col-resize;touch-action:none;
+  background:rgba(255,210,122,.10);transition:background .12s;
+}
+.splitter:hover{background:rgba(255,79,168,.55)}
+.splitter.on{background:var(--acid)}
 /* ---------- STUDIO 左: BOARD ---------- */
 #studio-board{position:relative;width:40%;min-width:240px;flex:none;border-right:1px solid var(--border);overflow:hidden}
 #board-cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
 #board-tools{
   position:absolute;left:12px;top:12px;display:flex;flex-direction:column;gap:6px;
   background:rgba(21,9,39,.86);border:1px solid var(--border);padding:9px;z-index:10;
-  backdrop-filter:blur(3px);
+  backdrop-filter:blur(3px);max-height:calc(100% - 24px);overflow-y:auto;
 }
+#studio-board.has-clip #board-tools{top:38px}
 #board-tools .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 #board-hint{color:var(--grey);font-size:9px;letter-spacing:.06em;max-width:212px;line-height:1.6;font-family:var(--jp)}
 #zoom-label{color:var(--gold);font-size:9px;letter-spacing:.1em}
+/* REF BOARD クリップ帯（SPEC_13 §2-1a） */
+#clip-bar{
+  position:absolute;left:0;right:0;top:0;height:26px;z-index:11;display:none;
+  align-items:center;gap:8px;padding:0 8px;font-family:var(--jp);font-size:10px;
+  background:rgba(90,233,255,.12);border-bottom:1px solid rgba(90,233,255,.45);color:var(--ice);
+}
+#clip-tx{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#clip-bar .btn{padding:3px 7px;font-size:8px}
+/* 選択中オブジェクトのパネル */
+#photo-panel,#cutframe-panel{display:none;flex-direction:column;gap:5px;border-top:1px solid var(--border);padding-top:7px}
+#photo-panel.on,#cutframe-panel.on{display:flex}
+#board-tools .sld-row{gap:5px}
+#board-tools .sld-row input[type=range]{width:96px}
+.sld-k{color:var(--grey);font-size:9px;min-width:14px}
+.mini-note{color:var(--dim);font-size:9px;font-family:var(--jp);line-height:1.5;max-width:212px}
+#photo-ref-tx{color:var(--ice);font-size:9px;font-family:var(--jp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:120px}
+#cutframe-label{font-family:var(--bank);font-size:13px;letter-spacing:.1em;color:var(--acid)}
 /* ---------- STUDIO 中央: プレビュー＋現在カット編集 ---------- */
 #studio-center{flex:1;display:flex;flex-direction:column;min-width:0}
 #cur-box{
@@ -91,7 +116,7 @@ body{
 #cur-dur:disabled,#cur-note:disabled{opacity:.35}
 /* ---------- STUDIO 右: SHEETパネル ---------- */
 #studio-sheet{
-  width:22%;min-width:200px;max-width:360px;flex:none;background:var(--panel2);
+  width:22%;min-width:160px;flex:none;background:var(--panel2);
   border-left:1px solid var(--border);display:flex;flex-direction:column;
 }
 #studio-sheet.hidden{display:none}
@@ -168,7 +193,8 @@ body{
   flex:1;display:flex;align-items:center;justify-content:center;min-width:0;overflow:hidden;
   background:radial-gradient(ellipse 60% 60% at 50% 40%,rgba(184,80,255,0.07),transparent 70%);
 }
-#edit-cv{background:#888;box-shadow:0 0 30px rgba(0,0,0,.6);touch-action:none;cursor:crosshair}
+#edit-cv{background:#888;box-shadow:0 0 30px rgba(0,0,0,.6);touch-action:none;cursor:crosshair;flex:none}
+#edit-zoom{color:var(--gold);font-size:10px;letter-spacing:.08em;min-width:42px}
 /* ---------- TIMELINE（STUDIO中央のプレビュー＋最下段の帯） ---------- */
 #tl-stage{
   flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden;
@@ -234,6 +260,13 @@ body{
   box-shadow:0 0 40px rgba(255,79,168,.2);
 }
 #modal-msg{font-family:var(--jp);font-size:13px;line-height:1.7;margin-bottom:16px}
+#modal-input{
+  display:none;width:100%;height:96px;margin-bottom:14px;resize:none;
+  background:var(--black);border:1px solid var(--border);color:var(--white);
+  font-family:var(--mono);font-size:11px;line-height:1.5;padding:7px;
+  -webkit-user-select:text;user-select:text;
+}
+#modal-input:focus{outline:none;border-color:var(--border-bright)}
 #modal-btns{display:flex;gap:8px;justify-content:flex-end}
 </style>
 </head>
@@ -244,7 +277,8 @@ body{
   <button class="btn mode on" id="btn-view-studio">STUDIO</button>
   <button class="btn mode" id="btn-view-edit" title="現在カットを加筆EDITで開く">EDIT</button>
   <button class="btn ex" id="btn-import">+ IMPORT PHOTO</button>
-  <input type="file" id="file-input" accept="image/*" multiple style="display:none;">
+  <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none;">
+  <button class="btn" id="btn-clip-paste" title="ref-board の ⧉ でコピーしたクリップJSONを貼り付け（別オリジン/file:// 用）">&#9187; CLIP</button>
   <label id="burnin-label"><input type="checkbox" id="chk-burnin"> C#/尺 焼き込み</label>
   <button class="btn ex" id="btn-export" title="実時間で再生しながら録画します（タブを前面のまま待つ）">EXPORT VIDEO</button>
   <span id="bar-total">0 CUTS</span>
@@ -261,6 +295,11 @@ body{
     <!-- 左: BOARD -->
     <div id="studio-board">
       <canvas id="board-cv"></canvas>
+      <div id="clip-bar">
+        <span id="clip-tx"></span>
+        <span style="flex:1"></span>
+        <button class="btn" id="btn-clip-clear" title="クリップを解除（ref-board側の棚も空にします）">解除</button>
+      </div>
       <div id="board-tools">
         <div class="row">
           <button class="btn mode on" id="btn-tool-move">MOVE</button>
@@ -268,12 +307,44 @@ body{
         </div>
         <div class="row">
           <button class="btn" id="btn-board-fit">FIT</button>
-          <button class="btn" id="btn-photo-del" disabled>DEL PHOTO</button>
           <span id="zoom-label">50%</span>
         </div>
-        <div id="board-hint">写真をD&amp;D / IMPORTで読み込み。MOVE=写真移動（空白ドラッグ=パン・Alt/中ボタン=常にパン・ホイール/ピンチ=ズーム）。CUT=矩形ドラッグで絵コンテのコマ化（16:9）。</div>
+        <!-- 選択中の写真 -->
+        <div id="photo-panel">
+          <div class="pnl-t">PHOTO</div>
+          <div class="row">
+            <button class="btn" id="btn-photo-rot" title="90°回転">&#8634; 90&deg;</button>
+            <button class="btn mode" id="btn-photo-gray" title="モノクロ化">GRAY</button>
+            <button class="btn" id="btn-photo-ref" title="REF BOARDの元リンクを開く／クリップがあれば紐づけ">&#128279;</button>
+            <button class="btn" id="btn-photo-del" disabled>DEL</button>
+          </div>
+          <div class="sld-row">
+            <span class="sld-k">明</span>
+            <input type="range" id="photo-bright" min="50" max="200" step="5" value="100" title="明るさ 0.5〜2.0">
+            <span class="sld-val" id="photo-bright-val">1.00</span>
+          </div>
+          <div class="sld-row">
+            <span class="sld-k">コ</span>
+            <input type="range" id="photo-contrast" min="50" max="200" step="5" value="100" title="コントラスト 0.5〜2.0">
+            <span class="sld-val" id="photo-contrast-val">1.00</span>
+          </div>
+          <div id="photo-ref-tx"></div>
+        </div>
+        <!-- 選択中のCUT枠 -->
+        <div id="cutframe-panel">
+          <div class="pnl-t">CUT 枠</div>
+          <div class="row">
+            <span id="cutframe-label">C1</span>
+            <button class="btn" id="btn-cutframe-edit" title="加筆EDITで開く">&#9998;</button>
+            <button class="btn" id="btn-cutframe-del" title="このカットを削除 (Delete)">&#10005;</button>
+          </div>
+          <div class="mini-note">枠内ドラッグ=移動 ／ 角=リサイズ(16:9) ／ 離すと自動で再ベイク</div>
+        </div>
+        <div id="board-hint">写真をD&amp;D / IMPORT / Ctrl+Vで読み込み。MOVE=写真移動（空白ドラッグ=パン・Alt/中ボタン=常にパン・ホイール/ピンチ=ズーム）。CUT枠は枠線かC#ラベルをクリックで選択。CUT=矩形ドラッグで絵コンテのコマ化（16:9）。</div>
       </div>
     </div>
+
+    <div class="splitter" id="split-board" title="ドラッグでBOARD幅を変更 ／ ダブルクリックで既定へ"></div>
 
     <!-- 中央: プレビュー＋現在カットの編集欄 -->
     <div id="studio-center">
@@ -290,6 +361,11 @@ body{
           <div class="sld-row">
             <input type="range" id="tl-brush" min="1" max="64" value="6" title="ブラシサイズ">
             <span class="sld-val" id="tl-brush-val">6</span>
+          </div>
+          <div class="sld-row">
+            <span class="sld-k">B</span>
+            <input type="range" id="tl-base-alpha" min="0" max="100" value="100" title="BASE透過（トレース）">
+            <span class="sld-val" id="tl-base-alpha-val">100%</span>
           </div>
           <div id="tl-mini-swatch" title="現在色（スポイトで選択スロットに上書き）"></div>
           <div class="palette" id="tl-palette"></div>
@@ -318,6 +394,8 @@ body{
         <textarea id="cur-note" placeholder="内容・セリフ"></textarea>
       </div>
     </div>
+
+    <div class="splitter" id="split-sheet" title="ドラッグでSHEETパネル幅を変更 ／ ダブルクリックで既定へ"></div>
 
     <!-- 右: SHEETパネル -->
     <div id="studio-sheet">
@@ -362,6 +440,9 @@ body{
     <span style="color:var(--grey);margin-left:10px;">尺</span>
     <input id="edit-dur" value="2+0" title="秒+コマ（24fps）例: 3+12">
     <span id="edit-dur-f">48f</span>
+    <span style="color:var(--grey);margin-left:10px;">表示</span>
+    <button class="btn" id="btn-edit-fit" title="ズーム/パンをリセット">FIT</button>
+    <span id="edit-zoom">100%</span>
     <span style="flex:1"></span>
     <button class="btn" id="btn-ui-side" title="TOOLパネルを左右入替">&#8646; TOOL</button>
     <button class="btn" id="btn-clear-draw" title="加筆レイヤーを消去（Undo可）">CLEAR DRAW</button>
@@ -398,6 +479,13 @@ body{
         </div>
       </div>
       <div>
+        <div class="pnl-t">BASE 透過（トレース）</div>
+        <div class="sld-row">
+          <input type="range" id="base-alpha" min="0" max="100" value="100" title="切り出しベース画像の濃度（20〜40%がトレース用）">
+          <span class="sld-val" id="base-alpha-val">100%</span>
+        </div>
+      </div>
+      <div>
         <div class="pnl-t">BG GRAY（下地）</div>
         <div class="sld-row">
           <input type="range" id="bg-slider" min="0" max="255" value="232">
@@ -425,6 +513,7 @@ body{
 <div id="modal-ovl">
   <div id="modal-box">
     <div id="modal-msg"></div>
+    <textarea id="modal-input" placeholder='{"v":1,"ts":…,"item":{…}}'></textarea>
     <div id="modal-btns">
       <button class="btn" id="modal-cancel">キャンセル</button>
       <button class="btn ex" id="modal-ok">OK</button>
@@ -443,6 +532,11 @@ body{
 const CONTE_W = 1280, CONTE_H = 720, FPS = 24;
 const PAL_LS = 'econte_palette_v1';
 const UI_LS = 'econte_ui_v1';
+/* REF BOARD 連携（SPEC_13 §2-1a）— 送信側 Tools/ref-board/ref-board.html と同契約 */
+const LS_CLIP = 'refboard.clip.v1';
+const BC_NAME = 'refboard_live';
+const CLIP_MAX_AGE = 24 * 60 * 60 * 1000;   // 24時間以上前のクリップは無視（貼り忘れの誤爆防止）
+const HEIC_CDN = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
 const $ = sel => document.querySelector(sel);
 
 const PALETTE_48 = [
@@ -462,14 +556,16 @@ const state = {
   brush: 6,
   curCut: -1,
   selPhoto: null,
+  selCut: null,          // {i,k} 選択中のCUT枠（k = cam[]の枠index。V2-Bでは常に0）
+  editView: { x: 0, y: 0, z: 1 },   // EDITのズーム/パン（z=1 が fit）
   tl: { frame: 0, playing: false, loop: true, lastTs: 0, acc: 0 },
   board: { x: -800, y: -450, z: 0.5 }
 };
-let photos = [];   // {id,name,img,blob,x,y,w,h} — BOARD座標
+let photos = [];   // {id,name,img,blob,x,y,w,h,rot,filter,ref} — BOARD座標
 let cuts = [];     // SPEC_10 cutモデル
 let db = null;
 let gFocusCut = -1;                          // 現在カット = cutIndexAt(tl.frame).i の導出値
-let gUi = { side: 'left', sheet: true };     // TOOLパネルの左右 / 右SHEETパネルの開閉
+let gUi = { side: 'left', sheet: true, boardW: 40, sheetW: 22 };   // TOOLパネル左右 / 右パネル開閉 / ペイン幅(%)
 
 function uid(){ return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function clamp(v, a, b){ return Math.min(b, Math.max(a, v)); }
@@ -519,8 +615,19 @@ function toast(msg){
 let modalResolve = null;
 function modalConfirm(msg){
   $('#modal-msg').textContent = msg;
+  $('#modal-input').style.display = 'none';
   $('#modal-ovl').classList.add('on');
   return new Promise(res => { modalResolve = res; });
+}
+/* 貼り付け入力つきモーダル（native prompt は使わない・app風に揃える） */
+function modalPrompt(msg){
+  const inp = $('#modal-input');
+  $('#modal-msg').textContent = msg;
+  inp.value = '';
+  inp.style.display = 'block';
+  $('#modal-ovl').classList.add('on');
+  setTimeout(() => inp.focus(), 0);
+  return new Promise(res => { modalResolve = ok => res(ok ? inp.value.trim() : null); });
 }
 function modalClose(ok){
   $('#modal-ovl').classList.remove('on');
@@ -569,13 +676,15 @@ function scheduleSave(){
 async function saveAll(){
   if(!db) return;
   try{
-    const phItems = photos.map(p => ({ id: p.id, name: p.name, x: p.x, y: p.y, w: p.w, h: p.h, blob: p.blob }));
+    const phItems = photos.map(p => ({ id: p.id, name: p.name, x: p.x, y: p.y, w: p.w, h: p.h, blob: p.blob,
+                                       rot: p.rot || 0, filter: p.filter || null, ref: p.ref || null }));
     const cutItems = [];
     for(let i = 0; i < cuts.length; i++){
       const c = cuts[i];
       if(c.dirtyBase){ c.baseBlob = c.baseC ? await canvasToBlob(c.baseC) : null; c.dirtyBase = false; }
       if(c.dirtyDraw){ c.drawBlob = await canvasToBlob(c.drawC); c.dirtyDraw = false; }
       cutItems.push({ id: c.id, order: i, src: c.src, bg: c.bg, durF: c.durF, note: c.note,
+                      baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : 1),
                       baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null });
     }
     await idbClearPut('photos', phItems);
@@ -593,7 +702,8 @@ async function loadAll(){
     for(const p of phItems){
       if(!p.blob) continue;
       const img = await blobToImage(p.blob);
-      photos.push({ id: p.id, name: p.name, img, blob: p.blob, x: p.x, y: p.y, w: p.w, h: p.h });
+      photos.push({ id: p.id, name: p.name, img, blob: p.blob, x: p.x, y: p.y, w: p.w, h: p.h,
+                    rot: p.rot || 0, filter: normFilter(p.filter), ref: p.ref || null });
     }
     const cutItems = await idbGetAll('cuts');
     cutItems.sort((a, b) => a.order - b.order);
@@ -610,6 +720,7 @@ async function loadAll(){
         ctx2d(baseC).drawImage(bi, 0, 0);
       }
       cuts.push({ id: c.id, src: c.src || null, baseC, drawC, bg: (typeof c.bg === 'number' ? c.bg : 232),
+                  baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : 1),
                   durF: c.durF || FPS * 2, note: c.note || '',
                   baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null,
                   dirtyBase: false, dirtyDraw: false, thumb: null });
@@ -651,7 +762,8 @@ function renderStudioSync(force){
     const rows = $('#sheet-list').children;
     for(let k = 0; k < rows.length; k++) rows[k].classList.toggle('focus', k === i);
     if(rows[i]) rows[i].scrollIntoView({ block: 'nearest' });
-    renderBoard();   // BOARD上の該当CUT枠の色を変える
+    renderBoard();        // BOARD上の該当CUT枠の色を変える
+    syncBaseAlphaUI();    // ミニツールの BASE スライダーも現在カットへ
   }
   const cut = cuts[i];
   const lab = $('#cur-cut-label'), durEl = $('#cur-dur'), durF = $('#cur-dur-f'), note = $('#cur-note');
@@ -694,6 +806,39 @@ function rectFromDrag(a, b){
   const h = w * 9 / 16;
   return { x: dx >= 0 ? a.x : a.x - w, y: dy >= 0 ? a.y : a.y - h, w, h };
 }
+/* --- 写真の描画（回転＋フィルタ）。renderBoard と bakeCut の唯一の入口 ---
+   p.x/y/w/h は「BOARD上の見た目の外接矩形」を正とする（＝当たり判定はそのまま）。
+   rot 90/270 のときだけ、内側で幅高を入れ替えて描いてから回す。 */
+function normFilter(f){
+  return { gray: !!(f && f.gray),
+           bright: (f && typeof f.bright === 'number') ? f.bright : 1,
+           contrast: (f && typeof f.contrast === 'number') ? f.contrast : 1 };
+}
+function filterStr(f){
+  if(!f) return '';
+  const parts = [];
+  if(f.gray) parts.push('grayscale(1)');
+  if(f.bright !== 1) parts.push('brightness(' + f.bright + ')');
+  if(f.contrast !== 1) parts.push('contrast(' + f.contrast + ')');
+  return parts.join(' ');
+}
+function drawPhoto(ctx, p){
+  const fs = filterStr(p.filter);
+  const rot = p.rot || 0;
+  if(!fs && !rot){ ctx.drawImage(p.img, p.x, p.y, p.w, p.h); return; }
+  ctx.save();
+  if(fs) ctx.filter = fs;          // ※iPad Safari 16 以前は ctx.filter 未対応（無視されるだけ）
+  if(rot){
+    const swap = (rot === 90 || rot === 270);
+    const dw = swap ? p.h : p.w, dh = swap ? p.w : p.h;
+    ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
+    ctx.rotate(rot * Math.PI / 180);
+    ctx.drawImage(p.img, -dw / 2, -dh / 2, dw, dh);
+  }else{
+    ctx.drawImage(p.img, p.x, p.y, p.w, p.h);
+  }
+  ctx.restore();
+}
 function renderBoard(){
   const b = state.board;
   const cw = boardCv.clientWidth, ch = boardCv.clientHeight;
@@ -712,7 +857,13 @@ function renderBoard(){
   boardCtx.imageSmoothingEnabled = true;
   boardCtx.imageSmoothingQuality = 'medium';
   for(const p of photos){
-    boardCtx.drawImage(p.img, p.x, p.y, p.w, p.h);
+    drawPhoto(boardCtx, p);
+    if(p.ref){
+      // REF BOARD 由来のマーカー（右上角）
+      const m = 12 / b.z;
+      boardCtx.fillStyle = 'rgba(90,233,255,0.92)';
+      boardCtx.fillRect(p.x + p.w - m - 4 / b.z, p.y + 4 / b.z, m, m);
+    }
     if(p.id === state.selPhoto){
       boardCtx.strokeStyle = '#5AE9FF';
       boardCtx.lineWidth = 2 / b.z;
@@ -722,13 +873,20 @@ function renderBoard(){
   // existing cut frames
   boardCtx.font = (13 / b.z) + 'px monospace';
   cuts.forEach((c, i) => {
-    if(!c.src) return;
-    const foc = (i === gFocusCut);   // 現在カット（プレイヘッド位置）だけ色を変える
-    boardCtx.strokeStyle = foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.75)';
-    boardCtx.lineWidth = (foc ? 2.5 : 1.5) / b.z;
-    boardCtx.strokeRect(c.src.x, c.src.y, c.src.w, c.src.h);
-    boardCtx.fillStyle = foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.9)';
-    boardCtx.fillText('C' + (i + 1), c.src.x + 4 / b.z, c.src.y + 15 / b.z);
+    for(let k = 0; k < camCount(c); k++){
+      const r = camRect(c, k);
+      const foc = (i === gFocusCut);   // 現在カット（プレイヘッド位置）だけ色を変える
+      const sel = state.selCut && state.selCut.i === i && state.selCut.k === k;
+      boardCtx.strokeStyle = sel ? 'rgba(255,79,168,0.95)' : (foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.75)');
+      boardCtx.lineWidth = (sel || foc ? 2.5 : 1.5) / b.z;
+      boardCtx.strokeRect(r.x, r.y, r.w, r.h);
+      boardCtx.fillStyle = sel ? 'rgba(255,79,168,0.95)' : (foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.9)');
+      boardCtx.fillText(camLabel(i, k), r.x + 4 / b.z, r.y + 15 / b.z);
+      if(sel){
+        const h = CAM_HANDLE / b.z;
+        camCorners(r).forEach(c2 => boardCtx.fillRect(c2.x - h / 2, c2.y - h / 2, h, h));
+      }
+    }
   });
   // dragging rect
   if(bDrag && bDrag.mode === 'rect' && bDrag.cur){
@@ -758,7 +916,7 @@ function boardFit(){
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const add = (x, y, w, h) => { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h); };
   photos.forEach(p => add(p.x, p.y, p.w, p.h));
-  cuts.forEach(c => { if(c.src) add(c.src.x, c.src.y, c.src.w, c.src.h); });
+  cuts.forEach(c => { for(let k = 0; k < camCount(c); k++){ const r = camRect(c, k); add(r.x, r.y, r.w, r.h); } });
   if(minX === Infinity){ b.x = -boardCv.clientWidth; b.y = -boardCv.clientHeight; b.z = 0.5; renderBoard(); return; }
   const bw = maxX - minX, bh = maxY - minY;
   b.z = clamp(Math.min(boardCv.clientWidth / bw, boardCv.clientHeight / bh) * 0.88, 0.05, 4);
@@ -792,15 +950,34 @@ function bDown(e){
   if(!pan && state.tool === 'cut'){
     bDrag = { mode: 'rect', start: bp, cur: bp };
   }else if(!pan && state.tool === 'move'){
-    const p = hitPhoto(bp.x, bp.y);
-    if(p){
-      state.selPhoto = p.id;
-      $('#btn-photo-del').disabled = false;
-      bDrag = { mode: 'photo', p, ox: bp.x - p.x, oy: bp.y - p.y };
+    // ① 選択中CUT枠の角ハンドル → リサイズ（16:9固定）
+    const corner = hitCutHandle(bp.x, bp.y);
+    const sel = state.selCut;
+    if(corner){
+      const r = camRect(cuts[sel.i], sel.k);
+      bDrag = { mode: 'cut-resize', sel, corner, before: { x: r.x, y: r.y, w: r.w, h: r.h } };
     }else{
-      state.selPhoto = null;
-      $('#btn-photo-del').disabled = true;
-      bDrag = { mode: 'pan', sx: e.clientX, sy: e.clientY, bx: state.board.x, by: state.board.y };
+      // ② 枠線/C#ラベル（写真より優先）。選択済み枠は内側ドラッグでも移動
+      const hit = hitCutFrame(bp.x, bp.y);
+      const insideSel = sel && inRect(bp.x, bp.y, camRect(cuts[sel.i], sel.k));
+      if(hit || insideSel){
+        const s = hit || sel;
+        if(!sel || sel.i !== s.i || sel.k !== s.k) selectCutFrame({ i: s.i, k: s.k });
+        const r = camRect(cuts[s.i], s.k);
+        bDrag = { mode: 'cut-move', sel: { i: s.i, k: s.k }, ox: bp.x - r.x, oy: bp.y - r.y,
+                  before: { x: r.x, y: r.y, w: r.w, h: r.h } };
+      }else{
+        const p = hitPhoto(bp.x, bp.y);
+        if(state.selCut) selectCutFrame(null);
+        if(p){
+          state.selPhoto = p.id;
+          bDrag = { mode: 'photo', p, ox: bp.x - p.x, oy: bp.y - p.y, before: { x: p.x, y: p.y } };
+        }else{
+          state.selPhoto = null;
+          bDrag = { mode: 'pan', sx: e.clientX, sy: e.clientY, bx: state.board.x, by: state.board.y };
+        }
+        syncBoardPanels();
+      }
     }
   }else{
     bDrag = { mode: 'pan', sx: e.clientX, sy: e.clientY, bx: state.board.x, by: state.board.y };
@@ -835,6 +1012,23 @@ function bMove(e){
   }else if(bDrag.mode === 'rect'){
     bDrag.cur = screenToBoard(e.clientX, e.clientY);
     renderBoard();
+  }else if(bDrag.mode === 'cut-move'){
+    const bp = screenToBoard(e.clientX, e.clientY);
+    const cut = cuts[bDrag.sel.i];
+    const r = camRect(cut, bDrag.sel.k);
+    setCamRect(cut, bDrag.sel.k, { x: bp.x - bDrag.ox, y: bp.y - bDrag.oy, w: r.w, h: r.h });
+    renderBoard();
+  }else if(bDrag.mode === 'cut-resize'){
+    const bp = screenToBoard(e.clientX, e.clientY);
+    const o = bDrag.before;
+    // 対角のコーナーを固定してドラッグ（16:9固定）
+    const ax = (bDrag.corner === 'nw' || bDrag.corner === 'sw') ? o.x + o.w : o.x;
+    const ay = (bDrag.corner === 'nw' || bDrag.corner === 'ne') ? o.y + o.h : o.y;
+    const w = Math.max(24, Math.max(Math.abs(bp.x - ax), Math.abs(bp.y - ay) * 16 / 9));
+    const h = w * 9 / 16;
+    setCamRect(cuts[bDrag.sel.i], bDrag.sel.k,
+               { x: bp.x >= ax ? ax : ax - w, y: bp.y >= ay ? ay : ay - h, w, h });
+    renderBoard();
   }
 }
 function bUp(e){
@@ -845,7 +1039,29 @@ function bUp(e){
       createCutFromRect({ x: r.x, y: r.y, w: r.w, h: r.h });
     }
   }
-  if(bDrag && bDrag.mode === 'photo'){ scheduleSave(); }
+  if(bDrag && bDrag.mode === 'photo'){
+    const p = bDrag.p, o = bDrag.before, n = { x: p.x, y: p.y };
+    if(n.x !== o.x || n.y !== o.y){
+      pushLog({ type: 'photo-move',
+                undo(){ p.x = o.x; p.y = o.y; }, redo(){ p.x = n.x; p.y = n.y; } });
+    }
+    scheduleSave();
+  }
+  if(bDrag && (bDrag.mode === 'cut-move' || bDrag.mode === 'cut-resize')){
+    const sel = bDrag.sel, cut = cuts[sel.i], o = bDrag.before;
+    const r = camRect(cut, sel.k);
+    const n = { x: r.x, y: r.y, w: r.w, h: r.h };
+    if(n.x !== o.x || n.y !== o.y || n.w !== o.w){
+      // 枠を動かしたら焼き直す（SPEC_13 §5b: 操作としては何も増やさない）
+      rebakeFromCam(cut);
+      pushLog({ type: 'cut-rect',
+                undo(){ setCamRect(cut, sel.k, o); rebakeFromCam(cut); },
+                redo(){ setCamRect(cut, sel.k, n); rebakeFromCam(cut); } });
+      refreshRow(sel.i);
+      renderPaintViews();
+      scheduleSave();
+    }
+  }
   bDrag = null;
   renderBoard();
 }
@@ -859,38 +1075,311 @@ function addPhotoFromImage(img, name, blob, at){
   const off = (importCount % 6) * 46;
   importCount++;
   const p = { id: uid(), name: name || 'photo', img, blob: blob || null,
-              x: c.x - w / 2 + off, y: c.y - h / 2 + off, w, h };
+              x: c.x - w / 2 + off, y: c.y - h / 2 + off, w, h,
+              rot: 0, filter: normFilter(null), ref: null };
   photos.push(p);
+  // REF BOARD のクリップがあれば、増えた写真に紐づけて棚を空にする（複数枚なら先頭1枚だけ）
+  if(clipConsume(p)) toast('REF: 「' + (p.ref.title || p.ref.url) + '」を ' + (name || 'photo') + ' に紐づけました');
   if(!p.blob){
     const cc = document.createElement('canvas');
     cc.width = img.width; cc.height = img.height;
     cc.getContext('2d').drawImage(img, 0, 0);
     cc.toBlob(bl => { p.blob = bl; scheduleSave(); }, 'image/png');
   }
+  let slot = photos.length - 1;   // 元の重なり順に戻すため位置を覚える
+  pushLog({ type: 'photo-add',
+            undo(){ const k = photos.indexOf(p); if(k >= 0){ slot = k; photos.splice(k, 1); } if(state.selPhoto === p.id) state.selPhoto = null; },
+            redo(){ if(photos.indexOf(p) < 0) photos.splice(Math.min(slot, photos.length), 0, p); } });
   renderBoard();
   scheduleSave();
   return p;
 }
+function isHeic(f){ return /hei[cf]/i.test(f.type || '') || /\.hei[cf]$/i.test(f.name || ''); }
+let gHeicLoad = null;
+function loadHeic2Any(){
+  if(window.heic2any) return Promise.resolve();
+  if(gHeicLoad) return gHeicLoad;
+  gHeicLoad = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = HEIC_CDN;
+    s.onload = () => res();
+    s.onerror = () => { gHeicLoad = null; rej(new Error('heic2any を読み込めませんでした（オフライン？）')); };
+    document.head.appendChild(s);
+  });
+  return gHeicLoad;
+}
+/* HEIC/HEIF: まず createImageBitmap（iPad/新Safariはネイティブで通る）→ 駄目なら heic2any をCDNから遅延ロード。
+   保存用の blob は必ず JPEG に落とす（HEICのまま持つとリロード時に復元できない） */
+async function decodeHeic(f){
+  try{
+    const bmp = await createImageBitmap(f);
+    const cc = document.createElement('canvas');
+    cc.width = bmp.width; cc.height = bmp.height;
+    cc.getContext('2d').drawImage(bmp, 0, 0);
+    const blob = await new Promise(r => cc.toBlob(b => r(b), 'image/jpeg', 0.9));
+    return { img: bmp, blob };
+  }catch(e){ /* ネイティブ非対応 → CDNへ */ }
+  toast('HEIC を変換中…');
+  await loadHeic2Any();
+  const out = await window.heic2any({ blob: f, toType: 'image/jpeg', quality: 0.9 });
+  const jpg = Array.isArray(out) ? out[0] : out;
+  return { img: await blobToImage(jpg), blob: jpg };
+}
 async function importFiles(files, at){
   for(const f of files){
-    if(!f.type.startsWith('image/')) continue;
+    const heic = isHeic(f);
+    if(!heic && !(f.type || '').startsWith('image/')) continue;
     try{
-      const img = await blobToImage(f);
-      addPhotoFromImage(img, f.name, f, at);
-      toast(f.name + ' を読み込みました');
-    }catch(e){ toast('読み込み失敗: ' + f.name); }
+      const r = heic ? await decodeHeic(f) : { img: await blobToImage(f), blob: f };
+      addPhotoFromImage(r.img, f.name, r.blob, at);
+      toast((f.name || '画像') + ' を読み込みました');
+    }catch(e){ toast('読み込み失敗: ' + (f.name || '画像') + '（' + (e.message || e) + '）'); }
   }
 }
 async function deleteSelPhoto(){
   const i = photos.findIndex(p => p.id === state.selPhoto);
   if(i < 0) return;
-  const ok = await modalConfirm('写真「' + photos[i].name + '」をボードから削除しますか？');
+  const p = photos[i];
+  const ok = await modalConfirm('写真「' + p.name + '」をボードから削除しますか？');
   if(!ok) return;
   photos.splice(i, 1);
   state.selPhoto = null;
-  $('#btn-photo-del').disabled = true;
+  pushLog({ type: 'photo-del',
+            undo(){ photos.splice(Math.min(i, photos.length), 0, p); },
+            redo(){ const k = photos.indexOf(p); if(k >= 0) photos.splice(k, 1); } });
+  syncBoardPanels();
   renderBoard();
   scheduleSave();
+}
+function selPhotoObj(){ return photos.find(p => p.id === state.selPhoto) || null; }
+/* 90°回転。外接矩形（p.w/p.h）も一緒に回すので当たり判定は追従する */
+function rotatePhoto(d){
+  const p = selPhotoObj();
+  if(!p) return;
+  const apply = dd => {
+    const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
+    p.rot = (((p.rot || 0) + dd) % 360 + 360) % 360;
+    const t = p.w; p.w = p.h; p.h = t;
+    p.x = cx - p.w / 2; p.y = cy - p.h / 2;
+  };
+  apply(d);
+  pushLog({ type: 'photo-rot', undo(){ apply(-d); }, redo(){ apply(d); } });
+  renderBoard();
+  scheduleSave();
+}
+let gFilterBefore = null;
+function setPhotoFilter(key, val, commit){
+  const p = selPhotoObj();
+  if(!p) return;
+  p.filter = normFilter(p.filter);
+  if(!gFilterBefore) gFilterBefore = { p, before: Object.assign({}, p.filter) };
+  p.filter[key] = val;
+  if(commit && gFilterBefore){
+    const g = gFilterBefore, after = Object.assign({}, p.filter);
+    gFilterBefore = null;
+    if(JSON.stringify(g.before) !== JSON.stringify(after)){
+      pushLog({ type: 'photo-filter',
+                undo(){ g.p.filter = Object.assign({}, g.before); }, redo(){ g.p.filter = Object.assign({}, after); } });
+    }
+    scheduleSave();
+  }
+  syncBoardPanels();
+  renderBoard();
+}
+/* 🔗: ref があれば開く、無ければ現在のクリップを紐づけ（既存スクショの後付け） */
+function photoRefAction(){
+  const p = selPhotoObj();
+  if(!p) return;
+  if(p.ref && p.ref.url){ window.open(p.ref.url, '_blank', 'noopener'); return; }
+  if(clipConsume(p)){
+    toast('REF: 「' + (p.ref.title || p.ref.url) + '」を紐づけました');
+    syncBoardPanels();
+    renderBoard();
+    scheduleSave();
+    return;
+  }
+  toast('クリップがありません（ref-board 側で 🔗 を押してください）');
+}
+/* 選択中オブジェクトに応じてBOARDパネルを出し分ける */
+function syncBoardPanels(){
+  const p = selPhotoObj();
+  if(!p && state.selPhoto) state.selPhoto = null;
+  if(state.selCut && !camRect(cuts[state.selCut.i], state.selCut.k)) state.selCut = null;
+  $('#photo-panel').classList.toggle('on', !!p);
+  $('#btn-photo-del').disabled = !p;
+  if(p){
+    const f = normFilter(p.filter);
+    p.filter = f;
+    $('#btn-photo-gray').classList.toggle('on', f.gray);
+    $('#photo-bright').value = Math.round(f.bright * 100);
+    $('#photo-bright-val').textContent = f.bright.toFixed(2);
+    $('#photo-contrast').value = Math.round(f.contrast * 100);
+    $('#photo-contrast-val').textContent = f.contrast.toFixed(2);
+    $('#photo-ref-tx').textContent = p.ref ? ('REF: ' + (p.ref.title || p.ref.url)) : '';
+    $('#btn-photo-ref').classList.toggle('mode', !!p.ref);
+  }
+  const sc = state.selCut;
+  $('#cutframe-panel').classList.toggle('on', !!sc);
+  if(sc) $('#cutframe-label').textContent = camLabel(sc.i, sc.k);
+}
+
+/* ---------------- REF BOARD 連携（クリップ棚・SPEC_13 §2-1a） ----------------
+   Tools/ref-board/ref-board.html が送信側（実装済み）。同一オリジンのときだけ
+   BroadcastChannel が通る（ルートで python -m http.server 8000 を立てた場合）。
+   file:// 等で繋がらないときのために ⧉ CLIP（JSON貼り付け）を用意してある。 */
+let gClip = null, gBC = null;
+function clipFresh(d){
+  return !!(d && d.v === 1 && d.item && (Date.now() - (d.ts || 0)) < CLIP_MAX_AGE);
+}
+function clipSend(type){
+  if(!gBC) return;
+  try{ gBC.postMessage({ type, v: 1, ts: Date.now() }); }catch(e){}
+}
+function clipSet(d, quiet){
+  gClip = { v: 1, ts: d.ts || Date.now(), item: d.item };
+  try{ localStorage.setItem(LS_CLIP, JSON.stringify(gClip)); }catch(e){}
+  renderClipBar();
+  if(!quiet) toast('REF BOARD: 「' + (gClip.item.title || gClip.item.url) + '」を受け取りました');
+}
+function clipForget(){
+  gClip = null;
+  try{ localStorage.removeItem(LS_CLIP); }catch(e){}   // 両側で同じ状態にする
+  renderClipBar();
+}
+function clipConsume(p){
+  if(!gClip || !p) return false;
+  p.ref = Object.assign({}, gClip.item);
+  clipForget();
+  clipSend('clip-used');       // ref-board 側は受信して棚を空にする
+  return true;
+}
+function clipClear(){
+  if(!gClip){ toast('クリップはありません'); return; }
+  clipForget();
+  clipSend('clip-clear');
+  toast('クリップを解除しました');
+}
+function renderClipBar(){
+  const on = !!gClip;
+  $('#clip-bar').style.display = on ? 'flex' : 'none';
+  $('#studio-board').classList.toggle('has-clip', on);
+  if(on) $('#clip-tx').textContent = 'CLIP: ' + (gClip.item.title || gClip.item.url) + ' — 次に貼る画像に付けます';
+}
+function initClipBridge(){
+  try{
+    const raw = localStorage.getItem(LS_CLIP);   // 後から econte を開いた場合の受け皿
+    if(raw){
+      const d = JSON.parse(raw);
+      if(clipFresh(d)) gClip = { v: 1, ts: d.ts, item: d.item };
+      else localStorage.removeItem(LS_CLIP);     // 24時間以上前は無視（誤爆防止）
+    }
+  }catch(e){}
+  renderClipBar();
+  if(typeof BroadcastChannel === 'undefined') return;
+  try{ gBC = new BroadcastChannel(BC_NAME); }catch(e){ gBC = null; return; }
+  gBC.onmessage = e => {
+    const d = e.data;
+    if(!d || d.v !== 1) return;
+    if(d.type === 'clip' && clipFresh(d)) clipSet(d);
+    else if(d.type === 'clip-clear' || d.type === 'clip-used') clipForget();
+  };
+}
+async function clipPasteJson(){
+  const txt = await modalPrompt('ref-board の ⧉ でコピーした クリップJSON を貼り付けてください（別オリジン / file:// 用）');
+  if(!txt) return;
+  let d = null;
+  try{ d = JSON.parse(txt); }catch(e){ toast('JSONを読めませんでした'); return; }
+  if(!d || d.v !== 1 || !d.item || !d.item.url){ toast('クリップJSONの形式が違います'); return; }
+  clipSet(d, true);   // 手動で貼ったものは ts が古くても受け取る
+  toast('クリップを受け取りました（次に貼る画像に付きます）');
+}
+
+/* ---------------- BOARD統合Undoログ（animator と同じ一元ログ） ----------------
+   gLog = [{type, undo(), redo()}]。STUDIO の Ctrl+Z/Y はこれを叩く。
+   EDIT内は従来どおりカット内 drawC のスナップショット（undoStack/redoStack）のまま。 */
+let gLog = [], gLogRedo = [];
+const LOG_MAX = 60, LOG_PAINT_MAX = 8;   // paint は ImageData 2枚 ≒ 7MB/件なので別枠で制限
+function pushLog(e){
+  gLog.push(e);
+  gLogRedo.length = 0;
+  if(e.type === 'paint'){
+    let n = 0;
+    for(let i = gLog.length - 1; i >= 0; i--){
+      if(gLog[i].type === 'paint' && ++n > LOG_PAINT_MAX){ gLog.splice(i, 1); break; }
+    }
+  }
+  if(gLog.length > LOG_MAX) gLog.shift();
+}
+function logStep(from, to, dir){
+  const e = from.pop();
+  if(!e){ toast(dir === 'undo' ? '元に戻す操作がありません' : 'やり直す操作がありません'); return; }
+  (dir === 'undo' ? e.undo : e.redo)();
+  to.push(e);
+  syncBoardPanels();
+  refreshStudio();
+  renderBoard();
+  renderPaintViews();
+  scheduleSave();
+}
+function logUndo(){ logStep(gLog, gLogRedo, 'undo'); }
+function logRedo(){ logStep(gLogRedo, gLog, 'redo'); }
+
+/* ---------------- カメラ枠アクセサ（V2-D1 で cut.cam[] になる場所） ----------------
+   SPEC_13 §5a: 枠1つ = cam[] の1要素。V2-B時点では「cam.length === 1（= cut.src）」しか
+   無いだけ、という形で書いておく。ヒットテスト／移動／リサイズは全部この層を通すこと。 */
+const CAM_HANDLE = 10;   // 角ハンドルの一辺（画面px）
+const CAM_EDGE = 8;      // 枠線の当たり幅（画面px）
+function camCount(cut){ return cut && cut.src ? 1 : 0; }
+function camRect(cut, k){ return (cut && k === 0) ? cut.src : null; }
+function setCamRect(cut, k, r){ if(cut && k === 0) cut.src = { x: r.x, y: r.y, w: r.w, h: r.h }; }
+function camLabel(i, k){ return 'C' + (i + 1) + (camCount(cuts[i]) > 1 ? '-' + 'ABCDEFGHIJKL'[k] : ''); }
+function camCorners(r){
+  return [{ x: r.x, y: r.y, n: 'nw' }, { x: r.x + r.w, y: r.y, n: 'ne' },
+          { x: r.x, y: r.y + r.h, n: 'sw' }, { x: r.x + r.w, y: r.y + r.h, n: 'se' }];
+}
+/* 枠線とC#ラベルだけを当たり判定にする（枠の内側は写真操作を邪魔しない）。写真より優先 */
+function hitCutFrame(bx, by){
+  const tol = CAM_EDGE / state.board.z;
+  const lw = 42 / state.board.z, lh = 20 / state.board.z;
+  for(let i = cuts.length - 1; i >= 0; i--){
+    for(let k = camCount(cuts[i]) - 1; k >= 0; k--){
+      const r = camRect(cuts[i], k);
+      if(bx >= r.x && bx <= r.x + lw && by >= r.y && by <= r.y + lh) return { i, k };
+      const inX = bx >= r.x - tol && bx <= r.x + r.w + tol;
+      const inY = by >= r.y - tol && by <= r.y + r.h + tol;
+      const nearEdge = Math.abs(bx - r.x) <= tol || Math.abs(bx - (r.x + r.w)) <= tol ||
+                       Math.abs(by - r.y) <= tol || Math.abs(by - (r.y + r.h)) <= tol;
+      if(inX && inY && nearEdge) return { i, k };
+    }
+  }
+  return null;
+}
+function hitCutHandle(bx, by){
+  const s = state.selCut;
+  if(!s) return null;
+  const r = camRect(cuts[s.i], s.k);
+  if(!r) return null;
+  const h = (CAM_HANDLE + 4) / state.board.z / 2;
+  for(const c of camCorners(r)) if(Math.abs(bx - c.x) <= h && Math.abs(by - c.y) <= h) return c.n;
+  return null;
+}
+function inRect(bx, by, r){ return r && bx >= r.x && bx <= r.x + r.w && by >= r.y && by <= r.y + r.h; }
+function selectCutFrame(sel){
+  state.selCut = sel;
+  if(sel){
+    state.selPhoto = null;
+    seek(cutStartFrame(sel.i));   // 枠を選んだら中央プレビューもそのカットへ
+  }
+  syncBoardPanels();
+  renderBoard();
+}
+/* 枠から焼き直す（V2-D1以降は bakeRect の再計算がここに入る） */
+function rebakeFromCam(cut){
+  const r = camRect(cut, 0);
+  if(!r) return;
+  cut.baseC = bakeCut(r);
+  cut.dirtyBase = true;
+  cut.thumb = null;
 }
 
 /* ---------------- cuts ---------------- */
@@ -901,23 +1390,31 @@ function bakeCut(src){
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.setTransform(s, 0, 0, s, -src.x * s, -src.y * s);
-  for(const p of photos) ctx.drawImage(p.img, p.x, p.y, p.w, p.h);
+  for(const p of photos) drawPhoto(ctx, p);   // 回転・モノクロ/輝度も焼き込まれる
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   return c;
 }
 function createCutFromRect(src){
-  const cut = { id: uid(), src, baseC: bakeCut(src), drawC: blankCanvas(), bg: 232,
+  const cut = { id: uid(), src, baseC: bakeCut(src), drawC: blankCanvas(), bg: 232, baseAlpha: 1,
                 durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: true, dirtyDraw: true, thumb: null };
   cuts.push(cut);
+  let slot = cuts.length - 1;   // 並べ替え後でも元の位置に戻す
+  pushLog({ type: 'cut-add',
+            undo(){ const k = cuts.indexOf(cut); if(k >= 0){ slot = k; cuts.splice(k, 1); } state.selCut = null; },
+            redo(){ if(cuts.indexOf(cut) < 0) cuts.splice(Math.min(slot, cuts.length), 0, cut); } });
   toast('C' + cuts.length + ' を追加しました（右パネルで確認）');
   refreshStudio();
   scheduleSave();
   return cut;
 }
 function addEmptyCut(){
-  const cut = { id: uid(), src: null, baseC: null, drawC: blankCanvas(), bg: 232,
+  const cut = { id: uid(), src: null, baseC: null, drawC: blankCanvas(), bg: 232, baseAlpha: 1,
                 durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: false, dirtyDraw: true, thumb: null };
   cuts.push(cut);
+  let slot = cuts.length - 1;
+  pushLog({ type: 'cut-add',
+            undo(){ const k = cuts.indexOf(cut); if(k >= 0){ slot = k; cuts.splice(k, 1); } },
+            redo(){ if(cuts.indexOf(cut) < 0) cuts.splice(Math.min(slot, cuts.length), 0, cut); } });
   refreshStudio();
   scheduleSave();
 }
@@ -929,19 +1426,24 @@ function moveCut(i, d){
   scheduleSave();
 }
 async function deleteCut(i){
-  const ok = await modalConfirm('C' + (i + 1) + ' を削除しますか？（Undo不可）');
+  const cut = cuts[i];
+  if(!cut) return;
+  const ok = await modalConfirm('C' + (i + 1) + ' を削除しますか？（STUDIOの Ctrl+Z で戻せます）');
   if(!ok) return;
   cuts.splice(i, 1);
+  state.selCut = null;
   if(state.curCut >= cuts.length) state.curCut = cuts.length - 1;
+  pushLog({ type: 'cut-del',
+            undo(){ cuts.splice(Math.min(i, cuts.length), 0, cut); },
+            redo(){ const k = cuts.indexOf(cut); if(k >= 0) cuts.splice(k, 1); } });
+  syncBoardPanels();
   refreshStudio();
   scheduleSave();
 }
 function rebakeCut(i){
   const c = cuts[i];
-  if(!c.src){ toast('このコマは空コマです（切り出し元なし）'); return; }
-  c.baseC = bakeCut(c.src);
-  c.dirtyBase = true;
-  c.thumb = null;
+  if(!camCount(c)){ toast('このコマは空コマです（切り出し元なし）'); return; }
+  rebakeFromCam(c);
   refreshRow(i);
   renderPaintViews();
   toast('C' + (i + 1) + ' をBOARDから再切り出ししました');
@@ -956,8 +1458,45 @@ function compositeTo(ctx, cut){
   const v = cut.bg;
   ctx.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
   ctx.fillRect(0, 0, CONTE_W, CONTE_H);
-  if(cut.baseC) ctx.drawImage(cut.baseC, 0, 0);
+  if(cut.baseC){
+    // トレース透かし（SPEC_13 §3-1）: baseC を描くときだけ alpha を落とす。
+    // ここを通る全部（EDIT/プレビュー/サムネ/書き出し）に効く＝WYSIWYG
+    const a = baseAlphaOf(cut);
+    if(a < 1){
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.drawImage(cut.baseC, 0, 0);
+      ctx.restore();
+    }else{
+      ctx.drawImage(cut.baseC, 0, 0);
+    }
+  }
   ctx.drawImage(cut.drawC, 0, 0);
+}
+function baseAlphaOf(cut){ return (cut && typeof cut.baseAlpha === 'number') ? clamp(cut.baseAlpha, 0, 1) : 1; }
+/* baseAlpha を編集する対象カット: EDIT中は編集中のカット、STUDIOではプレイヘッド位置のカット */
+function activeCutIndex(){ return state.view === 'edit' ? state.curCut : gFocusCut; }
+function setBaseAlpha(v){
+  const i = activeCutIndex();
+  const cut = cuts[i];
+  if(!cut) return;
+  cut.baseAlpha = clamp(v, 0, 1);
+  cut.thumb = null;
+  syncBaseAlphaUI();
+  renderPaintViews();
+  refreshRow(i);
+  scheduleSave();
+}
+/* EDITサイド と STUDIOミニツールの両方を更新する（片方だけだと状態がズレる） */
+function syncBaseAlphaUI(){
+  const cut = cuts[activeCutIndex()];
+  const pct = Math.round(baseAlphaOf(cut) * 100);
+  ['#base-alpha', '#tl-base-alpha'].forEach(id => {
+    const el = $(id);
+    if(el && document.activeElement !== el) el.value = pct;
+    if(el) el.disabled = !cut;
+  });
+  ['#base-alpha-val', '#tl-base-alpha-val'].forEach(id => { const el = $(id); if(el) el.textContent = pct + '%'; });
 }
 function cutThumb(cut){
   const c = document.createElement('canvas');
@@ -1081,11 +1620,39 @@ const editCtx = ctx2d(editCv);
 let undoStack = [], redoStack = [];
 const UNDO_MAX = 10;
 
+/* --- EDIT のズーム/パン（SPEC_13 §3-5） ---
+   CSSの width/height と transform だけを動かす。toCanvasCoord() は
+   getBoundingClientRect ベースなので **変更不要**（ここが重要）。 */
+let gEditFit = 1;
 function fitEditCanvas(){
   const st = $('#edit-stage');
   const s = Math.min((st.clientWidth - 24) / CONTE_W, (st.clientHeight - 24) / CONTE_H);
-  editCv.style.width = Math.max(80, CONTE_W * s) + 'px';
-  editCv.style.height = Math.max(45, CONTE_H * s) + 'px';
+  gEditFit = Math.max(0.02, s);
+  applyEditView();
+}
+function applyEditView(){
+  const v = state.editView;
+  editCv.style.width = Math.max(40, CONTE_W * gEditFit * v.z) + 'px';
+  editCv.style.height = Math.max(23, CONTE_H * gEditFit * v.z) + 'px';
+  editCv.style.transform = 'translate(' + Math.round(v.x) + 'px,' + Math.round(v.y) + 'px)';
+  $('#edit-zoom').textContent = Math.round(gEditFit * v.z * 100) + '%';
+}
+function editFit(){
+  state.editView.x = 0; state.editView.y = 0; state.editView.z = 1;
+  applyEditView();
+}
+/* カーソル（またはピンチ中心）を固定してズーム */
+function editZoomAt(clientX, clientY, factor){
+  const v = state.editView;
+  const nz = clamp(v.z * factor, 0.25, 12);
+  const k = nz / v.z;
+  if(Math.abs(k - 1) < 1e-6) return;
+  const st = $('#edit-stage').getBoundingClientRect();
+  const cx = st.left + st.width / 2 + v.x, cy = st.top + st.height / 2 + v.y;
+  v.x += (clientX - cx) * (1 - k);
+  v.y += (clientY - cy) * (1 - k);
+  v.z = nz;
+  applyEditView();
 }
 function renderEditCanvas(){
   const cut = cuts[state.curCut];
@@ -1105,6 +1672,7 @@ function openEdit(i){
   $('#bg-slider').value = cut.bg;
   $('#bg-val').textContent = cut.bg;
   setView('edit');
+  syncBaseAlphaUI();
 }
 function setETool(t){
   state.etool = t;
@@ -1142,6 +1710,28 @@ function pushUndo(){
   undoStack.push(ctx2d(cut.drawC).getImageData(0, 0, CONTE_W, CONTE_H));
   if(undoStack.length > UNDO_MAX) undoStack.shift();
   redoStack.length = 0;
+}
+/* ペイントのundo: EDIT内は従来のカット別スタック、STUDIOでは統合ログの paint エントリ。
+   カット参照をクロージャに閉じ込めるので、カットをまたいでも壊れない。 */
+let gPaintBefore = null;
+function beginPaintUndo(){
+  if(state.view === 'edit'){ pushUndo(); gPaintBefore = null; return; }
+  const cut = cuts[state.curCut];
+  if(!cut) return;
+  gPaintBefore = { cut, before: ctx2d(cut.drawC).getImageData(0, 0, CONTE_W, CONTE_H) };
+}
+function applyDrawData(cut, data){
+  ctx2d(cut.drawC).putImageData(data, 0, 0);
+  cut.dirtyDraw = true;
+  cut.thumb = null;
+}
+function endPaintUndo(){
+  if(!gPaintBefore) return;
+  const cut = gPaintBefore.cut, before = gPaintBefore.before;
+  gPaintBefore = null;
+  const after = ctx2d(cut.drawC).getImageData(0, 0, CONTE_W, CONTE_H);
+  pushLog({ type: 'paint',
+            undo(){ applyDrawData(cut, before); }, redo(){ applyDrawData(cut, after); } });
 }
 function doUndo(){
   const cut = cuts[state.curCut];
@@ -1303,6 +1893,8 @@ function renderPaintViews(){
 }
 function paintDown(e, cv){
   if(e.pointerType === 'mouse' && e.button !== 0) return;
+  // SPEC_13 §4-3: 指は描かない（パン/ピンチ経路へ）。描くのはペンとマウスだけ
+  if(e.pointerType === 'touch') return;
   e.preventDefault();
   cv.setPointerCapture(e.pointerId);
   paintCv = cv;
@@ -1312,16 +1904,17 @@ function paintDown(e, cv){
     return;
   }
   if(state.etool === 'fill'){
-    pushUndo();
+    beginPaintUndo();
     floodFill(p.x, p.y);
     const cut = cuts[state.curCut];
     if(cut) cut.dirtyDraw = true;
+    endPaintUndo();
     renderPaintViews();
     refreshRow(state.curCut);
     scheduleSave();
     return;
   }
-  pushUndo();
+  beginPaintUndo();
   stroking = true;
   strokeLast = p;
   strokeSeg(p, p);
@@ -1338,6 +1931,7 @@ function paintUp(){
   paintCv = null;
   if(!stroking) return;
   stroking = false;
+  endPaintUndo();
   refreshRow(state.curCut);   // 右パネルのサムネを更新
   scheduleSave();
 }
@@ -1640,6 +2234,7 @@ function saveExportBlob(){
 }
 function tlPaintDown(e){
   if(gExporting) return;
+  if(e.pointerType === 'touch') return;   // §4-3: 指では描かない（STUDIOプレビューにパンは無い）
   const T = totalFrames();
   if(!T) return;
   pause();
@@ -1685,6 +2280,8 @@ function loadUi(){
     const o = JSON.parse(localStorage.getItem(UI_LS) || '{}');
     if(o.side === 'left' || o.side === 'right') gUi.side = o.side;
     if(typeof o.sheet === 'boolean') gUi.sheet = o.sheet;
+    if(typeof o.boardW === 'number') gUi.boardW = clamp(o.boardW, 12, 72);
+    if(typeof o.sheetW === 'number') gUi.sheetW = clamp(o.sheetW, 10, 48);
   }catch(e){}
 }
 function saveUi(){
@@ -1696,7 +2293,53 @@ function applyUi(){
   $('#tl-minitools').classList.toggle('right', right);
   $('#btn-tl-tools').classList.toggle('right', right);
   $('#studio-sheet').classList.toggle('hidden', !gUi.sheet);
+  $('#split-sheet').style.display = gUi.sheet ? 'block' : 'none';
   $('#btn-sheet-toggle').classList.toggle('on', gUi.sheet);
+  $('#studio-board').style.width = gUi.boardW + '%';
+  $('#studio-sheet').style.width = gUi.sheetW + '%';
+}
+/* スプリッタ（AEのようにペイン境界をドラッグ）。TIMELINE帯は全幅なので影響を受けない＝
+   ドラッグ中は BOARD とプレビューの再フィットだけでよい（layoutTL は不要） */
+let gSplit = null;
+function bindSplit(el, which){
+  const move = e => {
+    if(!gSplit || gSplit.id !== e.pointerId) return;
+    const m = $('#studio-main').getBoundingClientRect();
+    if(!m.width) return;
+    // 中央（プレビュー）が潰れないよう、反対側のペイン幅を差し引いた残りでクランプする
+    const MIN_CENTER = 320, SP = 5 + (gUi.sheet ? 5 : 0);
+    const sheetPx = gUi.sheet ? $('#studio-sheet').getBoundingClientRect().width : 0;
+    const boardPx = $('#studio-board').getBoundingClientRect().width;
+    if(which === 'board'){
+      const max = Math.max(160, m.width - sheetPx - SP - MIN_CENTER);
+      gUi.boardW = +(clamp(e.clientX - m.left, 160, max) / m.width * 100).toFixed(2);
+    }else{
+      const max = Math.max(140, m.width - boardPx - SP - MIN_CENTER);
+      gUi.sheetW = +(clamp(m.right - e.clientX, 140, max) / m.width * 100).toFixed(2);
+    }
+    applyUi();
+    resizeBoard(); renderBoard(); fitTLCanvas(); renderTL();
+  };
+  const end = () => {
+    if(!gSplit) return;
+    gSplit = null;
+    el.classList.remove('on');
+    saveUi();
+    layoutStudio();
+  };
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    gSplit = { which, id: e.pointerId };
+    el.classList.add('on');
+  });
+  el.addEventListener('pointermove', move);
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  el.addEventListener('dblclick', () => {
+    if(which === 'board') gUi.boardW = 40; else gUi.sheetW = 22;
+    applyUi(); saveUi(); layoutStudio();
+  });
 }
 function toggleUiSide(){
   gUi.side = (gUi.side === 'left') ? 'right' : 'left';
@@ -1724,6 +2367,85 @@ function toggleFullscreen(){
   if(r && r.catch) r.catch(() => toast('フルスクリーンにできませんでした'));
 }
 
+/* ---------------- EDIT のタッチ操作（1本指=パン / 2本指=ピンチ・SPEC_13 §3-5） ---------------- */
+const ePtrs = new Map();
+let eGest = null;
+function editTouchDown(e){
+  editCv.setPointerCapture(e.pointerId);
+  ePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const v = state.editView;
+  if(ePtrs.size === 2){
+    const p = [...ePtrs.values()];
+    eGest = { mode: 'pinch', d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y),
+              mx: (p[0].x + p[1].x) / 2, my: (p[0].y + p[1].y) / 2 };
+  }else if(ePtrs.size === 1){
+    eGest = { mode: 'pan', sx: e.clientX, sy: e.clientY, vx: v.x, vy: v.y };
+  }else{
+    eGest = null;
+  }
+}
+function editTouchMove(e){
+  if(!ePtrs.has(e.pointerId)) return;
+  ePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if(!eGest) return;
+  const v = state.editView;
+  if(eGest.mode === 'pinch' && ePtrs.size === 2){
+    const p = [...ePtrs.values()];
+    const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+    const mx = (p[0].x + p[1].x) / 2, my = (p[0].y + p[1].y) / 2;
+    if(eGest.d > 0) editZoomAt(mx, my, d / eGest.d);
+    v.x += mx - eGest.mx;
+    v.y += my - eGest.my;
+    eGest.d = d; eGest.mx = mx; eGest.my = my;
+    applyEditView();
+  }else if(eGest.mode === 'pan' && ePtrs.size === 1){
+    v.x = eGest.vx + (e.clientX - eGest.sx);
+    v.y = eGest.vy + (e.clientY - eGest.sy);
+    applyEditView();
+  }
+}
+function editTouchUp(e){
+  ePtrs.delete(e.pointerId);
+  if(ePtrs.size === 1){
+    const p = [...ePtrs.entries()][0][1];
+    eGest = { mode: 'pan', sx: p.x, sy: p.y, vx: state.editView.x, vy: state.editView.y };
+  }else if(!ePtrs.size){
+    eGest = null;
+  }
+}
+function cancelGestures(){
+  ePtrs.clear(); eGest = null;
+  bPtrs.clear(); bDrag = null;
+}
+
+/* --- 2本指タップ=UNDO / 3本指タップ=REDO（SPEC_13 §4-2・EDIT/STUDIO両方） --- */
+const gTap = { pts: new Map(), t0: 0, max: 0, moved: false };
+function tapDown(e){
+  if(e.pointerType !== 'touch') return;
+  if(!gTap.pts.size){ gTap.t0 = performance.now(); gTap.max = 0; gTap.moved = false; }
+  gTap.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if(gTap.pts.size > gTap.max) gTap.max = gTap.pts.size;
+}
+function tapMove(e){
+  if(e.pointerType !== 'touch') return;
+  const p = gTap.pts.get(e.pointerId);
+  if(p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 12) gTap.moved = true;
+}
+function tapUp(e){
+  if(e.pointerType !== 'touch' || !gTap.pts.has(e.pointerId)) return;
+  gTap.pts.delete(e.pointerId);
+  if(gTap.pts.size) return;                       // まだ指が残っている
+  const n = gTap.max, dt = performance.now() - gTap.t0;
+  gTap.max = 0;
+  if(gTap.moved || dt > 250 || n < 2 || n > 3) return;
+  cancelGestures();                               // 直前のピンチ/パンを打ち切る（誤爆防止）
+  if(n === 2){ undoActive(); toast('UNDO（2本指）'); }
+  else { redoActive(); toast('REDO（3本指）'); }
+}
+/* EDIT内はカット別スタック、STUDIOは統合ログ（キーボードと同じ振り分け） */
+function undoActive(){ if(state.view === 'edit') doUndo(); else logUndo(); }
+function redoActive(){ if(state.view === 'edit') doRedo(); else logRedo(); }
+
 /* --- iPad: ネイティブ dblclick が飛ばないことがあるので pointerup 2回で拾う（SPEC_13 §4-1） --- */
 function bindDoubleTap(el, fn){
   let lt = 0, lx = 0, ly = 0;
@@ -1744,12 +2466,19 @@ function onKey(e){
   if($('#modal-ovl').classList.contains('on')) return;
   const tag = (e.target && e.target.tagName) || '';
   if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+  // STUDIO は統合ログ（写真・枠・ペイントを一列）、EDIT内は従来のカット別スタック
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
     e.preventDefault();
-    if(e.shiftKey) doRedo(); else doUndo();
+    const redo = e.shiftKey;
+    if(state.view === 'edit'){ redo ? doRedo() : doUndo(); }
+    else { redo ? logRedo() : logUndo(); }
     return;
   }
-  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){ e.preventDefault(); doRedo(); return; }
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){
+    e.preventDefault();
+    if(state.view === 'edit') doRedo(); else logRedo();
+    return;
+  }
   if(state.view === 'studio'){
     const nk = normKey(e);   // Space/←→/Home/End/J/K/L はトランスポート
     for(const a of SHORTCUT_ACTIONS){
@@ -1760,6 +2489,7 @@ function onKey(e){
       }
     }
     if(e.key === 'Delete' || e.key === 'Backspace'){
+      if(state.selCut){ deleteCut(state.selCut.i); return; }
       if(state.selPhoto){ deleteSelPhoto(); return; }
     }
   }
@@ -1783,6 +2513,8 @@ function wire(){
   $('#btn-sheet-toggle').addEventListener('click', toggleSheetPanel);
   $('#btn-ui-side').addEventListener('click', toggleUiSide);
   $('#btn-ui-side-mini').addEventListener('click', toggleUiSide);
+  bindSplit($('#split-board'), 'board');
+  bindSplit($('#split-sheet'), 'sheet');
   $('#btn-home').addEventListener('click', () => { location.href = 'index.html'; });
   $('#btn-import').addEventListener('click', () => $('#file-input').click());
   $('#file-input').addEventListener('change', e => {
@@ -1802,6 +2534,38 @@ function wire(){
   });
   $('#btn-board-fit').addEventListener('click', boardFit);
   $('#btn-photo-del').addEventListener('click', deleteSelPhoto);
+  $('#btn-photo-rot').addEventListener('click', () => rotatePhoto(-90));   // ボタンの字形(↺)に合わせて反時計回り
+  $('#btn-photo-ref').addEventListener('click', photoRefAction);
+  $('#btn-photo-gray').addEventListener('click', () => {
+    const p = selPhotoObj();
+    if(!p) return;
+    setPhotoFilter('gray', !normFilter(p.filter).gray, true);
+  });
+  $('#photo-bright').addEventListener('input', e => setPhotoFilter('bright', +e.target.value / 100, false));
+  $('#photo-bright').addEventListener('change', e => setPhotoFilter('bright', +e.target.value / 100, true));
+  $('#photo-contrast').addEventListener('input', e => setPhotoFilter('contrast', +e.target.value / 100, false));
+  $('#photo-contrast').addEventListener('change', e => setPhotoFilter('contrast', +e.target.value / 100, true));
+  $('#btn-cutframe-edit').addEventListener('click', () => { if(state.selCut) openEdit(state.selCut.i); });
+  $('#btn-cutframe-del').addEventListener('click', () => { if(state.selCut) deleteCut(state.selCut.i); });
+  // REF BOARD クリップ
+  $('#btn-clip-clear').addEventListener('click', clipClear);
+  $('#btn-clip-paste').addEventListener('click', clipPasteJson);
+  // Ctrl+V ペースト（STUDIO表示中・入力欄フォーカス中は無視）
+  window.addEventListener('paste', e => {
+    if(state.view !== 'studio') return;
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+    const items = (e.clipboardData && e.clipboardData.items) || [];
+    const files = [];
+    for(const it of items){
+      if(it.kind !== 'file') continue;
+      const f = it.getAsFile();
+      if(f && ((f.type || '').startsWith('image/') || isHeic(f))) files.push(f);
+    }
+    if(!files.length) return;
+    e.preventDefault();
+    importFiles(files, viewCenterBoard());
+  });
   boardCv.addEventListener('pointerdown', bDown);
   boardCv.addEventListener('pointermove', bMove);
   boardCv.addEventListener('pointerup', bUp);
@@ -1859,10 +2623,30 @@ function wire(){
   $('#btn-bg-white').addEventListener('click', () => setCutBg(255));
   $('#btn-bg-gray').addEventListener('click', () => setCutBg(160));
   $('#btn-bg-black').addEventListener('click', () => setCutBg(24));
-  editCv.addEventListener('pointerdown', e => paintDown(e, editCv));
-  editCv.addEventListener('pointermove', paintMove);
-  editCv.addEventListener('pointerup', paintUp);
-  editCv.addEventListener('pointercancel', paintUp);
+  $('#base-alpha').addEventListener('input', e => setBaseAlpha(+e.target.value / 100));
+  $('#tl-base-alpha').addEventListener('input', e => setBaseAlpha(+e.target.value / 100));
+  $('#btn-edit-fit').addEventListener('click', editFit);
+  // 指=操作 / ペン・マウス=描画（SPEC_13 §4-3）
+  editCv.addEventListener('pointerdown', e => {
+    if(e.pointerType === 'touch'){ e.preventDefault(); editTouchDown(e); return; }
+    paintDown(e, editCv);
+  });
+  editCv.addEventListener('pointermove', e => {
+    if(e.pointerType === 'touch'){ editTouchMove(e); return; }
+    paintMove(e);
+  });
+  editCv.addEventListener('pointerup', e => {
+    if(e.pointerType === 'touch'){ editTouchUp(e); return; }
+    paintUp();
+  });
+  editCv.addEventListener('pointercancel', e => {
+    if(e.pointerType === 'touch'){ editTouchUp(e); return; }
+    paintUp();
+  });
+  $('#edit-stage').addEventListener('wheel', e => {
+    e.preventDefault();
+    editZoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015));
+  }, { passive: false });
   // TIMELINE帯
   $('#btn-play').addEventListener('click', togglePlay);
   $('#btn-tl-first').addEventListener('click', () => { pause(); seek(0); });
@@ -1952,6 +2736,11 @@ function wire(){
   // modal
   $('#modal-ok').addEventListener('click', () => modalClose(true));
   $('#modal-cancel').addEventListener('click', () => modalClose(false));
+  // 2本指=UNDO / 3本指=REDO（capture段で拾うので各ハンドラの preventDefault に影響されない）
+  window.addEventListener('pointerdown', tapDown, true);
+  window.addEventListener('pointermove', tapMove, true);
+  window.addEventListener('pointerup', tapUp, true);
+  window.addEventListener('pointercancel', tapUp, true);
   // keyboard
   window.addEventListener('keydown', onKey);
   const relayout = () => {
@@ -1969,6 +2758,7 @@ async function init(){
   loadPalette();
   loadUi();
   applyUi();
+  initClipBridge();
   state.fillColor = gPalette[gPalSlot] || '#000000';
   updateSwatch();
   renderPalette();
@@ -1977,6 +2767,7 @@ async function init(){
     await loadAll();
   }catch(e){ console.error('DB init failed', e); }
   updateTotals();
+  syncBoardPanels();
   setView('studio');
   if(!photos.length && !cuts.length){
     toast('紙のネーム/ラフの写真をD&D または IMPORT で読み込んでください');
@@ -1990,10 +2781,17 @@ window.__ECONTE__ = {
   state, photos, cuts,
   get focusCut(){ return gFocusCut; },
   get ui(){ return gUi; },
+  get clip(){ return gClip; },
+  get log(){ return { undo: gLog.length, redo: gLogRedo.length, types: gLog.map(e => e.type) }; },
   addPhotoFromImage, createCutFromRect, addEmptyCut, bakeCut, rebakeCut, deleteCut, moveCut,
   renderBoard, renderSheetPanel, renderEditCanvas, openEdit, setView, setETool,
   renderStudioSync, layoutStudio, refreshStudio, refreshRow, setCutDur, cutThumbSrc,
   toggleUiSide, toggleSheetPanel, toggleFullscreen, applyUi,
+  drawPhoto, rotatePhoto, setPhotoFilter, photoRefAction, syncBoardPanels, selPhotoObj, importFiles,
+  setBaseAlpha, baseAlphaOf, syncBaseAlphaUI, activeCutIndex, editFit, editZoomAt, applyEditView,
+  fitEditCanvas, undoActive, redoActive, cancelGestures,
+  camCount, camRect, setCamRect, camLabel, hitCutFrame, hitCutHandle, selectCutFrame, rebakeFromCam,
+  clipSet, clipClear, clipConsume, clipPasteJson, renderClipBar, logUndo, logRedo, isHeic, decodeHeic,
   fmtDur, parseDur, floodFill, sampleCompositeColor, saveAll, boardFit, updateTotals,
   totalFrames, cutIndexAt, cutStartFrame, seek, play, pause, togglePlay, seekCut, toggleLoop,
   layoutTL, renderTL, fitTLCanvas, exportVideo, finishExport, cancelExport, loadKeymap

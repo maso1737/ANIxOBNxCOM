@@ -42,6 +42,11 @@ cut = {
 - **P1（実装済み）**: TIMELINE（composer-timeline-kit 移植・クリップ尺⇔SHEET尺・再生・動画書き出し）
 - **V2-A（実装済み・2026-08-02）**: STUDIO 1画面統合＋フォーカス同期＋フルスクリーン＋
   パレット挙動変更＋TOOL左右入替＋iPadダブルタップ（SPEC_13 §1/§3-2,3-3/§4-1）
+- **V2-B（実装済み・2026-08-02）**: BOARD強化（Ctrl+Vペースト／HEIC／写真の回転・モノクロ輝度／
+  CUT枠編集／統合Undoログ）＋REF BOARD連携 `photo.ref`（SPEC_13 §2・§2-1a）。
+  併せてペイン境界のスプリッタ（AE風の幅変更）を追加
+- **V2-C（実装済み・2026-08-02）**: トレース透かし `cut.baseAlpha`＋EDITズーム/パン＋
+  指=操作・ペン=描画＋2本指UNDO/3本指REDO（SPEC_13 §3-1・§3-5・§4-2・§4-3）
 - **P2**: animator連携（SPEC_07 `tdr_live` 語彙参加・REF送り）＋カラースクリプト一覧PNG
 - **P3（構想）**: manga-plate FRAME接続・OBANコマ送り
 
@@ -69,14 +74,45 @@ cut = {
 
 ### BOARD — 考える場（無限キャンバス風）
 
-- 紙の写真を IMPORT ボタン / D&D で複数投げ込み、パン・ズーム（ホイール／ピンチ）
-  の効く場に自由配置。
-- ツール **MOVE**: 写真ドラッグで移動（空白ドラッグ＝パン）。
+- 紙の写真を IMPORT ボタン / D&D / **Ctrl+V ペースト**（V2-B）で複数投げ込み、
+  パン・ズーム（ホイール／ピンチ）の効く場に自由配置。**HEIC/HEIF 対応**（V2-B）:
+  まず `createImageBitmap`、駄目なら heic2any をCDNから遅延ロード。
+  保存用blobは必ずJPEGに落とす（HEICのまま持つとリロードで復元できない）。
+- ツール **MOVE**: 写真ドラッグで移動（空白ドラッグ＝パン／Alt・中ボタン＝常にパン）。
+- **写真の加工（V2-B）**: `photo.rot`(0/90/180/270) と
+  `photo.filter = {gray, bright, contrast}`。描画は `drawPhoto(ctx,p)` 一本に集約され、
+  **renderBoard と bakeCut の両方に効く**（＝⟳再ベイクで絵コンテにも反映）。
+  `p.x/y/w/h` は「見た目の外接矩形」を正とし、回転時は w/h も入れ替える（当たり判定はそのまま）。
 - ツール **CUT**: 矩形ドラッグ（**16:9固定比**）→ その範囲を 1280×720 にベイクして
   新規カット追加。切り出し元矩形 `src` を保持し、BOARD上に既存カット枠（C番号付き）
   を常時表示。
+- **CUT枠の編集（V2-B）**: MOVEツールで**枠線かC#ラベル**をクリックして選択（写真より優先。
+  枠の内側は写真操作を邪魔しない）。選択枠は 内側ドラッグ=移動 / 角ハンドル=リサイズ(16:9固定) /
+  Delete=削除。離した瞬間に自動で再ベイク（`dirtyBase`）。
+  実装は **`cam[]` の1要素を編集する形**（`camCount/camRect/setCamRect`）で書いてあり、
+  V2-D1 の枠列はこの層を増やすだけで載る。
 - SHEET側の **⟳（再ベイク）** で、同じ `src` から現在のBOARD内容を再切り出し
   （「枠があと」「切り直したい」に対応）。
+- **統合Undoログ（V2-B）**: `gLog = [{type, undo(), redo()}]`。type は photo-add / photo-move /
+  photo-del / photo-rot / photo-filter / cut-add / cut-rect / cut-del / paint。
+  STUDIO の Ctrl+Z/Y はこのログ、EDIT内は従来のカット別スナップショット。
+- **ペイン幅（V2-B同時）**: BOARD⇔中央⇔SHEETパネルの境界をドラッグで幅変更（ダブルクリックで既定）。
+  `gUi.boardW/sheetW`(%) に永続化。中央プレビューは最低320px確保でクランプ。
+
+### REF BOARD 連携（`photo.ref`・SPEC_13 §2-1a）
+
+- `photos[]` に `ref: {refId,url,svc,title,memo,tags[]} | null` を1つ足しただけ。
+  **`cut` 側には持たせない**（カットの参照一覧が要るときは `src`/`bakeRect` に重なる
+  `photos[].ref` をその場で集める＝導出値。「同期を作らない」原則を崩さない）。
+- 受信: `BroadcastChannel('refboard_live')`（同一オリジンのとき即時）＋
+  `localStorage['refboard.clip.v1']`（後から econte を開いた場合の受け皿）。**両方見る**。
+  `v!==1` と **ts が24時間以上前**は無視（貼り忘れの誤爆防止・起動時はlocalStorageごと破棄）。
+- 写真が増えたら**先頭1枚だけ**に ref を付けて棚を空にし、`clip-used` を送り返す
+  （ref-board 側が受信して棚を消す）。econte 側で解除したら `clip-clear`。
+- 選択中写真パネルの **🔗**: ref があれば開く / 無ければ現在のクリップを紐づけ（既存スクショの後付け）。
+  ref 付きの写真は BOARD 上の右上角に ice のマーカー。
+- file:// 等でチャンネルが繋がらない場合は、トップバーの **⧉ CLIP** から
+  ref-board の ⧉ でコピーした `{v,ts,item}` を貼り付ける（手動貼付は ts が古くても受け取る）。
 
 ### SHEET — 絵コンテ表（V2-A以降は STUDIO 右の縦パネル）
 
@@ -91,6 +127,19 @@ cut = {
 ### EDIT — 加筆（animator系・仕上げではない）
 
 - レイヤー合成: 下地グレー(bg) → baseC → drawC。表示はfitスケール、描画は実寸座標。
+- **トレース透かし（V2-C）**: `cut.baseAlpha`（0..1・既定1.0）。`compositeTo()` の
+  **baseC を描くときだけ** `globalAlpha` を落とす。ここを通る全部
+  （EDIT／プレビュー／サムネ／動画書き出し）に効くのでWYSIWYG。20〜40%がトレース用の想定。
+  スライダーは **EDITサイドと STUDIOミニツールの両方**（対象カットは EDIT中＝編集中カット／
+  STUDIO＝プレイヘッド位置のカット。`activeCutIndex()`）。
+- **ズーム/パン（V2-C）**: `state.editView = {x,y,z}`。ホイール=カーソル中心ズーム（0.25〜12倍）／
+  1本指=パン／2本指=ピンチ拡縮＋パン／FITボタンでリセット。
+  実装は editCv の **CSSの width/height と transform だけ**を動かすので、
+  `toCanvasCoord()`（getBoundingClientRect ベース）は**変更不要**。カット切替でズームは維持される。
+- **指=操作・ペン=描画（V2-C）**: `paintDown()` は `pointerType === 'touch'` を描画に通さない。
+  ペンとマウスだけが描く（animatorと同じ操作感）。STUDIOプレビューは指では何も起きない。
+- **2本指タップ=UNDO / 3本指タップ=REDO（V2-C）**: 全部の指が250ms以内に上がり移動<12pxならタップ。
+  window の capture 段で拾うので EDIT/STUDIO どちらでも効く。判定が出たら直前のピンチ/パンを打ち切る。
 - ツール: PEN / ERASER / FILL（合成色を境界判定して drawC に書く）/ EYEDROP。
   手振れ補正なし。ブラシサイズ 1–64。
 - **FILLパレット＋Altスポイト**: animator正準（skill `animator-color-palette`）を移植。
@@ -106,8 +155,8 @@ cut = {
 
 ## 保存（IndexedDB `econte_db_v1`）
 
-- store `photos`: {id, name, x,y,w,h, blob}
-- store `cuts`: {id, order, src, bg, durF, note, baseBlob, drawBlob}
+- store `photos`: {id, name, x,y,w,h, blob, rot, filter, ref}
+- store `cuts`: {id, order, src, bg, baseAlpha, durF, note, baseBlob, drawBlob}
 - store `meta`: BOARD視点(pan/zoom)・選択状態
 - debounce保存。ビットマップは dirty のカットのみ再エンコード。
 
@@ -129,7 +178,7 @@ node tools/check.js
 
 ## 制限（P0/P1）
 
-- EDITビューはズームなし（fit表示のみ）。
+- ~~EDITビューはズームなし（fit表示のみ）~~ → V2-C でズーム/パン実装済み。
 - BOARDの写真は矩形配置のみ（回転なし）。
 - Undo は drawC（加筆）のみ対象。BASE破棄・写真移動・尺変更は対象外。
 - 動画書き出しは実時間（2分のコンテなら2分かかる）。非表示タブでは進まない。

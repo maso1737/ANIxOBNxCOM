@@ -105,13 +105,14 @@ input[type=number]{-moz-appearance:textfield;}
 .kf-dot:hover{border-color:var(--acid);}
 .kf-btn{width:100%;background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.5);font-family:var(--mono);font-size:8px;letter-spacing:0.1em;padding:3px 6px;cursor:pointer;margin-top:3px;}
 .kf-btn:hover{border-color:var(--border-bright);color:var(--acid);}
+.kf-btn.on{border-color:var(--acid);color:var(--acid);background:rgba(255,79,168,0.10);}
 
 /* TIMELINE */
 #timeline{grid-column:1/-1;position:relative;background:var(--panel);border-top:1px solid var(--border);display:grid;grid-template-rows:24px 1fr;overflow:hidden;}
 #tl-resize{position:absolute;top:-3px;left:0;right:0;height:8px;cursor:row-resize;z-index:9;}
 #tl-resize::after{content:'';position:absolute;top:3px;left:50%;transform:translateX(-50%);width:48px;height:2px;background:rgba(255,255,255,0.18);border-radius:2px;transition:background .1s;}
 #tl-resize:hover::after,#tl-resize.active::after{background:var(--acid);box-shadow:0 0 6px rgba(255,79,168,0.5);width:100%;}
-#tl-ruler{position:relative;border-bottom:1px solid var(--border);background:var(--panel2);cursor:pointer;overflow:hidden;padding-left:154px;box-sizing:border-box;}
+#tl-ruler{position:relative;border-bottom:1px solid var(--border);background:var(--panel2);cursor:pointer;overflow:hidden;padding-left:164px;box-sizing:border-box;}
 #tl-ruler-canvas{display:block;width:100%;height:100%;}
 /* スクロールバーは非表示（幅を取るとストリップがルーラーより狭くなりKF/セルが左へずれるため。ホイール/タッチでスクロール可） */
 #tl-tracks{position:relative;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;}
@@ -465,6 +466,14 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-track.tl-cam.selected .tl-track-name .num{text-shadow:0 0 8px rgba(90,233,255,0.7);}
 #kf-parent{flex:1;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--ice);font-family:var(--mono);font-size:9px;padding:2px 4px;outline:none;min-width:0;}
 #kf-parent option{background:#000;color:var(--ice);}
+/* SPEC_11 P7-6: INSPECTOR 最下段の OUTPUT（コンポ全体設定）。罫線で TRANSFORM と分離・既定は折りたたみ */
+#insp-output{margin-top:12px;padding-top:10px;border-top:1px solid var(--border-bright);}
+#out-head{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;}
+#out-head:hover{color:var(--acid);}
+#out-sum{font-size:8px;letter-spacing:0.06em;color:rgba(255,255,255,0.45);font-family:var(--mono);}
+#insp-output select{flex:1;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:rgba(255,255,255,0.8);font-family:var(--mono);font-size:9px;padding:2px 4px;outline:none;min-width:0;}
+#insp-output select option{background:#000;color:rgba(255,255,255,0.85);}
+#insp-output .kf-row .k{cursor:default;width:40px;}
 /* SPEC_11 P5-2: CAMERA行の親(NULL)選択セレクト（削除ボタン横の小型プルダウン） */
 /* CAMERA行の PRNT。S/PNG/ANI/Re が無い分の余白を全部使って伸ばす（✕は margin-left:auto で右端固定） */
 .tl-parent-sel{flex:1 1 auto;min-width:0;max-width:none;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--ice);font-family:var(--mono);font-size:8px;letter-spacing:0;padding:1px 2px;outline:none;cursor:pointer;line-height:1.4;}
@@ -562,6 +571,25 @@ input[type=number]{-moz-appearance:textfield;}
       <!-- COPY/PASTE は Ctrl+C / Ctrl+V、EASE・HOLD はキーのWクリック送り、
            イーズ量はトランスポートバーの EASE スライダーへ移動したのでボタンは廃止 -->
     </div>
+    <!-- SPEC_11 P7-6: INSPECTOR = トラック編集 ＋ 最下段の OUTPUT（コンポ全体設定）。SETTINGSが一杯のためこちらへ -->
+    <div class="insp-section" id="insp-output">
+      <div class="insp-h" id="out-head" title="書き出し解像度・のりしろ・PNGの出力先（クリックで開閉）"><span id="out-head-t">▸ OUTPUT</span><span id="out-sum">—</span></div>
+      <div id="out-body" style="display:none">
+        <div class="sc-hint">SEQ PNG / VIDEO / EXPORT WEB に適用。コンポのアスペクトは常に保たれます</div>
+        <div class="kf-row" title="出力サイズ。長辺3840（既定）は16:9コンポで従来と同じ 3840×2160"><span class="k">SIZE</span><select id="out-mode">
+          <option value="x1">×1（コンポ等倍）</option>
+          <option value="x2">×2</option>
+          <option value="long3840">長辺 3840</option>
+          <option value="custom">任意（長辺px）</option>
+        </select></div>
+        <div class="kf-row" id="out-long-row" title="長辺のピクセル数。短辺はアスペクトから自動計算"><span class="k">長辺</span><input type="number" id="out-long" class="sg-num" min="16" max="16384" step="2" style="flex:1"><span class="sg-x">px</span></div>
+        <button class="kf-btn" id="out-bleed" title="書き出し時だけキャンバスを1.2倍に広げます（レイヤーの拡大率はコンポ基準のまま＝画面外が余白に写り込む）。AEでタイムコードを載せる／画ブレで端が切れないようにする用。AE JSX は常にのりしろ込み">のりしろ ×1.2 : OFF（本番のみ）</button>
+        <div class="kf-row" title="連番PNGの出力先。FOLDER はフォルダへ1枚ずつ書き出すのでメモリに溜め込まず、尺の上限が実質なくなります（未対応ブラウザは自動でZIP）"><span class="k">PNG</span><select id="out-dest">
+          <option value="folder">FOLDER（推奨・溜め込まない）</option>
+          <option value="zip">ZIP</option>
+        </select></div>
+      </div>
+    </div>
     </div><!-- /#inspector-body -->
     <div id="inspector-resize" title="ドラッグで高さ調整（セクション境目でスナップ）"></div>
   </div>
@@ -608,6 +636,8 @@ input[type=number]{-moz-appearance:textfield;}
       <button id="btn-last">▶|</button>
       <button id="btn-loop" class="on">⟲</button>
       <button id="btn-graph" title="ミニグラフ 値/速度カーブ (G)">∿</button>
+      <!-- SPEC_11 P7-5: タイムラインの時間軸ズーム。AE の ; と同じ「ワークエリア⇔全体」トグル -->
+      <button id="btn-tl-zoom" title="タイムラインをワークエリアにズーム / 全体に戻す（;）&#10;Alt+ホイール = カーソル基点でズーム&#10;Shift+ホイール = 横スクロール">⤢</button>
       <!-- イーズ量（AE風 influence %）。対象=選択KF、無ければ現フレームのキー。0=解除 -->
       <span class="ease-grp" title="イーズの効き（0〜100%）。IN=キーに入る側 / OUT=キーから出る側。0でリニアに戻ります。対象は選択中のキー（無ければ現フレームのキー）">
         <span class="badge">EASE</span>
@@ -672,6 +702,8 @@ input[type=number]{-moz-appearance:textfield;}
         <button class="sc-key sg-preset" data-gw="1920" data-gh="1080">1920×1080</button>
         <button class="sc-key sg-preset" data-gw="1280" data-gh="720">1280×720</button>
         <button class="sc-key sg-preset" data-gw="2048" data-gh="858">2048×858(SCOPE)</button>
+        <!-- SPEC_11 P7-2: のりしろ運用の「本番枠」＝コンポの内側 1/1.2。コンポサイズ依存なので専用ボタン -->
+        <button class="sc-key" id="guide-res-honban" title="コンポの内側 1/1.2 を解像度枠に設定（のりしろ1.2倍の本番枠）">本番枠(1/1.2)</button>
       </div>
       <div class="sg-row">
         <button id="guide-safe-toggle" class="sc-key sg-toggle" title="セーフフレームの表示ON/OFF">セーフ</button>
@@ -1137,14 +1169,66 @@ if(typeof window !== 'undefined'){
 
 <script>
 const LABEL_W = 164; // = .tl-track の padding-left 14 + ⠿ハンドル 12 + .tl-track-label 138
-// タイムラインX座標規約（SPEC_11 P0）: フレーム f の左端 = LABEL_W + frameFrac(f)*描画幅。
-// ルーラー/プレイヘッド/WAバンド/KFダイヤ/コマブロック/ミニグラフの全UIでこれに統一（分母は total。total-1 は使わない）
-const frameFrac = f => state.totalFrames ? f/state.totalFrames : 0;
+// タイムラインX座標規約（SPEC_11 P0 → P7-5で時間軸ズーム対応）:
+//   フレーム f の左端 = LABEL_W + frameFrac(f)*描画幅 ／ 逆変換は pxToFrame(px, 描画幅)。
+// ルーラー/プレイヘッド/WAバンド/KFダイヤ/マーカー/トリム/コマブロック/ミニグラフの**全UIがこの2関数を通る**。
+// 直接 f/total を書かないこと（ズームすると必ずズレる）。
+// state.tlView = {start, span}（span=0 は「全体表示」＝従来と完全に同じ値になる）
+function tlSpan(){
+  const t=state.totalFrames||0; if(!t) return 1;
+  const v=state.tlView;
+  return (!v||!v.span) ? t : Math.max(1,Math.min(t,v.span));
+}
+function tlStart(){
+  const t=state.totalFrames||0; if(!t) return 0;
+  const v=state.tlView;
+  return (!v||!v.span) ? 0 : Math.max(0,Math.min(t-tlSpan(), v.start||0));
+}
+const tlZoomed = () => !!(state.tlView&&state.tlView.span&&state.tlView.span<state.totalFrames);
+const frameFrac = f => state.totalFrames ? (f-tlStart())/tlSpan() : 0;
+const pxToFrame = (px,width) => tlStart() + (width?px/width:0)*tlSpan();
 // SPEC_11 P3b-2: トラック内時間 = コンポ時間 − tOffset。KFの読み書きは常にトラック内時間で行う
 // （タイムライン上のダイヤ/マーカーは +tOffset した位置に描かれるので、プレイヘッド直下＝curLocalFrame）
 const trackOff = t => (t&&t.tOffset)||0;
 const curLocalFrame = () => state.currentFrame - trackOff(selTrack());
-const OUT_W = 3840, OUT_H = 2160;
+// ── 出力解像度 / のりしろ（SPEC_11 P7-1・P7-2）──
+// 旧: OUT_W/OUT_H=3840×2160 固定 ＋ drawOneTrack の sx=tw/width, sy=th/height が別計算
+//     → 16:9でないコンポは書き出しで変形していた（2400×1000 なら縦に34%伸びる）。
+// 新: コンポのアスペクトを保って出力サイズを算出し、drawOneTrack は sx=sy の1スケールで描く。
+//     既定 'long3840' は 16:9 コンポで従来と完全にピクセル一致（後方互換）。
+const BLEED_K = 1.2;   // のりしろ倍率（固定）。書き出しキャンバスだけ広げ、レイヤーの拡大率は据え置く
+function outScale(){
+  const long=Math.max(state.width||1,state.height||1);
+  const o=state.out||{};
+  if(o.mode==='x1') return 1;
+  if(o.mode==='x2') return 2;
+  if(o.mode==='custom') return Math.max(16,o.long||3840)/long;
+  return 3840/long; // 'long3840'（既定）
+}
+// bleed=true: 出力キャンバスを1.2倍に広げる（＝普段フレーム外で見切れている部分が余白に写り込む）
+function outSize(bleed){
+  const s=outScale(), k=bleed?BLEED_K:1;
+  return {w:Math.max(2,Math.round((state.width||1)*s*k)), h:Math.max(2,Math.round((state.height||1)*s*k)), s};
+}
+// 書き出し中の出力サイズ。beginRender() が更新し、endRender() で通常（プレビュー）へ戻す
+let gOutW=3840, gOutH=2160, gRenderBleed=false;
+function beginRender(bleed){
+  const sz=outSize(bleed);
+  gOutW=sz.w; gOutH=sz.h; gRenderBleed=!!bleed;
+  return sz;
+}
+function endRender(){ gRenderBleed=false; }
+const outBleedOn = () => !!(state.out&&state.out.bleed);
+// 保存JSONの out を正規化（未知/欠損は既定へ＝旧プロジェクトは従来どおり長辺3840・のりしろ無し）
+function normalizeOut(saved){
+  const def={mode:'long3840', long:3840, bleed:false};
+  if(!saved||typeof saved!=='object') return def;
+  return {
+    mode: ['x1','x2','long3840','custom'].includes(saved.mode)?saved.mode:def.mode,
+    long: Math.max(16,Math.min(16384,(saved.long|0)||def.long)),
+    bleed: !!saved.bleed,
+  };
+}
 const ALL_PROPS = ['x','y','z','s','ax','ay','rot','op'];
 const PROP_STEP = {x:1,y:1,z:1,s:0.01,ax:1,ay:1,rot:0.5,op:0.01};
 const PROP_MIN  = {s:0,op:0,z:-990}, PROP_MAX = {op:1};
@@ -1174,7 +1258,10 @@ const state = {
   fps: 24, width: 0, height: 0, bgBright: 100,
   isPlaying: false, loop: true, lastTimestamp: 0, frameAccumulator: 0,
   workArea: null,
-  compFrames: null,     // 手入力したコンポ尺（null=素材まかせ・SPEC_11調整）
+  tlView: {start:0, span:0}, // SPEC_11 P7-5: タイムラインの表示範囲（span=0＝全体）。保存対象外＝表示状態
+  compFrames: null,    // 手入力したコンポ尺（null=素材まかせ・SPEC_11調整）
+  // SPEC_11 P7-1/P7-2: 出力設定（コンポの属性＝PROJECT_v2に保存）。mode: x1/x2/long3840/custom
+  out: {mode:'long3840', long:3840, bleed:false},
   fx: SatsueiFX.makeDefaultFx(), // 撮影処理チェーン（SPEC_06 SATSUEI KIT）
   markers: [],         // グローバル(ワークエリア)マーカー [{frame,label}]
   vpDragging: false, vpDragStart: null, vpDragKfStart: null,
@@ -1534,8 +1621,10 @@ function renderGlobalMarkers(){
   const rw=$('#tl-ruler').clientWidth, aw=rw-LABEL_W;
   ensureMarkerNos(); // 旧データにも番号を振ってから描く
   state.markers.forEach((m,idx)=>{
+    const fr=frameFrac(m.frame);
+    if(fr<0||fr>1) return; // SPEC_11 P7-5: 表示範囲の外は描かない（ラベル側へはみ出すため）
     const el=document.createElement('div'); el.className='tl-gmarker';
-    el.style.left=(LABEL_W+m.frame/total*aw)+'px';
+    el.style.left=(LABEL_W+fr*aw)+'px';
     el.dataset.label=m.label?(m.n+' '+m.label):('M'+m.n); // 出した順の番号を表示（数字キーで飛べる）
     el.title=`マーカー ${m.n}（数字キー ${m.n<=9?m.n:'—'}）  コマ${m.frame+1}${m.label?' — '+m.label:''}（ダブルクリックでメモ）`;
     let dragActive=false, wasDragged=false, ctrlStart=false;
@@ -1544,9 +1633,9 @@ function renderGlobalMarkers(){
       if(!dragActive||ctrlStart) return;
       if(!e.buttons){ dragActive=false; return; } // ペン等でpointerupを取り逃した場合の保険
       wasDragged=true;
-      let f=Math.round(Math.max(0,Math.min(total-1,(e.clientX-$('#tl-ruler').getBoundingClientRect().left-LABEL_W)/aw*total)));
-      if(e.shiftKey) f=snapFrame(f,aw/total,m,true);
-      m.frame=f; el.style.left=(LABEL_W+f/total*aw)+'px';
+      let f=Math.round(Math.max(0,Math.min(total-1,pxToFrame(e.clientX-$('#tl-ruler').getBoundingClientRect().left-LABEL_W,aw))));
+      if(e.shiftKey) f=snapFrame(f,aw/tlSpan(),m,true);
+      m.frame=f; el.style.left=(LABEL_W+frameFrac(f)*aw)+'px';
     });
     el.addEventListener('pointerup',()=>{
       if(!dragActive) return; dragActive=false;
@@ -1582,6 +1671,7 @@ function cloneEditState(){
     })),
     gmarkers: state.markers.map(m=>({...m})),
     compFrames: state.compFrames,
+    out: {...state.out}, // SPEC_11 P7-1/P7-2: 出力設定もコンポ属性なので undo 対象
     selectedTrack: state.selectedTrack,
     workArea: state.workArea?{...state.workArea}:null,
   };
@@ -1695,6 +1785,7 @@ function applyHistory(snap){
   sanitizeParents();
   if(snap.gmarkers) state.markers = snap.gmarkers.map(m=>({...m}));
   state.compFrames = snap.compFrames!==undefined?snap.compFrames:null;
+  if(snap.out) state.out={...snap.out}; // SPEC_11 P7-1/P7-2
   recalcTotalFrames();
   if(state.currentFrame>=state.totalFrames) state.currentFrame=Math.max(0,state.totalFrames-1);
   if(snap.workArea) state.workArea={...snap.workArea};
@@ -1703,7 +1794,7 @@ function applyHistory(snap){
   gSelTids = state.tracks[state.selectedTrack] ? [state.tracks[state.selectedTrack].tid] : [];
   // 3) トラック構成が変わりうるため全再構築（undo/redoはショートカット/ボタン起点＝KFドラッグ中には発火しない）
   rebuildAllTrackUI();
-  drawCurrentFrame(); updateKfUI(); updateUndoButtons(); updateExportButtons();
+  drawCurrentFrame(); updateKfUI(); updateUndoButtons(); updateExportButtons(); updateOutputUI();
 }
 // undo/parent変更後に行ラベルの⛓だけ差し替える（DOM全再構築なしの安全策）
 function refreshTrackChainMarks(){
@@ -1888,6 +1979,7 @@ function loadJSON(json){
   }
   state.bgBright = json.bgBright??100;
   state.compFrames = (typeof json.compFrames==='number'&&json.compFrames>0)?(json.compFrames|0):null;
+  state.out = normalizeOut(json.out); // SPEC_11 P7-1/P7-2（無指定は既定 long3840・のりしろ無し＝従来出力）
   recalcTotalFrames();
   if(json.workArea&&typeof json.workArea==='object'){
     const s=Math.max(0,Math.min(state.totalFrames,json.workArea.startFrame|0));
@@ -2357,17 +2449,20 @@ async function exportTrackPNG(trackIdx){
   const tname=(track.name||'track').toLowerCase().replace(/[^a-z0-9]/g,'_');
   const {start,len}=webRange(); // SPEC_11 P3: 全体書き出しと同じくWA準拠
   if(len<=0){ flashLive('ワークエリアが空です'); return; }
-  await exportZipPNG(len,`${tname}_4k.zip`,(ctx,i)=>{
-    const f=start+i;
-    const bg=Math.round(255*(state.bgBright/100));
-    ctx.fillStyle=`rgb(${bg},${bg},${bg})`; ctx.fillRect(0,0,OUT_W,OUT_H);
-    // カメラは見たまま焼き込み（カメラ抜きで出したいときは◉でカメラOFFにして書き出す）
-    const cam=getCamAt(f);
-    ctx.save();
-    applyCamWrap(ctx,OUT_W,OUT_H,cam);
-    drawOneTrack(ctx,OUT_W,OUT_H,f,track,false,cam);
-    ctx.restore();
-  },start);
+  beginRender(outBleedOn()); // SPEC_11 P7-1/P7-2
+  try{
+    await exportZipPNG(len,`${tname}_${gOutW}x${gOutH}.zip`,(ctx,i)=>{
+      const f=start+i;
+      const bg=Math.round(255*(state.bgBright/100));
+      ctx.fillStyle=`rgb(${bg},${bg},${bg})`; ctx.fillRect(0,0,gOutW,gOutH);
+      // カメラは見たまま焼き込み（カメラ抜きで出したいときは◉でカメラOFFにして書き出す）
+      const cam=getCamAt(f);
+      ctx.save();
+      applyCamWrap(ctx,gOutW,gOutH,cam);
+      drawOneTrack(ctx,gOutW,gOutH,f,track,false,cam);
+      ctx.restore();
+    },start);
+  } finally { endRender(); }
 }
 
 // ── TRACK DRAG & DROP ──
@@ -2709,8 +2804,8 @@ function buildTrackElement(idx){
     for(const c of track.cellInfos){
       const block=document.createElement('div');
       block.className='tl-frame-block '+(c.kind==='empty'?'empty':'draw');
-      block.style.left=((c.startFrame+off)/total*100)+'%';
-      block.style.width=(c.duration/total*100)+'%';
+      block.style.left=(frameFrac(c.startFrame+off)*100)+'%';
+      block.style.width=(c.duration/tlSpan()*100)+'%';
       const lbl=document.createElement('div'); lbl.className='tl-label';
       const cn=String(c.cellIdx+1).padStart(3,'0');
       lbl.textContent=c.duration>1?`${cn}·${c.duration}`:cn;
@@ -2758,8 +2853,8 @@ function buildTrackElement(idx){
       if(!offDrag) return;
       if(!e.buttons){ offDrag=false; if(offMoved) endOff(); return; }
       const rect=strip.getBoundingClientRect();
-      const tot=state.totalFrames||1, ppf=rect.width/tot;
-      let d=Math.round((e.clientX-offStartX)/rect.width*tot);
+      const ppf=rect.width/tlSpan(); // SPEC_11 P7-5: ズーム中は1コマの幅が変わる
+      let d=Math.round((e.clientX-offStartX)/ppf);
       // 2026-07-26: Alt+Shift+ドラッグ＝レイヤーの頭/尻をインジケータ・他トラックのIN/OUT・キーへ吸着
       if(e.shiftKey){
         const hasTrim=offStartIn!==0||offStartOut!=null;
@@ -2778,7 +2873,7 @@ function buildTrackElement(idx){
         }
         renderKfDiamonds(idx); renderMarkers(idx); refreshTrimUI(idx);
         strip.querySelectorAll('.tl-frame-block').forEach((b,i)=>{
-          const c=track.cellInfos[i]; if(c) b.style.left=((c.startFrame+nv)/state.totalFrames*100)+'%';
+          const c=track.cellInfos[i]; if(c) b.style.left=(frameFrac(c.startFrame+nv)*100)+'%';
         });
         drawCurrentFrame();
       }
@@ -2814,9 +2909,9 @@ function buildTrackElement(idx){
         if(!drag) return;
         if(!e.buttons){ drag=false; h.classList.remove('active'); if(moved) endTrim(); return; }
         const rect=strip.getBoundingClientRect();
-        let f=Math.round(Math.max(0,Math.min(total,(e.clientX-rect.left)/rect.width*total)));
+        let f=Math.round(Math.max(0,Math.min(total,pxToFrame(e.clientX-rect.left,rect.width))));
         // 2026-07-26: Shift＝インジケータ・他トラックのIN/OUT・キー・マーカーへ吸着（自分のIN/OUTは除外）
-        if(e.shiftKey) f=Math.max(0,Math.min(total,snapFrame(f,rect.width/total,null,true,null,trimSnapCands)));
+        if(e.shiftKey) f=Math.max(0,Math.min(total,snapFrame(f,rect.width/tlSpan(),null,true,null,trimSnapCands)));
         if(which==='in') track.tIn=Math.max(0,Math.min(f,(track.tOut==null?total:track.tOut)-1));
         else track.tOut=(f>=total)?null:Math.max((track.tIn||0)+1,f);
         moved=true;
@@ -2854,12 +2949,14 @@ function refreshTrimUI(trackIdx){
   const clampF=v=>Math.max(0,Math.min(total,v));
   const tIn=clampF(track.tIn||0), tOut=clampF(track.tOut==null?total:track.tOut);
   const hIn=strip.querySelector('.tl-trim-handle.in'), hOut=strip.querySelector('.tl-trim-handle.out');
-  if(hIn){ hIn.style.left=(tIn/total*100)+'%'; hIn.classList.toggle('set',!!track.tIn); }
-  if(hOut){ hOut.style.left='calc('+(tOut/total*100)+'% - 7px)'; hOut.classList.toggle('set',track.tOut!=null); }
+  // SPEC_11 P7-5: 位置は frameFrac 経由（表示範囲の外へ出た端は % が 0/100 を外れるが strip が overflow:hidden）
+  const pIn=frameFrac(tIn)*100, pOut=frameFrac(tOut)*100;
+  if(hIn){ hIn.style.left=pIn+'%'; hIn.classList.toggle('set',!!track.tIn); }
+  if(hOut){ hOut.style.left='calc('+pOut+'% - 7px)'; hOut.classList.toggle('set',track.tOut!=null); }
   // 範囲外のベールは IN/OUT のフレーム位置ちょうどで切る（コマ境界には吸着させない）
   const vL=strip.querySelector('.tl-trim-veil.left'), vR=strip.querySelector('.tl-trim-veil.right');
-  if(vL){ vL.style.left='0'; vL.style.width=(tIn/total*100)+'%'; vL.style.display=tIn>0?'block':'none'; }
-  if(vR){ vR.style.left=(tOut/total*100)+'%'; vR.style.right='0'; vR.style.display=tOut<total?'block':'none'; }
+  if(vL){ vL.style.left='0'; vL.style.width=Math.max(0,pIn)+'%'; vL.style.display=tIn>0?'block':'none'; }
+  if(vR){ vR.style.left=pOut+'%'; vR.style.right='0'; vR.style.display=tOut<total?'block':'none'; }
 }
 function updateTrackHeights(){
   const N=state.tracks.length; if(!N) return;
@@ -2913,7 +3010,7 @@ function renderKfDiamonds(trackIdx){
     // SPEC_11 P2: HOLD は形状優先（正方形グレー）。イーズ形状は hold でないときだけ
     if(holdOn) d.classList.add('ez-hold');
     else if(ezAmt>=0.99) d.classList.add('ez-max'); else if(ezAmt>0) d.classList.add('ez-mid');
-    d.style.left=((f+off)/total*100)+'%'; d.title=`F${f+off+1}`+(holdOn?' (HOLD)':ezAmt>=0.99?' (EASE最大)':ezAmt>0?' (EASE中)':' (LINEAR)')
+    d.style.left=(frameFrac(f+off)*100)+'%'; d.title=`F${f+off+1}`+(holdOn?' (HOLD)':ezAmt>=0.99?' (EASE最大)':ezAmt>0?' (EASE中)':' (LINEAR)')
       +'\nCtrl+クリック / ダブルクリック = LINEAR→EASE→HOLD 送り\nShift+ドラッグ = 吸着（インジケータ/他トラックのキー・IN/OUT）\nAlt+ドラッグ = 複製';
     // この frame の各プロパティ値（単一移動/複製で持ち回る）
     const kfVals={}, kfEz={}, kfInf={}, kfHold={};
@@ -2963,29 +3060,29 @@ function renderKfDiamonds(trackIdx){
       if(!dragActive) return;
       if(!e.buttons){ dragActive=false; if(wasDragged) endKfDrag(); return; } // ペン等の保険
       const rect=strip.getBoundingClientRect();
-      const ppf=rect.width/total; // 1コマあたりpx（スナップ半径の換算に使う）
-      let compF=Math.round(Math.max(0,Math.min(total-1,(e.clientX-rect.left)/rect.width*total)));
+      const ppf=rect.width/tlSpan(); // 1コマあたりpx（P7-5: ズーム中はspan基準）
+      let compF=Math.round(Math.max(0,Math.min(total-1,pxToFrame(e.clientX-rect.left,rect.width))));
       // 2026-07-26: Shift+ドラッグ＝インジケータ / 他トラックのキー・マーカー・IN/OUT へ吸着
       if(shiftStart&&!groupMode) compF=snapFrame(compF,ppf,null,true,null,snapCands);
       let newF=compF-off;
-      if(!wasDragged){ if(Math.abs(e.clientX-(rect.left+(origF+off)/total*rect.width))<3) return; wasDragged=true; }
+      if(!wasDragged){ if(Math.abs(e.clientX-(rect.left+frameFrac(origF+off)*rect.width))<3) return; wasDragged=true; }
       if(groupMode){
         let gd=newF-f;
         if(shiftStart&&gEdges) gd=snapDelta(gd,gEdges,ppf,null,snapCands); // グループは「どれか1つの端」が吸い付く
         applyGroupDelta(gd);
-        d.style.left=((f+lastDelta+off)/total*100)+'%'; d.title=`F${f+lastDelta+off+1}`;
+        d.style.left=(frameFrac(f+lastDelta+off)*100)+'%'; d.title=`F${f+lastDelta+off+1}`;
         drawCurrentFrame(); updateKfUI();
       } else if(altStart){
         // Alt+ドラッグ＝複製（元のキーは残す）※Shiftはスナップに使うので複製から外した
         if(newF===copyF) return;
         putKeys(newF, copyF===origF?null:copyF);
         copyF=newF;
-        d.style.left=((newF+off)/total*100)+'%'; d.title=`F${newF+off+1} (copy)`;
+        d.style.left=(frameFrac(newF+off)*100)+'%'; d.title=`F${newF+off+1} (copy)`;
       } else {
         if(newF===origF) return;
         putKeys(newF, origF);
         origF=newF;
-        d.style.left=((newF+off)/total*100)+'%'; d.title=`F${newF+off+1}`;
+        d.style.left=(frameFrac(newF+off)*100)+'%'; d.title=`F${newF+off+1}`;
         drawCurrentFrame(); updateKfUI();
       }
     });
@@ -3025,7 +3122,7 @@ function renderMarkers(trackIdx){
   for(const m of track.markers){
     const el=document.createElement('div');
     el.className='tl-marker';
-    el.style.left=((m.frame+off)/total*100)+'%';
+    el.style.left=(frameFrac(m.frame+off)*100)+'%';
     el.dataset.label=m.label||('M'+(track.markers.indexOf(m)+1));
     el.title=`コマ${m.frame+off+1}${m.label?' — '+m.label:''}`;
     let dragActive=false, wasDragged=false;
@@ -3041,9 +3138,9 @@ function renderMarkers(trackIdx){
       if(!e.buttons){ dragActive=false; return; } // ペン等でpointerupを取り逃した場合の保険
       wasDragged=true;
       const rect=strip.getBoundingClientRect();
-      let newF=Math.round(Math.max(0,Math.min(total-1,(e.clientX-rect.left)/rect.width*total)));
-      if(e.shiftKey) newF=snapFrame(newF,rect.width/total,m,true);
-      m.frame=newF-off; el.style.left=(newF/total*100)+'%';
+      let newF=Math.round(Math.max(0,Math.min(total-1,pxToFrame(e.clientX-rect.left,rect.width))));
+      if(e.shiftKey) newF=snapFrame(newF,rect.width/tlSpan(),m,true);
+      m.frame=newF-off; el.style.left=(frameFrac(newF)*100)+'%';
     });
     el.addEventListener('pointerup',()=>{
       if(!dragActive) return; dragActive=false;
@@ -3064,12 +3161,16 @@ function drawRuler(){
   rulerCtx.clearRect(0,0,c.width,c.height); rulerCtx.scale(dpr,dpr);
   const total=state.totalFrames; if(!total) return;
   const cw=c.clientWidth, ch=c.clientHeight, fps=state.fps;
-  const ppf=cw/total; let stride=1;
+  // SPEC_11 P7-5: 目盛りは表示範囲(tlView)基準。ズームすると刻みが自動で細かくなる
+  const span=tlSpan(), f0=tlStart(), f1=Math.min(total,f0+span);
+  const ppf=cw/span; let stride=1;
   for(const s of[1,2,4,fps/2,fps,fps*2,fps*5,fps*10]){if(s*ppf>=50){stride=s;break;}stride=s;}
   stride=Math.max(1,Math.round(stride));
   rulerCtx.font='8px Menlo,Consolas,monospace'; rulerCtx.textBaseline='middle';
-  for(let f=0;f<=total;f+=stride){
-    const x=(f/total)*cw, isSec=f%fps===0;
+  const fStart=Math.floor(f0/stride)*stride;
+  for(let f=fStart;f<=f1;f+=stride){
+    if(f<0) continue;
+    const x=frameFrac(f)*cw, isSec=f%fps===0;
     rulerCtx.strokeStyle=isSec?'rgba(255,79,168,0.5)':'rgba(255,255,255,0.18)';
     rulerCtx.beginPath(); rulerCtx.moveTo(x+.5,ch); rulerCtx.lineTo(x+.5,isSec?ch-10:ch-6); rulerCtx.stroke();
     if(isSec){rulerCtx.fillStyle='rgba(255,79,168,0.7)';rulerCtx.fillText(String(f+1).padStart(5,'0'),x+4,ch/2-1);}
@@ -3085,11 +3186,56 @@ function updateWorkArea(){
     band.style.display='none'; waIn.style.display='none'; waOut.style.display='none'; return;
   }
   const rw=$('#tl-ruler').clientWidth, aw=rw-LABEL_W;
-  const x0=LABEL_W+(wa.startFrame/total)*aw;
-  const x1=LABEL_W+(wa.endFrame/total)*aw;
-  band.style.display='block'; band.style.left=x0+'px'; band.style.width=Math.max(0,x1-x0)+'px';
-  waIn.style.display='block';  waIn.style.left=x0+'px';
-  waOut.style.display='block'; waOut.style.left=x1+'px';
+  // SPEC_11 P7-5: バンドは表示範囲でクリップし、ハンドルは範囲外なら隠す（ラベル側にはみ出さないように）
+  const f0=frameFrac(wa.startFrame), f1=frameFrac(wa.endFrame);
+  const cl=v=>Math.max(0,Math.min(1,v));
+  const x0=LABEL_W+f0*aw, x1=LABEL_W+f1*aw;
+  band.style.display='block';
+  band.style.left=(LABEL_W+cl(f0)*aw)+'px';
+  band.style.width=Math.max(0,(cl(f1)-cl(f0))*aw)+'px';
+  waIn.style.display=(f0<0||f0>1)?'none':'block';  waIn.style.left=x0+'px';
+  waOut.style.display=(f1<0||f1>1)?'none':'block'; waOut.style.left=x1+'px';
+}
+// ── タイムラインの時間軸ズーム（SPEC_11 P7-5 Step2/3）──
+// 座標変換は frameFrac / pxToFrame の2関数に集約済みなので、ここは state.tlView を書き換えて描き直すだけ。
+function refreshTimelineX(){
+  rebuildAllTrackUI();   // コマブロック/ダイヤ/マーカー/トリムを新しい座標で作り直す（ruler/WAも中で更新）
+  updatePlayhead(); renderAudioWaveform(); renderGraph();
+  const b=$('#btn-tl-zoom'); if(b) b.classList.toggle('on',tlZoomed());
+}
+function setTlView(start,span){
+  const total=state.totalFrames||0;
+  if(!total){ state.tlView={start:0,span:0}; refreshTimelineX(); return; }
+  span=Math.round(span||0);
+  if(!span||span>=total) state.tlView={start:0,span:0}; // 全体表示＝従来と同じ座標
+  else {
+    span=Math.max(2,span);
+    state.tlView={start:Math.max(0,Math.min(total-span,Math.round(start))),span};
+  }
+  // ユーザーが明示的に表示範囲を決めた直後は、インジケータ追従（updatePlayhead）に上書きさせない。
+  // これが無いと「Alt+ホイールでズームしても即インジケータ位置へ戻される」ようになる（実機で発見）
+  gTlFollowing=true;
+  try{ refreshTimelineX(); } finally { gTlFollowing=false; }
+}
+// AE の `;` 相当：ワークエリアにズーム ⇔ 全体
+function toggleTlZoomWa(){
+  const total=state.totalFrames; if(!total) return;
+  if(tlZoomed()){ setTlView(0,0); flashLive('⤢ TIMELINE 全体表示'); return; }
+  const wa=state.workArea||{startFrame:0,endFrame:total};
+  const len=wa.endFrame-wa.startFrame;
+  if(len>=total||len<2){ flashLive('ワークエリアを B / N で決めてからズームしてください'); return; }
+  setTlView(wa.startFrame,len);
+  flashLive('⤡ TIMELINE ズーム F'+(wa.startFrame+1)+'–'+wa.endFrame);
+}
+// Alt+ホイール：カーソル下のコマを画面内の同じ位置に留めたままズーム
+function tlZoomAt(factor, anchorFrame){
+  const total=state.totalFrames; if(!total) return;
+  const span=tlSpan(), start=tlStart();
+  let ns=Math.max(2,Math.min(total,Math.round(span*factor)));
+  if(ns>=total){ setTlView(0,0); return; }
+  const a=Math.max(0,Math.min(total,anchorFrame));
+  const r=(a-start)/span;
+  setTlView(a-r*ns,ns);
 }
 function setWaStart(f){
   if(!state.totalFrames) return;
@@ -3338,7 +3484,9 @@ function drawOneTrack(tCtx, tw, th, frameIdx, track, hasSolo, cam){
   const fi=Math.max(0,Math.min(Math.floor(frameIdx-(track.tOffset||0)),track.totalFrames-1));
   const f=track.frames[fi];
   if(!f||f.kind!=='draw'||f.hidden||!f.image||!f.image.complete) return;
-  const sx=tw/state.width, sy=th/state.height; // コンポ座標→出力座標
+  // SPEC_11 P7-1: コンポ座標→出力座標。**縦横で同じスケール**（旧 sy=th/height は非16:9コンポで変形した）
+  // SPEC_11 P7-2: のりしろ込みキャンバスでは 1.2 で割って「レイヤーはコンポ基準のまま・余白だけ広い」状態にする
+  const sx=tw/((state.width||1)*(gRenderBleed?BLEED_K:1)), sy=sx;
   // トラック固有の解像度で配置（AE準拠：コンポ中央に原寸配置。解像度違いでも基点がずれない）
   const trW=track.width||state.width, trH=track.height||state.height;
   const drawW=trW*sx, drawH=trH*sy;
@@ -3353,12 +3501,39 @@ function drawOneTrack(tCtx, tw, th, frameIdx, track, hasSolo, cam){
     const dofE=state.fx.chain.find(e=>e.t==='dof'&&e.on);
     if(dofE){
       const r=SatsueiFX.dofBlurPx(tr.z||0,dofE.p);
-      if(r>0.3) tCtx.filter='blur('+(r*(tw/state.width)).toFixed(1)+'px)'; // 出力解像度スケール
+      if(r>0.3) tCtx.filter='blur('+(r*sx).toFixed(1)+'px)'; // 出力解像度スケール（P7-1: sxに統一）
     }
   }
   tCtx.drawImage(f.image,-drawW/2-tr.ax*sx,-drawH/2-tr.ay*sy,drawW,drawH);
   tCtx.filter='none';
   tCtx.restore();
+}
+// ── Zソート（SPEC_11 P7-3）──
+// AEは連続した3Dレイヤーを1つのレンダーグループにまとめ、その中は**カメラからの距離（Z）順**で描く。
+// JSX書き出しは全レイヤーに threeDLayer=true を立てている＝AE側は既にZ順。
+// ズレていたのは配列順で描いていた COMPOSER 側なので、これは新機能ではなくバグ修正。
+// 実効Zは親チェーン依存（子Zは親の深度平面基準）なので、合成後の透視倍率から逆算する。
+function perspAt(track, frame, cam, depth){
+  depth=depth||0;
+  const tr=getTransform(frame-trackOff(track),track.keyframes);
+  const p=(depth<8&&track.parent)?state.tracks.find(t=>t.tid===track.parent&&t.type!=='camera'):null;
+  if(p){
+    const cd=PERSP_FOCAL+(tr.z||0);
+    return perspAt(p,frame,cam,depth+1)*(cd<1?1:PERSP_FOCAL/cd);
+  }
+  const dp=PERSP_FOCAL+(tr.z||0)-(cam?(cam.z||0):0);
+  return dp<1?1e-6:PERSP_FOCAL/dp;
+}
+// 実効Z（大きいほど奥）。persp = FOCAL/(FOCAL+z) の逆算
+function depthAt(track, frame, cam){
+  const pr=perspAt(track,frame,cam,0);
+  return pr>1e-9 ? PERSP_FOCAL/pr-PERSP_FOCAL : 1e9;
+}
+// 描画順＝奥→手前。**安定ソート**なのでZ同値（＝通常の使い方）は従来の配列順のまま。
+// Zが1つもキーされていないコンポでは並べ替え自体を省く（毎フレームの評価コストを避ける）
+function tracksInDrawOrder(frame, cam){
+  if(!state.tracks.some(t=>t.keyframes.z.length)) return state.tracks;
+  return state.tracks.slice().sort((a,b)=>depthAt(b,frame,cam)-depthAt(a,frame,cam));
 }
 function drawFrame(tCtx, tw, th, frameIdx){
   const bg=Math.round(255*(state.bgBright/100));
@@ -3367,7 +3542,7 @@ function drawFrame(tCtx, tw, th, frameIdx){
   const cam=getCamAt(frameIdx);
   tCtx.save();
   applyCamWrap(tCtx,tw,th,cam);
-  for(const track of state.tracks) drawOneTrack(tCtx,tw,th,frameIdx,track,hasSolo,cam);
+  for(const track of tracksInDrawOrder(frameIdx,cam)) drawOneTrack(tCtx,tw,th,frameIdx,track,hasSolo,cam);
   tCtx.restore();
 }
 function drawCurrentFrame(){
@@ -3577,7 +3752,7 @@ function renderGraph(){
     const arr=t.keyframes[gGraphDrag.p];
     const d=gGraphDrag;
     // 横＝フレーム移動（相対）。既存キーと衝突したら移動しない（クランプ）
-    const df=Math.round((x-d.px0)/(gGraphGeo.sw||1)*total);
+    const df=Math.round((x-d.px0)/(gGraphGeo.sw||1)*tlSpan()); // SPEC_11 P7-5
     const nf=Math.max(0,Math.min(total-1,d.f0+df));
     if(nf!==d.k.f && !arr.some(k=>k!==d.k&&k.f===nf)){ d.k.f=nf; arr.sort((a,b)=>a.f-b.f); d.moved=true; }
     // 縦＝値（Shiftで×0.1の精密。既存スクラブと同じ流儀）
@@ -3602,10 +3777,23 @@ function renderGraph(){
   cv.addEventListener('pointercancel',endGraphDrag);
 })();
 // ── PLAYBACK ──
+let gTlFollowing=false; // 追従スクロール中の再入防止
 function updatePlayhead(){
   const total=state.totalFrames||1;
+  // SPEC_11 P7-5: ズーム中にインジケータが画面外へ出たら表示範囲を送る（AEのタイムライン追従と同じ）
+  if(tlZoomed()&&!gTlFollowing){
+    const st=tlStart(), sp=tlSpan(), f=state.currentFrame;
+    if(f<st||f>=st+sp){
+      gTlFollowing=true;
+      try{ setTlView(f-Math.round(sp*0.1),sp); } finally { gTlFollowing=false; }
+      return; // setTlView → refreshTimelineX が updatePlayhead を呼び直す
+    }
+  }
   const rw=$('#tl-ruler').clientWidth, sw=rw-LABEL_W;
-  $('#tl-playhead').style.left=(LABEL_W+state.currentFrame/total*sw)+'px';
+  const fr=frameFrac(state.currentFrame);
+  const ph=$('#tl-playhead');
+  ph.style.left=(LABEL_W+fr*sw)+'px';
+  ph.style.display=(fr<-0.002||fr>1.002)?'none':''; // 表示範囲の外ではラベル側にはみ出させない
   renderGraph();
 }
 function tick(ts){
@@ -3651,14 +3839,17 @@ function updateInspector(){
   if(!state.width) return;
   // PROJECT/OUTPUT セクションは廃止。出力仕様は SEQ PNG のツールチップに集約（ホバーで確認）
   const ex=$('#btn-export');
+  const osz=outSize(outBleedOn()); // SPEC_11 P7-1/P7-2: INSPECTOR の OUTPUT 設定から算出
   if(ex) ex.title=[
-    '連番PNGでZIP書き出し（AE合成用）',
-    `OUTPUT: ${OUT_W}×${OUT_H} / SCALE ×${(OUT_W/state.width).toFixed(3)} / NEAREST（ドット等倍・ぼかさない）`,
+    '連番PNGで書き出し（AE合成用）',
+    `OUTPUT: ${osz.w}×${osz.h} / SCALE ×${osz.s.toFixed(3)}${outBleedOn()?'（のりしろ×1.2込み）':''} / NEAREST（ドット等倍・ぼかさない）`,
     `SRC: ${state.width}×${state.height} / ${state.fps}fps`,
     '範囲: ワークエリア準拠・ファイル名は絶対フレーム番号',
+    '出力先/解像度/のりしろは INSPECTOR 下段の OUTPUT で変更',
     '誤爆防止: Shift+クリック',
   ].join('\n');
   updateCompLenUI();
+  updateOutputUI(); // SPEC_11 P7-6: INSPECTOR 下段の OUTPUT セクション
   const t=selTrack();
   $('#proj-meta').textContent=`${state.width}×${state.height} / ${state.fps}fps / ${state.totalFrames}f / ${state.tracks.length}T`;
   $('#meta-tl').textContent=t?(t.name||'—'):'—';
@@ -3795,6 +3986,7 @@ function buildProjectPayload(){
     bgBright:state.bgBright,
     workArea:state.workArea||{startFrame:0,endFrame:state.totalFrames},
     ...(state.compFrames?{compFrames:state.compFrames}:{}),
+    out:{...state.out}, // SPEC_11 P7-1/P7-2: 出力解像度・のりしろ（コンポの属性）
     fx:state.fx, // 撮影処理チェーン（スキーマ共通・変換なしで持ち回る）
     markers:state.markers.map(m=>({frame:m.frame,label:m.label||'',n:m.n})), // n=出した順の番号（数字キー用）
     tracks:state.tracks.map(t=>{
@@ -3885,8 +4077,11 @@ function exportAeJsx(){
            ax:at(0,'ax'), ay:at(0,'ay'), s:at(0,'s'), rot:at(0,'rot'), op:at(0,'op') },
     };
   });
+  // SPEC_11 P7-2: AE JSX は**常にのりしろ込み**（AEでタイムコードを載せる前提なので切ったら意味がない）。
+  // W/H をのりしろサイズにしてあるので、AE側でこのサイズのコンポを作れば sx=1＝レイヤーはコンポ基準の等倍で載る。
+  const bw=Math.round(state.width*BLEED_K), bh=Math.round(state.height*BLEED_K);
   const data={
-    fps, W:state.width, H:state.height, focal:PERSP_FOCAL,
+    fps, W:bw, H:bh, focal:PERSP_FOCAL,
     cam: camT ? {
       pos: bake(['x','y','z'],tr=>[tr.x,tr.y,tr.z]),
       rot: bake(['rot'],tr=>tr.rot),
@@ -3896,7 +4091,9 @@ function exportAeJsx(){
   };
   const jsx=[
 '// COMPOSER export — After Effects用スクリプト',
-'// 使い方: 同サイズ（または任意サイズ）のコンポを開いた状態で File > Scripts > Run Script File...',
+'// 使い方: コンポを開いた状態で File > Scripts > Run Script File...',
+'// 推奨コンポサイズ: '+bw+'×'+bh+'（のりしろ×1.2込み。本番枠は内側の '+state.width+'×'+state.height+'）',
+'//   → このサイズなら等倍で載ります。別サイズのコンポでも横幅に合わせて自動スケールします。',
 '// 生成物: COMPOSER_CAM_NULL（親ヌル・Position/Z回転キー）+ COMPOSER_CAM（一節点カメラ・Zoomキー）',
 '//         + 各トラックの平面/ヌルレイヤー（Position/Anchor/Scale/Rotation/Opacity のキー付き）',
 '// 注: 絵そのものは運びません。平面のソースを差し替えて使ってください。',
@@ -3987,34 +4184,66 @@ $('#export-cancel').addEventListener('click',()=>{gExportCancel=true;});
 // PNG連番→ZIP書き出しの共通処理。drawAt(ctx2d, i) で1コマ描画（i=0..total-1 の相対番号）
 // SPEC_11 P3: numStart=ファイル名に使う絶対フレーム番号の起点（WA開始）。AEに読み込んだとき
 // タイムライン上のコマ番号と一致させるため、連番はWAの絶対番号で振る（WA未設定なら従来と同一）
+// SPEC_11 P7-4: 尺の上限を決めていたのは「全コマを base64 文字列で JSZip にメモリ上へ溜め込む」こと。
+// 出力先が FOLDER なら showDirectoryPicker でフォルダへ1枚ずつ書き、溜め込みをゼロにする（実質上限なし）。
+// ZIP経路も toDataURL → toBlob にして base64 の +33% を解消した。未対応/キャンセルは ZIP へ自動フォールバック。
+// ※ showDirectoryPicker はユーザー操作の直後にしか開けない。クリック → この関数までは
+//    await を挟まない同期チェーンにしてあるので、途中に await を足さないこと。
+async function pickExportDir(){
+  if(gPngDest!=='folder'||!window.showDirectoryPicker) return null;
+  try{
+    return await window.showDirectoryPicker({id:'composer-png',mode:'readwrite',startIn:'downloads'});
+  }catch(err){
+    if(err&&err.name==='AbortError') return 'abort'; // ユーザーが選択をやめた＝書き出し自体を中止
+    flashLive('フォルダ書き出しが使えないため ZIP に切替えます');
+    return null;
+  }
+}
 async function exportZipPNG(total, zipName, drawAt, numStart){
   pause();
+  const dir=await pickExportDir();
+  if(dir==='abort') return;
   gExportCancel=false;
-  $('#export-msg').textContent='EXPORTING PNG SEQUENCE';
+  $('#export-msg').textContent=dir?'EXPORTING PNG SEQUENCE → FOLDER':'EXPORTING PNG SEQUENCE';
   const ov=$('#export-overlay'); ov.classList.add('show');
   const bar=$('#export-bar'), prog=$('#export-prog');
-  const oc=document.createElement('canvas'); oc.width=OUT_W; oc.height=OUT_H;
+  const oc=document.createElement('canvas'); oc.width=gOutW; oc.height=gOutH;
   const oc2d=oc.getContext('2d'); oc2d.imageSmoothingEnabled=false;
-  const zip=new JSZip(), folder=zip.folder('frames');
-  let canceled=false;
-  for(let i=0;i<total;i++){
-    if(gExportCancel){canceled=true;break;}
-    drawAt(oc2d,i);
-    folder.file(`frame_${String((numStart||0)+i+1).padStart(5,'0')}.png`,oc.toDataURL('image/png').split(',')[1],{base64:true});
-    const pct=((i+1)/total*100).toFixed(1);
-    bar.style.width=pct+'%'; prog.textContent=`${i+1} / ${total} — ${pct}%`;
-    if(i%4===3) await new Promise(r=>setTimeout(r,0));
-  }
-  if(!canceled){
-    prog.textContent='ZIPPING...';
-    const blob=await zip.generateAsync({type:'blob'});
-    if(!gExportCancel){
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a'); a.href=url; a.download=zipName; a.click();
-      URL.revokeObjectURL(url);
+  const zip=dir?null:new JSZip(), folder=zip?zip.folder('frames'):null;
+  const base=zipName.replace(/\.zip$/,'');
+  let canceled=false, err=null;
+  try{
+    for(let i=0;i<total;i++){
+      if(gExportCancel){canceled=true;break;}
+      drawAt(oc2d,i);
+      const name=`frame_${String((numStart||0)+i+1).padStart(5,'0')}.png`;
+      const blob=await new Promise(res=>oc.toBlob(res,'image/png'));
+      if(!blob){ err=new Error('toBlob failed'); break; }
+      if(dir){
+        const fh=await dir.getFileHandle(name,{create:true});
+        const w=await fh.createWritable();
+        await w.write(blob); await w.close();
+      } else {
+        folder.file(name,blob);
+      }
+      const pct=((i+1)/total*100).toFixed(1);
+      bar.style.width=pct+'%'; prog.textContent=`${i+1} / ${total} — ${pct}%`;
+      if(i%4===3) await new Promise(r=>setTimeout(r,0));
     }
-  }
+    if(!canceled&&!err&&!dir){
+      prog.textContent='ZIPPING...';
+      const blob=await zip.generateAsync({type:'blob'});
+      if(!gExportCancel){
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a'); a.href=url; a.download=zipName; a.click();
+        URL.revokeObjectURL(url);
+      }
+    }
+  }catch(e){ err=e; }
   ov.classList.remove('show'); bar.style.width='0%';
+  if(err){ flashLive('書き出しに失敗しました: '+(err.message||err)); return; }
+  if(canceled) return;
+  flashLive(dir?`🖼 ${total}枚をフォルダへ書き出しました（${gOutW}×${gOutH}）`:`🖼 ${base}.zip — ${total}枚（${gOutW}×${gOutH}）`);
 }
 // ── 動画書き出し（MediaRecorder + captureStream・実時間レンダリング）──
 function pickVideoMime(){
@@ -4036,12 +4265,13 @@ async function exportVideoComposer(){
   $('#export-msg').textContent='EXPORTING VIDEO ('+ext.toUpperCase()+')';
   const ov=$('#export-overlay'); ov.classList.add('show');
   const bar=$('#export-bar'), prog=$('#export-prog');
-  const oc=document.createElement('canvas'); oc.width=OUT_W; oc.height=OUT_H;
+  beginRender(outBleedOn()); // SPEC_11 P7-1/P7-2
+  const oc=document.createElement('canvas'); oc.width=gOutW; oc.height=gOutH;
   const c2d=oc.getContext('2d'); c2d.imageSmoothingEnabled=false;
   const stream=oc.captureStream(state.fps);
   let rec;
   try{ rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:16000000}); }
-  catch(e){ ov.classList.remove('show'); alert('MediaRecorderの初期化に失敗: '+e.message); return; }
+  catch(e){ endRender(); ov.classList.remove('show'); alert('MediaRecorderの初期化に失敗: '+e.message); return; }
   const chunks=[];
   rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
   const recStopped=new Promise(res=>{rec.onstop=res;});
@@ -4064,6 +4294,7 @@ async function exportVideoComposer(){
   });
   rec.stop();
   await recStopped;
+  endRender();
   ov.classList.remove('show'); bar.style.width='0%';
   if(canceled||chunks.length===0) return;
   const blob=new Blob(chunks,{type:mime.split(';')[0]});
@@ -4078,8 +4309,9 @@ async function exportPNG(){
   const {start,len}=webRange();
   if(len<=0){ flashLive('ワークエリアが空です'); return; }
   gFxTier='final'; // SPEC_06 §6: PNG連番=final（MB蓄積＋DOF layer）。VIDEOはrtのまま
-  try{ await exportZipPNG(len,'composer_4k.zip',(ctx,i)=>fxRenderFinal(ctx,start+i),start); }
-  finally{ gFxTier='draft'; }
+  beginRender(outBleedOn()); // SPEC_11 P7-1/P7-2
+  try{ await exportZipPNG(len,`composer_${gOutW}x${gOutH}.zip`,(ctx,i)=>fxRenderFinal(ctx,start+i),start); }
+  finally{ gFxTier='draft'; endRender(); }
 }
 
 // ── SATSUEI FX（撮影処理・SPEC_06 P0）──
@@ -4089,9 +4321,12 @@ let gFxTier='draft', gFxAcc=null, gFxAcc2d=null; // tier: draft(プレビュー)
 let gFxFinalPrev=false, gFxPrevAcc=null, gFxPrevAcc2d=null; // FINAL PREVIEW: 停止中のみMB+DOFをコンポ解像度で確認
 function ensureFx(){ if(!gFx) gFx=SatsueiFX.createSatsueiFX(); return gFx; }
 function ensureFxExp(){
-  if(gFxExp) return;
-  gFxExp=document.createElement('canvas'); gFxExp.width=OUT_W; gFxExp.height=OUT_H;
+  // SPEC_11 P7-1: 出力サイズは可変になったので、キャッシュ済みでもサイズが違えば作り直す
+  if(gFxExp&&gFxExp.width===gOutW&&gFxExp.height===gOutH) return;
+  if(!gFxExp) gFxExp=document.createElement('canvas');
+  gFxExp.width=gOutW; gFxExp.height=gOutH;
   gFxExp2d=gFxExp.getContext('2d'); gFxExp2d.imageSmoothingEnabled=false;
+  if(gFxAcc){ gFxAcc.width=gOutW; gFxAcc.height=gOutH; gFxAcc2d=gFxAcc.getContext('2d'); gFxAcc2d.imageSmoothingEnabled=false; }
 }
 // 保存JSONの fx を既定チェーンにマージ（欠損補完・未知tは持ち回り＝apply側がスキップ）
 function normalizeFx(saved){
@@ -4109,19 +4344,20 @@ function normalizeFx(saved){
 }
 // 書き出し1コマ描画（tier=rt: カメラ速度→方向ブラー近似）。FX無効なら従来経路のまま
 function fxRenderExport(dst2d,i){
-  if(!(state.fx&&state.fx.enabled&&ensureFx().available)){ drawFrame(dst2d,OUT_W,OUT_H,i); return; }
+  if(!(state.fx&&state.fx.enabled&&ensureFx().available)){ drawFrame(dst2d,gOutW,gOutH,i); return; }
   ensureFxExp();
-  drawFrame(gFxExp2d,OUT_W,OUT_H,i);
+  drawFrame(gFxExp2d,gOutW,gOutH,i);
   const c0=getCamAt(Math.max(0,i-1)), c1=getCamAt(i);
+  const bw=(state.width||1)*(gRenderBleed?BLEED_K:1), bh=(state.height||1)*(gRenderBleed?BLEED_K:1);
   const out=gFx.apply(gFxExp,state.fx,{ t:i/state.fps,
-    velX:(c1&&c0)?(c1.x-c0.x)/state.width:0,   // コンポpx → uv/フレーム
-    velY:(c1&&c0)?(c1.y-c0.y)/state.height:0 });
-  dst2d.drawImage(out,0,0,OUT_W,OUT_H);
+    velX:(c1&&c0)?(c1.x-c0.x)/bw:0,   // コンポpx → uv/フレーム（P7-2: のりしろ込みの画面幅で正規化）
+    velY:(c1&&c0)?(c1.y-c0.y)/bh:0 });
+  dst2d.drawImage(out,0,0,gOutW,gOutH);
 }
 // tier=final（EXPORT PNG連番・SPEC_06 §6.2）: MB=シャッター角準拠のサブフレーム蓄積 →
 // frame型fx（velを渡さない＝rt近似mbは不発）。DOFは drawOneTrack 側のlayerフック（gFxTier経由）
 function fxRenderFinal(dst2d,i){
-  if(!(state.fx&&state.fx.enabled&&ensureFx().available)){ drawFrame(dst2d,OUT_W,OUT_H,i); return; }
+  if(!(state.fx&&state.fx.enabled&&ensureFx().available)){ drawFrame(dst2d,gOutW,gOutH,i); return; }
   ensureFxExp();
   const mb=state.fx.chain.find(e=>e.t==='mb'&&e.on);
   const win=mb?(mb.p.shutter==null?180:mb.p.shutter)/360:0;   // シャッター角→フレーム窓
@@ -4129,22 +4365,22 @@ function fxRenderFinal(dst2d,i){
   if(mb&&win>0){
     const N=Math.max(2,Math.round(mb.p.samples)||8);
     if(!gFxAcc){
-      gFxAcc=document.createElement('canvas'); gFxAcc.width=OUT_W; gFxAcc.height=OUT_H;
+      gFxAcc=document.createElement('canvas'); gFxAcc.width=gOutW; gFxAcc.height=gOutH;
       gFxAcc2d=gFxAcc.getContext('2d'); gFxAcc2d.imageSmoothingEnabled=false;
     }
     for(let k=0;k<N;k++){
       const sub=i-win/2+win*(k+0.5)/N;              // iを中心に前後へ開く
-      drawFrame(gFxExp2d,OUT_W,OUT_H,Math.max(0,sub));
+      drawFrame(gFxExp2d,gOutW,gOutH,Math.max(0,sub));
       gFxAcc2d.globalAlpha=1/(k+1);                 // 逐次平均（k=0は全面上書き）
       gFxAcc2d.drawImage(gFxExp,0,0);
     }
     gFxAcc2d.globalAlpha=1;
     src=gFxAcc;
   } else {
-    drawFrame(gFxExp2d,OUT_W,OUT_H,i);
+    drawFrame(gFxExp2d,gOutW,gOutH,i);
   }
   const out=gFx.apply(src,state.fx,{t:i/state.fps});
-  dst2d.drawImage(out,0,0,OUT_W,OUT_H);
+  dst2d.drawImage(out,0,0,gOutW,gOutH);
 }
 // FXモーダル: FX_DEFS の ui/colors 配列から自動生成（エフェクト追加でUI改修ゼロ）
 function buildSfxUI(){
@@ -4318,6 +4554,7 @@ async function exportWeb(){
   const camT=getCameraTrack();
   const data={
     width:state.width, height:state.height, bgBright:state.bgBright, fps:state.fps,
+    bleed:outBleedOn()?BLEED_K:1, // SPEC_11 P7-2: ビューアのキャンバスだけ広げる（レイヤーはコンポ基準）
     totalFrames:len,
     markers:state.markers.filter(m=>m.frame>=start&&m.frame<start+len).map(m=>({f:m.frame-start,label:m.label||''})),
     camera:(camT&&camT.visible)?{parent:camT.parent||null,tOffset:camT.tOffset||0,keyframes:ALL_PROPS.reduce((o,p)=>({...o,[p]:camT.keyframes[p].map(k=>({f:k.f,v:k.v,ez:k.ez||0,...(k.ei!=null?{ei:k.ei}:{}),...(k.eo!=null?{eo:k.eo}:{}),...(k.hold?{hold:true}:{})}))}),{})}:null,
@@ -4462,7 +4699,8 @@ function drawOneTrack(tCtx,tw,th,lf,track,cam){
   if(idx<0)return;
   var img=track.imgEls[idx];
   if(!img||!img.complete)return;
-  var sx=tw/DATA.width,sy=th/DATA.height;
+  // SPEC_11 P7-1: 縦横同一スケール（アスペクト保持）/ P7-2: のりしろ分は拡大しない
+  var sx=tw/(DATA.width*(DATA.bleed||1)),sy=sx;
   var trW=track.width||DATA.width,trH=track.height||DATA.height;
   var drawW=trW*sx,drawH=trH*sy;
   tCtx.save();
@@ -4474,11 +4712,31 @@ function drawOneTrack(tCtx,tw,th,lf,track,cam){
   // ctx.filter未対応ブラウザでは代入が無視され素通し（グレースフルデグラデーション）
   if(FXDOF&&!track.parent){
     var dr=window.SatsueiFX.dofBlurPx(tr.z||0,FXDOF.p);
-    if(dr>0.3)tCtx.filter='blur('+(dr*(tw/DATA.width)).toFixed(1)+'px)';
+    if(dr>0.3)tCtx.filter='blur('+(dr*sx).toFixed(1)+'px)';
   }
   tCtx.drawImage(img,-drawW/2-tr.ax*sx,-drawH/2-tr.ay*sy,drawW,drawH);
   tCtx.filter='none';
   tCtx.restore();
+}
+// SPEC_11 P7-3: Zソート（本体 perspAt/depthAt/tracksInDrawOrder と同一ロジック）
+function perspAt(track,af,cam,depth){
+  var tr=getTransform(af-(track.tOffset||0),track.keyframes);
+  var p=(depth<8&&track.parent)?findTrack(track.parent):null;
+  if(p){
+    var cd=PERSP_FOCAL+(tr.z||0);
+    return perspAt(p,af,cam,depth+1)*(cd<1?1:PERSP_FOCAL/cd);
+  }
+  var dp=PERSP_FOCAL+(tr.z||0)-(cam?(cam.z||0):0);
+  return dp<1?1e-6:PERSP_FOCAL/dp;
+}
+function depthAt(track,af,cam){
+  var pr=perspAt(track,af,cam,0);
+  return pr>1e-9?PERSP_FOCAL/pr-PERSP_FOCAL:1e9;
+}
+var HAS_Z=(function(){for(var i=0;i<DATA.tracks.length;i++)if(DATA.tracks[i].keyframes.z.length)return true;return false;})();
+function tracksInDrawOrder(af,cam){
+  if(!HAS_Z)return DATA.tracks;
+  return DATA.tracks.slice().sort(function(a,b){return depthAt(b,af,cam)-depthAt(a,af,cam);});
 }
 function drawFrame(tCtx,tw,th,lf,cam){
   var bg=Math.round(255*(DATA.bgBright/100));
@@ -4486,12 +4744,15 @@ function drawFrame(tCtx,tw,th,lf,cam){
   tCtx.fillRect(0,0,tw,th);
   tCtx.save();
   applyCamWrap(tCtx,tw,th,cam);
-  for(var i=0;i<DATA.tracks.length;i++)drawOneTrack(tCtx,tw,th,lf,DATA.tracks[i],cam);
+  var order=tracksInDrawOrder(lf+START,cam);
+  for(var i=0;i<order.length;i++)drawOneTrack(tCtx,tw,th,lf,order[i],cam);
   tCtx.restore();
 }
 // ── ビューア本体 ──
+// SPEC_11 P7-2: のりしろ込みで書き出された場合、キャンバスだけ1.2倍（レイヤーはコンポ基準のまま）
+var VW=Math.round(DATA.width*(DATA.bleed||1)),VH=Math.round(DATA.height*(DATA.bleed||1));
 var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
-cv.width=DATA.width;cv.height=DATA.height;
+cv.width=VW;cv.height=VH;
 ctx.imageSmoothingEnabled=false;
 // ── SATSUEI FX（rt・SPEC_06 P2b）── ?fx=0 で強制OFF / WebGL不可・コア未注入なら素通し
 var FXQ=null;try{FXQ=new URLSearchParams(location.search);}catch(e){}
@@ -4508,15 +4769,15 @@ if(FXP&&FXP.enabled&&window.SatsueiFX){
 }
 var fsc=null,fscx=null,pcamx=0,pcamy=0;
 if(FXOK){
-  fsc=document.createElement('canvas');fsc.width=DATA.width;fsc.height=DATA.height;
+  fsc=document.createElement('canvas');fsc.width=VW;fsc.height=VH;
   fscx=fsc.getContext('2d');fscx.imageSmoothingEnabled=false;
 }
 var spacer=document.getElementById('spacer');
 function layout(){
   spacer.style.height=(TOTAL*CFG.pxPerFrame+window.innerHeight)+'px';
-  var sc=Math.min(window.innerWidth/DATA.width,window.innerHeight/DATA.height);
-  cv.style.width=(DATA.width*sc)+'px';
-  cv.style.height=(DATA.height*sc)+'px';
+  var sc=Math.min(window.innerWidth/VW,window.innerHeight/VH);
+  cv.style.width=(VW*sc)+'px';
+  cv.style.height=(VH*sc)+'px';
 }
 window.addEventListener('resize',layout);
 layout();
@@ -4541,14 +4802,14 @@ function camAt(af){
 function render(lf){
   var cam=camAt(lf+START);
   if(FXOK){ // シーン→オフスクリーン→fx→可視。velはカメラ速度（コンポpx→uv、±0.05クランプ）
-    drawFrame(fscx,DATA.width,DATA.height,lf,cam);
-    var vx=Math.max(-0.05,Math.min(0.05,(cam.x-pcamx)/DATA.width));
-    var vy=Math.max(-0.05,Math.min(0.05,(cam.y-pcamy)/DATA.height));
+    drawFrame(fscx,VW,VH,lf,cam);
+    var vx=Math.max(-0.05,Math.min(0.05,(cam.x-pcamx)/VW));
+    var vy=Math.max(-0.05,Math.min(0.05,(cam.y-pcamy)/VH));
     var out=gfx.apply(fsc,FXP,{t:performance.now()/1000,velX:vx,velY:vy});
-    ctx.clearRect(0,0,DATA.width,DATA.height);
-    ctx.drawImage(out,0,0,DATA.width,DATA.height);
+    ctx.clearRect(0,0,VW,VH);
+    ctx.drawImage(out,0,0,VW,VH);
   } else {
-    drawFrame(ctx,DATA.width,DATA.height,lf,cam); // 従来経路（enabled:falseはapply未呼び出し）
+    drawFrame(ctx,VW,VH,lf,cam); // 従来経路（enabled:falseはapply未呼び出し）
   }
   pcamx=cam.x;pcamy=cam.y;
 }
@@ -4681,7 +4942,7 @@ function renderAudioWaveform(){
   c.strokeStyle=`rgba(255,210,122,${alpha})`; c.lineWidth=1;
   c.beginPath();
   for(let x=0;x<cw;x++){
-    const frame=(x/cw)*total;
+    const frame=pxToFrame(x,cw); // SPEC_11 P7-5: 波形も表示範囲に追従
     const audioF=frame-off;
     if(audioF<0||audioF>=audioTotalFrames) continue;
     const peakIdx=Math.floor((audioF/audioTotalFrames)*peaks.length);
@@ -4737,7 +4998,7 @@ function removeAudio(){
   strip.addEventListener('pointermove',e=>{
     if(!audio._dragActive||!state.totalFrames) return;
     const rect=strip.getBoundingClientRect();
-    const framesPerPx=state.totalFrames/rect.width;
+    const framesPerPx=tlSpan()/rect.width; // SPEC_11 P7-5
     audio.offsetFrames=Math.round(audio._dragStartOffset+(e.clientX-audio._dragStartX)*framesPerPx);
     renderAudioWaveform();
   });
@@ -5222,6 +5483,8 @@ const SHORTCUT_ACTIONS=[
 
   {cat:'表示',          id:'fit',      label:'FIT / 2回で100%',      def:'F',         run:()=>fitAction()},
   {cat:'表示',          id:'graph',    label:'ミニグラフ',           def:'G',         run:()=>toggleGraph()},
+  // SPEC_11 P7-5: AE と同じ `;`＝タイムラインをワークエリアにズーム／全体へ戻す
+  {cat:'表示',          id:'tlZoomWa', label:'タイムラインをWAにズーム/全体', def:';', prevent:true, run:()=>toggleTlZoomWa()},
   {cat:'表示',          id:'sfx',      label:'撮影FX（Shift=FX PREVIEW）', def:'X',   run:e=>{ if(e&&e.shiftKey) toggleFxPreview(); else toggleSfxModal(); }},
   {cat:'表示',          id:'inspSwap', label:'INSPECTOR / SETTINGS 左右入替', def:'Tab', prevent:true, run:()=>toggleInspectorSide()},
   {cat:'表示',          id:'settings', label:'設定パネル',           def:',',         run:()=>toggleSettingsPanel()},
@@ -5476,11 +5739,35 @@ let scrubbing=false;
 function rulerScrub(e){
   const rect=$('#tl-ruler').getBoundingClientRect();
   const x=e.clientX-rect.left-LABEL_W, aw=rect.width-LABEL_W;
-  let f=Math.floor(Math.max(0,Math.min(1,x/aw))*state.totalFrames);
-  if(e.shiftKey&&state.totalFrames) f=snapFrame(Math.min(f,state.totalFrames-1),aw/state.totalFrames);
+  // SPEC_11 P7-5: 表示範囲(tlView)基準の逆変換
+  let f=Math.floor(Math.max(0,Math.min(state.totalFrames,pxToFrame(Math.max(0,Math.min(aw,x)),aw))));
+  if(e.shiftKey&&state.totalFrames) f=snapFrame(Math.min(f,state.totalFrames-1),aw/tlSpan());
   pause(); seek(f);
 }
 $('#tl-ruler').addEventListener('pointerdown',e=>{scrubbing=true;rulerScrub(e);});
+// SPEC_11 P7-5 Step3: Alt+ホイール＝カーソル基点でズーム / Shift・横ホイール＝横スクロール
+// 素のホイールは #tl-tracks の縦スクロールに残す（preventDefaultしない）
+$('#btn-tl-zoom').addEventListener('click',toggleTlZoomWa);
+function tlWheel(e){
+  if(!state.totalFrames) return;
+  const rect=$('#tl-ruler').getBoundingClientRect();
+  const aw=Math.max(1,rect.width-LABEL_W);
+  if(e.altKey){
+    e.preventDefault();
+    const x=Math.max(0,Math.min(aw,e.clientX-rect.left-LABEL_W));
+    tlZoomAt(e.deltaY>0?1.25:0.8, pxToFrame(x,aw));
+    return;
+  }
+  if(!tlZoomed()) return;
+  const dx=(Math.abs(e.deltaX)>Math.abs(e.deltaY))?e.deltaX:(e.shiftKey?e.deltaY:0);
+  if(!dx) return;
+  e.preventDefault();
+  const ppf=aw/tlSpan();
+  const d=Math.round(dx/ppf) || (dx>0?1:-1); // ppfが大きいときも最低1コマは動く
+  setTlView(tlStart()+d,tlSpan());
+}
+$('#tl-ruler').addEventListener('wheel',tlWheel,{passive:false});
+$('#tl-tracks').addEventListener('wheel',tlWheel,{passive:false});
 // 2026-07-27: インジケータの頭をダブルクリック → ワークエリアを「全体」⇔「直前の範囲」でトグル。
 // 掴んでのスクラブも従来どおりできるよう pointerdown はルーラーと同じ処理へ流す
 let gWaPrev=null;
@@ -5510,7 +5797,7 @@ window.addEventListener('pointercancel',()=>{scrubbing=false;});
   function waMove(e){
     if(!waDrag||!state.workArea) return;
     const rect=$('#tl-ruler').getBoundingClientRect();
-    const f=Math.round(Math.max(0,Math.min(state.totalFrames,(e.clientX-rect.left-LABEL_W)/(rect.width-LABEL_W)*state.totalFrames)));
+    const f=Math.round(Math.max(0,Math.min(state.totalFrames,pxToFrame(e.clientX-rect.left-LABEL_W,rect.width-LABEL_W))));
     if(waDrag==='in') setWaStart(f); else setWaEnd(f);
   }
   ['in','out'].forEach(side=>{
@@ -5581,7 +5868,7 @@ window.addEventListener('pointercancel',()=>{scrubbing=false;});
         const st=document.querySelector(`.tl-track-strip[data-track="${downTrack}"]`);
         if(st&&state.totalFrames){
           const r=st.getBoundingClientRect();
-          const f=Math.floor(Math.max(0,Math.min(1,(sx-r.left)/r.width))*state.totalFrames);
+          const f=Math.floor(Math.max(0,pxToFrame(Math.max(0,Math.min(r.width,sx-r.left)),r.width))); // SPEC_11 P7-5
           pause(); seek(Math.min(f,state.totalFrames-1));
         }
       }
@@ -5784,6 +6071,67 @@ document.querySelectorAll('#settings-panel .sg-preset[data-gw]').forEach(b=>{
     state.guides.resOn=true; applyGuideUI(); renderGuides();
   });
 });
+// SPEC_11 P7-2: 本番枠＝コンポの内側 1/1.2（のりしろ運用の目安。表示のみで書き出しには影響しない）
+$('#guide-res-honban').addEventListener('click',()=>{
+  if(!state.width){ flashLive('コンポがありません'); return; }
+  state.guides.resW=Math.round(state.width/BLEED_K); state.guides.resH=Math.round(state.height/BLEED_K);
+  state.guides.resOn=true; applyGuideUI(); renderGuides();
+  flashLive('本番枠 '+state.guides.resW+'×'+state.guides.resH);
+});
+
+// ── OUTPUT セクション（SPEC_11 P7-1/P7-2/P7-4/P7-6）──
+// PNGの出力先だけは「その端末で使えるか」の話なので localStorage（プロジェクトには保存しない）
+const LS_PNG_DEST='composer_png_dest_v1';
+let gPngDest=(function(){
+  const v=localStorage.getItem(LS_PNG_DEST);
+  if(v==='zip'||v==='folder') return v;
+  return window.showDirectoryPicker?'folder':'zip';
+})();
+function updateOutputUI(){
+  const mode=$('#out-mode'); if(!mode) return;
+  const o=state.out||(state.out={mode:'long3840',long:3840,bleed:false});
+  if(document.activeElement!==mode) mode.value=o.mode;
+  const longRow=$('#out-long-row');
+  longRow.style.display=(o.mode==='custom')?'flex':'none';
+  const longIn=$('#out-long');
+  if(document.activeElement!==longIn) longIn.value=o.long;
+  const b=$('#out-bleed');
+  b.textContent='のりしろ ×1.2 : '+(o.bleed?'ON（余白付き）':'OFF（本番のみ）');
+  b.classList.toggle('on',!!o.bleed);
+  const dest=$('#out-dest');
+  if(!window.showDirectoryPicker){
+    dest.value='zip'; dest.disabled=true;
+    dest.title='このブラウザは showDirectoryPicker 未対応のため ZIP のみ';
+  } else if(document.activeElement!==dest){ dest.value=gPngDest; }
+  const sz=outSize(outBleedOn());
+  $('#out-sum').textContent=state.width?`${sz.w}×${sz.h}`:'—';
+}
+function setOut(patch){
+  state.out=Object.assign({},state.out,patch);
+  updateInspector(); // → updateOutputUI（表示更新）＋ SEQ PNG のツールチップ再生成
+  recordHistory();
+}
+$('#out-head').addEventListener('click',()=>{
+  const body=$('#out-body'), open=body.style.display==='none';
+  body.style.display=open?'block':'none';
+  $('#out-head-t').textContent=(open?'▾':'▸')+' OUTPUT';
+  if(open) updateOutputUI();
+});
+$('#out-mode').addEventListener('change',e=>setOut({mode:e.target.value}));
+$('#out-long').addEventListener('change',e=>{
+  let v=parseInt(e.target.value,10); if(isNaN(v)) v=state.out.long;
+  setOut({long:Math.max(16,Math.min(16384,v))});
+});
+$('#out-bleed').addEventListener('click',()=>{
+  setOut({bleed:!outBleedOn()});
+  flashLive(outBleedOn()?'のりしろ ×1.2 ON — 書き出しキャンバスだけ広がります':'のりしろ OFF（本番のみ）');
+});
+$('#out-dest').addEventListener('change',e=>{
+  gPngDest=e.target.value==='folder'?'folder':'zip';
+  localStorage.setItem(LS_PNG_DEST,gPngDest);
+  updateOutputUI();
+});
+updateOutputUI(); // プロジェクト読み込み前でもセレクタの初期値（PNG出力先）を合わせておく
 // 設定パネルのドラッグ移動（INSPECTORと同じ makeFloatDrag ＝ 掴んだ時点でドック解除される）
 makeFloatDrag($('#settings-panel'), $('#settings-panel-head'), t=>!!(t&&t.closest&&t.closest('.set-head-btns')));
 $('#settings-panel-dock').addEventListener('click',e=>{ e.stopPropagation(); dockSettings(); });
