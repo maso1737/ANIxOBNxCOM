@@ -29,6 +29,7 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
 #topbar button.primary{border-color:var(--acid);color:var(--acid);}
 #topbar button.primary:hover{background:rgba(255,79,168,0.1);}
 #topbar button:disabled{opacity:0.3;cursor:default;}
+#draft-play-toggle{white-space:nowrap;} /* 「½ DRAFT」が2行に折り返して行高を押し上げないように */
 #live-toast{position:fixed;top:46px;right:16px;z-index:300;background:rgba(16,7,34,0.96);border:1px solid var(--acid);color:var(--acid);font-family:var(--mono);font-size:9px;letter-spacing:0.14em;padding:6px 12px;opacity:0;transform:translateY(-6px);transition:opacity 0.18s,transform 0.18s;pointer-events:none;}
 #live-toast.show{opacity:1;transform:translateY(0);}
 
@@ -106,6 +107,11 @@ input[type=number]{-moz-appearance:textfield;}
 .kf-btn{width:100%;background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.5);font-family:var(--mono);font-size:8px;letter-spacing:0.1em;padding:3px 6px;cursor:pointer;margin-top:3px;}
 .kf-btn:hover{border-color:var(--border-bright);color:var(--acid);}
 .kf-btn.on{border-color:var(--acid);color:var(--acid);background:rgba(255,79,168,0.10);}
+.tc-input.len{color:var(--neon);border-color:var(--neon);}
+.kf-btn:disabled{opacity:0.3;cursor:default;}
+.kf-btn:disabled:hover{border-color:var(--border);color:rgba(255,255,255,0.5);}
+.out-exp{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+.out-exp .kf-btn{text-align:left;padding-left:8px;}
 
 /* TIMELINE */
 #timeline{grid-column:1/-1;position:relative;background:var(--panel);border-top:1px solid var(--border);display:grid;grid-template-rows:24px 1fr;overflow:hidden;}
@@ -466,6 +472,20 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-track.tl-cam.selected .tl-track-name .num{text-shadow:0 0 8px rgba(90,233,255,0.7);}
 #kf-parent{flex:1;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--ice);font-family:var(--mono);font-size:9px;padding:2px 4px;outline:none;min-width:0;}
 #kf-parent option{background:#000;color:var(--ice);}
+/* ── パネル本文の文字は選択・コピーできる（ANIMATOR と同じ流儀。2026-08-02）──
+   body 全体の user-select:none を打ち消す。ヘッダ（ドラッグ用）は none のまま。 */
+#settings-panel-body,#inspector-body,#sfx-body{-webkit-user-select:text;user-select:text;cursor:text;}
+/* ボタン/スライダー、および「掴んで値をこするラベル」は従来どおり選択させない
+   （ドラッグのたびに文字が選ばれると誤操作になるため）。数値・テキスト入力は選択可のまま */
+#settings-panel-body button,#settings-panel-body input[type=range],
+#inspector-body button,#inspector-body input[type=range],#inspector-body .kf-row .k,
+#sfx-body button,#sfx-body input[type=range]{-webkit-user-select:none;user-select:none;}
+#settings-panel-body button,#sfx-body button{cursor:pointer;}
+#inspector-body button{cursor:pointer;}
+#inspector-body .kf-row .k{cursor:ew-resize;}
+/* 選択中は白抜き＝小さい文字でも読める */
+#settings-panel-body ::selection,#inspector-body ::selection,#sfx-body ::selection{background:var(--acid);color:#fff;}
+
 /* SPEC_11 P7-6: INSPECTOR 最下段の OUTPUT（コンポ全体設定）。罫線で TRANSFORM と分離・既定は折りたたみ */
 #insp-output{margin-top:12px;padding-top:10px;border-top:1px solid var(--border-bright);}
 #out-head{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;}
@@ -497,6 +517,8 @@ input[type=number]{-moz-appearance:textfield;}
   <div id="topbar">
     <div class="g">
       <span class="title">COMPOSER</span>
+      <!-- 再生の重さ対策は「今ONかどうか」が一目で分かる方が良いので、設定パネルではなくここに置く -->
+      <button id="draft-play-toggle" title="1/2解像度ドラフト再生 — 再生中だけ半分の解像度で描いて軽くします（停止すると自動でフル解像度に戻ります）。重いコンポで再生がカクつくときに">½ DRAFT</button>
       <span style="color:var(--dim)">/</span>
       <span class="meta">v0.7 — MOTION COMIC</span>
     </div>
@@ -517,9 +539,6 @@ input[type=number]{-moz-appearance:textfield;}
       <span style="color:var(--dim)">/</span>
       <!-- 書き出し系 -->
       <button id="btn-export-project" disabled title="プロジェクト全体をJSONで書き出し（トラック・KF・カメラ込み）">EXPORT PROJECT</button>
-      <button id="btn-export" disabled title="連番PNGでZIP書き出し（AE合成用）&#10;OUTPUT: 3840×2160 / NEAREST（ドット等倍・ぼかさない）&#10;範囲: ワークエリア準拠・ファイル名は絶対フレーム番号&#10;誤爆防止: Shift+クリック">SEQ PNG</button>
-      <button id="btn-export-video" disabled title="全体をmp4で書き出し（実時間）">EXPORT VIDEO</button>
-      <button id="btn-export-web" disabled title="スクロール駆動のモーションコミックHTMLを書き出し（単一ファイル・依存ゼロ）">EXPORT WEB</button>
       <button id="btn-export-jsx" disabled title="カメラKF（親NULL合成込み）＋各トラック（平面/ヌル・Position/Anchor/Scale/Rotation/Opacityのキー付き）をAfter Effects用.jsxとして書き出し。絵そのものは運ばないので平面のソースを差し替えて使います。AEでコンポを開いた状態で File > Scripts > Run Script File">AE JSX</button>
       <span style="color:var(--dim)">/</span>
       <button id="btn-live" class="primary" title="ANIMATORの編集をライブ反映中（クリックでOFF）">LIVE ●</button>
@@ -573,8 +592,8 @@ input[type=number]{-moz-appearance:textfield;}
     </div>
     <!-- SPEC_11 P7-6: INSPECTOR = トラック編集 ＋ 最下段の OUTPUT（コンポ全体設定）。SETTINGSが一杯のためこちらへ -->
     <div class="insp-section" id="insp-output">
-      <div class="insp-h" id="out-head" title="書き出し解像度・のりしろ・PNGの出力先（クリックで開閉）"><span id="out-head-t">▸ OUTPUT</span><span id="out-sum">—</span></div>
-      <div id="out-body" style="display:none">
+      <div class="insp-h" id="out-head" title="書き出し設定と書き出しボタン（クリックで開閉）"><span id="out-head-t">▾ OUTPUT</span><span id="out-sum">—</span></div>
+      <div id="out-body">
         <div class="sc-hint">SEQ PNG / VIDEO / EXPORT WEB に適用。コンポのアスペクトは常に保たれます</div>
         <div class="kf-row" title="出力サイズ。長辺3840（既定）は16:9コンポで従来と同じ 3840×2160"><span class="k">SIZE</span><select id="out-mode">
           <option value="x1">×1（コンポ等倍）</option>
@@ -588,6 +607,13 @@ input[type=number]{-moz-appearance:textfield;}
           <option value="folder">FOLDER（推奨・溜め込まない）</option>
           <option value="zip">ZIP</option>
         </select></div>
+        <!-- 設定のすぐ下に書き出しボタンを並べる（解像度・のりしろを決めてそのまま出せる導線）。
+             EXPORT PROJECT / AE JSX は「絵ではないデータ」なのでトップバーに残す -->
+        <div class="out-exp">
+          <button class="kf-btn" id="btn-export" disabled>■ SEQ PNG</button>
+          <button class="kf-btn" id="btn-export-video" disabled title="コンポ全体をmp4/webmで書き出し（実時間レンダリング）。上の SIZE / のりしろ設定が効きます">■ EXPORT VIDEO</button>
+          <button class="kf-btn" id="btn-export-web" disabled title="スクロール駆動のモーションコミックHTMLを書き出し（単一ファイル・依存ゼロ）。上の SIZE / のりしろ設定が効きます">■ EXPORT WEB</button>
+        </div>
       </div>
     </div>
     </div><!-- /#inspector-body -->
@@ -722,13 +748,6 @@ input[type=number]{-moz-appearance:textfield;}
         <span class="sg-x" style="min-width:28px">DUR</span>
         <input type="number" id="set-dur" class="sg-num" min="0.04" step="0.1" title="コンポ全体の秒数（FPS換算でコマ数に反映）">
         <span class="sg-x">s</span>
-      </div>
-    </div>
-    <div class="set-sect">
-      <div class="set-sect-h">PLAYBACK</div>
-      <div class="sc-hint">重いコンポで再生がカクつくときに。停止すると自動でフル解像度に戻ります</div>
-      <div class="sg-row">
-        <button id="draft-play-toggle" class="sc-key sg-toggle" title="再生中だけ1/2解像度で描画して軽くする">1/2解像度ドラフト再生</button>
       </div>
     </div>
     <div class="set-sect" id="set-sect-autosave">
@@ -3845,8 +3864,7 @@ function updateInspector(){
     `OUTPUT: ${osz.w}×${osz.h} / SCALE ×${osz.s.toFixed(3)}${outBleedOn()?'（のりしろ×1.2込み）':''} / NEAREST（ドット等倍・ぼかさない）`,
     `SRC: ${state.width}×${state.height} / ${state.fps}fps`,
     '範囲: ワークエリア準拠・ファイル名は絶対フレーム番号',
-    '出力先/解像度/のりしろは INSPECTOR 下段の OUTPUT で変更',
-    '誤爆防止: Shift+クリック',
+    `出力先: ${gPngDest==='folder'?'フォルダへ1枚ずつ（未対応ならZIP）':'ZIP'}`,
   ].join('\n');
   updateCompLenUI();
   updateOutputUI(); // SPEC_11 P7-6: INSPECTOR 下段の OUTPUT セクション
@@ -3907,16 +3925,23 @@ function parseTimecodeToFrame(v){
   const n=parseFloat(v); if(!isFinite(n)) return null;
   return Math.round(n*fps); // コロン無し＝秒。その秒の先頭コマへ
 }
+// 2026-08-02: **Ctrl(⌘)+クリックはコンポ尺（COMP LENGTH）の変更**。
+// 設定パネルの FRAMES / DUR と同じ `setCompFrames()` を呼ぶ（素材より短くはできない＝自動で戻る）。
+// 素のクリックは従来どおりインジケータ移動なので、2つの意味が同じ場所に同居する。
 (function(){
-  const mk=(sel,cur,parse)=>{
+  const mk=(sel,cur,parse,curLen,applyLen)=>{
     const span=$(sel); if(!span) return;
     span.classList.add('tc-edit');
-    span.title='クリックで直接入力 → その位置へインジケータが飛びます（Enter確定 / Escキャンセル）';
-    span.addEventListener('click',()=>{
+    span.title='クリック = 直接入力してインジケータを移動'
+      +'\nCtrl(⌘)+クリック = コンポ尺（全体の長さ）を変更 — 設定パネルの COMP LENGTH と同じ'
+      +'\n（Enter確定 / Escキャンセル）';
+    span.addEventListener('click',e=>{
       if(!state.totalFrames||span.querySelector('input')) return;
+      const lenMode=e.ctrlKey||e.metaKey; // Ctrl+クリック＝尺の変更
       const old=span.textContent;
       const inp=document.createElement('input');
-      inp.type='text'; inp.className='tc-input'; inp.value=cur();
+      inp.type='text'; inp.className='tc-input'+(lenMode?' len':''); inp.value=lenMode?curLen():cur();
+      inp.title=lenMode?'コンポ尺':'インジケータ位置';
       span.textContent=''; span.appendChild(inp);
       inp.focus(); inp.select();
       let done=false;
@@ -3925,8 +3950,11 @@ function parseTimecodeToFrame(v){
         const v=inp.value.trim();
         span.textContent=old;
         if(commit&&v){
-          const f=parse(v);
-          if(f!=null&&isFinite(f)){ pause(); seek(Math.max(0,Math.min(state.totalFrames-1,Math.round(f)))); }
+          if(lenMode) applyLen(v);
+          else {
+            const f=parse(v);
+            if(f!=null&&isFinite(f)){ pause(); seek(Math.max(0,Math.min(state.totalFrames-1,Math.round(f)))); }
+          }
         }
         updateTransport();
       };
@@ -3938,8 +3966,12 @@ function parseTimecodeToFrame(v){
       });
     });
   };
-  mk('#tc-frame', ()=>String(state.currentFrame+1), v=>parseInt(v,10)-1);
-  mk('#tc-time',  ()=>frameToTimecode(state.currentFrame), parseTimecodeToFrame);
+  mk('#tc-frame', ()=>String(state.currentFrame+1), v=>parseInt(v,10)-1,
+     ()=>String(state.totalFrames),
+     v=>{ const n=parseInt(v,10); if(isFinite(n)&&n>0) setCompFrames(n); });
+  mk('#tc-time',  ()=>frameToTimecode(state.currentFrame), parseTimecodeToFrame,
+     ()=>(state.totalFrames/(state.fps||24)).toFixed(2),
+     v=>{ const sec=parseFloat(v); if(isFinite(sec)&&sec>0) setCompFrames(Math.round(sec*(state.fps||24))); });
 })();
 function updateExportButtons(){
   const has=state.tracks.length>0&&state.totalFrames>0;
@@ -5147,10 +5179,8 @@ $('#kf-parent').addEventListener('change',()=>{
   const sfx=(t.type!=='camera'&&!alt)?' (補正あり)':'';
   flashLive(p?('⛓ PARENT → '+(p.name||'TRACK')+sfx):'⛓ PARENT NONE'+sfx);
 });
-$('#btn-export').addEventListener('click',e=>{
-  if(!e.shiftKey){ flashLive('SEQ PNG書き出しは Shift+クリック'); return; }
-  exportPNG();
-});
+// 2026-08-02: INSPECTOR の OUTPUT へ移したので Shift+クリックの誤爆防止は不要になった
+$('#btn-export').addEventListener('click',()=>exportPNG());
 $('#btn-export-project').addEventListener('click',exportProject);
 $('#btn-home').addEventListener('click',()=>{location.href='index.html';});
 
@@ -5736,15 +5766,30 @@ bindPropInputs('fx-','fx-dot-');
 
 // Ruler scrub
 let scrubbing=false;
+// スクラブには2通りある（2026-08-02）:
+//  'abs' … ルーラーを直接クリック＝押した位置のコマへ飛ぶ（従来）
+//  'rel' … インジケータの頭（#tl-playhead-grab）を掴んだ＝**掴んだ時のコマからの相対移動**。
+//          掴み枠は線の左右に7pxずつ張り出しているので絶対座標で読むと押した瞬間に別コマへ落ち、
+//          **ダブルクリックしようとすると1コマ左へ飛んでいた**（発注者報告）。
+//          相対にすると「動かさなければ絶対に動かない」＝クリック/Wクリックと両立し、
+//          線の位置のサブピクセル誤差にも影響されない。
+let gScrubMode='abs', gScrubX0=0, gScrubF0=0;
 function rulerScrub(e){
   const rect=$('#tl-ruler').getBoundingClientRect();
-  const x=e.clientX-rect.left-LABEL_W, aw=rect.width-LABEL_W;
-  // SPEC_11 P7-5: 表示範囲(tlView)基準の逆変換
-  let f=Math.floor(Math.max(0,Math.min(state.totalFrames,pxToFrame(Math.max(0,Math.min(aw,x)),aw))));
+  const aw=rect.width-LABEL_W;
+  let f;
+  if(gScrubMode==='rel'){
+    f=gScrubF0+Math.round((e.clientX-gScrubX0)/(aw/tlSpan()));
+    f=Math.max(0,Math.min(state.totalFrames-1,f));
+  } else {
+    const x=e.clientX-rect.left-LABEL_W;
+    // SPEC_11 P7-5: 表示範囲(tlView)基準の逆変換
+    f=Math.floor(Math.max(0,Math.min(state.totalFrames,pxToFrame(Math.max(0,Math.min(aw,x)),aw))));
+  }
   if(e.shiftKey&&state.totalFrames) f=snapFrame(Math.min(f,state.totalFrames-1),aw/tlSpan());
   pause(); seek(f);
 }
-$('#tl-ruler').addEventListener('pointerdown',e=>{scrubbing=true;rulerScrub(e);});
+$('#tl-ruler').addEventListener('pointerdown',e=>{gScrubMode='abs';scrubbing=true;rulerScrub(e);});
 // SPEC_11 P7-5 Step3: Alt+ホイール＝カーソル基点でズーム / Shift・横ホイール＝横スクロール
 // 素のホイールは #tl-tracks の縦スクロールに残す（preventDefaultしない）
 $('#btn-tl-zoom').addEventListener('click',toggleTlZoomWa);
@@ -5773,7 +5818,13 @@ $('#tl-tracks').addEventListener('wheel',tlWheel,{passive:false});
 let gWaPrev=null;
 (function(){
   const grab=$('#tl-playhead-grab'); if(!grab) return;
-  grab.addEventListener('pointerdown',e=>{ e.stopPropagation(); scrubbing=true; rulerScrub(e); });
+  grab.addEventListener('pointerdown',e=>{
+    e.stopPropagation();
+    // 掴んだ瞬間は動かさない（クリック＝現状維持／Wクリック＝WAトグルを邪魔しない）。
+    // ドラッグに入ったときだけ、掴んだコマからの**相対**で動かす
+    gScrubMode='rel'; gScrubX0=e.clientX; gScrubF0=state.currentFrame;
+    scrubbing=true;
+  });
   grab.addEventListener('dblclick',e=>{
     e.stopPropagation(); e.preventDefault();
     scrubbing=false;
@@ -5788,8 +5839,8 @@ let gWaPrev=null;
   });
 })();
 window.addEventListener('pointermove',e=>{if(scrubbing){ if(!e.buttons){scrubbing=false;return;} rulerScrub(e);} });
-window.addEventListener('pointerup',()=>{scrubbing=false;});
-window.addEventListener('pointercancel',()=>{scrubbing=false;});
+window.addEventListener('pointerup',()=>{scrubbing=false;gScrubMode='abs';});
+window.addEventListener('pointercancel',()=>{scrubbing=false;gScrubMode='abs';});
 
 // Work area handle drag
 (function(){
@@ -6049,10 +6100,11 @@ $('#shortcut-reset').addEventListener('click',()=>{
 $('#set-frames').addEventListener('change',()=>{ setCompFrames(parseFloat($('#set-frames').value)); });
 $('#set-dur').addEventListener('change',()=>{ setCompFrames(parseFloat($('#set-dur').value)*state.fps); });
 // SPEC_11 P4-3: ドラフト再生トグル
-$('#draft-play-toggle').classList.toggle('on',gDraftPlay);
+// 2026-08-02: トップバーへ移設。トップバーの点灯クラスは .primary（設定パネルの .on ではない）
+$('#draft-play-toggle').classList.toggle('primary',gDraftPlay);
 $('#draft-play-toggle').addEventListener('click',()=>{
   gDraftPlay=!gDraftPlay;
-  $('#draft-play-toggle').classList.toggle('on',gDraftPlay);
+  $('#draft-play-toggle').classList.toggle('primary',gDraftPlay);
   try{ localStorage.setItem(DRAFT_LS,gDraftPlay?'1':'0'); }catch(e){}
   drawCurrentFrame();
   flashLive(gDraftPlay?'▶ ドラフト再生 ON（1/2解像度）':'▶ ドラフト再生 OFF');
@@ -6111,12 +6163,16 @@ function setOut(patch){
   updateInspector(); // → updateOutputUI（表示更新）＋ SEQ PNG のツールチップ再生成
   recordHistory();
 }
-$('#out-head').addEventListener('click',()=>{
-  const body=$('#out-body'), open=body.style.display==='none';
-  body.style.display=open?'block':'none';
+// 開閉状態は覚える（書き出しボタンが入ったので既定は開いた状態）
+const LS_OUT_OPEN='composer_out_open_v1';
+function setOutOpen(open){
+  $('#out-body').style.display=open?'block':'none';
   $('#out-head-t').textContent=(open?'▾':'▸')+' OUTPUT';
+  try{ localStorage.setItem(LS_OUT_OPEN,open?'1':'0'); }catch(e){}
   if(open) updateOutputUI();
-});
+}
+$('#out-head').addEventListener('click',()=>setOutOpen($('#out-body').style.display==='none'));
+try{ if(localStorage.getItem(LS_OUT_OPEN)==='0') setOutOpen(false); }catch(e){}
 $('#out-mode').addEventListener('change',e=>setOut({mode:e.target.value}));
 $('#out-long').addEventListener('change',e=>{
   let v=parseInt(e.target.value,10); if(isNaN(v)) v=state.out.long;

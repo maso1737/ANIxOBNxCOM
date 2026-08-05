@@ -265,6 +265,24 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 - **INSPECTOR = トラック編集 ＋ 最下段の OUTPUT**（コンポ全体設定）にルール改訂。2026-07-25 の「OUTPUT廃止」は SETTINGS が一杯のため撤回
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
+【2026-08-04 追加（SPEC_11 P8＝P7後の操作性調整）】
+- **スクラブは2モード**: `gScrubMode` … `'abs'`＝ルーラー本体クリック（押した位置のコマへ飛ぶ・従来）／
+  `'rel'`＝インジケータの頭 `#tl-playhead-grab` から掴んだとき（**掴んだコマからの相対移動**）。
+  頭は線の左右に7pxずつ張り出しているので絶対で読むと押した瞬間に別コマへ落ち、**Wクリックしようとすると1コマ左へ飛んでいた**。
+  相対にすると「動かさなければ動かない」＝クリック／Wクリック（WA 全体⇔直前）と両立する。
+  **掴み枠つきのドラッグを足すときは同じ流儀（相対）にすること**
+- **書き出しボタンは INSPECTOR の OUTPUT 内**（`#btn-export` / `#btn-export-video` / `#btn-export-web`）。
+  トップバーに残すのは EXPORT PROJECT / AE JSX（＝絵ではないデータ）。SEQ PNG は Shift 不要。
+  OUTPUT の開閉は `composer_out_open_v1`（既定=開）。**`updateExportButtons()` は id 参照なので置き場所を変えても効く**
+- **`#tc-frame` / `#tc-time` は2つの意味を持つ**: 素のクリック＝インジケータ移動 / **Ctrl(⌘)+クリック＝コンポ尺の変更**
+  （`setCompFrames()`。設定パネルの COMP LENGTH と同じ経路）。尺モードの input は `.tc-input.len`（琥珀）で区別
+- **`½ DRAFT`（1/2解像度ドラフト再生）はトップバー**（COMPOSERタイトルの右）。
+  **点灯は `.primary`**（トップバーのボタンに `.on` のスタイルは無い）。設定パネルの PLAYBACK セクションは廃止
+- **パネル本文は文字を選択できる**（`#settings-panel-body` / `#inspector-body` / `#sfx-body` が `user-select:text`）。
+  **ボタン・`input[type=range]`・`.kf-row .k`（掴んでこするラベル）は `none` のまま**。
+  掴んで値を動かすUIを足したら、その要素も `none` 側に足すこと（でないとドラッグで文字が選ばれる）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 【コードの注意点】
 - KF関数はkfsパラメータ明示。op=0は isNaN(v)?1:v で判定
 - ALL_PROPS にprop追加時は #kf-*/#fx-*/#dot-*/#fx-dot-* のUIも要追加（updateKfUI/Fxがループ参照）
