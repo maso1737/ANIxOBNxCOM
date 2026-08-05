@@ -1,0 +1,26 @@
+{
+  "tool": "oban-builder",
+  "root": "..",
+  "html": "oban-builder.html?harness=1",
+
+  "seeks": [
+    { "label": "o01_p000", "timeMs": 0 },
+    { "label": "o02_p020", "timeMs": 800 },
+    { "label": "o03_p045_wipe", "timeMs": 1800 },
+    { "label": "o04_p060", "timeMs": 2400 },
+    { "label": "o05_p080", "timeMs": 3200 },
+    { "label": "o06_p095", "timeMs": 3800 }
+  ],
+
+  "vrt": { "colorThreshold": 0.1, "allowedPixelRatio": 0.0002 },
+
+  "perfPass": { "enabled": true, "sampleMs": 2000, "samples": 8 },
+
+  "budget": {
+    "maxTTFFms": 600,
+    "maxLongestFrameMs": 300,
+    "maxVramBytes": 6291456
+  },
+
+  "timeoutMs": 30000
+}

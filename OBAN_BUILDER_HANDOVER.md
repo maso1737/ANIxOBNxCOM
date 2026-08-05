@@ -124,6 +124,30 @@ PROJECT={version:2,name,
 
 Node構文チェック＋DOMスタブスモーク済み。ビューアはテンプレートから実生成→構文チェック→スクロール往復＋ATTRACT自動走行スモーク済み。**ビューアテンプレート内に生バッククォートを置かない**（検証スクリプトがチェックしている。`</script>` は `S` 変数経由）。
 
+### VERIFY HARNESS（決定論VRT・2026-08-05 実装）
+
+`oban-builder.html` 末尾に `window.__HARNESS__` 契約を実装済み。TAKE走行の6点を撮って
+前回の承認済み画像と比較する（SPEC_08 / `verify/CLAUDE.md`）。
+
+配置・カメラ・パララックス・ワイプまわり（`prect` / `childRect` / `camAt` / `buildTake` /
+`applyFxRect` / `frameFxAt` / `computeWipeP` / `applyWipeVisual` / `renderWorld` / `seqIdx`）を
+触ったら実行すること:
+
+```
+cd verify && npm run verify:oban
+```
+
+覚えておくこと4点:
+
+- **`?harness=1`（`HARNESS_ON`）の窓でしか動かない。** 同じ鍵で `save()`/`load()` を封鎖してあり、
+  検証窓は localStorage の `oban-project` を**読みも書きもしない**（実データ入りの窓で確認済み）。
+- **ステージ＝ウィンドウなので、フィクスチャで `VW=960 / VH=540 / DPR=1` と `cv.width/height` を固定**
+  してから撮る。OBANはウィンドウ幅で絵が変わる唯一のツールなので、ここが他の2つと違う。
+- **`mode='take'` ＋ `PV.on=true` で撮る。** PLACE編集ビューは `prect()` が `zi=cam.z` の均一ズームに
+  分岐して**出力と別物**になるため。`cleanView=true` でグリッド／ガイド／TAKE軌道は消す。
+- **連番パネルは `trigger:'always'` を使う。** `'enter'` は `p._t0` に初回可視時刻を焼き込むので
+  「同じ t なら同じ絵」でなくなり、seek の順番で結果が変わる。
+
 ## 制限（v1スコープ / SPEC_01 §5どおり）
 
 - 音・テキスト組版・モバイルなし（連番はV2-Bのファイルseq＋SPEC_07のANIMATOR直結で対応済み）

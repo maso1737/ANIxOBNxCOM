@@ -8,7 +8,9 @@
     "verify:animator": "node harness/runner.mjs verify.animator.config.json",
     "approve:animator": "UPDATE_BASELINE=1 node harness/runner.mjs verify.animator.config.json",
     "verify:composer": "node harness/runner.mjs verify.composer.config.json",
-    "approve:composer": "UPDATE_BASELINE=1 node harness/runner.mjs verify.composer.config.json"
+    "approve:composer": "UPDATE_BASELINE=1 node harness/runner.mjs verify.composer.config.json",
+    "verify:oban": "node harness/runner.mjs verify.oban.config.json",
+    "approve:oban": "UPDATE_BASELINE=1 node harness/runner.mjs verify.oban.config.json"
   },
   "devDependencies": {
     "pixelmatch": "^6.0.0",

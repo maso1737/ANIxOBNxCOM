@@ -13,8 +13,8 @@
 - `index.html` — ランディングページ（**OBAN 追加予定**）
 - `inbetween_lab.html` / `inbetween_warp_lab.html` — 中割り実験ラボ
 - `tools/check.js` — 依存ゼロのスモークチェック（構文/配線/ID重複/デッドコード）
-- `verify/` — VERIFY HARNESS（決定論VRT＋パフォーマンス予算。SPEC_08）。**ANIMATOR / COMPOSER 実装済み**。
-  詳細は [verify/CLAUDE.md](verify/CLAUDE.md)
+- `verify/` — VERIFY HARNESS（決定論VRT＋パフォーマンス予算。SPEC_08）。
+  **ANIMATOR / COMPOSER / OBAN BUILDER 実装済み**。詳細は [verify/CLAUDE.md](verify/CLAUDE.md)
 
 ドキュメント（ハンドオーバー／仕様）:
 - `ANIMATOR_HANDOVER.md` — animator 実装メモ／設計履歴（深掘りはこちら）
@@ -55,6 +55,7 @@ node tools/check.js
 ```
 cd verify && npm run verify:animator
 cd verify && npm run verify:composer
+cd verify && npm run verify:oban
 ```
 コマ送り6点を作業解像度そのままで撮って前回の承認済み画像と比較する（PASS=0%）。
 意図した変更で差分が出たら `UPDATE_BASELINE=1 node harness/runner.mjs verify.<tool>.config.json` で承認。

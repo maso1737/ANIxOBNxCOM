@@ -8,17 +8,18 @@ Animation Paint の単一HTMLツールを**決定論的に**検証するハー�
 （スキル `single-html-verify` の配布物と同一）。**ここでは改造しない。**
 挙動を変えたくなったら、まず正準側を直して SPEC_08 の version を上げ、その後コピーし直す。
 
-現在の対象は **ANIMATOR と COMPOSER**。OBAN / econte も各HTMLに `window.__HARNESS__` を足せば
-同じ runner でそのまま回る（config を1本足すだけ）。
+現在の対象は **ANIMATOR / COMPOSER / OBAN BUILDER**。econte も同じ要領で足せる
+（HTMLに `window.__HARNESS__` を実装して config を1本追加するだけ）。
 
 | ツール | config | 起動URL（鍵） | 撮るもの |
 |---|---|---|---|
 | ANIMATOR | `verify.animator.config.json` | `animator.html?ro=1` | 作画レイヤー合成（1024×576） |
 | COMPOSER | `verify.composer.config.json` | `composer.html?harness=1` | コンポ合成（960×540） |
+| OBAN BUILDER | `verify.oban.config.json` | `oban-builder.html?harness=1` | TAKE走行中のステージ（960×540） |
 
-**鍵が違うのは歴史的理由**。animator には元から別窓用の `?ro=1`（＝autosaveしない窓）があったので
-それを流用し、composer には無かったので `?harness=1` を新設した。どちらも「**その窓は保存しない**」
-という同じ意味で、フィクスチャが現在の作業を捨てても壊れないための安全装置。
+**animator だけ鍵が違うのは歴史的理由**。animator には元から別窓用の `?ro=1`（＝autosaveしない窓）が
+あったのでそれを流用した。3つとも意味は同じ「**その窓は保存しない**」で、フィクスチャが現在の作業を
+捨てても壊れないための安全装置。
 
 ## 走らせる
 
@@ -27,6 +28,7 @@ cd verify
 npm install
 npm run verify:animator
 npm run verify:composer
+npm run verify:oban
 ```
 
 - 初回は `baselines/` に正解画像を作るだけで必ず通る。**2回目以降が本番**（比較してPASS/FAIL）。
@@ -162,6 +164,67 @@ ANIMATOR と同じ形だが、フィクスチャの作り方が違う。
 `timeMs → frame` は `floor(t*24/1000)`。誤差を避けるため `frame*1000/24` がちょうど整数になる
 値を選ぶ（0 / 375 / 750 / 1000 / 1250 …）。`c05_f30_empty` は CHAR の空セル区間（frames 30〜35）、
 `c04_f24_hold` は `hold` キーの区間、`c06_f44_fade` は `op` フェード区間を踏むために置いてある。
+
+## OBAN BUILDER 側の契約（oban-builder.html 末尾）
+
+```js
+window.__HARNESS__ = { version:1, kind:'canvas2d', canvas:'#harness-shot', ready, seek, render, info }
+```
+
+OBAN固有の事情が3つある。
+
+1. **canvas がウィンドウそのもの。**
+   OBANは `VW/VH/DPR`＝`innerWidth/innerHeight/devicePixelRatio` でステージを作るので、
+   **ウィンドウ幅が変わると絵が変わる**。フィクスチャで `VW=960 / VH=540 / DPR=1` と
+   `cv.width/height` を直接固定してから撮る。ここを固定しないとVRTが成立しない。
+
+2. **PREVIEW相当の状態で撮る（`mode='take'` ＋ `PV.on=true`）。**
+   `prect()` は PLACE編集ビューだと `zi=cam.z` の均一ズームに分岐する＝**出力と別物**。
+   TAKE/PREVIEW側のマルチプレーン `zi=1+(cam.z-1)*lerp(0.55,1.25,depth)` を通すために
+   この2つを立てる。あわせて `cleanView=true` でグリッド／ガイド／TAKE軌道を消す。
+
+3. **`?harness=1`（`HARNESS_ON`）の窓でしか動かない。** 同じ鍵で `save()` と `load()` を
+   封鎖しているので、検証窓は localStorage の `oban-project` を**読みも書きもしない**。
+   （実データを入れた窓で確認済み: harness窓で fixture を組んでも保存値は `USER_WORK` のまま）
+
+### フィクスチャの構成（`OB_FIX` / `obBuildProject`）
+
+| 要素 | 何を踏むか |
+|---|---|
+| BG (depth 0.12) | パンのパララックス係数 `pf=lerp(0.7,1.2,depth)` の浅い側 |
+| MID / MID2 | 通常パネル。MID2 は **KF3→KF4 の長いトラベルの経路上**に置いてある |
+| SEQ (連番) | `seqIdx`/`panelImg` の連番送り（`mode:'loop'`・`trigger:'always'`＝**tSの純関数**） |
+| FRAME | **台形quadマスク**・内部パララックス(`par`)・IN演出 `slide-l`・drift `push-in`・枠線・**whiteoutワイプ** |
+| FRAME の子 ×2 | `childRect()` の深度差（フレーム内パララックス） |
+| テキスト ×2 | ルート縦書き＋**KF窓つき**フレーム内テキスト（`kfWinAlpha`） |
+| TAKE KF ×4 | dwell/travel の区間割り・ease 3種（smooth/inout/outCubic） |
+
+`trigger:'enter'` の連番は使わないこと。`p._t0` に**初回可視時刻を焼き込む**＝tの純関数でなくなり、
+seek の順番で結果が変わる（契約違反）。
+
+### 区間の地図（この構成での実測値）
+
+```
+dwell0 0〜0.1199 / travel 〜0.2612 / dwell1 〜0.3570 / travel 〜0.5083
+dwell2 〜0.6522 / travel 〜0.8921 / dwell3 〜1.0        wipeP = 0.4425
+```
+
+`seek(t)` は **1周＝`OB_FIX.cycleMs`(4000ms) 固定**で P に写す（アプリのPREVIEW速度は `TT.total`
+依存だが、VRTに要るのは「同じtなら同じP」だけ）。so `timeMs/4000` がそのまま P。
+
+### 予算（OBAN・2026-08-05 実測）
+
+| 項目 | 実測 | 上限 | 何を捕まえるか |
+|---|---|---|---|
+| `maxTTFFms` | 226〜232ms | 600 | 起動＋素材生成＋TAKE構築＋`computeWipeP`(400サンプル) |
+| `maxLongestFrameMs` | 158〜163ms | 300 | 最長フレーム（起動時のスクリプト評価が主） |
+| `maxVramBytes` | 4.23MB | 6MB | 素材画像のRAM（9枚） |
+| `allowedPixelRatio` | 0.000% | 0.02% | 他2ツールと同じ |
+
+負のコントロール: パララックス係数を `lerp(0.7,1.2,...)` → `lerp(0.7,1.18,...)` に変えると
+6コマ中4コマが 0.875〜7.4% で FAIL する。**残り2コマが0%なのは正常**:
+`o01_p000` はカメラが原点（`cam.x*pf=0` で係数が効かない）、`o03_p045_wipe` は画面の約87%が
+白に飛んでいて幾何の差が出ない。**この2枚はワイプと初期状態の番人**であって、レイアウトの番人ではない。
 
 ## 他のツールへ広げるとき
 

@@ -931,11 +931,17 @@ function toggleCleanView(){
 }
 try{guides=(localStorage.getItem('oban-guides')??'1')==='1';}catch(e){}
 
+/* VERIFY HARNESS モード（?harness=1）。検証用フィクスチャは現在のプロジェクトを捨てて
+   組み直すので、この鍵が無い窓では harness を起動させない＆localStorageに読み書きしない。 */
+const HARNESS_ON=(()=>{try{return new URLSearchParams(location.search).get('harness')==='1';}catch(e){return false;}})();
+
 /* ---------- persistence (localStorage / 画像はファイル名参照) ---------- */
 function save(){
+  if(HARNESS_ON)return;   // 検証窓は書かない
   try{localStorage.setItem('oban-project',JSON.stringify(PROJECT));}catch(e){}
 }
 function load(){
+  if(HARNESS_ON)return;   // 検証窓は読まない（実データに左右されないため）
   try{
     const j=localStorage.getItem('oban-project');
     if(!j)return;
@@ -2677,6 +2683,199 @@ computeWipeP();
 bootedV2C=true;
 if(PROJECT.panels.length)$('#drop').classList.add('hide');
 requestAnimationFrame(frame);
+
+/* ============================================================
+   VERIFY HARNESS 契約（SPEC_08 / スキル single-html-verify）
+     window.__HARNESS__ = {version,kind,canvas,ready,seek,render,info}
+     verify/harness/runner.mjs が「中身を知らずに」検証するための共通面。
+
+   ・通常操作では一切走らない。ready() を呼ぶのは runner だけ。
+   ・**?harness=1（HARNESS_ON）の窓でしか動かない**。同じ鍵で save()/load() を
+     封鎖してあるので、検証窓は localStorage の 'oban-project' に触れない。
+   ・OBANのcanvasは**ウィンドウサイズそのもの**（VW/VH/DPR）なので、フィクスチャで
+     960×540/DPR=1 に固定してから撮る。ウィンドウ幅で絵が変わるツールなので、
+     ここを固定しないとVRTが成立しない。
+   ・撮影対象は #cv のCSS表示ではなく、そのピクセルを等倍でコピーした #harness-shot。
+   ・PREVIEW相当の見た目で撮る（mode='take' + PV.on）。PLACE編集ビューは
+     prect() が zi=cam.z の均一ズームに分岐する＝出力と別物なので使わない。
+   ============================================================ */
+const OB_FIX={W:960,H:540,cycleMs:4000};   // 撮影サイズ／P(0..1)へ写す1周の長さ
+let obShotCv=null,obShotCtx=null,obReadyPromise=null;
+let obP=0,obTs=0;
+
+/* 決定論PRNG（Math.random に依存しない＝injectの無いPass2でも同じ絵） */
+function obRng(seed){
+  let s=seed>>>0;
+  return function(){s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};
+}
+
+/* テスト素材を1枚描いて data URL で返す（文字は使わない＝フォント差で揺れないため） */
+function obMakeImg(kind,i){
+  const c=document.createElement('canvas');
+  const w=c.width =(kind==='bg')?640:(kind==='seq')?300:480;
+  const h=c.height=(kind==='bg')?360:(kind==='seq')?300:270;
+  const g=c.getContext('2d');
+  const rnd=obRng(0xB0A7+i*4099+kind.charCodeAt(0)*271);
+  if(kind==='bg'){
+    g.fillStyle='#1b1140';g.fillRect(0,0,w,h);
+    for(let k=0;k<6;k++){g.fillStyle=`rgba(120,90,220,${0.10+k*0.04})`;g.fillRect(0,h*(0.35+k*0.10),w,h*0.09);}
+    g.fillStyle='#f2eefc';g.beginPath();g.arc(w*0.22,h*0.26,52,0,Math.PI*2);g.fill();
+    g.strokeStyle='rgba(242,238,252,.45)';g.lineWidth=2;
+    for(let x=40;x<w;x+=80){g.beginPath();g.moveTo(x,h*0.62);g.lineTo(x,h);g.stroke();}
+  }else if(kind==='seq'){
+    g.fillStyle='#0c061d';g.fillRect(0,0,w,h);
+    g.translate(w/2,h/2);g.rotate(i*Math.PI/2*0.5);
+    g.fillStyle=['#5AE9FF','#FF4FA8','#FFD24B','#7CFF9B'][i%4];
+    g.beginPath();g.moveTo(0,-90);g.lineTo(78,60);g.lineTo(-78,60);g.closePath();g.fill();
+    g.strokeStyle='#f2eefc';g.lineWidth=5;g.stroke();
+    g.setTransform(1,0,0,1,0,0);
+    g.fillStyle='#f2eefc';for(let k=0;k<=i;k++)g.fillRect(10+k*16,10,10,10);
+  }else{ // ch1 / ch2 / mid
+    g.clearRect(0,0,w,h);
+    const col=(kind==='ch2')?'#FF4FA8':(kind==='mid')?'#FFD24B':'#5AE9FF';
+    g.fillStyle=col;
+    for(let k=0;k<7;k++){
+      const x=rnd()*w,y=rnd()*h,r=18+rnd()*46;
+      g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill();
+    }
+    g.strokeStyle='#0c061d';g.lineWidth=8;g.strokeRect(12,12,w-24,h-24);
+    g.fillStyle='#0c061d';g.fillRect(w*0.5-40,h*0.5-40,80,80);
+  }
+  return c.toDataURL('image/png');
+}
+
+/* IMGCACHE へ1枚登録（デコード完了まで待つ。待たないと空枠が撮れてしまう） */
+async function obPutImg(name,kind,i){
+  const img=new Image();
+  img.src=obMakeImg(kind,i);
+  if(img.decode) await img.decode().catch(()=>{});
+  else await new Promise(r=>{img.addEventListener('load',r,{once:true});img.addEventListener('error',r,{once:true});});
+  IMGCACHE[name]={img,ar:img.naturalWidth/img.naturalHeight};
+}
+
+/* フィクスチャのPROJECT。トラック構成がそのまま検証範囲:
+   BG(depth浅=パララックス小) / MID / SEQ(連番送り) /
+   FRAME(台形quadマスク・内部パララックス・IN演出slide-l・drift push-in・枠線・whiteoutワイプ)
+   ＋ その子2枚（depth差＝フレーム内パララックス）／ルート縦書きテキスト／KF窓つきフレーム内テキスト */
+function obBuildProject(){
+  return {
+    version:2,name:'harness',
+    panels:[
+      {id:1,name:'h_bg.png', x:0,    y:0,    h:1.05,depth:0.12,ord:0,ar:1.777,parent:null,seq:null},
+      {id:2,name:'h_mid.png',x:0.55, y:0.18, h:0.42,depth:0.62,ord:1,ar:1.777,parent:null,seq:null},
+      {id:3,name:'hseq',     x:-0.50,y:0.55, h:0.38,depth:0.85,ord:2,ar:1,    parent:null,
+        seq:{pre:'hseq_',start:0,pad:4,ext:'png',n:4,fps:8,mode:'loop',trigger:'always'}},
+      /* KF3→KF4 の長いトラベルの途中に置く。ここが空だと P=0.8 の1枚がほぼ背景だけになり
+         「何も検証していないコマ」ができてしまうため、経路上に絵を置いておく */
+      {id:6,name:'h_mid2.png',x:0.20,y:0.58,h:0.50,depth:0.35,ord:3,ar:1.777,parent:null,seq:null},
+      {id:4,name:'h_ch1.png',x:-0.12,y:0.02, h:0.62,depth:0.25,ord:0,ar:1.777,parent:'f1',seq:null},
+      {id:5,name:'h_ch2.png',x:0.16, y:0.06, h:0.50,depth:0.85,ord:1,ar:1.777,parent:'f1',seq:null},
+    ],
+    frames:[
+      {id:'f1',name:'FRAME 01',x:0.9,y:0.62,h:0.82,depth:0.5,ord:3,ar:1.777,
+       quad:[{x:0.06,y:0},{x:1,y:0.05},{x:0.94,y:1},{x:0,y:0.95}],
+       par:0.6,fx:{in:'slide-l',drift:'push-in',amt:0.14,kf:2},wipe:'whiteout',line:{on:true,w:14}},
+    ],
+    texts:[
+      {type:'v',str:'OBAN',x:-0.34,y:-0.30,size:90,col:'#fff',parent:null,kf:null},
+      {type:'v',str:'KF2', x:0.10, y:0.06, size:70,col:'#000',parent:'f1',kf:2},
+    ],
+    take:{version:1,name:'take-H',kf:[
+      {x:0,    y:0,    z:0.90,dwell:1.0,ease:'smooth'},
+      {x:0.55, y:0.18, z:1.50,dwell:0.8,ease:'inout'},
+      {x:0.90, y:0.62, z:2.20,dwell:1.2,ease:'outCubic'},
+      {x:-0.50,y:0.55, z:1.60,dwell:0.9,ease:'smooth'},
+    ]},
+    clickFx:'none',
+  };
+}
+
+async function obBuildFixture(){
+  if(!HARNESS_ON){
+    throw new Error('VERIFY HARNESS: ?harness=1 の窓でのみ実行できます（本窓の作業を壊さないため）');
+  }
+  if(window.__DET__) await window.__DET__.ensureRenderReady();
+
+  /* 画面サイズ依存を切る（OBANはウィンドウ＝ステージなのでここが要） */
+  VW=OB_FIX.W;VH=OB_FIX.H;DPR=1;
+  cv.width=OB_FIX.W;cv.height=OB_FIX.H;
+
+  await obPutImg('h_bg.png','bg',0);
+  await obPutImg('h_mid.png','mid',0);
+  await obPutImg('h_mid2.png','mid',1);
+  await obPutImg('h_ch1.png','ch1',0);
+  await obPutImg('h_ch2.png','ch2',0);
+  for(let i=0;i<4;i++) await obPutImg(seqFile({pre:'hseq_',start:0,pad:4,ext:'png'},i),'seq',i);
+
+  pid=100;
+  PROJECT=migrate(obBuildProject());
+  TT=buildTake(PROJECT.take);
+  computeWipeP();
+  renderCards();
+
+  /* 出力と同じ見た目で撮る（PLACEの均一ズーム分岐を避ける）＋編集UIは隠す */
+  mode='take';PV.on=true;sel=null;ctxFrame=null;maskEdit.on=false;maskEdit.f=null;
+  cleanView=true;document.body.classList.add('cleanview');
+  gClick=0;
+
+  if(!obShotCv){
+    obShotCv=document.createElement('canvas');
+    obShotCv.id='harness-shot';
+    obShotCv.style.cssText='position:fixed;left:0;top:0;z-index:99999;pointer-events:none;background:#000;';
+    document.body.appendChild(obShotCv);
+    obShotCtx=obShotCv.getContext('2d');
+  }
+  obShotCv.width=OB_FIX.W;obShotCv.height=OB_FIX.H;
+  obShotCv.style.width=OB_FIX.W+'px';obShotCv.style.height=OB_FIX.H+'px';
+  obShotCtx.imageSmoothingEnabled=false;
+
+  window.__HARNESS__.seek(0);
+  window.__HARNESS__.render();
+  /* Pass2（実クロックperf）はアプリ本来の frame() ループがそのまま自走する
+     （PV.on=true にした時点でカメラが動く）。ここで別ループは足さない。 */
+}
+
+window.__HARNESS__={
+  version:1,
+  kind:'canvas2d',
+  canvas:'#harness-shot',
+  ready(){return obReadyPromise||(obReadyPromise=obBuildFixture());},
+  /* t(ms) → TAKE進捗P(0..1)。1周は OB_FIX.cycleMs に固定する（アプリのPREVIEW速度は
+     TT.total 依存だが、VRTに要るのは「同じtなら同じP」だけ）。tS は連番送り用の秒。 */
+  seek(t){
+    obP=(t%OB_FIX.cycleMs)/OB_FIX.cycleMs;
+    obTs=t/1000;
+    PV.p=obP;
+  },
+  render(){
+    const cam=camAt(obP);
+    cx=cx0;
+    cx.clearRect(0,0,cv.width,cv.height);
+    cx.fillStyle='#0c061d';cx.fillRect(0,0,cv.width,cv.height);
+    renderWorld(cam,obTs,obP);
+    applyWipeVisual(obP);   // whiteout はピクセルに乗る（invertはCSSフィルタなので乗らない）
+    obShotCtx.clearRect(0,0,OB_FIX.W,OB_FIX.H);
+    obShotCtx.drawImage(cv,0,0);
+  },
+  /* Canvas2Dなので GPU VRAM ではなく素材画像の実RAM量。予算キー互換のため
+     vramBytesEstimate の名前で返す（budget.maxVramBytes が効く）。 */
+  info(){
+    let px=0,n=0;
+    for(const k in IMGCACHE){
+      const e=IMGCACHE[k];if(!e||!e.img)continue;
+      n++;px+=(e.img.naturalWidth||0)*(e.img.naturalHeight||0)*4;
+    }
+    return{
+      panels:PROJECT.panels.length,
+      frames:PROJECT.frames.length,
+      texts:(PROJECT.texts||[]).length,
+      takeKf:PROJECT.take.kf.length,
+      images:n,
+      pixelBytes:px,
+      vramBytesEstimate:px,
+    };
+  },
+};
 </script>
 </body>
 </html>

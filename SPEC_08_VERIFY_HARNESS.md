@@ -100,8 +100,8 @@ PNG書き出しにframemd5 golden＋連続性チェック / 透過がstraight al
 
 ## ANIxOBNxCOM への適用（2026-08-05）
 
-本リポジトリ側の実装は `verify/`。**ANIMATOR と COMPOSER が契約を実装済み**で、
-Playwright e2e が実機で通っている（両方とも Pass1 6コマすべて 0.000% ／ Pass2 予算内）。
+本リポジトリ側の実装は `verify/`。**ANIMATOR / COMPOSER / OBAN BUILDER が契約を実装済み**で、
+Playwright e2e が実機で通っている（3本とも Pass1 6コマすべて 0.000% ／ Pass2 予算内）。
 運用・設計判断・予算の実測値は [verify/CLAUDE.md](verify/CLAUDE.md) が生きたドキュメント。
 
 要点だけ:
@@ -116,15 +116,18 @@ Playwright e2e が実機で通っている（両方とも Pass1 6コマすべて
 - COMPOSER: 生成した PNG data URL を `loadJSON()`（PROJECT_v2）に流し、**IMPORT経路ごと**検証。
   トラック構成 BG/CHAR/NULL/FG/CAMERA で Z・親・別解像度・空セル・イーズ3種・パララックスを踏む。
   `drawFrame()` を直接叩くため **FXチェーン（SATSUEI）は現状カバー外**。
-- OBAN / econte も同じ runner で回せる（各HTMLに契約を足して config を1本増やすだけ）。
+- OBAN BUILDER: ステージ＝ウィンドウなので `VW/VH/DPR` と `cv` サイズをフィクスチャで固定してから撮る。
+  TAKE走行の6点で 台形quadマスク・内部パララックス・IN演出・drift・連番送り・whiteoutワイプ・
+  KF窓テキストを踏む。**PLACE編集ビューではなく `mode='take'`＋`PV.on` の出力側**を撮ること。
+- econte も同じ runner で回せる（HTMLに契約を足して config を1本増やすだけ）。
 
 ## ロードマップ
 
 - **v1（実装済）**: 契約API・決定論・統合runner・VRT・予算・スキーマ・APIモック・動くサンプル。
 - **v2（実装済 2026-07）**: 上記§v2 一式。純JS（決定論/pixelmatch/bbox/スキーマ/framemd5解析/逆乗算）は
   自己テスト通過。ブラウザ無し環境では @napi-rs/canvas で2パス合否フローを再現確認済み。
-- **Playwright e2e実走（実機確認済 2026-08-05）**: ANIMATOR / COMPOSER で2パス通し。chromium は
-  `chromium_headless_shell-1228`（playwright 1.61.1 固定）。
-- **未**: OBAN BUILDER / econte への契約埋め込み、COMPOSER の FXチェーン（SATSUEI）検証。
-  LP側の既存ツール（SCROLL_*_LP / Camera Map Fx 等）も同様。
+- **Playwright e2e実走（実機確認済 2026-08-05）**: ANIMATOR / COMPOSER / OBAN BUILDER で2パス通し。
+  chromium は `chromium_headless_shell-1228`（playwright 1.61.1 固定）。
+- **未**: econte への契約埋め込み、COMPOSER の FXチェーン（SATSUEI）検証、
+  OBAN 書き出しビューア（`viewerHTML`）の検証。LP側の既存ツール（SCROLL_*_LP / Camera Map Fx 等）も同様。
 - **将来**: ④実API面が決まれば極小プロキシ＋実ストリーミング検証を具体化。
