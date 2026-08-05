@@ -1,0 +1,26 @@
+{
+  "tool": "animator",
+  "root": "..",
+  "html": "animator.html?ro=1",
+
+  "seeks": [
+    { "label": "a01_t0",    "timeMs": 0 },
+    { "label": "a02_t125",  "timeMs": 125 },
+    { "label": "a03_t292",  "timeMs": 292 },
+    { "label": "a04_t500",  "timeMs": 500 },
+    { "label": "a05_empty", "timeMs": 583 },
+    { "label": "a06_t750",  "timeMs": 750 }
+  ],
+
+  "vrt": { "colorThreshold": 0.1, "allowedPixelRatio": 0.0002 },
+
+  "perfPass": { "enabled": true, "sampleMs": 2000, "samples": 8 },
+
+  "budget": {
+    "maxTTFFms": 800,
+    "maxLongestFrameMs": 300,
+    "maxVramBytes": 25165824
+  },
+
+  "timeoutMs": 30000
+}

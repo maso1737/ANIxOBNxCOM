@@ -1,0 +1,8 @@
+# 依存（npm install で入れ直す）
+node_modules/
+package-lock.json
+
+# 実行のたびに上書きされる出力（actual / diff / summary.json）
+artifacts/
+
+# baselines/ は承認済みの正解画像なのでコミットする（.gitignore しない）

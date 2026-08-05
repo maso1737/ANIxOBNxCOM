@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "single-html-verify unified result",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "environment", "summary", "frames"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "tool": { "type": "string", "description": "検証したHTMLの識別子" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "environment": {
+      "type": "object",
+      "required": ["headless", "renderBackend"],
+      "properties": {
+        "headless": { "type": "boolean" },
+        "renderBackend": { "type": "string", "description": "egl-angle | angle | swiftshader | unknown" },
+        "gpuName": { "type": "string" },
+        "engine": { "type": "string", "description": "canvas2d | webgl | dom | scroll" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["status", "framesTested", "failedFrames"],
+      "properties": {
+        "status": { "type": "string", "enum": ["PASS", "FAIL"] },
+        "framesTested": { "type": "integer" },
+        "failedFrames": { "type": "integer" },
+        "errors": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "perf": {
+      "type": "object",
+      "description": "パフォーマンスバジェット計測（Pass2・実クロック）",
+      "properties": {
+        "pass": { "type": "string", "description": "realclock" },
+        "timeToFirstFrameMs": { "type": ["integer", "null"] },
+        "longAnimationFrames": { "type": "integer" },
+        "longestFrameMs": { "type": "number" },
+        "totalBlockingMs": { "type": "number" },
+        "measuredMemoryBytes": { "type": ["integer", "null"] },
+        "renderer": {
+          "type": ["object", "null"],
+          "properties": {
+            "drawCalls": { "type": "integer" },
+            "triangles": { "type": "integer" },
+            "textures": { "type": "integer" },
+            "geometries": { "type": "integer" },
+            "vramBytesEstimate": { "type": "integer" }
+          }
+        },
+        "budget": {
+          "type": "object",
+          "description": "違反したものだけ true",
+          "additionalProperties": { "type": "boolean" }
+        }
+      }
+    },
+    "frameSequence": {
+      "type": ["object", "null"],
+      "description": "連番PNG書き出しの検証（export-verify.mjs・任意）",
+      "properties": {
+        "frames": { "type": "integer" },
+        "consecutiveDuplicates": { "type": "integer" },
+        "frameMd5Match": { "type": ["boolean", "null"] },
+        "changedFrames": { "type": ["array", "null"], "items": { "type": "integer" } },
+        "source": { "type": "string" }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "timeMs", "verdict"],
+        "properties": {
+          "label": { "type": "string" },
+          "timeMs": { "type": "number" },
+          "verdict": { "type": "string", "enum": ["PASS", "FAIL", "BASELINE_CREATED"] },
+          "mismatchPixelRatio": { "type": "number" },
+          "allowedPixelRatio": { "type": "number" },
+          "colorThreshold": { "type": "number" },
+          "unstableRegions": {
+            "type": "array",
+            "description": "AIエージェント向け超軽量サマリ。座標は整数に丸める。",
+            "items": {
+              "type": "object",
+              "properties": {
+                "boundingBox": {
+                  "type": "object",
+                  "properties": {
+                    "x1": { "type": "integer" }, "y1": { "type": "integer" },
+                    "x2": { "type": "integer" }, "y2": { "type": "integer" }
+                  }
+                },
+                "severity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+                "mismatchRatioInRegion": { "type": "number" },
+                "reasoningPattern": { "type": "string" }
+              }
+            }
+          },
+          "artifacts": {
+            "type": "object",
+            "properties": {
+              "baseline": { "type": "string" },
+              "actual": { "type": "string" },
+              "diff": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

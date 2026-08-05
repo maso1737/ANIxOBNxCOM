@@ -437,6 +437,27 @@ option 1（projectIdキー分離）を検討するにあたって実測した数
 
 ---
 
+## VERIFY HARNESS（決定論VRT・2026-08-05 実装）
+
+`animator.html` 末尾に `window.__HARNESS__` 契約を実装済み。`verify/` の runner が
+**描画結果が前回と1pxでも変わっていないか**を自動判定する（SPEC_08 / `verify/CLAUDE.md`）。
+
+描画パイプライン（`drawLine` / `drawDot` / `drawLineRadius` / `floodFill` / オニオン合成 /
+`renderGuides`）を触ったら実行すること:
+
+```
+cd verify && npm run verify:animator
+```
+
+覚えておくこと3点:
+
+- **`?ro=1` の窓でしか動かない。** `ready()` は現在のコマを全部捨てて決定論フィクスチャを
+  組むため、本窓で誤って呼ばれても壊れないよう `AUTOSAVE_OFF` を鍵にしている。
+- **`frameAtTick()` は再生ループと harness の共有定義。** 元は `play()` 内のローカル関数
+  `frameToShowAt` だったものをトップレベルへ切り出した。tick→表示コマの規則を1か所に保つため。
+- **撮影対象は `#harness-shot`**（harness実行時だけ生成される合成用キャンバス）。
+  通常起動では作られないので、レイヤー構成の話に混ぜて考えないこと。
+
 ## 開発スタイル
 - 単一HTMLで完結。外部依存は CDN（JSZip 等）のみ。
 - 変更は Edit（差分）で最小限に。全書き換えは避ける。

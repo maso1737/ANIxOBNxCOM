@@ -1704,6 +1704,10 @@ function recordHistory(){
   scheduleAutosave(); // SPEC_11 P1: 編集のたびdebounce保存
 }
 
+// VERIFY HARNESS モード（?harness=1）。検証用フィクスチャは現在のコンポを捨てて組み直すので、
+// この鍵が無い窓では harness を起動させない＆自動保存も一切書かない（本窓の作業を守る）。
+const HARNESS_ON = (()=>{ try{ return new URLSearchParams(location.search).get('harness')==='1'; }catch(e){ return false; } })();
+
 // ── AUTOSAVE（IndexedDB・SPEC_11 P1）──
 // 「絵」(cellsストア・import/LIVE更新時のみ全書き) と「編集」(metaストア=cells抜きpayload・recordHistory毎にdebounce) を分離。
 // 音声ファイル本体は対象外（オフセット等の数値も現状metaに含まれない）。失敗は握ってflashLiveのみ＝アプリ動作は継続。
@@ -1737,6 +1741,7 @@ function asGet(store,key){
 }
 function asClearAll(){ return Promise.all([asTx('cells',st=>st.clear()),asTx('meta',st=>st.clear())]); }
 function saveAutosaveCells(){ // 絵の保存（重いのでimport/LIVE更新時のみ。クリア後に全トラック分put）
+  if(HARNESS_ON) return;      // 検証窓は書かない
   if(!state.tracks.length) return;
   asTx('cells',st=>{
     st.clear();
@@ -1751,6 +1756,7 @@ function buildAutosaveMeta(){ // buildProjectPayloadから各トラックのcell
   return out;
 }
 function scheduleAutosave(){
+  if(HARNESS_ON) return;      // 検証窓は書かない
   clearTimeout(gAsTimer);
   gAsTimer=setTimeout(()=>{
     const meta=buildAutosaveMeta(); if(!meta) return;
@@ -1758,6 +1764,7 @@ function scheduleAutosave(){
   },2000);
 }
 async function checkAutosaveRestore(){ // 起動時: 保存があれば復元バーを出す
+  if(HARNESS_ON) return;      // 検証窓では復元バーも出さない（DBに触れない）
   let meta=null;
   try{ meta=await asGet('meta','current'); }catch(e){ return; }
   if(!meta) return;
@@ -6308,6 +6315,222 @@ function toggleInspectorSide(){
   document.addEventListener('fullscreenchange',syncFS);
   document.addEventListener('webkitfullscreenchange',syncFS);
 })();
+
+// ============================================================
+// VERIFY HARNESS 契約（SPEC_08 / スキル single-html-verify）
+//   window.__HARNESS__ = {version,kind,canvas,ready,seek,render,info}
+//   verify/harness/runner.mjs が「中身を知らずに」検証するための共通面。
+//
+//   ・通常操作では一切走らない。ready() を呼ぶのは runner だけ。
+//   ・**?harness=1 の窓でしか動かない**（HARNESS_ON）。フィクスチャは現在のコンポを
+//     捨てて組み直すので、本窓で誤って呼ばれても壊れないようにするための鍵。
+//     同じ鍵で AUTOSAVE の書き込みと復元バーも止めている。
+//   ・撮影対象は #preview-canvas の見た目ではなく、drawFrame() をコンポ解像度そのまま
+//     (1:1) に流した専用キャンバス #harness-shot。ビューのズーム/ウィンドウサイズに
+//     左右されず、合成のズレがそのまま差分になる。
+//   ・素材は毎回その場で生成する決定論画像（PNG data URL）→ 実際の IMPORT 経路
+//     （loadJSON → parseTrackFromJSON）に流すので、読み込み側も一緒に検証される。
+// ============================================================
+const CH_FIX = {
+  W: 960, H: 540,        // コンポ解像度
+  fps: 24, frames: 48,   // 2秒
+  cellW: 480, cellH: 270,// CHARトラックだけ解像度が違う（基点ずれの検出）
+  cells: 8, cellDur: 6,  // 8セル×6コマ＝48
+  emptyCellAt: 5,        // 空セル＝描かない区間の経路
+};
+let chShotCv = null, chShotCtx = null;
+let chReadyPromise = null;
+
+// 決定論PRNG（Math.random に依存しない＝injectの無いPass2でも同じ絵になる）
+function chRng(seed){
+  let s = seed >>> 0;
+  return function(){ s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+// テスト素材を1枚描いて data URL で返す。文字は使わない（フォント差で揺れるため）
+function chMakeCell(kind, i){
+  const c = document.createElement('canvas');
+  const w = c.width  = (kind === 'char') ? CH_FIX.cellW : CH_FIX.W;
+  const h = c.height = (kind === 'char') ? CH_FIX.cellH : CH_FIX.H;
+  const g = c.getContext('2d');
+  const rnd = chRng(0x5EED + i * 6151 + kind.charCodeAt(0) * 131);
+  if(kind === 'bg'){
+    g.fillStyle = '#e8f0fb'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#ffd76a'; g.beginPath(); g.arc(w * 0.79, h * 0.20, 62, 0, Math.PI * 2); g.fill();
+    // 遠景の丘（奥→手前）
+    ['#cfdcc6', '#bfcfb4'].forEach((col, k) => {
+      g.fillStyle = col; g.beginPath();
+      g.moveTo(0, h * (0.70 + k * 0.05));
+      for(let x = 0; x <= w; x += 60) g.lineTo(x, h * (0.70 + k * 0.05) - Math.sin((x / w) * Math.PI * (2 + k)) * (40 - k * 12));
+      g.lineTo(w, h); g.lineTo(0, h); g.closePath(); g.fill();
+    });
+    g.fillStyle = '#dfe7d5'; g.fillRect(0, h * 0.80, w, h * 0.20);
+    g.strokeStyle = '#8a9a86'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(0, h * 0.80); g.lineTo(w, h * 0.80); g.stroke();
+    // パララックスが目で追えるように等間隔の柱を置く
+    g.fillStyle = '#9fb098';
+    for(let x = 48; x < w; x += 96) g.fillRect(x, h * 0.74, 6, h * 0.08);
+  } else if(kind === 'char'){
+    const ph = i / CH_FIX.cells * Math.PI * 2;             // 歩行位相
+    const cx = w / 2, cy = h / 2 + Math.sin(ph) * 8;
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.strokeStyle = '#111'; g.fillStyle = '#fff'; g.lineWidth = 6;
+    g.beginPath(); g.ellipse(cx, cy + 20, 52, 62, 0, 0, Math.PI * 2); g.fill(); g.stroke();  // 胴
+    g.fillStyle = '#2f6ad0';
+    g.beginPath(); g.arc(cx, cy - 62, 40, 0, Math.PI * 2); g.fill(); g.stroke();             // 頭
+    g.strokeStyle = '#111'; g.lineWidth = 10;                                                // 脚（位相で開閉）
+    [1, -1].forEach(s => {
+      g.beginPath(); g.moveTo(cx, cy + 74);
+      g.lineTo(cx + Math.sin(ph) * 34 * s, cy + 74 + 46); g.stroke();
+    });
+    g.lineWidth = 8;                                                                          // 腕
+    [1, -1].forEach(s => {
+      g.beginPath(); g.moveTo(cx, cy + 2);
+      g.lineTo(cx + s * 46, cy + 2 - Math.cos(ph) * 26 * s); g.stroke();
+    });
+    g.fillStyle = '#111';                                                                     // コマ番号ぶんの点（文字を使わない目印）
+    for(let k = 0; k <= i; k++) g.fillRect(10 + k * 12, 10, 8, 8);
+  } else { // fg
+    g.fillStyle = 'rgba(28,38,32,0.88)';
+    for(let k = 0; k < 9; k++){
+      const x = rnd() * w, r = 40 + rnd() * 60;
+      g.beginPath(); g.arc(x, h + 20 - r * 0.5, r, 0, Math.PI * 2); g.fill();
+    }
+    g.fillStyle = 'rgba(28,38,32,0.75)';
+    g.fillRect(w * 0.06, h * 0.30, 26, h * 0.70);
+    g.fillRect(w * 0.90, h * 0.16, 34, h * 0.84);
+  }
+  return c.toDataURL('image/png');
+}
+
+// PROJECT_v2 のペイロードを組む。トラック構成でカバーする範囲:
+//   BG   … Z奥・カメラパンの視差が小さい側
+//   CHAR … 別解像度・セル送り・空セル・イーズ3種（ez / ei-eo ベジェ / hold）
+//   NULL … 親チェーン（FGの親）
+//   FG   … Z手前・親あり・アルファ合成
+//   CAM  … パン/ドリー/回転/ズーム（深度別パララックス＋Zソート）
+function chBuildPayload(){
+  const cells = [];
+  for(let i = 0; i < CH_FIX.cells; i++){
+    if(i === CH_FIX.emptyCellAt){ cells.push({ kind: 'empty', duration: CH_FIX.cellDur }); continue; }
+    cells.push({ kind: 'draw', duration: CH_FIX.cellDur, id: 'hc' + i, image: chMakeCell('char', i) });
+  }
+  const last = CH_FIX.frames - 1;
+  return {
+    format: 'PROJECT_v2',
+    width: CH_FIX.W, height: CH_FIX.H, bgBright: 100, compFrames: CH_FIX.frames,
+    workArea: { startFrame: 0, endFrame: CH_FIX.frames },
+    markers: [{ frame: 12, label: 'HIT' }, { frame: 36, label: 'END' }],
+    tracks: [
+      { tid: 'h_bg', type: 'image', name: 'BG', width: CH_FIX.W, height: CH_FIX.H,
+        cells: [{ kind: 'draw', duration: CH_FIX.frames, id: 'hbg', image: chMakeCell('bg', 0) }],
+        composer: { keyframes: { z: [{ frame: 0, v: 240 }], x: [{ frame: 0, v: 0 }, { frame: last, v: -30 }] } } },
+      { tid: 'h_char', type: 'anim', name: 'CHAR', width: CH_FIX.cellW, height: CH_FIX.cellH, cells,
+        composer: { keyframes: {
+          x:   [{ frame: 0, v: -300 }, { frame: 24, v: 0, ez: 0.8 }, { frame: last, v: 280 }],
+          y:   [{ frame: 0, v: 40 }, { frame: 12, v: -60, eo: 60 }, { frame: 24, v: 40, ei: 60 }, { frame: last, v: 0 }],
+          s:   [{ frame: 0, v: 0.9 }, { frame: 24, v: 1.25, ez: 1 }, { frame: last, v: 0.9 }],
+          rot: [{ frame: 0, v: -6 }, { frame: 24, v: 0, hold: true }, { frame: last, v: 9 }],
+          op:  [{ frame: 0, v: 1 }, { frame: 40, v: 1 }, { frame: last, v: 0.4 }],
+        }, markers: [{ frame: 24, label: 'TOP' }] } },
+      { tid: 'h_null', type: 'null', name: 'NULL',
+        composer: { keyframes: { x: [{ frame: 0, v: 0 }, { frame: last, v: 70, ez: 0.5 }],
+                                 y: [{ frame: 0, v: 0 }, { frame: last, v: -24 }] } } },
+      { tid: 'h_fg', type: 'image', name: 'FG', width: CH_FIX.W, height: CH_FIX.H, parent: 'h_null',
+        cells: [{ kind: 'draw', duration: CH_FIX.frames, id: 'hfg', image: chMakeCell('fg', 0) }],
+        composer: { keyframes: { z: [{ frame: 0, v: -150 }] } } },
+      { tid: 'h_cam', type: 'camera', name: 'CAMERA',
+        composer: { keyframes: {
+          x:   [{ frame: 0, v: 0 }, { frame: last, v: 90, ez: 0.7 }],
+          z:   [{ frame: 0, v: 0 }, { frame: last, v: 70 }],
+          rot: [{ frame: 0, v: 0 }, { frame: last, v: -3 }],
+          s:   [{ frame: 0, v: 1 }, { frame: last, v: 1.08 }],
+        } } },
+    ],
+  };
+}
+
+// 画面と同じ重ね順で1枚に合成（コンポ合成 → ガイド）
+function chComposite(){
+  if(!chShotCtx) return;
+  drawFrame(chShotCtx, CH_FIX.W, CH_FIX.H, state.currentFrame); // 先頭で背景を塗るのでclear不要
+  renderGuides();
+  chShotCtx.drawImage(guideCanvas, 0, 0);
+}
+
+async function chBuildFixture(){
+  if(!HARNESS_ON){
+    throw new Error('VERIFY HARNESS: ?harness=1 の窓でのみ実行できます（本窓の作業を壊さないため）');
+  }
+  if(window.__DET__) await window.__DET__.ensureRenderReady();   // フォント/画像
+  if(state.isPlaying) pause();
+  clearTimeout(gAsTimer);
+
+  // 実際のIMPORT経路に流す（読み込み側も検証対象に入る）
+  loadJSON(chBuildPayload());
+
+  // data URL のデコード完了を待つ（未完了の画像は drawOneTrack がスキップする＝空フレームになる）
+  const imgs = [];
+  for(const t of state.tracks) for(const ci of t.cellInfos) if(ci.image) imgs.push(ci.image);
+  await Promise.all(imgs.map(im => im.complete
+    ? (im.decode ? im.decode().catch(() => {}) : Promise.resolve())
+    : new Promise(res => { im.addEventListener('load', res, { once: true }); im.addEventListener('error', res, { once: true }); })));
+
+  // 表示状態を固定（ガイドの線幅がビューのズーム依存なので view.zoom も固定する）
+  state.guides.resOn = true;  state.guides.resW = 854; state.guides.resH = 480;
+  state.guides.safeOn = true; state.guides.safeA = 90; state.guides.safeB = 80;
+  state.view.zoom = 1; state.view.panX = 0; state.view.panY = 0;
+  state.currentFrame = 0;
+
+  // 撮影用キャンバス（コンポ解像度そのまま＝1:1）
+  if(!chShotCv){
+    chShotCv = document.createElement('canvas');
+    chShotCv.id = 'harness-shot';
+    chShotCv.style.cssText = 'position:fixed;left:0;top:0;z-index:99999;pointer-events:none;background:#000;';
+    document.body.appendChild(chShotCv);
+    chShotCtx = chShotCv.getContext('2d');
+  }
+  chShotCv.width = CH_FIX.W; chShotCv.height = CH_FIX.H;
+  chShotCv.style.width = CH_FIX.W + 'px'; chShotCv.style.height = CH_FIX.H + 'px';
+  chShotCtx.imageSmoothingEnabled = false;
+  chComposite();
+
+  // Pass2（実クロックperf）: injectが無い＝__TEST_MODE__ が立たない側でだけ自走させる。
+  // COMPOSER本来の再生ループ（tick→drawCurrentFrame）を回してLoAFを実測する。
+  if(!window.__TEST_MODE__){ state.loop = true; play(); }
+}
+
+window.__HARNESS__ = {
+  version: 1,
+  kind: 'canvas2d',
+  canvas: '#harness-shot',
+  ready(){ return chReadyPromise || (chReadyPromise = chBuildFixture()); },
+  // t(ms) → コマ番号。ワークエリア内で折り返す（状態を決めるだけで描かない）
+  seek(t){
+    const wa = state.workArea || { startFrame: 0, endFrame: state.totalFrames };
+    const span = Math.max(1, wa.endFrame - wa.startFrame);
+    state.currentFrame = wa.startFrame + (Math.floor(t * state.fps / 1000) % span);
+  },
+  render(){ chComposite(); },
+  // Canvas2Dなので GPU VRAM ではなく素材画像の実RAM量。予算キー互換のため
+  // vramBytesEstimate の名前で返す（budget.maxVramBytes が効く）。
+  info(){
+    const seen = new Set();
+    let px = 0;
+    for(const t of state.tracks) for(const ci of t.cellInfos){
+      if(!ci.image || seen.has(ci.image)) continue;
+      seen.add(ci.image);
+      px += (ci.image.naturalWidth || 0) * (ci.image.naturalHeight || 0) * 4;
+    }
+    return {
+      tracks: state.tracks.length,
+      images: seen.size,
+      totalFrames: state.totalFrames,
+      pixelBytes: px,
+      vramBytesEstimate: px,
+    };
+  },
+};
 </script>
 </body>
 </html>

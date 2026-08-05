@@ -13,6 +13,8 @@
 - `index.html` — ランディングページ（**OBAN 追加予定**）
 - `inbetween_lab.html` / `inbetween_warp_lab.html` — 中割り実験ラボ
 - `tools/check.js` — 依存ゼロのスモークチェック（構文/配線/ID重複/デッドコード）
+- `verify/` — VERIFY HARNESS（決定論VRT＋パフォーマンス予算。SPEC_08）。**ANIMATOR / COMPOSER 実装済み**。
+  詳細は [verify/CLAUDE.md](verify/CLAUDE.md)
 
 ドキュメント（ハンドオーバー／仕様）:
 - `ANIMATOR_HANDOVER.md` — animator 実装メモ／設計履歴（深掘りはこちら）
@@ -48,6 +50,15 @@ https://claude.ai/code/artifact/a57e3c0b-064f-4e1b-97d2-a158602ab07b
 node tools/check.js
 ```
 6ファイル（animator / oban-builder / composer / index / manga-plate / econte）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※type属性の無い `<script>` のみJS扱い（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。
+
+**描画・合成まわりを触ったら、続けて見た目の回帰検査も走らせる**（SPEC_08）:
+```
+cd verify && npm run verify:animator
+cd verify && npm run verify:composer
+```
+コマ送り6点を作業解像度そのままで撮って前回の承認済み画像と比較する（PASS=0%）。
+意図した変更で差分が出たら `UPDATE_BASELINE=1 node harness/runner.mjs verify.<tool>.config.json` で承認。
+`artifacts/summary.json` だけ読めば合否と崩れた位置が分かる。詳細は [verify/CLAUDE.md](verify/CLAUDE.md)。
 
 ## デプロイ
 - `animator.html` / `composer.html` を直接編集 → 構文チェック → **明示依頼があったときのみ** master に commit & push。

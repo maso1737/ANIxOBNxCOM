@@ -310,3 +310,28 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
 
 【変更後チェック】
 node -e "const fs=require('fs');const h=fs.readFileSync('composer.html','utf8');const m=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]).filter(s=>s.length>200).join('\n;\n');new Function(m);console.log('OK')"
+
+## VERIFY HARNESS（決定論VRT・2026-08-05 実装）
+
+`composer.html` 末尾に `window.__HARNESS__` 契約を実装済み。`verify/` の runner が
+**合成結果が前回と1pxでも変わっていないか**を自動判定する（SPEC_08 / `verify/CLAUDE.md`）。
+
+合成まわり（`drawFrame` / `drawOneTrack` / `applyTrackChain` / `getCamAt` / `getKfValue` /
+`tracksInDrawOrder` / `renderGuides`）を触ったら実行すること:
+
+```
+cd verify && npm run verify:composer
+```
+
+覚えておくこと4点:
+
+- **`?harness=1`（`HARNESS_ON`）の窓でしか動かない。** フィクスチャは現在のコンポを捨てて
+  組み直すため。同じ鍵で `scheduleAutosave` / `saveAutosaveCells` / `checkAutosaveRestore` も
+  止めてあり、**検証窓は `composer_autosave_v1` を一度も開かない**。
+- **素材はその場で生成した PNG data URL を `loadJSON()` に流す**（PROJECT_v2）。
+  ＝ `parseTrackFromJSON` の読み込み側も検証対象。画像デコード待ちは `ready()` が `img.decode()` で行う。
+- **フィクスチャのトラック構成が検証範囲**: BG(Z奥) / CHAR(別解像度・空セル・イーズ3種) /
+  NULL(親) / FG(Z手前・親あり・アルファ) / CAMERA(パン・ドリー・回転・ズーム)。
+- **撮影は `drawFrame()` をコンポ解像度1:1で叩いた `#harness-shot`。** `drawCurrentFrame()` は
+  通さないので **FXチェーン（SATSUEI）とドラフト再生は現状カバー外**。FXも検証したくなったら
+  別ラベルの config を足す（WebGL経路なので baseline の環境依存が強くなる点に注意）。

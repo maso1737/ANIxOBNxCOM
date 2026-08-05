@@ -4841,6 +4841,23 @@ function onionTint(drawData, hex){
 // PLAYBACK
 // ============================================================
 let playRAF = 0;
+
+// 範囲内のtickから idx と「実描画フレームidx」を返す（tick→表示コマの純関数）
+// 空ブロック／非表示コマの場合は直前のdrawフレームを返す。
+// ※ 再生ループと VERIFY HARNESS の seek() が共有する唯一の定義（ズレ防止）
+function frameAtTick(tick){
+  let acc = 0;
+  let lastDrawIdx = -1;
+  for(let i = 0; i < state.frames.length; i++){
+    const f = state.frames[i];
+    if(f.kind === 'draw' && !f.hidden) lastDrawIdx = i;
+    acc += f.duration;
+    if(tick < acc){
+      return { idx: i, showIdx: (f.kind === 'draw' && !f.hidden) ? i : lastDrawIdx };
+    }
+  }
+  return { idx: state.frames.length - 1, showIdx: lastDrawIdx };
+}
 function play(){
   if(state.frames.length === 0) return;
   // ワークエリアが妥当か確認
@@ -4861,22 +4878,6 @@ function play(){
   // フルレンジ時はREF延長分まで再生（手元が短くてもREFを最後まで流す）
   const endTick = workAreaIsFull() ? Math.max(state.workEnd, maxRefTicks()) : state.workEnd; // exclusive
   const rangeTicks = Math.max(1, endTick - startTick);
-
-  // 範囲内のtickから idx と「実描画フレームidx」を返す
-  // 空ブロックの場合は直前のdrawフレームを返す
-  function frameToShowAt(tick){
-    let acc = 0;
-    let lastDrawIdx = -1;
-    for(let i = 0; i < state.frames.length; i++){
-      const f = state.frames[i];
-      if(f.kind === 'draw' && !f.hidden) lastDrawIdx = i;
-      acc += f.duration;
-      if(tick < acc){
-        return { idx: i, showIdx: (f.kind === 'draw' && !f.hidden) ? i : lastDrawIdx };
-      }
-    }
-    return { idx: state.frames.length - 1, showIdx: lastDrawIdx };
-  }
 
   let lastShown = -1;
   let lastTick  = -1;
@@ -4904,7 +4905,7 @@ function play(){
       }
     }
 
-    const { idx, showIdx } = frameToShowAt(tick);
+    const { idx, showIdx } = frameAtTick(tick);
     if(idx !== lastShown){
       lastShown = idx;
       state.currentFrame = idx;
@@ -8866,7 +8867,8 @@ window.addEventListener('resize', () => {
   if(state.fitMode) fitToStage();
 });
 
-(async function init(){
+// 起動完了のPromise。VERIFY HARNESS の ready() が「初期化が終わったか」を待つのに使う
+const gBootPromise = (async function init(){
   fitToStage();
   setupStripScroll();
   setupWorkArea();
@@ -8980,6 +8982,221 @@ window.addEventListener('beforeunload', e => {
     flushSave();
   }
 });
+
+// ============================================================
+// VERIFY HARNESS 契約（SPEC_08 / スキル single-html-verify）
+//   window.__HARNESS__ = {version,kind,canvas,ready,seek,render,info}
+//   verify/harness/runner.mjs が「中身を知らずに」検証するための共通面。
+//
+//   ・通常操作では一切走らない。ready() を呼ぶのは runner だけ。
+//   ・**?ro=1（AUTOSAVE_OFF）の窓でしか動かない**。フィクスチャは現在の
+//     コマを全部捨てるので、本窓で誤って呼ばれても IndexedDB を壊さないための鍵。
+//   ・撮影対象は「stageのCSS表示」ではなく、レイヤーを作業解像度そのままで
+//     合成した専用キャンバス #harness-shot（1:1）。ズーム/ウィンドウサイズに
+//     左右されず、線1本の差まで pixelmatch に乗る。
+//   ・seek(t) は再生と同じ tick→コマ の純関数 frameAtTick() を共有する。
+// ============================================================
+const H_FIX = {
+  W: 1024, H: 576,     // 検証用の作業解像度（既定2048×1152の半分。16:9のまま）
+  fps: 24,
+  zoom: 0.5,           // renderGuides の線幅がズーム依存なので固定する
+  // duration の並び。5番目(idx5)だけ空ブロック＝「空コマは直前の絵を出す」経路も踏む
+  durations: [2, 2, 3, 2, 4, 2, 2, 3],
+  emptyAt: 5,
+};
+let hShotCv = null, hShotCtx = null;
+let hReadyPromise = null;
+let hShowIdx = -1;
+
+// 決定論PRNG（Math.random に依存しない＝injectの無いPass2でも同じ絵になる）
+function hRng(seed){
+  let s = seed >>> 0;
+  return function(){ s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+// 1コマぶんのテスト画を drawCtx に描く。
+// animator の描画プリミティブ（ブレゼンハム／可変ドット／筆圧補間／バケツ）を
+// ひと通り踏むことで、ラスタライズの回帰がそのまま差分として出る。
+function hDrawTestArt(i, n){
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  const rnd = hRng(0x9E37 + i * 7919);
+  const t = n > 1 ? i / (n - 1) : 0;
+  // ① ボール: 閉じた多角形の輪郭（drawLine）→ 内側を floodFill
+  const cx = Math.round(W * 0.18 + W * 0.64 * t);
+  const cy = Math.round(H * 0.72 - Math.sin(t * Math.PI) * H * 0.46);
+  const r  = Math.round(Math.min(W, H) * 0.11);
+  let px = cx + r, py = cy;
+  for(let k = 1; k <= 24; k++){
+    const a = k / 24 * Math.PI * 2;
+    const nx = Math.round(cx + Math.cos(a) * r);
+    const ny = Math.round(cy + Math.sin(a) * r * 0.92);
+    drawLine(drawCtx, px, py, nx, ny, 3, '#000000');
+    px = nx; py = ny;
+  }
+  floodFill(cx, cy, '#2f6ad0');
+  // ② 筆圧線（入り抜き）＝ 半径補間つきブレゼンハム
+  drawLineRadius(drawCtx,
+    Math.round(W * 0.08), Math.round(H * 0.12 + i * 4),
+    Math.round(W * 0.92), Math.round(H * 0.20 + i * 4),
+    1, 9, '#000000');
+  // ③ ばら撒き線（1px/2px の固定ドット経路）
+  for(let k = 0; k < 6; k++){
+    const x0 = Math.round(rnd() * W);
+    const y0 = Math.round(H * 0.55 + rnd() * H * 0.4);
+    drawLine(drawCtx, x0, y0,
+      x0 + Math.round((rnd() - 0.5) * W * 0.18),
+      y0 + Math.round((rnd() - 0.5) * H * 0.18),
+      1 + (k % 2), '#000000');
+  }
+  // ④ 1pxドット列
+  for(let k = 0; k < 12; k++) drawDot(drawCtx, 8 + k * 7, 8 + (i % 3) * 3, 1, '#000000');
+}
+
+// 画面と同じ重ね順でレイヤーを1枚に合成（bg → onion → draw → guide）
+function hComposite(){
+  if(!hShotCtx) return;
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  hShotCtx.clearRect(0, 0, W, H);
+  hShotCtx.drawImage(bgCanvas, 0, 0);
+  if(state.onionOn){
+    hShotCtx.globalAlpha = ONION.opacity;   // CSS opacity と同値
+    hShotCtx.drawImage(onionPrev, 0, 0);
+    hShotCtx.drawImage(onionNext, 0, 0);
+    hShotCtx.globalAlpha = 1;
+  }
+  hShotCtx.drawImage(drawCanvas, 0, 0);
+  hShotCtx.drawImage(guideLayerCanvas, 0, 0);
+}
+
+// 決定論フィクスチャを組む（毎回まったく同じドキュメントを作る）
+async function hBuildFixture(){
+  if(!AUTOSAVE_OFF){
+    throw new Error('VERIFY HARNESS: ?ro=1 の窓でのみ実行できます（本窓の作業を壊さないため）');
+  }
+  await gBootPromise;
+  if(window.__DET__) await window.__DET__.ensureRenderReady();  // フォント/画像
+  // 書き込み系タイマーを止める（ro=1でも空振りさせない）
+  if(state.saveTimer){ clearTimeout(state.saveTimer); state.saveTimer = null; }
+  if(tlTimer){ clearInterval(tlTimer); tlTimer = null; }
+  if(state.playing) stop();
+
+  // 描画状態を既定に固定（localStorage 復元値の影響を消す）
+  state.tool = 'pen'; state.inkColor = 'black'; state.fillColor = '#2f6ad0';
+  state.fillErase = false; state.pressurePen = false; state.mirrorOn = false;
+  state.flipped = false; state.frameLayer.editMode = false;
+  state.frameLayer.x = 0; state.frameLayer.y = 0; state.frameLayer.scale = 1;
+  state.refImages = []; state.refAnimators = []; state.bgBright = 100;
+  state.fps = H_FIX.fps;
+
+  // 作業解像度を固定
+  setCanvasSize(H_FIX.W, H_FIX.H);
+  setupCanvas();
+
+  // コマを作り直す（draw × 7 ＋ 空ブロック × 1）
+  state.frames = [];
+  for(let i = 0; i < H_FIX.durations.length; i++){
+    if(i === H_FIX.emptyAt){
+      state.frames.push({ id: newFrameId(), kind: 'empty', duration: H_FIX.durations[i], history: [], histIdx: -1, thumbCanvas: null });
+      continue;
+    }
+    const f = createBlankFrame();
+    f.duration = H_FIX.durations[i];
+    drawCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
+    hDrawTestArt(i, H_FIX.durations.length);
+    syncFrameFromCanvas(f);
+    f.dirty = false;
+    state.frames.push(f);
+    // 1コマずつタスクを切る。まとめて描くとフィクスチャ構築自体が
+    // 長いフレーム(LoAF)として計上され、Pass2のperf実測を汚すため。
+    await new Promise(r => setTimeout(r, 0));
+  }
+  state.currentFrame = 0;
+  state.pendingSaveFrames.clear();
+  state.dirty = false;
+  resetGlobalHistory();
+
+  // オニオン・ガイドも検証対象に入れる（両方とも合成に乗る）
+  state.onionOn = true;
+  ONION.prevN = 2; ONION.nextN = 1; ONION.opacity = 0.35;
+  ONION.prevColor = '#DC3C3C'; ONION.nextColor = '#3C78DC';
+  applyOnionOpacity();
+  state.guides.resOn = true;  state.guides.resW = 960; state.guides.resH = 540;
+  state.guides.safeOn = true; state.guides.safeA = 90; state.guides.safeB = 80;
+
+  // 再生範囲＝全域、表示ズームは固定（FITはウィンドウ依存なので使わない）
+  state.workStart = 0; state.workEnd = totalTicks();
+  ensureWorkAreaValid();
+  state.zoom = H_FIX.zoom; state.fitMode = false; state.panX = 0; state.panY = 0;
+  applyZoom();
+  buildStrip();
+  refreshFrameUI();
+
+  // 撮影用キャンバス（作業解像度そのまま＝1:1）
+  if(!hShotCv){
+    hShotCv = document.createElement('canvas');
+    hShotCv.id = 'harness-shot';
+    hShotCv.style.cssText = 'position:fixed;left:0;top:0;z-index:9999;pointer-events:none;background:#fff;';
+    document.body.appendChild(hShotCv);
+    hShotCtx = hShotCv.getContext('2d');
+  }
+  hShotCv.width = CFG.WORK_W; hShotCv.height = CFG.WORK_H;
+  hShotCv.style.width = CFG.WORK_W + 'px'; hShotCv.style.height = CFG.WORK_H + 'px';
+  hShotCtx.imageSmoothingEnabled = false;
+
+  window.__HARNESS__.seek(0);
+  window.__HARNESS__.render();
+
+  // Pass2（実クロックperf）: injectが無い＝__TEST_MODE__ が立たない側でだけ自走させる。
+  // 再生ループ＋合成を回してLoAFを実測する。Pass1では絶対に回さない（seek/renderと競合する）。
+  if(!window.__TEST_MODE__){
+    state.loop = true;
+    play();
+    const spin = () => { hComposite(); requestAnimationFrame(spin); };
+    requestAnimationFrame(spin);
+  }
+}
+
+window.__HARNESS__ = {
+  version: 1,
+  kind: 'canvas2d',
+  canvas: '#harness-shot',
+  ready(){ return hReadyPromise || (hReadyPromise = hBuildFixture()); },
+  // t(ms) → 再生ティック → 表示コマ。状態を決めるだけで描かない（契約どおり純関数）
+  seek(t){
+    const span = Math.max(1, state.workEnd - state.workStart);
+    const tick = state.workStart + (Math.floor(t / (1000 / state.fps)) % span);
+    const r = frameAtTick(tick);
+    state.currentFrame = r.idx;
+    hShowIdx = r.showIdx;
+  },
+  // 現在状態を1回だけ同期描画
+  render(){
+    const f = hShowIdx >= 0 ? state.frames[hShowIdx] : null;
+    if(f && f.kind === 'draw'){
+      drawCtx.putImageData(new ImageData(new Uint8ClampedArray(f.drawData), CFG.WORK_W, CFG.WORK_H), 0, 0);
+    } else {
+      drawCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
+    }
+    updateOnion();
+    renderGuides();
+    hComposite();
+  },
+  // Canvas2Dなので GPU VRAM ではなく ImageData の実RAM量。
+  // 予算キー互換のため vramBytesEstimate の名前で返す（budget.maxVramBytes が効く）。
+  info(){
+    let px = 0, snaps = 0;
+    for(const f of state.frames){
+      if(f.drawData) px += f.drawData.length;
+      if(f.history) for(const s of f.history){ if(s && s.data) snaps += s.data.length; }
+    }
+    return {
+      frames: state.frames.length,
+      pixelBytes: px,
+      historyBytes: snaps,
+      vramBytesEstimate: px + snaps,
+    };
+  },
+};
 </script>
 
 

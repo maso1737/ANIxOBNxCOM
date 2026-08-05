@@ -1,0 +1,18 @@
+{
+  "name": "anixobnxcom-verify",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ANIMATOR / OBAN / COMPOSER 用の決定論的検証ハーネス（SPEC_08 / single-html-verify の複製）",
+  "scripts": {
+    "verify:animator": "node harness/runner.mjs verify.animator.config.json",
+    "approve:animator": "UPDATE_BASELINE=1 node harness/runner.mjs verify.animator.config.json",
+    "verify:composer": "node harness/runner.mjs verify.composer.config.json",
+    "approve:composer": "UPDATE_BASELINE=1 node harness/runner.mjs verify.composer.config.json"
+  },
+  "devDependencies": {
+    "pixelmatch": "^6.0.0",
+    "playwright": "1.61.1",
+    "pngjs": "^7.0.0"
+  }
+}

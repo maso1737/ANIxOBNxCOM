@@ -1,0 +1,26 @@
+{
+  "tool": "composer",
+  "root": "..",
+  "html": "composer.html?harness=1",
+
+  "seeks": [
+    { "label": "c01_f0",       "timeMs": 0 },
+    { "label": "c02_f9",       "timeMs": 375 },
+    { "label": "c03_f18",      "timeMs": 750 },
+    { "label": "c04_f24_hold", "timeMs": 1000 },
+    { "label": "c05_f30_empty","timeMs": 1250 },
+    { "label": "c06_f44_fade", "timeMs": 1834 }
+  ],
+
+  "vrt": { "colorThreshold": 0.1, "allowedPixelRatio": 0.0002 },
+
+  "perfPass": { "enabled": true, "sampleMs": 2000, "samples": 8 },
+
+  "budget": {
+    "maxTTFFms": 800,
+    "maxLongestFrameMs": 300,
+    "maxVramBytes": 12582912
+  },
+
+  "timeoutMs": 30000
+}
