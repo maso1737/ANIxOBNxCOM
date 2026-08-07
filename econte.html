@@ -150,6 +150,12 @@ body{
 }
 .sp-row:hover{border-color:var(--border-bright)}
 .sp-row.focus{border-color:var(--ice);background:rgba(90,233,255,.09);box-shadow:0 0 10px rgba(90,233,255,.18)}
+.sp-row.dragging{opacity:.45;border-style:dashed}
+#sheet-list{position:relative}
+#sp-drop{
+  position:absolute;left:6px;right:6px;height:2px;background:var(--acid);
+  box-shadow:0 0 8px rgba(255,79,168,.9);display:none;pointer-events:none;z-index:5;
+}
 .sp-head{display:flex;align-items:center;gap:6px;margin-bottom:4px}
 .sp-no{font-family:var(--bank);font-size:12px;letter-spacing:.08em;color:var(--acid)}
 .sp-dur{
@@ -203,6 +209,26 @@ body{
 #color-swatch{
   width:100%;height:26px;border:1px solid var(--border);cursor:default;
 }
+/* ---------- HSV ピッカー（SPEC_13 §9e） ---------- */
+.hsv-row{display:flex;align-items:center;gap:4px;margin-bottom:3px}
+.hsv-k{color:var(--grey);font-size:9px;min-width:9px}
+.hsv-sl{
+  flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:14px;
+  border:1px solid var(--border);cursor:pointer;background:#000;
+}
+.hsv-sl::-webkit-slider-thumb{
+  -webkit-appearance:none;width:7px;height:18px;margin-top:-2px;cursor:pointer;
+  background:#fff;border:1px solid #000;box-shadow:0 0 3px rgba(0,0,0,.7);
+}
+.hsv-sl::-moz-range-thumb{width:7px;height:18px;background:#fff;border:1px solid #000;border-radius:0}
+.hsv-num{
+  width:32px;flex:none;background:var(--black);border:1px solid var(--border);color:var(--gold);
+  font-family:var(--mono);font-size:9px;text-align:right;padding:2px 3px;
+  -webkit-user-select:text;user-select:text;
+}
+.hsv-num:focus{outline:none;border-color:var(--border-bright)}
+.hsv-step{display:flex;flex-direction:column;gap:1px}
+.hsv-step .btn{padding:0 3px;font-size:6px;line-height:1.3}
 .palette{display:grid;grid-template-columns:repeat(8,1fr);gap:3px}
 .pal-cell{aspect-ratio:1;cursor:pointer;border:1px solid rgba(255,255,255,.12)}
 .pal-cell.on{outline:2px solid var(--acid);outline-offset:1px;border-color:transparent}
@@ -214,6 +240,26 @@ body{
   background:radial-gradient(ellipse 60% 60% at 50% 40%,rgba(184,80,255,0.07),transparent 70%);
 }
 #edit-cv{background:#888;box-shadow:0 0 30px rgba(0,0,0,.6);touch-action:none;cursor:crosshair;flex:none}
+/* ---------- EDIT GRID（カラースクリプト編集・SPEC_13 §9b） ---------- */
+#edit-grid{
+  flex:1;min-width:0;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:14px;background:radial-gradient(ellipse 60% 60% at 50% 30%,rgba(184,80,255,0.06),transparent 70%);
+}
+#edit-main.grid #edit-stage{display:none}
+#edit-main.grid #edit-grid{display:block}
+#grid-wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.gc{position:relative}
+.gc-cv{
+  width:100%;height:auto;aspect-ratio:16/9;display:block;background:#222;
+  border:1px solid var(--border);touch-action:none;cursor:crosshair;
+}
+.gc.on .gc-cv{border-color:var(--acid);box-shadow:0 0 12px rgba(255,79,168,.35)}
+.gc-cap{display:flex;align-items:baseline;gap:6px;margin-top:3px;font-size:9px;letter-spacing:.06em}
+.gc-no{font-family:var(--bank);color:var(--acid)}
+.gc-sub{color:var(--grey);font-family:var(--mono);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.gc-cap .btn{padding:1px 5px;font-size:8px}
+.gc-sep{grid-column:1/-1;height:1px;background:rgba(255,210,122,.22);margin:2px 0}
+#grid-empty{color:var(--grey);font-family:var(--jp);font-size:12px;padding:20px;text-align:center}
 #edit-zoom{color:var(--gold);font-size:10px;letter-spacing:.08em;min-width:42px}
 /* ---------- TIMELINE（STUDIO中央のプレビュー＋最下段の帯） ---------- */
 #tl-stage{
@@ -288,6 +334,29 @@ body{
 }
 #modal-input:focus{outline:none;border-color:var(--border-bright)}
 #modal-btns{display:flex;gap:8px;justify-content:flex-end}
+/* ---------- SETTINGS（ショートカット一覧・表示のみ） ---------- */
+#help-ovl{
+  position:fixed;inset:0;z-index:280;background:rgba(7,3,15,.78);display:none;
+  align-items:center;justify-content:center;padding:24px;
+}
+#help-ovl.on{display:flex}
+#help-box{
+  background:var(--panel);border:1px solid var(--border-bright);padding:18px 22px;
+  max-width:760px;width:100%;max-height:100%;overflow-y:auto;
+  box-shadow:0 0 40px rgba(255,79,168,.2);
+}
+#help-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+#help-head .t{font-family:var(--bank);font-size:13px;letter-spacing:.24em;color:var(--acid)}
+#help-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.help-grp{border:1px solid var(--border);padding:9px 11px}
+.help-grp h4{font-family:var(--bank);font-size:9px;letter-spacing:.2em;color:var(--gold);margin-bottom:6px;font-weight:400}
+.help-grp .r{display:flex;gap:8px;align-items:baseline;padding:2px 0;font-family:var(--jp);font-size:11px}
+.help-grp .k{
+  font-family:var(--mono);font-size:10px;color:var(--ice);white-space:nowrap;
+  border:1px solid var(--border);padding:1px 5px;min-width:74px;text-align:center;flex:none;
+}
+.help-grp .d{color:rgba(248,239,255,.78);line-height:1.5}
+#help-note{color:var(--dim);font-size:10px;font-family:var(--jp);margin-top:12px;line-height:1.6}
 </style>
 </head>
 <body>
@@ -299,10 +368,14 @@ body{
   <button class="btn ex" id="btn-import">+ IMPORT PHOTO</button>
   <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none;">
   <button class="btn" id="btn-clip-paste" title="ref-board の ⧉ でコピーしたクリップJSONを貼り付け（別オリジン/file:// 用）">&#9187; CLIP</button>
+  <button class="btn" id="btn-proj-export" title="プロジェクトをZIPで書き出し（写真＋枠列＋加筆。ベイクは含めない）">&#8681; PROJ</button>
+  <button class="btn" id="btn-proj-import" title="プロジェクトZIPを読み込み（現在の内容は置き換わります）">&#8679; PROJ</button>
+  <input type="file" id="proj-file-input" accept=".zip,application/zip" style="display:none;">
   <label id="burnin-label"><input type="checkbox" id="chk-burnin"> C#/尺 焼き込み</label>
   <button class="btn ex" id="btn-export" title="実時間で再生しながら録画します（タブを前面のまま待つ）">EXPORT VIDEO</button>
   <span id="bar-total">0 CUTS</span>
   <span id="save-dot"></span>
+  <button class="btn" id="btn-help" title="ショートカット一覧 (?)">&#9881;</button>
   <button class="btn mode on" id="btn-sheet-toggle" title="右のSHEETパネルを開閉">≡</button>
   <button class="btn" id="btn-fs" title="フルスクリーン切替">⛶</button>
   <button class="btn" id="btn-home" title="ランディングページに戻る">HOME</button>
@@ -395,6 +468,7 @@ body{
             <span class="sld-val" id="tl-base-alpha-val">100%</span>
           </div>
           <div id="tl-mini-swatch" title="現在色（スポイトで選択スロットに上書き）"></div>
+          <div id="tl-hsv-box"></div>
           <div class="palette" id="tl-palette"></div>
           <div class="pal-btns">
             <button class="btn" id="btn-tl-pal-add" title="色スロットを追加">＋</button>
@@ -430,7 +504,7 @@ body{
         <button class="btn ex" id="btn-add-empty">+ 空コマ</button>
         <span id="sheet-total"></span>
       </div>
-      <div id="sheet-list"></div>
+      <div id="sheet-list"><div id="sp-drop"></div></div>
     </div>
 
   </div>
@@ -461,6 +535,8 @@ body{
 <div class="view" id="view-edit">
   <div id="edit-top">
     <button class="btn" id="btn-edit-back">&#9666; STUDIO</button>
+    <button class="btn mode on" id="btn-mode-single" title="1カットを全面で加筆">SINGLE</button>
+    <button class="btn mode" id="btn-mode-grid" title="一覧でカラースクリプトを描く">GRID</button>
     <button class="btn" id="btn-cut-prev">&#9664;</button>
     <span id="edit-cut-label">C1</span>
     <button class="btn" id="btn-cut-next">&#9654;</button>
@@ -487,6 +563,24 @@ body{
         </div>
       </div>
       <div>
+        <div class="pnl-t">描く先</div>
+        <div class="etools">
+          <div class="etool on" data-target="draw" title="線画レイヤー（加筆）">線画</div>
+          <div class="etool" data-target="color" title="カラースクリプト層（一覧と同じレイヤー）">色</div>
+        </div>
+      </div>
+      <div>
+        <div class="pnl-t">COLOR LAYER（カラースクリプト）</div>
+        <div class="sld-row">
+          <select id="color-blend" title="描画モード"></select>
+        </div>
+        <div class="sld-row">
+          <span class="sld-k">濃</span>
+          <input type="range" id="color-alpha" min="0" max="100" value="100" title="カラー層の不透明度">
+          <span class="sld-val" id="color-alpha-val">100%</span>
+        </div>
+      </div>
+      <div>
         <div class="pnl-t">BRUSH</div>
         <div class="sld-row">
           <input type="range" id="brush-size" min="1" max="64" value="6">
@@ -496,6 +590,7 @@ body{
       <div>
         <div class="pnl-t">COLOR / PALETTE</div>
         <div id="color-swatch" title="現在色（スポイトで選択スロットに上書き）"></div>
+        <div id="hsv-box" style="margin-top:6px;"></div>
         <div class="palette" id="palette" style="margin-top:6px;"></div>
         <div class="pal-btns">
           <button class="btn" id="btn-pal-add" title="色スロットを追加（選択してスポイトで色を取り込み）">＋</button>
@@ -533,6 +628,22 @@ body{
       </div>
     </div>
     <div id="edit-stage"><canvas id="edit-cv" width="1280" height="720"></canvas></div>
+    <div id="edit-grid"><div id="grid-wrap"></div><div id="grid-empty">カットがありません</div></div>
+  </div>
+</div>
+
+<div id="help-ovl">
+  <div id="help-box">
+    <div id="help-head">
+      <span class="t">SETTINGS ／ SHORTCUTS</span>
+      <span style="flex:1"></span>
+      <button class="btn" id="btn-help-close">CLOSE</button>
+    </div>
+    <div id="help-body"></div>
+    <div id="help-note">
+      再生系のキー（Space / ←→ / Home / End / J / K / L）は localStorage <code>econte_keymap_v1</code> で
+      差し替えできます（アプリ内の再割当UIはありません）。
+    </div>
   </div>
 </div>
 
@@ -564,6 +675,11 @@ const LS_CLIP = 'refboard.clip.v1';
 const BC_NAME = 'refboard_live';
 const CLIP_MAX_AGE = 24 * 60 * 60 * 1000;   // 24時間以上前のクリップは無視（貼り忘れの誤爆防止）
 const HEIC_CDN = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+const JSZIP_CDN = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+const PROJ_FORMAT = 'ECONTE_PROJECT_v1';
+/* カラースクリプト専用レイヤー（SPEC_13 §9b）。ベイク空間の低解像度版・LRU対象外で常駐 */
+const COLOR_W = 512, COLOR_H = 288;
+const BLENDS = [['multiply', '乗算'], ['normal', '通常'], ['lighter', '加算'], ['screen', '発光'], ['overlay', 'オーバーレイ']];
 const $ = sel => document.querySelector(sel);
 
 const PALETTE_48 = [
@@ -583,7 +699,8 @@ const state = {
   brush: 6,
   curCut: -1,
   selPhoto: null,
-  selCut: null,          // {i,k} 選択中のCUT枠（k = cam[]の枠index。V2-Bでは常に0）
+  paintTarget: 'draw',   // 'draw'=線画レイヤー / 'color'=カラースクリプト層（V2-E2）
+  selCut: null,          // {i,k} 選択中のCUT枠（k = cam[]の枠index）
   editView: { x: 0, y: 0, z: 1 },   // EDITのズーム/パン（z=1 が fit）
   tl: { frame: 0, playing: false, loop: true, lastTs: 0, acc: 0 },
   board: { x: -800, y: -450, z: 0.5 }
@@ -611,11 +728,16 @@ function parseDur(str){
   if(m) return (+m[1]) * FPS;
   return null;
 }
-function blankCanvas(){
+function blankCanvas(w, h){
   const c = document.createElement('canvas');
-  c.width = CONTE_W; c.height = CONTE_H;
+  c.width = Math.max(1, Math.round(w || CONTE_W));
+  c.height = Math.max(1, Math.round(h || CONTE_H));
   ctx2d(c);
   return c;
+}
+/* カットのビットマップ寸法（V2-D2でカット毎に可変。CONTE_W/H は出力解像度の意味に純化） */
+function bakeSize(cut){
+  return { w: (cut && cut.bakeW) || CONTE_W, h: (cut && cut.bakeH) || CONTE_H };
 }
 function blobToImage(blob){
   return new Promise((res, rej) => {
@@ -626,8 +748,8 @@ function blobToImage(blob){
     img.src = url;
   });
 }
-function canvasToBlob(c){
-  return new Promise(res => c.toBlob(b => res(b), 'image/png'));
+function canvasToBlob(c, type, q){
+  return new Promise(res => c.toBlob(b => res(b), type || 'image/png', q));
 }
 
 /* ---------------- toast / modal ---------------- */
@@ -708,16 +830,17 @@ async function saveAll(){
     const cutItems = [];
     for(let i = 0; i < cuts.length; i++){
       const c = cuts[i];
-      if(c.dirtyBase){ c.baseBlob = c.baseC ? await canvasToBlob(c.baseC) : null; c.dirtyBase = false; }
-      if(c.dirtyDraw){ c.drawBlob = await canvasToBlob(c.drawC); c.dirtyDraw = false; }
+      await encodeCut(c);   // 非常駐カットは既に焼き付け済みなので何もしない
       cutItems.push({ id: c.id, order: i, bg: c.bg, durF: c.durF, note: c.note,
                       baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : 1),
                       cam: (c.cam || []).map(k => ({ k: k.k, x: k.x, y: k.y, w: k.w, h: k.h,
                                                      dur: k.dur | 0, ease: k.ease || 'LINEAR',
                                                      key: !!k.key, keyUser: !!k.keyUser })),
                       bakeRect: c.bakeRect || null, bakeW: c.bakeW || CONTE_W, bakeH: c.bakeH || CONTE_H,
-                      bakeExpand: c.bakeExpand || 1.02,
-                      baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null });
+                      bakeExpand: c.bakeExpand || 1.02, bakeClamp: c.bakeClamp || 1,
+                      colorBlend: colorBlendOf(c), colorAlpha: colorAlphaOf(c),
+                      baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null,
+                      colorBlob: c.colorBlob || null });
     }
     await idbClearPut('photos', phItems);
     await idbClearPut('cuts', cutItems);
@@ -756,25 +879,25 @@ async function loadAll(){
     const cutItems = await idbGetAll('cuts');
     cutItems.sort((a, b) => a.order - b.order);
     for(const c of cutItems){
-      const drawC = blankCanvas();
-      if(c.drawBlob){
-        const di = await blobToImage(c.drawBlob);
-        ctx2d(drawC).drawImage(di, 0, 0);
-      }
-      let baseC = null;
-      if(c.baseBlob){
-        baseC = blankCanvas();
-        const bi = await blobToImage(c.baseBlob);
-        ctx2d(baseC).drawImage(bi, 0, 0);
-      }
-      const cut = { id: c.id, baseC, drawC, bg: (typeof c.bg === 'number' ? c.bg : 232),
+      // V2-D2: ここではデコードしない（Blobが正・必要になったカットだけ ensureResident する）
+      const cut = { id: c.id, baseC: null, drawC: null, bg: (typeof c.bg === 'number' ? c.bg : 232),
                     baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : 1),
                     durF: c.durF || FPS * 2, note: c.note || '',
                     cam: c.cam || null, bakeRect: c.bakeRect || null,
                     bakeW: c.bakeW || CONTE_W, bakeH: c.bakeH || CONTE_H,
-                    bakeExpand: c.bakeExpand || 1.02,
+                    bakeExpand: c.bakeExpand || 1.02, bakeClamp: c.bakeClamp || 1,
+                    colorC: null, colorBlend: c.colorBlend || 'multiply',
+                    colorAlpha: (typeof c.colorAlpha === 'number' ? c.colorAlpha : 1),
                     baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null,
-                    dirtyBase: false, dirtyDraw: false, thumb: null };
+                    colorBlob: c.colorBlob || null,
+                    dirtyBase: false, dirtyDraw: false, dirtyColor: false, thumb: null };
+      // カラー層は小さいので **ここで復号して常駐させる**（一覧で待たせないため）
+      if(c.colorBlob){
+        try{
+          const ci = await blobToImage(c.colorBlob);
+          ctx2d(getColor(cut)).drawImage(ci, 0, 0);
+        }catch(e){}
+      }
       if(migrateCutV2(cut, c)) migrated++;
       cuts.push(cut);
     }
@@ -790,6 +913,117 @@ async function loadAll(){
   }
 }
 
+/* ---------------- 遅延デコード LRU（SPEC_13 §5d・V2-D2） ----------------
+   **Blob が正**。canvas は「今要るカット」だけ持つ。大判1カットは baseC+drawC で
+   最大66MBあるため、全カット常駐のままでは iPad が落ちる。
+   **`cut.baseC/drawC` を直接触らないこと**。必ず getBase()/getDraw()/ensureResident() 経由。 */
+const LRU_MAX = 8;
+let gLru = [];                    // 常駐カットの id（新しいほど後ろ＝新しい）
+function isResident(cut){ return !!(cut && cut.drawC); }
+let gEvictT = 0;
+function scheduleEvict(){
+  clearTimeout(gEvictT);
+  gEvictT = setTimeout(() => { evictLru(); }, 250);
+}
+function touchLru(cut){
+  if(!cut) return;
+  const k = gLru.indexOf(cut.id);
+  if(k >= 0) gLru.splice(k, 1);
+  gLru.push(cut.id);
+  if(gLru.length > LRU_MAX) scheduleEvict();   // 新規作成・アクセスだけでも溜まるので必ず掃く
+}
+function getDraw(cut){ if(isResident(cut)){ touchLru(cut); return cut.drawC; } requestResident(cut); return null; }
+/* カラースクリプト層は小さい（512×288）ので **LRUに乗せず常に持つ**。
+   一覧(GRID)で待たずに描けることが目的なので、ここを遅延にすると破綻する */
+function getColor(cut){
+  if(!cut) return null;
+  if(!cut.colorC) cut.colorC = blankCanvas(COLOR_W, COLOR_H);
+  return cut.colorC;
+}
+function hasColor(cut){ return !!(cut && cut.colorC); }
+function colorBlendOf(cut){ return (cut && cut.colorBlend) || 'multiply'; }
+function colorAlphaOf(cut){ return (cut && typeof cut.colorAlpha === 'number') ? clamp(cut.colorAlpha, 0, 1) : 1; }
+function getBase(cut){ if(isResident(cut)){ touchLru(cut); return cut.baseC; } requestResident(cut); return null; }
+/* 常駐させる（非同期）。描く前に必ずこれを await する経路を通す */
+function ensureResident(cut){
+  if(!cut) return Promise.resolve(null);
+  if(isResident(cut)){ touchLru(cut); return Promise.resolve(cut); }
+  if(cut.loading) return cut.loading;
+  cut.loading = (async () => {
+    const s = bakeSize(cut);
+    const drawC = blankCanvas(s.w, s.h);
+    if(cut.drawBlob){
+      try{ const im = await blobToImage(cut.drawBlob); ctx2d(drawC).drawImage(im, 0, 0); }catch(e){}
+    }
+    let baseC = null;
+    if(cut.baseBlob){
+      baseC = blankCanvas(s.w, s.h);
+      try{ const im = await blobToImage(cut.baseBlob); ctx2d(baseC).drawImage(im, 0, 0); }catch(e){}
+    }
+    cut.drawC = drawC;
+    cut.baseC = baseC;
+    cut.loading = null;
+    touchLru(cut);
+    await evictLru();
+    return cut;
+  })();
+  return cut.loading;
+}
+/* 非同期デコードを投げっぱなしで頼む（描画経路から呼ぶ用）。完了したら描き直す */
+let gResidentPending = 0;
+function requestResident(cut){
+  if(!cut || isResident(cut) || cut.loading) return;
+  gResidentPending++;
+  ensureResident(cut).then(() => {
+    gResidentPending--;
+    if(state.view === 'studio') renderTL(); else renderEditCanvas();
+  }).catch(() => { gResidentPending--; });
+}
+/* 追い出さないカット: EDIT中 / プレイヘッド前後1カット */
+function keepResident(cut){
+  const i = cuts.indexOf(cut);
+  if(i < 0) return false;
+  if(state.view === 'edit' && state.curCut === i) return true;
+  if(state.selCut && state.selCut.i === i) return true;   // 枠を編集中のカット
+  const ca = cutIndexAt(state.tl.frame);
+  return !!(ca && Math.abs(ca.i - i) <= 1);
+}
+async function encodeCut(cut){
+  // 追い出す前に dirty を焼き付ける（線画=PNG / 写真ベース=素材が覆っていればJPEG）
+  if(cut.dirtyBase){
+    cut.baseBlob = cut.baseC ? await canvasToBlob(cut.baseC, cut.baseOpaque ? 'image/jpeg' : 'image/png', 0.85) : null;
+    cut.dirtyBase = false;
+  }
+  if(cut.dirtyDraw && cut.drawC){
+    cut.drawBlob = await canvasToBlob(cut.drawC, 'image/png');
+    cut.dirtyDraw = false;
+  }
+  if(cut.dirtyColor && cut.colorC){   // カラー層は小さいので常にPNG
+    cut.colorBlob = await canvasToBlob(cut.colorC, 'image/png');
+    cut.dirtyColor = false;
+  }
+}
+async function evictLru(){
+  let guard = gLru.length + 4;
+  while(gLru.length > LRU_MAX && guard-- > 0){
+    const id = gLru[0];
+    const cut = cuts.find(c => c.id === id);
+    if(!cut){ gLru.shift(); continue; }
+    if(keepResident(cut)){ gLru.shift(); gLru.push(id); continue; }   // 保護対象は末尾へ回す
+    await encodeCut(cut);
+    cut.drawC = null;
+    cut.baseC = null;
+    gLru.shift();
+  }
+}
+/* プレイヘッド前後を先読みしておく（再生中に間に合わせるため） */
+let gPrefetchAt = -1;
+function prefetchAround(i){
+  if(i < 0 || i === gPrefetchAt) return;
+  gPrefetchAt = i;
+  [i, i + 1, i - 1].forEach(k => { if(cuts[k]) requestResident(cuts[k]); });
+}
+
 /* ---------------- view switching（STUDIO / EDIT） ---------------- */
 function setView(v){
   if(v !== 'studio') pause();   // 再生の取り残し防止（TIMELINE帯はSTUDIOにしかない）
@@ -798,8 +1032,15 @@ function setView(v){
   $('#view-edit').classList.toggle('on', v === 'edit');
   $('#btn-view-studio').classList.toggle('on', v === 'studio');
   $('#btn-view-edit').classList.toggle('on', v === 'edit');
-  if(v === 'studio'){ renderSheetPanel(); layoutStudio(); renderStudioSync(true); }
-  if(v === 'edit'){ fitEditCanvas(); renderEditCanvas(); }
+  if(v === 'studio'){
+    setPaintTarget('draw');   // STUDIOプレビューの直描きは線画（色はEDIT/GRIDの担当）
+    renderSheetPanel(); layoutStudio(); renderStudioSync(true);
+  }
+  if(v === 'edit'){
+    if(gEditMode === 'grid') renderGrid();
+    else { sizeEditCanvas(cuts[state.curCut]); fitEditCanvas(); renderEditCanvas(); }
+    syncEditPanels();
+  }
 }
 function layoutStudio(){
   resizeBoard(); renderBoard();
@@ -816,7 +1057,7 @@ function renderStudioSync(force){
   const changed = force || i !== gFocusCut;
   gFocusCut = i;
   if(changed){
-    const rows = $('#sheet-list').children;
+    const rows = spRows();
     for(let k = 0; k < rows.length; k++) rows[k].classList.toggle('focus', k === i);
     if(rows[i]) rows[i].scrollIntoView({ block: 'nearest' });
     renderBoard();        // BOARD上の該当CUT枠の色を変える
@@ -831,7 +1072,14 @@ function renderStudioSync(force){
   note.disabled = !has;
   $('#btn-cur-edit').disabled = !has;
   lab.textContent = has ? 'C' + (i + 1) : '—';
-  durF.textContent = has ? (cut.durF + 'f' + (cam ? ' ／ ' + cut.cam.map(c => c.k).join('→') : '')) : '';
+  let tail = '';
+  if(has){
+    if(cam) tail += ' ／ ' + cut.cam.map(c => c.k).join('→');
+    if(cut.bakeW) tail += ' ／ ' + cut.bakeW + '×' + cut.bakeH;
+    if(cut.bakeClamp && cut.bakeClamp < 0.995) tail += '（最寄り枠 ' + cut.bakeClamp.toFixed(2) + 'x）';
+    if(cut.uncov > 0) tail += ' ⚠素材不足';
+  }
+  durF.textContent = has ? (cut.durF + 'f' + tail) : '';
   // 再生中にフォーカス中の入力欄を書き換えない（入力が飛ぶため）
   const dv = has ? fmtDur(cut.durF) : '';
   if(document.activeElement !== durEl && durEl.value !== dv) durEl.value = dv;
@@ -928,6 +1176,22 @@ function renderBoard(){
       boardCtx.lineWidth = 2 / b.z;
       boardCtx.strokeRect(p.x, p.y, p.w, p.h);
     }
+  }
+  // 素材はみ出し警告（SPEC_13 §5e）: 注目カットの bakeRect のうち写真が無い所を赤ハッチ
+  const warnCut = cuts[state.selCut ? state.selCut.i : gFocusCut];
+  if(warnCut && warnCut.covGrid && warnCut.uncov > 0 && warnCut.bakeRect){
+    const br = warnCut.bakeRect;
+    const cw = br.w / COV_X, ch = br.h / COV_Y;
+    boardCtx.fillStyle = 'rgba(255,60,60,0.22)';
+    for(let j = 0; j < COV_Y; j++){
+      for(let i = 0; i < COV_X; i++){
+        if(warnCut.covGrid[j * COV_X + i]) continue;
+        boardCtx.fillRect(br.x + i * cw, br.y + j * ch, cw + 0.5, ch + 0.5);
+      }
+    }
+    boardCtx.strokeStyle = 'rgba(255,60,60,0.65)';
+    boardCtx.lineWidth = 1 / b.z;
+    boardCtx.strokeRect(br.x, br.y, br.w, br.h);
   }
   // existing cut frames
   boardCtx.font = (13 / b.z) + 'px monospace';
@@ -1103,6 +1367,8 @@ function bUp(e){
     if(n.x !== o.x || n.y !== o.y){
       pushLog({ type: 'photo-move',
                 undo(){ p.x = o.x; p.y = o.y; }, redo(){ p.x = n.x; p.y = n.y; } });
+      invalidateCoverage();
+      refreshStudio();
     }
     scheduleSave();
   }
@@ -1147,7 +1413,9 @@ function addPhotoFromImage(img, name, blob, at){
   pushLog({ type: 'photo-add',
             undo(){ const k = photos.indexOf(p); if(k >= 0){ slot = k; photos.splice(k, 1); } if(state.selPhoto === p.id) state.selPhoto = null; },
             redo(){ if(photos.indexOf(p) < 0) photos.splice(Math.min(slot, photos.length), 0, p); } });
+  invalidateCoverage();
   renderBoard();
+  refreshStudio();
   scheduleSave();
   return p;
 }
@@ -1204,8 +1472,10 @@ async function deleteSelPhoto(){
   pushLog({ type: 'photo-del',
             undo(){ photos.splice(Math.min(i, photos.length), 0, p); },
             redo(){ const k = photos.indexOf(p); if(k >= 0) photos.splice(k, 1); } });
+  invalidateCoverage();
   syncBoardPanels();
   renderBoard();
+  refreshStudio();
   scheduleSave();
 }
 function selPhotoObj(){ return photos.find(p => p.id === state.selPhoto) || null; }
@@ -1221,7 +1491,9 @@ function rotatePhoto(d){
   };
   apply(d);
   pushLog({ type: 'photo-rot', undo(){ apply(-d); }, redo(){ apply(d); } });
+  invalidateCoverage();
   renderBoard();
+  refreshStudio();
   scheduleSave();
 }
 let gFilterBefore = null;
@@ -1493,6 +1765,140 @@ async function clipPasteJson(){
   toast('クリップを受け取りました（次に貼る画像に付きます）');
 }
 
+/* ---------------- プロジェクト入出力 ZIP（SPEC_13 §9f） ----------------
+   中身: project.json ＋ 写真の原本 ＋ 加筆(drawC)。
+   **ベイク(baseC)は入れない** — BOARDから再生成できる派生物で、入れるとファイルが数十MBになる。
+   読み込み後に rebakeFromCam() で焼き直す。 */
+let gZipLoad = null;
+function loadJSZip(){
+  if(window.JSZip) return Promise.resolve();
+  if(gZipLoad) return gZipLoad;
+  gZipLoad = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = JSZIP_CDN;
+    s.onload = () => res();
+    s.onerror = () => { gZipLoad = null; rej(new Error('JSZip を読み込めませんでした（オフライン？）')); };
+    document.head.appendChild(s);
+  });
+  return gZipLoad;
+}
+async function exportProject(){
+  if(!photos.length && !cuts.length){ toast('書き出すものがありません'); return; }
+  try{
+    toast('プロジェクトをまとめています…');
+    await loadJSZip();
+    const zip = new window.JSZip();
+    const meta = { format: PROJ_FORMAT, ver: 2, fps: FPS, conteW: CONTE_W, conteH: CONTE_H,
+                   savedAt: new Date().toISOString(),
+                   board: { x: state.board.x, y: state.board.y, z: state.board.z },
+                   photos: [], cuts: [] };
+    for(const p of photos){
+      const file = 'photos/' + p.id + '.png';
+      if(p.blob) zip.file(file, p.blob);
+      meta.photos.push({ id: p.id, name: p.name, x: p.x, y: p.y, w: p.w, h: p.h,
+                         rot: p.rot || 0, filter: normFilter(p.filter), ref: p.ref || null,
+                         file: p.blob ? file : null });
+    }
+    for(let i = 0; i < cuts.length; i++){
+      const c = cuts[i];
+      await encodeCut(c);
+      const file = 'cuts/' + c.id + '.draw.png';
+      if(c.drawBlob) zip.file(file, c.drawBlob);
+      const cfile = 'cuts/' + c.id + '.color.png';
+      if(c.colorBlob) zip.file(cfile, c.colorBlob);
+      meta.cuts.push({ id: c.id, order: i, bg: c.bg, durF: c.durF, note: c.note,
+                       baseAlpha: baseAlphaOf(c),
+                       colorBlend: colorBlendOf(c), colorAlpha: colorAlphaOf(c),
+                       colorFile: c.colorBlob ? cfile : null,
+                       cam: (c.cam || []).map(k => ({ k: k.k, x: k.x, y: k.y, w: k.w, h: k.h,
+                                                      dur: k.dur | 0, ease: k.ease || 'LINEAR',
+                                                      key: !!k.key, keyUser: !!k.keyUser })),
+                       bakeRect: c.bakeRect || null, bakeW: c.bakeW || CONTE_W, bakeH: c.bakeH || CONTE_H,
+                       bakeExpand: c.bakeExpand || 1.02,
+                       drawFile: c.drawBlob ? file : null });
+    }
+    zip.file('project.json', JSON.stringify(meta, null, 1));
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = url;
+    a.download = 'econte_project_' + ts + '.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('プロジェクトを書き出しました（' + Math.round(blob.size / 1024) + 'KB）');
+  }catch(e){
+    toast('書き出し失敗: ' + (e.message || e));
+    console.error('exportProject failed', e);
+  }
+}
+async function importProject(file){
+  try{
+    await loadJSZip();
+    const zip = await window.JSZip.loadAsync(file);
+    const pj = zip.file('project.json');
+    if(!pj){ toast('project.json が見つかりません'); return; }
+    const meta = JSON.parse(await pj.async('string'));
+    if(!meta || meta.format !== PROJ_FORMAT){ toast('ECONTEのプロジェクトZIPではありません'); return; }
+    const ok = await modalConfirm('プロジェクトを読み込みます。現在の写真とカットは**すべて置き換わります**。よろしいですか？');
+    if(!ok) return;
+    toast('読み込んでいます…');
+    photos.splice(0, photos.length);
+    cuts.splice(0, cuts.length);
+    gLru.length = 0;
+    gLog.length = 0; gLogRedo.length = 0;
+    state.selPhoto = null; state.selCut = null; state.curCut = -1; state.tl.frame = 0;
+    for(const p of (meta.photos || [])){
+      let blob = null, img = null;
+      if(p.file && zip.file(p.file)){
+        blob = await zip.file(p.file).async('blob');
+        try{ img = await blobToImage(blob); }catch(e){ img = null; }
+      }
+      if(!img) continue;
+      photos.push({ id: p.id, name: p.name, img, blob, x: p.x, y: p.y, w: p.w, h: p.h,
+                    rot: p.rot || 0, filter: normFilter(p.filter), ref: p.ref || null });
+    }
+    const list = (meta.cuts || []).slice().sort((a, b) => a.order - b.order);
+    for(const c of list){
+      const bw = c.bakeW || CONTE_W, bh = c.bakeH || CONTE_H;
+      const drawC = blankCanvas(bw, bh);
+      if(c.drawFile && zip.file(c.drawFile)){
+        try{
+          const im = await blobToImage(await zip.file(c.drawFile).async('blob'));
+          ctx2d(drawC).drawImage(im, 0, 0);
+        }catch(e){}
+      }
+      const cut = { id: c.id || uid(), cam: c.cam || [], bakeRect: c.bakeRect || null,
+                    bakeW: bw, bakeH: bh, bakeExpand: c.bakeExpand || 1.02, bakeClamp: 1,
+                    baseC: null, drawC, colorC: null, bg: (typeof c.bg === 'number' ? c.bg : 232),
+                    baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : 1),
+                    colorBlend: c.colorBlend || 'multiply',
+                    colorAlpha: (typeof c.colorAlpha === 'number' ? c.colorAlpha : 1),
+                    durF: c.durF || FPS * 2, note: c.note || '',
+                    baseBlob: null, drawBlob: null, colorBlob: null,
+                    dirtyBase: true, dirtyDraw: true, dirtyColor: true, thumb: null };
+      if(c.colorFile && zip.file(c.colorFile)){
+        try{
+          const im = await blobToImage(await zip.file(c.colorFile).async('blob'));
+          ctx2d(getColor(cut)).drawImage(im, 0, 0);
+        }catch(e){}
+      }
+      cuts.push(cut);
+      rebakeFromCam(cut);   // ベイクは持ち歩かずここで焼き直す
+    }
+    if(meta.board){ state.board.x = meta.board.x; state.board.y = meta.board.y; state.board.z = meta.board.z; }
+    invalidateCoverage();
+    refreshStudio();
+    syncBoardPanels();
+    layoutStudio();
+    scheduleSave();
+    toast('読み込みました（写真 ' + photos.length + ' 枚 / ' + cuts.length + ' カット）');
+  }catch(e){
+    toast('読み込み失敗: ' + (e.message || e));
+    console.error('importProject failed', e);
+  }
+}
+
 /* ---------------- BOARD統合Undoログ（animator と同じ一元ログ） ----------------
    gLog = [{type, undo(), redo()}]。STUDIO の Ctrl+Z/Y はこれを叩く。
    EDIT内は従来どおりカット内 drawC のスナップショット（undoStack/redoStack）のまま。 */
@@ -1514,6 +1920,7 @@ function logStep(from, to, dir){
   if(!e){ toast(dir === 'undo' ? '元に戻す操作がありません' : 'やり直す操作がありません'); return; }
   (dir === 'undo' ? e.undo : e.redo)();
   to.push(e);
+  if(/^photo-/.test(e.type)) invalidateCoverage();
   syncBoardPanels();
   refreshStudio();
   renderBoard();
@@ -1571,20 +1978,65 @@ function calcBakeRect(cut){
     x0 = Math.min(x0, c.x); y0 = Math.min(y0, c.y);
     x1 = Math.max(x1, c.x + c.w); y1 = Math.max(y1, c.y + c.h);
   }
-  const e = clamp(cut.bakeExpand || 1.02, 1, 1.5);
+  // FIXカット（枠1つ）は枠そのものを焼く＝出力と1:1（余白を足すと画が2%縮んでしまう）
+  const e = (cam.length <= 1) ? 1 : clamp(cut.bakeExpand || 1.02, 1, 1.5);
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   let w = (x1 - x0) * e, h = (y1 - y0) * e;
   if(w / h < CONTE_W / CONTE_H) w = h * CONTE_W / CONTE_H; else h = w * CONTE_H / CONTE_W;
   return { x: cx - w / 2, y: cy - h / 2, w, h };
 }
+/* --- 可変ベイク解像度（SPEC_13 §5c） ---
+   最寄り枠（いちばん寄った枠）が等倍＝1280幅になる密度でベイクし、4K面積でクランプする。 */
+const MAX_AREA = 3840 * 2160;
+function calcBakeSize(cut){
+  const br = cut.bakeRect, cam = cut.cam || [];
+  if(!br) return { w: CONTE_W, h: CONTE_H, clamp: 1 };
+  let minW = Infinity;
+  for(const c of cam) minW = Math.min(minW, c.w);
+  if(!isFinite(minW) || minW <= 0) minW = br.w;
+  const s = CONTE_W / minW;
+  let w = Math.round(br.w * s), h = Math.round(br.h * s);
+  let k = 1;
+  if(w * h > MAX_AREA){
+    k = Math.sqrt(MAX_AREA / (w * h));
+    w = Math.round(w * k); h = Math.round(h * k);
+  }
+  return { w: Math.max(16, w), h: Math.max(9, h), clamp: k };
+}
+/* --- 素材はみ出し（SPEC_13 §5e） ---
+   bakeRect のうち photos[] の union に含まれない領域を粗いグリッドで拾う。
+   ハッチ表示と ⚠ に使い、baseC を JPEG で焼けるか（＝完全に覆われているか）の判定も兼ねる。 */
+const COV_X = 48, COV_Y = 27;
+function updateCoverage(cut){
+  const br = cut.bakeRect;
+  if(!br){ cut.covGrid = null; cut.uncov = 0; cut.baseOpaque = false; return; }
+  const g = new Uint8Array(COV_X * COV_Y);
+  let miss = 0;
+  for(let j = 0; j < COV_Y; j++){
+    const by = br.y + (j + 0.5) / COV_Y * br.h;
+    for(let i = 0; i < COV_X; i++){
+      const bx = br.x + (i + 0.5) / COV_X * br.w;
+      const ok = !!hitPhoto(bx, by);
+      g[j * COV_X + i] = ok ? 1 : 0;
+      if(!ok) miss++;
+    }
+  }
+  cut.covGrid = g;
+  cut.uncov = miss / (COV_X * COV_Y);
+  cut.baseOpaque = (miss === 0);
+}
+/* 写真が動いた/増えた/消えたら全カットの被覆を取り直す（操作の終わりにだけ呼ぶ） */
+function invalidateCoverage(){
+  cuts.forEach(updateCoverage);
+}
 /* bakeRect が動いたら、加筆(drawC)も新しいベイク空間へ載せ替える
    （加筆は「紙の上」に描いてあるので、枠を動かしても絵に貼り付いたままにする） */
 function remapDraw(cut, oldRect, oldW, oldH){
   const nr = cut.bakeRect;
-  if(!nr || !oldRect) return;
-  if(oldRect.x === nr.x && oldRect.y === nr.y && oldRect.w === nr.w) return;
-  const tmp = document.createElement('canvas');
-  tmp.width = cut.bakeW; tmp.height = cut.bakeH;
+  if(!nr || !oldRect || !cut.drawC) return;
+  if(oldRect.x === nr.x && oldRect.y === nr.y && oldRect.w === nr.w &&
+     oldW === cut.bakeW && oldH === cut.bakeH) return;
+  const tmp = blankCanvas(cut.bakeW, cut.bakeH);
   const ctx = ctx2d(tmp);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -1629,6 +2081,7 @@ function selectCutFrame(sel){
   state.selCut = sel;
   if(sel){
     state.selPhoto = null;
+    ensureResident(cuts[sel.i]);  // 枠編集は常駐カット前提（V2-D2）
     seek(cutStartFrame(sel.i));   // 枠を選んだら中央プレビューもそのカットへ
   }
   syncBoardPanels();
@@ -1636,26 +2089,37 @@ function selectCutFrame(sel){
 }
 /* 枠 → bakeRect 再計算 → 再ベイク（ベイク経路はここ一本に集約する）
    V2-D1 ではベイクサイズは 1280×720 のまま。可変になるのは V2-D2。 */
+/* 常駐してから fn を走らせる（非常駐カットを焼き直すと加筆を失うため） */
+function withResident(cut, fn){
+  if(isResident(cut)){ fn(); return; }
+  ensureResident(cut).then(() => { fn(); afterCamChange(cuts.indexOf(cut)); });
+}
 function rebakeFromCam(cut){
   if(!cut) return;
-  const oldRect = cut.bakeRect, oldW = cut.bakeW || CONTE_W, oldH = cut.bakeH || CONTE_H;
+  if(!isResident(cut)){ withResident(cut, () => rebakeFromCam(cut)); return; }
+  const oldRect = cut.bakeRect, old = bakeSize(cut);
   const nr = calcBakeRect(cut);
   cut.bakeRect = nr;
-  cut.bakeW = CONTE_W;
-  cut.bakeH = CONTE_H;
   relabelCam(cut);
   recalcDur(cut);
+  cut.thumb = null;
   if(!nr){
+    cut.bakeW = CONTE_W; cut.bakeH = CONTE_H;
     cut.baseC = null;
     cut.baseBlob = null;
     cut.dirtyBase = true;
-    cut.thumb = null;
+    updateCoverage(cut);
     return;
   }
-  remapDraw(cut, oldRect, oldW, oldH);
-  cut.baseC = bakeCut(nr);
+  const sz = calcBakeSize(cut);            // V2-D2: カット毎に可変
+  cut.bakeW = sz.w; cut.bakeH = sz.h;
+  cut.bakeClamp = sz.clamp;
+  remapDraw(cut, oldRect, old.w, old.h);   // 加筆をベイク空間ごと載せ替え（寸法変更もここで吸収）
+  cut.baseC = bakeCut(nr, sz.w, sz.h);
   cut.dirtyBase = true;
-  cut.thumb = null;
+  cut.dirtyDraw = true;
+  updateCoverage(cut);
+  touchLru(cut);
 }
 /* --- 再生位置 → カメラ矩形（ease補間・SPEC_13 §5a） --- */
 function easeT(t, mode){
@@ -1686,49 +2150,56 @@ function camStartFrame(cut, k){
   return acc;
 }
 /* --- 出力1280×720へ描く（プレビュー／サムネ／書き出しの共通入口・SPEC_13 §5a） --- */
-function drawCamFrame(ctx, cut, f){
+function drawCamFrame(ctx, cut, f, outW, outH){
+  const OW = outW || CONTE_W, OH = outH || CONTE_H;
   const v = cut.bg;
   ctx.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
-  ctx.fillRect(0, 0, CONTE_W, CONTE_H);
+  ctx.fillRect(0, 0, OW, OH);
   const r = isCamCut(cut) ? camAt(cut, f) : null;
   const br = cut.bakeRect;
-  const bw = cut.bakeW || CONTE_W, bh = cut.bakeH || CONTE_H;
-  if(!r || !br){
-    // FIX カット（枠1つ以下）は従来どおり全面
-    if(cut.baseC){
-      const a = baseAlphaOf(cut);
-      if(a < 1){ ctx.save(); ctx.globalAlpha = a; ctx.drawImage(cut.baseC, 0, 0, CONTE_W, CONTE_H); ctx.restore(); }
-      else ctx.drawImage(cut.baseC, 0, 0, CONTE_W, CONTE_H);
-    }
-    ctx.drawImage(cut.drawC, 0, 0, CONTE_W, CONTE_H);
-    return;
-  }
-  const sx = (r.x - br.x) / br.w * bw, sy = (r.y - br.y) / br.h * bh;
-  const sw = r.w / br.w * bw,          sh = r.h / br.h * bh;
+  const b = bakeSize(cut);
+  const base = getBase(cut), draw = getDraw(cut);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  if(cut.baseC){
-    const a = baseAlphaOf(cut);
-    if(a < 1){ ctx.save(); ctx.globalAlpha = a; ctx.drawImage(cut.baseC, sx, sy, sw, sh, 0, 0, CONTE_W, CONTE_H); ctx.restore(); }
-    else ctx.drawImage(cut.baseC, sx, sy, sw, sh, 0, 0, CONTE_W, CONTE_H);
+  if(!r || !br){
+    // FIX カット（枠1つ以下）は全面。ベイク寸法→出力寸法へ等倍で載せる
+    if(base){
+      const a = baseAlphaOf(cut);
+      if(a < 1){ ctx.save(); ctx.globalAlpha = a; ctx.drawImage(base, 0, 0, OW, OH); ctx.restore(); }
+      else ctx.drawImage(base, 0, 0, OW, OH);
+    }
+    drawColorLayer(ctx, cut, OW, OH, null);
+    if(draw) ctx.drawImage(draw, 0, 0, OW, OH);
+    return;
   }
-  ctx.drawImage(cut.drawC, sx, sy, sw, sh, 0, 0, CONTE_W, CONTE_H);
+  const sx = (r.x - br.x) / br.w * b.w, sy = (r.y - br.y) / br.h * b.h;
+  const sw = r.w / br.w * b.w,          sh = r.h / br.h * b.h;
+  if(base){
+    const a = baseAlphaOf(cut);
+    if(a < 1){ ctx.save(); ctx.globalAlpha = a; ctx.drawImage(base, sx, sy, sw, sh, 0, 0, OW, OH); ctx.restore(); }
+    else ctx.drawImage(base, sx, sy, sw, sh, 0, 0, OW, OH);
+  }
+  drawColorLayer(ctx, cut, OW, OH, { x: sx, y: sy, w: sw, h: sh });
+  if(draw) ctx.drawImage(draw, sx, sy, sw, sh, 0, 0, OW, OH);
 }
 /* 出力座標(0..1280) → ベイク空間座標。枠列カットのプレビューに直接描くときに要る */
 function camToBake(cut, f, x, y){
-  if(!isCamCut(cut) || !cut.bakeRect) return { x, y };
+  const b = bakeSize(cut);
+  if(!isCamCut(cut) || !cut.bakeRect){
+    // FIXカットもベイク寸法≠出力寸法になり得る（V2-D2）
+    return { x: x / CONTE_W * b.w, y: y / CONTE_H * b.h };
+  }
   const r = camAt(cut, f), br = cut.bakeRect;
-  const bw = cut.bakeW || CONTE_W, bh = cut.bakeH || CONTE_H;
-  const sx = (r.x - br.x) / br.w * bw, sy = (r.y - br.y) / br.h * bh;
-  const sw = r.w / br.w * bw,          sh = r.h / br.h * bh;
+  const sx = (r.x - br.x) / br.w * b.w, sy = (r.y - br.y) / br.h * b.h;
+  const sw = r.w / br.w * b.w,          sh = r.h / br.h * b.h;
   return { x: sx + x / CONTE_W * sw, y: sy + y / CONTE_H * sh };
 }
 
 /* ---------------- cuts ---------------- */
-function bakeCut(src){
-  const c = blankCanvas();
+function bakeCut(src, w, h){
+  const c = blankCanvas(w || CONTE_W, h || CONTE_H);
   const ctx = ctx2d(c);
-  const s = CONTE_W / src.w;
+  const s = c.width / src.w;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.setTransform(s, 0, 0, s, -src.x * s, -src.y * s);
@@ -1739,8 +2210,10 @@ function bakeCut(src){
 function createCutFromRect(src){
   const cut = { id: uid(), cam: [mkCam(src, 0)], bakeRect: { x: src.x, y: src.y, w: src.w, h: src.h },
                 bakeW: CONTE_W, bakeH: CONTE_H, bakeExpand: 1.02,
-                baseC: bakeCut(src), drawC: blankCanvas(), bg: 232, baseAlpha: 1,
+                baseC: bakeCut(src, CONTE_W, CONTE_H), drawC: blankCanvas(CONTE_W, CONTE_H), bg: 232, baseAlpha: 1,
                 durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: true, dirtyDraw: true, thumb: null };
+  updateCoverage(cut);
+  touchLru(cut);
   cuts.push(cut);
   let slot = cuts.length - 1;   // 並べ替え後でも元の位置に戻す
   pushLog({ type: 'cut-add',
@@ -1753,20 +2226,14 @@ function createCutFromRect(src){
 }
 function addEmptyCut(){
   const cut = { id: uid(), cam: [], bakeRect: null, bakeW: CONTE_W, bakeH: CONTE_H, bakeExpand: 1.02,
-                baseC: null, drawC: blankCanvas(), bg: 232, baseAlpha: 1,
+                baseC: null, drawC: blankCanvas(CONTE_W, CONTE_H), bg: 232, baseAlpha: 1,
                 durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: false, dirtyDraw: true, thumb: null };
+  touchLru(cut);
   cuts.push(cut);
   let slot = cuts.length - 1;
   pushLog({ type: 'cut-add',
             undo(){ const k = cuts.indexOf(cut); if(k >= 0){ slot = k; cuts.splice(k, 1); } },
             redo(){ if(cuts.indexOf(cut) < 0) cuts.splice(Math.min(slot, cuts.length), 0, cut); } });
-  refreshStudio();
-  scheduleSave();
-}
-function moveCut(i, d){
-  const j = i + d;
-  if(j < 0 || j >= cuts.length) return;
-  const t = cuts[i]; cuts[i] = cuts[j]; cuts[j] = t;
   refreshStudio();
   scheduleSave();
 }
@@ -1788,6 +2255,7 @@ async function deleteCut(i){
 function rebakeCut(i){
   const c = cuts[i];
   if(!camCount(c)){ toast('このコマは空コマです（切り出し元なし）'); return; }
+  if(!isResident(c)){ withResident(c, () => rebakeCut(i)); return; }
   rebakeFromCam(c);
   refreshRow(i);
   renderPaintViews();
@@ -1799,24 +2267,48 @@ function refreshStudio(){
   renderSheetPanel();   // updateTotals() を内包
   if(state.view === 'studio'){ layoutTL(); renderTL(); renderStudioSync(true); }
 }
-function compositeTo(ctx, cut){
+/* カラースクリプト層を重ねる（合成順: 下地 → baseC → colorC → drawC・SPEC_13 §9b）
+   src が無いときは全面、あるときは同じ切り出し矩形を colorC 側の縮尺に直して使う */
+function drawColorLayer(ctx, cut, dw, dh, src){
+  if(!hasColor(cut)) return;
+  const a = colorAlphaOf(cut);
+  if(a <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.globalCompositeOperation = colorBlendOf(cut);
+  if(src){
+    const b = bakeSize(cut);
+    const kx = COLOR_W / b.w, ky = COLOR_H / b.h;
+    ctx.drawImage(cut.colorC, src.x * kx, src.y * ky, src.w * kx, src.h * ky, 0, 0, dw, dh);
+  }else{
+    ctx.drawImage(cut.colorC, 0, 0, dw, dh);
+  }
+  ctx.restore();
+}
+/* ベイク空間そのままの合成（EDIT表示・FILLの判定元・スポイト）。
+   w/h を渡すとその寸法に縮めて描く（GRIDセル・FILLの判定元で使う） */
+function compositeTo(ctx, cut, w, h){
+  const s = bakeSize(cut);
+  const dw = w || s.w, dh = h || s.h;
   const v = cut.bg;
   ctx.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
-  ctx.fillRect(0, 0, CONTE_W, CONTE_H);
-  if(cut.baseC){
+  ctx.fillRect(0, 0, dw, dh);
+  const base = getBase(cut), draw = getDraw(cut);
+  if(base){
     // トレース透かし（SPEC_13 §3-1）: baseC を描くときだけ alpha を落とす。
     // ここを通る全部（EDIT/プレビュー/サムネ/書き出し）に効く＝WYSIWYG
     const a = baseAlphaOf(cut);
     if(a < 1){
       ctx.save();
       ctx.globalAlpha = a;
-      ctx.drawImage(cut.baseC, 0, 0);
+      ctx.drawImage(base, 0, 0, dw, dh);
       ctx.restore();
     }else{
-      ctx.drawImage(cut.baseC, 0, 0);
+      ctx.drawImage(base, 0, 0, dw, dh);
     }
   }
-  ctx.drawImage(cut.drawC, 0, 0);
+  drawColorLayer(ctx, cut, dw, dh, null);
+  if(draw) ctx.drawImage(draw, 0, 0, dw, dh);
 }
 function baseAlphaOf(cut){ return (cut && typeof cut.baseAlpha === 'number') ? clamp(cut.baseAlpha, 0, 1) : 1; }
 /* baseAlpha を編集する対象カット: EDIT中は編集中のカット、STUDIOではプレイヘッド位置のカット */
@@ -1853,9 +2345,25 @@ function cutThumb(cut){
   return t.toDataURL('image/jpeg', 0.75);
 }
 /* 右パネルが常時表示になったので、サムネは cut.thumb にキャッシュして
-   絵が変わったとき（cut.thumb = null）だけ作り直す。 */
+   絵が変わったとき（cut.thumb = null）だけ作り直す。
+   V2-D2: 非常駐カットは先にプレースホルダを返し、デコード後に差し替える。 */
+const THUMB_PLACEHOLDER = (() => {
+  const c = blankCanvas(256, 144);
+  const x = c.getContext('2d');
+  x.fillStyle = '#2a2038'; x.fillRect(0, 0, 256, 144);
+  x.fillStyle = '#6b5a86'; x.font = '16px monospace'; x.fillText('…', 118, 80);
+  return c.toDataURL('image/jpeg', 0.6);
+})();
 function cutThumbSrc(cut){
-  if(!cut.thumb) cut.thumb = cutThumb(cut);
+  if(cut.thumb) return cut.thumb;
+  if(!isResident(cut) && (cut.drawBlob || cut.baseBlob)){
+    ensureResident(cut).then(() => {
+      cut.thumb = null;
+      refreshRow(cuts.indexOf(cut));
+    });
+    return THUMB_PLACEHOLDER;
+  }
+  cut.thumb = cutThumb(cut);
   return cut.thumb;
 }
 function updateTotals(){
@@ -1866,6 +2374,14 @@ function updateTotals(){
 }
 
 /* ---------------- SHEETパネル（STUDIO右・レイヤー一覧風） ---------------- */
+/* 行の見出し: C# ＋ 枠列（A→B）＋ ⚠（素材はみ出し §5e）＋ 解像度クランプ（§5c） */
+function rowLabel(cut, i){
+  let s = 'C' + (i + 1);
+  if(isCamCut(cut)) s += ' ' + cut.cam.map(c => c.k).join('→');
+  if(cut.uncov > 0) s += ' ⚠';
+  if(cut.bakeClamp && cut.bakeClamp < 0.995) s += ' ' + cut.bakeClamp.toFixed(2) + 'x';
+  return s;
+}
 function setCutDur(i, f){
   const cut = cuts[i];
   if(!cut) return;
@@ -1894,7 +2410,7 @@ function makeSheetRow(cut, i){
   head.className = 'sp-head';
   const no = document.createElement('span');
   no.className = 'sp-no';
-  no.textContent = 'C' + (i + 1) + (isCamCut(cut) ? ' ' + cut.cam.map(c => c.k).join('→') : '');
+  no.textContent = rowLabel(cut, i);
   const dur = document.createElement('input');
   dur.className = 'sp-dur';
   dur.value = fmtDur(cut.durF);
@@ -1916,8 +2432,6 @@ function makeSheetRow(cut, i){
     bt.addEventListener('click', ev => { ev.stopPropagation(); fn(); });
     btns.appendChild(bt);
   };
-  mk('▲', '上へ', () => moveCut(i, -1));
-  mk('▼', '下へ', () => moveCut(i, 1));
   mk('⟳', 'BOARDの切り出し元から再ベイク', () => rebakeCut(i));
   mk('✕', '削除', () => deleteCut(i));
   head.appendChild(no); head.appendChild(dur); head.appendChild(btns);
@@ -1934,14 +2448,75 @@ function makeSheetRow(cut, i){
   body.appendChild(thumb); body.appendChild(note);
 
   row.appendChild(head); row.appendChild(body);
-  row.addEventListener('click', () => { pause(); seek(cutStartFrame(i)); });
+  row.addEventListener('click', () => {
+    if(gRowDragged) return;              // ドラッグ直後のクリックは食わせない
+    pause(); seek(cutStartFrame(i));
+  });
   row.addEventListener('dblclick', () => openEdit(i));
   bindDoubleTap(row, () => openEdit(i));   // iPad: ネイティブdblclickが来ないことがある
+  row.addEventListener('pointerdown', e => rowDragDown(e, i, row));
   return row;
 }
+
+/* --- 行の上下ドラッグ並べ替え（SPEC_13 §9f。▲▼は撤去した） --- */
+let gRowDrag = null, gRowDragged = false;
+function rowDragDown(e, i, row){
+  const t = e.target;
+  if((t.closest && t.closest('.sp-btns')) || t.tagName === 'INPUT') return;   // ボタン/尺入力は対象外
+  gRowDrag = { i, row, y0: e.clientY, active: false, to: i };
+  gRowDragged = false;
+}
+function rowDragMove(e){
+  if(!gRowDrag) return;
+  if(!gRowDrag.active){
+    if(Math.abs(e.clientY - gRowDrag.y0) < 6) return;   // しきい値（クリックと区別）
+    gRowDrag.active = true;
+    gRowDrag.row.classList.add('dragging');
+    $('#sp-drop').style.display = 'block';
+  }
+  const list = $('#sheet-list'), rows = spRows();
+  if(!rows.length) return;
+  const lr = list.getBoundingClientRect();
+  let to = rows.length;
+  for(let k = 0; k < rows.length; k++){
+    const r = rows[k].getBoundingClientRect();
+    if(e.clientY < r.top + r.height / 2){ to = k; break; }
+  }
+  gRowDrag.to = to;
+  const ref = rows[Math.min(to, rows.length - 1)].getBoundingClientRect();
+  const y = (to >= rows.length ? ref.bottom : ref.top) - lr.top + list.scrollTop;
+  $('#sp-drop').style.top = (y - 1) + 'px';
+}
+function rowDragUp(){
+  if(!gRowDrag) return;
+  const g = gRowDrag;
+  gRowDrag = null;
+  $('#sp-drop').style.display = 'none';
+  g.row.classList.remove('dragging');
+  if(!g.active) return;
+  gRowDragged = true;
+  setTimeout(() => { gRowDragged = false; }, 0);   // 直後の click を1回だけ抑止
+  let to = g.to;
+  if(to > g.i) to--;                                // 自分を抜いた後の位置に直す
+  moveCutTo(g.i, to);
+}
+/* from → to へ差し替え（Undo対象） */
+function moveCutTo(from, to){
+  to = clamp(to, 0, cuts.length - 1);
+  if(from === to || from < 0 || from >= cuts.length) return;
+  const apply = (a, b) => { const c = cuts.splice(a, 1)[0]; cuts.splice(b, 0, c); };
+  apply(from, to);
+  pushLog({ type: 'cut-order', undo(){ apply(to, from); }, redo(){ apply(from, to); } });
+  if(state.selCut && state.selCut.i === from) state.selCut = { i: to, k: state.selCut.k };
+  if(state.curCut === from) state.curCut = to;
+  refreshStudio();
+  syncBoardPanels();
+  scheduleSave();
+}
+function spRows(){ return $('#sheet-list').querySelectorAll('.sp-row'); }
 function renderSheetPanel(){
   const list = $('#sheet-list');
-  list.innerHTML = '';
+  list.querySelectorAll('.sp-row').forEach(el => el.remove());   // #sp-drop は残す
   cuts.forEach((c, i) => {
     const row = makeSheetRow(c, i);
     if(i === gFocusCut) row.classList.add('focus');
@@ -1952,7 +2527,7 @@ function renderSheetPanel(){
 /* 1行だけの軽量更新（描画後・尺変更後） */
 function refreshRow(i){
   const cut = cuts[i];
-  const row = $('#sheet-list').children[i];
+  const row = spRows()[i];
   if(!cut || !row) return;
   const im = row.querySelector('.sp-thumb');
   const src = cutThumbSrc(cut);
@@ -1960,7 +2535,7 @@ function refreshRow(i){
   const du = row.querySelector('.sp-dur');
   if(du && document.activeElement !== du){ du.value = fmtDur(cut.durF); du.disabled = isCamCut(cut); }
   const no = row.querySelector('.sp-no');
-  if(no) no.textContent = 'C' + (i + 1) + (isCamCut(cut) ? ' ' + cut.cam.map(c => c.k).join('→') : '');
+  if(no) no.textContent = rowLabel(cut, i);
   const nt = row.querySelector('.sp-note');
   if(nt){
     nt.textContent = cut.note || '内容・セリフ';
@@ -1974,20 +2549,179 @@ const editCtx = ctx2d(editCv);
 let undoStack = [], redoStack = [];
 const UNDO_MAX = 10;
 
+/* ---------------- EDIT GRID＝カラースクリプト編集（SPEC_13 §9b） ----------------
+   セル ＝ cam[].key が true の枠。**§5h の一覧PNGと同じ単位**なので、
+   ここで描いた画がそのまま出力になる（描く画面と出す画面を同じにする）。 */
+let gEditMode = 'single';
+const GC_W = 320, GC_H = 180;
+function colorCells(){
+  const cells = [];
+  cuts.forEach((c, i) => {
+    const n = camCount(c);
+    if(!n){ cells.push({ i, k: 0, first: true, last: true }); return; }   // 空コマも1セル
+    let any = false;
+    for(let k = 0; k < n; k++){
+      if(c.cam[k].key){ cells.push({ i, k, first: !any, last: false }); any = true; }
+    }
+    if(!any) cells.push({ i, k: 0, first: true, last: true });            // 全部OFFなら先頭だけ
+    if(cells.length) cells[cells.length - 1].last = true;
+  });
+  return cells;
+}
+function cellSub(cut, k){
+  if(!isCamCut(cut)) return fmtDur(cut.durF);
+  const nx = cut.cam[k + 1];
+  return nx ? (cut.cam[k].k + '→' + nx.k + ' ' + Math.max(1, cut.cam[k].dur | 0) + 'Fr')
+            : (camStartFrame(cut, k) + 'f / ' + fmtDur(cut.durF));
+}
+function renderGrid(){
+  const wrap = $('#grid-wrap');
+  wrap.innerHTML = '';
+  const cells = colorCells();
+  $('#grid-empty').style.display = cells.length ? 'none' : 'block';
+  let prev = -1;
+  cells.forEach(ce => {
+    const cut = cuts[ce.i];
+    if(prev >= 0 && ce.i !== prev){        // カット境界に区切り線（§5h）
+      const sep = document.createElement('div');
+      sep.className = 'gc-sep';
+      wrap.appendChild(sep);
+    }
+    prev = ce.i;
+    const box = document.createElement('div');
+    box.className = 'gc' + (ce.i === state.curCut ? ' on' : '');
+    box.dataset.ci = ce.i;
+    const cv = document.createElement('canvas');
+    cv.className = 'gc-cv';
+    cv.width = GC_W; cv.height = GC_H;
+    cv.dataset.ci = ce.i; cv.dataset.ck = ce.k;
+    drawCamFrame(ctx2d(cv), cut, camStartFrame(cut, ce.k), GC_W, GC_H);
+    cv.addEventListener('pointerdown', e => gridPaintDown(e, cv));
+    cv.addEventListener('pointermove', paintMove);
+    cv.addEventListener('pointerup', paintUp);
+    cv.addEventListener('pointercancel', paintUp);
+    const cap = document.createElement('div');
+    cap.className = 'gc-cap';
+    const no = document.createElement('span');
+    no.className = 'gc-no';
+    no.textContent = camLabel(ce.i, ce.k);
+    const sub = document.createElement('span');
+    sub.className = 'gc-sub';
+    sub.textContent = cellSub(cut, ce.k);
+    const bt = document.createElement('button');
+    bt.className = 'btn';
+    bt.textContent = '✎';
+    bt.title = 'このカットを SINGLE で開く';
+    bt.addEventListener('click', ev => { ev.stopPropagation(); state.curCut = ce.i; setEditMode('single'); });
+    cap.appendChild(no); cap.appendChild(sub); cap.appendChild(bt);
+    box.appendChild(cv); box.appendChild(cap);
+    wrap.appendChild(box);
+  });
+}
+/* 描いたカットのセルだけ描き直す（毎ストロークで全再構築はしない） */
+function refreshGridCells(i){
+  $('#grid-wrap').querySelectorAll('.gc-cv').forEach(cv => {
+    if(+cv.dataset.ci !== i) return;
+    const cut = cuts[i];
+    if(cut) drawCamFrame(ctx2d(cv), cut, camStartFrame(cut, +cv.dataset.ck || 0), GC_W, GC_H);
+  });
+}
+function gridPaintDown(e, cv){
+  const i = +cv.dataset.ci;
+  if(state.curCut !== i){
+    state.curCut = i;
+    undoStack = []; redoStack = [];        // カットまたぎ undo の破損防止
+    $('#grid-wrap').querySelectorAll('.gc').forEach(g => g.classList.toggle('on', +g.dataset.ci === i));
+    syncEditPanels();
+  }
+  const cut = cuts[i];
+  if(state.paintTarget === 'draw' && !isResident(cut)){
+    ensureResident(cut).then(() => toast('読み込みました。もう一度なぞってください'));
+    return;
+  }
+  paintDown(e, cv);
+}
+function setEditMode(m, quiet){
+  gEditMode = m;
+  $('#edit-main').classList.toggle('grid', m === 'grid');
+  $('#btn-mode-single').classList.toggle('on', m === 'single');
+  $('#btn-mode-grid').classList.toggle('on', m === 'grid');
+  // GRIDは色を、SINGLEは線画を既定の描き先にする（手で切り替えも可）
+  setPaintTarget(m === 'grid' ? 'color' : 'draw');
+  if(quiet) return;                     // 表示は呼び出し側（setView）に任せる
+  if(m === 'grid') renderGrid();
+  else { sizeEditCanvas(cuts[state.curCut]); fitEditCanvas(); renderEditCanvas(); }
+  syncEditPanels();
+}
+function setPaintTarget(t){
+  state.paintTarget = (t === 'color') ? 'color' : 'draw';
+  document.querySelectorAll('.etool[data-target]').forEach(el =>
+    el.classList.toggle('on', el.dataset.target === state.paintTarget));
+  $('#btn-clear-draw').textContent = (state.paintTarget === 'color') ? 'CLEAR COLOR' : 'CLEAR DRAW';
+}
+/* カラー層の描画モード・不透明度（対象は現在カット） */
+function syncEditPanels(){
+  const cut = cuts[state.curCut];
+  const sel = $('#color-blend');
+  if(!sel.options.length){
+    BLENDS.forEach(([v, t]) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = t;
+      sel.appendChild(o);
+    });
+  }
+  sel.disabled = !cut;
+  $('#color-alpha').disabled = !cut;
+  if(cut){
+    sel.value = colorBlendOf(cut);
+    const a = Math.round(colorAlphaOf(cut) * 100);
+    if(document.activeElement !== $('#color-alpha')) $('#color-alpha').value = a;
+    $('#color-alpha-val').textContent = a + '%';
+  }
+  syncBaseAlphaUI();
+}
+function setColorBlend(v){
+  const cut = cuts[state.curCut];
+  if(!cut) return;
+  cut.colorBlend = v;
+  cut.thumb = null;
+  renderPaintViews();
+  refreshRow(state.curCut);
+  scheduleSave();
+}
+function setColorAlpha(v){
+  const cut = cuts[state.curCut];
+  if(!cut) return;
+  cut.colorAlpha = clamp(v, 0, 1);
+  cut.thumb = null;
+  $('#color-alpha-val').textContent = Math.round(cut.colorAlpha * 100) + '%';
+  renderPaintViews();
+  refreshRow(state.curCut);
+  scheduleSave();
+}
+
 /* --- EDIT のズーム/パン（SPEC_13 §3-5） ---
    CSSの width/height と transform だけを動かす。toCanvasCoord() は
    getBoundingClientRect ベースなので **変更不要**（ここが重要）。 */
 let gEditFit = 1;
+/* EDITキャンバスの内部解像度＝そのカットのベイク寸法（V2-D2で可変） */
+function sizeEditCanvas(cut){
+  const s = bakeSize(cut);
+  if(editCv.width !== s.w || editCv.height !== s.h){
+    editCv.width = s.w;
+    editCv.height = s.h;
+  }
+}
 function fitEditCanvas(){
   const st = $('#edit-stage');
-  const s = Math.min((st.clientWidth - 24) / CONTE_W, (st.clientHeight - 24) / CONTE_H);
-  gEditFit = Math.max(0.02, s);
+  const s = Math.min((st.clientWidth - 24) / editCv.width, (st.clientHeight - 24) / editCv.height);
+  gEditFit = Math.max(0.005, s);
   applyEditView();
 }
 function applyEditView(){
   const v = state.editView;
-  editCv.style.width = Math.max(40, CONTE_W * gEditFit * v.z) + 'px';
-  editCv.style.height = Math.max(23, CONTE_H * gEditFit * v.z) + 'px';
+  editCv.style.width = Math.max(40, editCv.width * gEditFit * v.z) + 'px';
+  editCv.style.height = Math.max(23, editCv.height * gEditFit * v.z) + 'px';
   editCv.style.transform = 'translate(' + Math.round(v.x) + 'px,' + Math.round(v.y) + 'px)';
   $('#edit-zoom').textContent = Math.round(gEditFit * v.z * 100) + '%';
 }
@@ -2018,21 +2752,23 @@ function renderEditCanvas(){
    editCv は表示用キャンバスなので drawC は汚れない（floodFill/スポイトは別経路） */
 function drawCamGuide(ctx, cut){
   if(!isCamCut(cut) || !cut.bakeRect) return;
-  const br = cut.bakeRect, bw = cut.bakeW || CONTE_W, bh = cut.bakeH || CONTE_H;
+  const br = cut.bakeRect, b = bakeSize(cut);
+  const bw = b.w, bh = b.h;
+  const k = bw / CONTE_W;   // 大判では線も文字も相応に太くする
   const toPx = r => ({ x: (r.x - br.x) / br.w * bw, y: (r.y - br.y) / br.h * bh,
                        w: r.w / br.w * bw, h: r.h / br.h * bh });
   ctx.save();
-  ctx.lineWidth = 2;
-  ctx.font = 'bold 22px monospace';
+  ctx.lineWidth = 2 * k;
+  ctx.font = 'bold ' + Math.round(22 * k) + 'px monospace';
   const pts = [];
   cut.cam.forEach((c, i) => {
     const p = toPx(c);
     ctx.strokeStyle = i === 0 ? 'rgba(90,233,255,0.85)' : 'rgba(255,79,168,0.75)';
-    ctx.setLineDash(i === 0 ? [] : [10, 6]);
+    ctx.setLineDash(i === 0 ? [] : [10 * k, 6 * k]);
     ctx.strokeRect(p.x, p.y, p.w, p.h);
     ctx.setLineDash([]);
     ctx.fillStyle = i === 0 ? 'rgba(90,233,255,0.95)' : 'rgba(255,79,168,0.9)';
-    ctx.fillText(c.k, p.x + 8, p.y + 26);
+    ctx.fillText(c.k, p.x + 8 * k, p.y + 26 * k);
     pts.push({ x: p.x + p.w / 2, y: p.y + p.h / 2 });
   });
   if(pts.length > 1){
@@ -2049,26 +2785,29 @@ function openEdit(i){
   pause();
   i = clamp(i, 0, cuts.length - 1);
   state.curCut = i;
-  undoStack = []; redoStack = [];   // カットをまたぐundo破損防止
+  undoStack = []; redoStack = [];   // カットをまたぐundo破損防止（寸法も変わり得る）
   const cut = cuts[i];
+  ensureResident(cut);              // V2-D2: 編集対象は必ず常駐させる
   $('#edit-cut-label').textContent = 'C' + (i + 1) + (isCamCut(cut) ? ' ' + cut.cam.map(c => c.k).join('→') : '');
   $('#edit-dur').value = fmtDur(cut.durF);
   $('#edit-dur').disabled = isCamCut(cut);
   $('#edit-dur-f').textContent = cut.durF + 'f';
   $('#bg-slider').value = cut.bg;
   $('#bg-val').textContent = cut.bg;
+  setEditMode('single', true);   // ✎/ダブルクリックで開いたら必ず単票表示
   setView('edit');
-  syncBaseAlphaUI();
 }
 function setETool(t){
   state.etool = t;
-  document.querySelectorAll('.etool').forEach(el => el.classList.toggle('on', el.dataset.tool === t));
+  // [data-tool] に限定する（描く先ボタン [data-target] を巻き込まないため）
+  document.querySelectorAll('.etool[data-tool]').forEach(el => el.classList.toggle('on', el.dataset.tool === t));
 }
 function updateSwatch(){
   ['#color-swatch', '#tl-mini-swatch'].forEach(id => {
     const el = $(id);
     if(el) el.style.background = state.fillColor;
   });
+  if(!gHsvDriving) syncHsvFromColor();   // パレット/スポイト側から色が変わったらHSVも追従
 }
 function setBrush(v){
   state.brush = clamp(Math.round(v), 1, 64);
@@ -2086,25 +2825,55 @@ function setCutBg(v){
   refreshRow(state.curCut);
   scheduleSave();
 }
+/* キャンバス自身の内部解像度で返す（editCv=ベイク寸法 / tlCv=出力1280×720。V2-D2） */
 function toCanvasCoord(clientX, clientY, cv){
-  const r = (cv || editCv).getBoundingClientRect();
-  return { x: (clientX - r.left) / r.width * CONTE_W, y: (clientY - r.top) / r.height * CONTE_H };
+  const el = cv || editCv;
+  const r = el.getBoundingClientRect();
+  return { x: (clientX - r.left) / r.width * el.width, y: (clientY - r.top) / r.height * el.height };
 }
-/* ペイント先は常に drawC＝ベイク空間。STUDIOプレビュー(tlCv)はカメラを通っているので戻す。
-   EDITキャンバスはベイク空間そのものなので変換不要（V2-D1） */
-function paintCoord(clientX, clientY, cv){
+/* 画面座標 →「今のペイント先レイヤー」の座標。
+   ①キャンバス内部座標 → ②ベイク空間（カメラを通っている面は camToBake で戻す）
+   → ③ターゲットが color なら 512×288 の縮尺へ */
+function toBakeCoord(clientX, clientY, cv){
   const p = toCanvasCoord(clientX, clientY, cv);
   const cut = cuts[state.curCut];
-  if(cv === tlCv && cut && isCamCut(cut)){
+  if(!cut) return p;
+  if(cv === tlCv){
     const ca = cutIndexAt(state.tl.frame);
     return camToBake(cut, ca ? ca.local : 0, p.x, p.y);
   }
-  return p;
+  if(cv.classList && cv.classList.contains('gc-cv')){   // GRIDのセル（出力枠の縮小表示）
+    const k = +cv.dataset.ck || 0;
+    return camToBake(cut, camStartFrame(cut, k), p.x / cv.width * CONTE_W, p.y / cv.height * CONTE_H);
+  }
+  return p;   // editCv はベイク空間そのもの
+}
+function paintCoord(clientX, clientY, cv){
+  const b = toBakeCoord(clientX, clientY, cv);
+  if(state.paintTarget !== 'color') return b;
+  const s = bakeSize(cuts[state.curCut]);
+  return { x: b.x * COLOR_W / s.w, y: b.y * COLOR_H / s.h };
+}
+/* ペイント先: 'draw'=線画レイヤー（ベイク寸法） / 'color'=カラースクリプト層（512×288） */
+function paintCanvas(cut){
+  return state.paintTarget === 'color' ? getColor(cut) : getDraw(cut);
+}
+function markPainted(cut){
+  if(state.paintTarget === 'color') cut.dirtyColor = true; else cut.dirtyDraw = true;
+  cut.thumb = null;
+}
+/* undo/redo は「そのレイヤーの実寸」で撮る。CONTE_W/H で撮ると別寸法のカットで静かに壊れる */
+function paintSnap(cut){
+  const c = paintCanvas(cut);
+  if(!c) return null;
+  return { t: state.paintTarget, data: ctx2d(c).getImageData(0, 0, c.width, c.height) };
 }
 function pushUndo(){
   const cut = cuts[state.curCut];
   if(!cut) return;
-  undoStack.push(ctx2d(cut.drawC).getImageData(0, 0, CONTE_W, CONTE_H));
+  const snap = paintSnap(cut);
+  if(!snap) return;
+  undoStack.push(snap);
   if(undoStack.length > UNDO_MAX) undoStack.shift();
   redoStack.length = 0;
 }
@@ -2115,29 +2884,33 @@ function beginPaintUndo(){
   if(state.view === 'edit'){ pushUndo(); gPaintBefore = null; return; }
   const cut = cuts[state.curCut];
   if(!cut) return;
-  gPaintBefore = { cut, before: ctx2d(cut.drawC).getImageData(0, 0, CONTE_W, CONTE_H) };
+  const snap = paintSnap(cut);
+  if(snap) gPaintBefore = { cut, before: snap };
 }
-function applyDrawData(cut, data){
-  ctx2d(cut.drawC).putImageData(data, 0, 0);
-  cut.dirtyDraw = true;
+function applySnap(cut, snap){
+  if(!snap) return;
+  const c = (snap.t === 'color') ? getColor(cut) : getDraw(cut);
+  if(!c || c.width !== snap.data.width || c.height !== snap.data.height) return;   // 寸法違いは当てない
+  ctx2d(c).putImageData(snap.data, 0, 0);
+  if(snap.t === 'color') cut.dirtyColor = true; else cut.dirtyDraw = true;
   cut.thumb = null;
 }
 function endPaintUndo(){
   if(!gPaintBefore) return;
   const cut = gPaintBefore.cut, before = gPaintBefore.before;
   gPaintBefore = null;
-  const after = ctx2d(cut.drawC).getImageData(0, 0, CONTE_W, CONTE_H);
+  const after = paintSnap(cut);
+  if(!after) return;
   pushLog({ type: 'paint',
-            undo(){ applyDrawData(cut, before); }, redo(){ applyDrawData(cut, after); } });
+            undo(){ applySnap(cut, before); }, redo(){ applySnap(cut, after); } });
 }
 function doUndo(){
   const cut = cuts[state.curCut];
   if(!cut || !undoStack.length) return;
-  const ctx = ctx2d(cut.drawC);
-  redoStack.push(ctx.getImageData(0, 0, CONTE_W, CONTE_H));
-  ctx.putImageData(undoStack.pop(), 0, 0);
-  cut.dirtyDraw = true;
-  cut.thumb = null;
+  const snap = paintSnap(cut);
+  if(!snap) return;
+  redoStack.push(snap);
+  applySnap(cut, undoStack.pop());
   renderPaintViews();
   refreshRow(state.curCut);
   scheduleSave();
@@ -2145,11 +2918,10 @@ function doUndo(){
 function doRedo(){
   const cut = cuts[state.curCut];
   if(!cut || !redoStack.length) return;
-  const ctx = ctx2d(cut.drawC);
-  undoStack.push(ctx.getImageData(0, 0, CONTE_W, CONTE_H));
-  ctx.putImageData(redoStack.pop(), 0, 0);
-  cut.dirtyDraw = true;
-  cut.thumb = null;
+  const snap = paintSnap(cut);
+  if(!snap) return;
+  undoStack.push(snap);
+  applySnap(cut, redoStack.pop());
   renderPaintViews();
   refreshRow(state.curCut);
   scheduleSave();
@@ -2157,7 +2929,9 @@ function doRedo(){
 function strokeSeg(a, b){
   const cut = cuts[state.curCut];
   if(!cut) return;
-  const ctx = ctx2d(cut.drawC);
+  const d = paintCanvas(cut);
+  if(!d) return;
+  const ctx = ctx2d(d);
   ctx.save();
   if(state.etool === 'eraser') ctx.globalCompositeOperation = 'destination-out';
   ctx.strokeStyle = state.fillColor;
@@ -2169,28 +2943,29 @@ function strokeSeg(a, b){
   ctx.lineTo(b.x + (a.x === b.x && a.y === b.y ? 0.01 : 0), b.y);
   ctx.stroke();
   ctx.restore();
-  cut.dirtyDraw = true;
-  cut.thumb = null;
+  markPainted(cut);
 }
 function floodFill(cx, cy){
   const cut = cuts[state.curCut];
   if(!cut) return;
+  const draw = paintCanvas(cut);
+  if(!draw) return;
+  const W = draw.width, H = draw.height;   // ★ CONTE_W/H ではなく「塗る先のレイヤー」の実寸
   cx = Math.floor(cx); cy = Math.floor(cy);
-  if(cx < 0 || cy < 0 || cx >= CONTE_W || cy >= CONTE_H) return;
-  const comp = document.createElement('canvas');
-  comp.width = CONTE_W; comp.height = CONTE_H;
+  if(cx < 0 || cy < 0 || cx >= W || cy >= H) return;
+  const comp = blankCanvas(W, H);
   const cctx = ctx2d(comp);
-  compositeTo(cctx, cut);
-  const src = cctx.getImageData(0, 0, CONTE_W, CONTE_H).data;
-  const dctx = ctx2d(cut.drawC);
-  const di = dctx.getImageData(0, 0, CONTE_W, CONTE_H);
+  compositeTo(cctx, cut, W, H);   // 判定元は「見えている合成」をレイヤー寸法に合わせて作る
+  const src = cctx.getImageData(0, 0, W, H).data;
+  const dctx = ctx2d(draw);
+  const di = dctx.getImageData(0, 0, W, H);
   const dd = di.data;
   const fc = hexToRgb(state.fillColor);
-  const t0 = (cy * CONTE_W + cx) * 4;
+  const t0 = (cy * W + cx) * 4;
   const tr = src[t0], tg = src[t0 + 1], tb = src[t0 + 2];
   const TOL = 2600;
-  const visited = new Uint8Array(CONTE_W * CONTE_H);
-  const stack = [cy * CONTE_W + cx];
+  const visited = new Uint8Array(W * H);
+  const stack = [cy * W + cx];
   while(stack.length){
     const p = stack.pop();
     if(visited[p]) continue;
@@ -2199,15 +2974,14 @@ function floodFill(cx, cy){
     const dr = src[o] - tr, dg = src[o + 1] - tg, db2 = src[o + 2] - tb;
     if(dr * dr + dg * dg + db2 * db2 > TOL) continue;
     dd[o] = fc.r; dd[o + 1] = fc.g; dd[o + 2] = fc.b; dd[o + 3] = 255;
-    const px = p % CONTE_W, py = (p / CONTE_W) | 0;
+    const px = p % W, py = (p / W) | 0;
     if(px > 0) stack.push(p - 1);
-    if(px < CONTE_W - 1) stack.push(p + 1);
-    if(py > 0) stack.push(p - CONTE_W);
-    if(py < CONTE_H - 1) stack.push(p + CONTE_W);
+    if(px < W - 1) stack.push(p + 1);
+    if(py > 0) stack.push(p - W);
+    if(py < H - 1) stack.push(p + W);
   }
   dctx.putImageData(di, 0, 0);
-  cut.dirtyDraw = true;
-  cut.thumb = null;
+  markPainted(cut);
 }
 
 /* --- palette (canon: animator-color-palette skill) --- */
@@ -2254,23 +3028,143 @@ function renderPalette(){
     });
   });
 }
+/* --- HSVスライダー式ピッカー（SPEC_13 §9e） ---
+   パレット＝保存した色 / HSV＝作る色。source of truth は state.fillColor（hex）。 */
+function hsvToRgb(h, s, v){
+  h = ((h % 360) + 360) % 360; s = clamp(s, 0, 1); v = clamp(v, 0, 1);
+  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+  let r = 0, g = 0, b = 0;
+  if(h < 60){ r = c; g = x; }
+  else if(h < 120){ r = x; g = c; }
+  else if(h < 180){ g = c; b = x; }
+  else if(h < 240){ g = x; b = c; }
+  else if(h < 300){ r = x; b = c; }
+  else { r = c; b = x; }
+  return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255), b: Math.round((b + m) * 255) };
+}
+function rgbToHsv(r, g, b){
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if(d){
+    if(mx === r) h = 60 * (((g - b) / d) % 6);
+    else if(mx === g) h = 60 * ((b - r) / d + 2);
+    else h = 60 * ((r - g) / d + 4);
+  }
+  return { h: ((h % 360) + 360) % 360, s: mx ? d / mx : 0, v: mx };
+}
+function hsvHex(h, s, v){ const c = hsvToRgb(h, s, v); return rgbToHex(c.r, c.g, c.b); }
+let gHsv = { H: 0, S: 0, V: 0 };      // H:0-360 / S,V:0-100
+let gHsvDriving = false;
+const HSV_BOXES = ['#hsv-box', '#tl-hsv-box'];
+function buildHsv(){
+  HSV_BOXES.forEach((id, bi) => {
+    const box = $(id);
+    if(!box) return;
+    const compact = (bi === 1);
+    box.innerHTML = '';
+    ['H', 'S', 'V'].forEach(k => {
+      const row = document.createElement('div');
+      row.className = 'hsv-row';
+      const lb = document.createElement('span');
+      lb.className = 'hsv-k';
+      lb.textContent = k;
+      const sl = document.createElement('input');
+      sl.type = 'range';
+      sl.className = 'hsv-sl hsv-sl-' + k;
+      sl.min = 0; sl.max = (k === 'H' ? 360 : 100); sl.step = 1;
+      sl.title = (k === 'H' ? '色相' : k === 'S' ? '彩度' : '明度');
+      sl.addEventListener('input', () => setHsv(k, +sl.value));
+      const nu = document.createElement('input');
+      nu.className = 'hsv-num hsv-num-' + k;
+      nu.addEventListener('click', ev => ev.stopPropagation());
+      nu.addEventListener('change', () => {
+        const v = parseFloat(nu.value);
+        if(isFinite(v)) setHsv(k, v); else renderHsv();
+      });
+      row.appendChild(lb); row.appendChild(sl); row.appendChild(nu);
+      if(!compact){
+        const st = document.createElement('div');
+        st.className = 'hsv-step';
+        const mk = (t, d) => {
+          const bt = document.createElement('button');
+          bt.className = 'btn';
+          bt.textContent = t;
+          bt.addEventListener('click', () => setHsv(k, gHsv[k] + d));
+          st.appendChild(bt);
+        };
+        mk('▲', 1); mk('▼', -1);
+        row.appendChild(st);
+      }
+      box.appendChild(row);
+    });
+  });
+  renderHsv();
+}
+function setHsv(k, val){
+  const max = (k === 'H' ? 360 : 100);
+  gHsv[k] = clamp(Math.round(val), 0, max);
+  gHsvDriving = true;
+  state.fillColor = hsvHex(gHsv.H, gHsv.S / 100, gHsv.V / 100);
+  updateSwatch();
+  gHsvDriving = false;
+  renderHsv();
+}
+function syncHsvFromColor(){
+  const c = hexToRgb(state.fillColor);
+  const o = rgbToHsv(c.r, c.g, c.b);
+  // 無彩色では色相が定まらないので、直前の値を保つ（スライダーが跳ねないように）
+  gHsv.H = (o.s > 0.004) ? Math.round(o.h) : gHsv.H;
+  gHsv.S = Math.round(o.s * 100);
+  gHsv.V = Math.round(o.v * 100);
+  renderHsv();
+}
+function renderHsv(){
+  const H = gHsv.H, S = gHsv.S / 100, V = gHsv.V / 100;
+  const grad = {
+    H: 'linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)',
+    S: 'linear-gradient(90deg,' + hsvHex(H, 0, V) + ',' + hsvHex(H, 1, V) + ')',
+    V: 'linear-gradient(90deg,' + hsvHex(H, S, 0) + ',' + hsvHex(H, S, 1) + ')'
+  };
+  HSV_BOXES.forEach(id => {
+    const box = $(id);
+    if(!box) return;
+    ['H', 'S', 'V'].forEach(k => {
+      const sl = box.querySelector('.hsv-sl-' + k);
+      const nu = box.querySelector('.hsv-num-' + k);
+      if(sl){
+        if(document.activeElement !== sl) sl.value = gHsv[k];
+        sl.style.background = grad[k];
+      }
+      if(nu && document.activeElement !== nu) nu.value = gHsv[k] + (k === 'H' ? '' : '%');
+    });
+  });
+}
+/* cx,cy は **ベイク空間**。上から drawC → colorC → baseC の順に不透明な画素を探す */
 function sampleCompositeColor(cx, cy){
   const cut = cuts[state.curCut];
   if(!cut) return null;
-  cx = Math.floor(cx); cy = Math.floor(cy);
-  if(cx < 0 || cy < 0 || cx >= CONTE_W || cy >= CONTE_H) return null;
-  const layers = [ctx2d(cut.drawC)];
-  if(cut.baseC) layers.push(ctx2d(cut.baseC));
-  for(const c of layers){
+  const draw = getDraw(cut);
+  if(!draw) return null;
+  const bx = Math.floor(cx), by = Math.floor(cy);
+  if(bx < 0 || by < 0 || bx >= draw.width || by >= draw.height) return null;
+  const probes = [[ctx2d(draw), bx, by]];
+  if(hasColor(cut)){
+    const s = bakeSize(cut);
+    probes.push([ctx2d(cut.colorC), Math.floor(cx * COLOR_W / s.w), Math.floor(cy * COLOR_H / s.h)]);
+  }
+  const base = getBase(cut);
+  if(base) probes.push([ctx2d(base), bx, by]);
+  for(const [c, x, y] of probes){
     try{
-      const d = c.getImageData(cx, cy, 1, 1).data;
+      const d = c.getImageData(x, y, 1, 1).data;
       if(d[3] > 8) return rgbToHex(d[0], d[1], d[2]);
     }catch(e){}
   }
   return rgbToHex(cut.bg, cut.bg, cut.bg);
 }
 function eyedropAt(clientX, clientY, cv){
-  const { x, y } = paintCoord(clientX, clientY, cv);
+  const { x, y } = toBakeCoord(clientX, clientY, cv);
   const hex = sampleCompositeColor(x, y);
   if(!hex) return;
   state.fillColor = hex;
@@ -2285,6 +3179,7 @@ function eyedropAt(clientX, clientY, cv){
 /* --- paint pointers（EDITキャンバスとTIMELINEプレビューで共用） --- */
 let stroking = false, strokeLast = null, paintCv = null;
 function renderPaintViews(){
+  if(state.view === 'edit' && gEditMode === 'grid'){ refreshGridCells(state.curCut); return; }
   if(state.view === 'studio') renderTL();
   else renderEditCanvas();
 }
@@ -2334,7 +3229,7 @@ function paintUp(){
 }
 async function clearBase(){
   const cut = cuts[state.curCut];
-  if(!cut || !cut.baseC){ toast('ベース画像はありません'); return; }
+  if(!cut || !(cut.baseC || cut.baseBlob)){ toast('ベース画像はありません'); return; }
   const ok = await modalConfirm('切り出しベース画像を破棄します（加筆は残る・Undo不可）。よろしいですか？');
   if(!ok) return;
   cut.baseC = null;
@@ -2348,10 +3243,11 @@ async function clearBase(){
 function clearDraw(){
   const cut = cuts[state.curCut];
   if(!cut) return;
+  const d = paintCanvas(cut);   // 今のペイント先（線画 or 色）だけを消す
+  if(!d) return;
   pushUndo();
-  ctx2d(cut.drawC).clearRect(0, 0, CONTE_W, CONTE_H);
-  cut.dirtyDraw = true;
-  cut.thumb = null;
+  ctx2d(d).clearRect(0, 0, d.width, d.height);
+  markPainted(cut);
   renderPaintViews();
   refreshRow(state.curCut);
   scheduleSave();
@@ -2389,6 +3285,7 @@ function renderTL(){
     tlCtx.fillRect(0, 0, CONTE_W, CONTE_H);
   }else{
     const ca = cutIndexAt(state.tl.frame);
+    prefetchAround(ca.i);                        // 再生に間に合うよう前後1カットを先読み
     drawCamFrame(tlCtx, cuts[ca.i], ca.local);   // 枠列カットはここでカメラが効く
     if($('#chk-burnin').checked) drawBurnin(ca);
   }
@@ -2638,6 +3535,8 @@ function tlPaintDown(e){
   const ca = cutIndexAt(state.tl.frame);
   if(!ca) return;
   if(state.curCut !== ca.i){ state.curCut = ca.i; undoStack = []; redoStack = []; }
+  const cut = cuts[ca.i];
+  if(!isResident(cut)){ ensureResident(cut).then(() => toast('読み込みました。もう一度なぞってください')); return; }
   paintDown(e, tlCv);
 }
 /* --- ショートカット（composer-timeline-kit 準拠・TIMELINEビューで有効） --- */
@@ -2858,11 +3757,72 @@ function bindDoubleTap(el, fn){
   });
 }
 
+/* ---------------- SETTINGS: ショートカット一覧（表示のみ・SPEC_13 §9f） ---------------- */
+const HELP_GROUPS = [
+  { t: 'TRANSPORT（STUDIO）', rows: 'keymap' },   // SHORTCUT_ACTIONS から自動生成
+  { t: 'PAINT（STUDIO / EDIT）', rows: [
+    ['B', 'ペン'], ['E', '消しゴム'], ['G', '塗りつぶし'], ['I', 'スポイト'],
+    ['[ / ]', 'ブラシを細く／太く'], ['Alt+クリック', 'スポイト（ツールを問わず）'],
+    ['Ctrl+Z / Y', 'UNDO / REDO（STUDIO=統合ログ・EDIT=カット内）']
+  ] },
+  { t: 'SHEETパネル', rows: [
+    ['クリック', 'そのカット頭へ'], ['ダブルクリック', '加筆EDITへ'],
+    ['上下ドラッグ', 'カットの並べ替え'], ['Ctrl+↑ / ↓', '現在カットを上へ／下へ']
+  ] },
+  { t: 'BOARD', rows: [
+    ['ドラッグ', '写真を移動（空白＝パン）'], ['Alt / 中ボタン ドラッグ', '常にパン'],
+    ['ホイール / ピンチ', 'ズーム'], ['枠線・C#をクリック', 'CUT枠を選択'],
+    ['Delete', '選択中の枠（カット）／写真を削除'], ['Ctrl+V', '画像を貼り付け']
+  ] },
+  { t: 'EDIT', rows: [
+    ['ホイール', 'カーソル中心ズーム'], ['1本指ドラッグ', 'パン'], ['2本指', 'ピンチ拡縮＋パン'],
+    ['FIT', 'ズーム/パンをリセット']
+  ] },
+  { t: 'iPad', rows: [
+    ['ダブルタップ', '加筆EDITへ（行・クリップ）'], ['2本指タップ', 'UNDO'], ['3本指タップ', 'REDO'],
+    ['指 / ペン', '指＝操作・ペン＝描画']
+  ] }
+];
+function renderHelp(){
+  const body = $('#help-body');
+  body.innerHTML = '';
+  HELP_GROUPS.forEach(g => {
+    const box = document.createElement('div');
+    box.className = 'help-grp';
+    const h = document.createElement('h4');
+    h.textContent = g.t;
+    box.appendChild(h);
+    const rows = (g.rows === 'keymap')
+      ? SHORTCUT_ACTIONS.map(a => [gKeymap[a.id] || a.def, a.label])
+      : g.rows;
+    rows.forEach(([k, d]) => {
+      const r = document.createElement('div');
+      r.className = 'r';
+      const ke = document.createElement('span'); ke.className = 'k'; ke.textContent = k;
+      const de = document.createElement('span'); de.className = 'd'; de.textContent = d;
+      r.appendChild(ke); r.appendChild(de);
+      box.appendChild(r);
+    });
+    body.appendChild(box);
+  });
+}
+function toggleHelp(force){
+  const ov = $('#help-ovl');
+  const on = (typeof force === 'boolean') ? force : !ov.classList.contains('on');
+  if(on) renderHelp();
+  ov.classList.toggle('on', on);
+}
+
 /* ---------------- keyboard ---------------- */
 function onKey(e){
   if($('#modal-ovl').classList.contains('on')) return;
   const tag = (e.target && e.target.tagName) || '';
   if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if($('#help-ovl').classList.contains('on')){
+    if(e.key === 'Escape' || e.key === '?' || e.key === '/') toggleHelp(false);
+    return;
+  }
+  if(e.key === '?' || (e.key === '/' && e.shiftKey)){ e.preventDefault(); toggleHelp(true); return; }
   // STUDIO は統合ログ（写真・枠・ペイントを一列）、EDIT内は従来のカット別スタック
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
     e.preventDefault();
@@ -2877,6 +3837,19 @@ function onKey(e){
     return;
   }
   if(state.view === 'studio'){
+    // Ctrl+↑/↓ = 現在カットを並べ替え（SHEET行ドラッグと同じ操作）
+    if((e.ctrlKey || e.metaKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown')){
+      e.preventDefault();
+      const d = (e.key === 'ArrowUp') ? -1 : 1;
+      if(gFocusCut >= 0){
+        const to = gFocusCut + d;
+        if(to >= 0 && to < cuts.length){
+          moveCutTo(gFocusCut, to);
+          seek(cutStartFrame(to));
+        }
+      }
+      return;
+    }
     const nk = normKey(e);   // Space/←→/Home/End/J/K/L はトランスポート
     for(const a of SHORTCUT_ACTIONS){
       if(gKeymap[a.id] && gKeymap[a.id] === nk){
@@ -2907,6 +3880,9 @@ function wire(){
     openEdit(gFocusCut >= 0 ? gFocusCut : 0);
   });
   $('#btn-fs').addEventListener('click', toggleFullscreen);
+  $('#btn-help').addEventListener('click', () => toggleHelp());
+  $('#btn-help-close').addEventListener('click', () => toggleHelp(false));
+  $('#help-ovl').addEventListener('click', e => { if(e.target === $('#help-ovl')) toggleHelp(false); });
   $('#btn-sheet-toggle').addEventListener('click', toggleSheetPanel);
   $('#btn-ui-side').addEventListener('click', toggleUiSide);
   $('#btn-ui-side-mini').addEventListener('click', toggleUiSide);
@@ -2954,6 +3930,14 @@ function wire(){
   // REF BOARD クリップ
   $('#btn-clip-clear').addEventListener('click', clipClear);
   $('#btn-clip-paste').addEventListener('click', clipPasteJson);
+  // プロジェクト入出力（ZIP）
+  $('#btn-proj-export').addEventListener('click', exportProject);
+  $('#btn-proj-import').addEventListener('click', () => $('#proj-file-input').click());
+  $('#proj-file-input').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if(f) importProject(f);
+  });
   // Ctrl+V ペースト（STUDIO表示中・入力欄フォーカス中は無視）
   window.addEventListener('paste', e => {
     if(state.view !== 'studio') return;
@@ -3006,6 +3990,13 @@ function wire(){
   });
   // EDIT
   $('#btn-edit-back').addEventListener('click', () => setView('studio'));
+  $('#btn-mode-single').addEventListener('click', () => setEditMode('single'));
+  $('#btn-mode-grid').addEventListener('click', () => setEditMode('grid'));
+  document.querySelectorAll('.etool[data-target]').forEach(el => {
+    el.addEventListener('click', () => setPaintTarget(el.dataset.target));
+  });
+  $('#color-blend').addEventListener('change', e => setColorBlend(e.target.value));
+  $('#color-alpha').addEventListener('input', e => setColorAlpha(+e.target.value / 100));
   $('#btn-cut-prev').addEventListener('click', () => openEdit(state.curCut - 1));
   $('#btn-cut-next').addEventListener('click', () => openEdit(state.curCut + 1));
   $('#edit-dur').addEventListener('change', () => {
@@ -3019,7 +4010,7 @@ function wire(){
   $('#btn-clear-base').addEventListener('click', clearBase);
   $('#btn-undo').addEventListener('click', doUndo);
   $('#btn-redo').addEventListener('click', doRedo);
-  document.querySelectorAll('.etool').forEach(el => {
+  document.querySelectorAll('.etool[data-tool]').forEach(el => {
     el.addEventListener('click', () => setETool(el.dataset.tool));
   });
   $('#brush-size').addEventListener('input', e => setBrush(+e.target.value));
@@ -3071,6 +4062,10 @@ function wire(){
   });
   window.addEventListener('pointermove', e => { if(gScrub && !gClipDrag) stripSeek(e); });
   window.addEventListener('pointerup', () => { gScrub = false; });
+  // SHEET行の上下ドラッグ（setPointerCapture は使わない＝dblclick/ダブルタップを殺さないため）
+  window.addEventListener('pointermove', rowDragMove);
+  window.addEventListener('pointerup', rowDragUp);
+  window.addEventListener('pointercancel', rowDragUp);
   // TIMELINE ミニツールバー
   $('#tl-brush').addEventListener('input', e => setBrush(+e.target.value));
   $('#btn-tl-tools-hide').addEventListener('click', () => {
@@ -3164,6 +4159,7 @@ async function init(){
   applyUi();
   initClipBridge();
   state.fillColor = gPalette[gPalSlot] || '#000000';
+  buildHsv();
   updateSwatch();
   renderPalette();
   try{
@@ -3171,6 +4167,7 @@ async function init(){
     await loadAll();
   }catch(e){ console.error('DB init failed', e); }
   updateTotals();
+  invalidateCoverage();
   syncBoardPanels();
   setView('studio');
   if(!photos.length && !cuts.length){
@@ -3187,7 +4184,8 @@ window.__ECONTE__ = {
   get ui(){ return gUi; },
   get clip(){ return gClip; },
   get log(){ return { undo: gLog.length, redo: gLogRedo.length, types: gLog.map(e => e.type) }; },
-  addPhotoFromImage, createCutFromRect, addEmptyCut, bakeCut, rebakeCut, deleteCut, moveCut,
+  addPhotoFromImage, createCutFromRect, addEmptyCut, bakeCut, rebakeCut, deleteCut, moveCutTo,
+  buildHsv, setHsv, syncHsvFromColor, hsvToRgb, rgbToHsv, spRows,
   renderBoard, renderSheetPanel, renderEditCanvas, openEdit, setView, setETool,
   renderStudioSync, layoutStudio, refreshStudio, refreshRow, setCutDur, cutThumbSrc,
   toggleUiSide, toggleSheetPanel, toggleFullscreen, applyUi,
@@ -3195,9 +4193,17 @@ window.__ECONTE__ = {
   setBaseAlpha, baseAlphaOf, syncBaseAlphaUI, activeCutIndex, editFit, editZoomAt, applyEditView,
   fitEditCanvas, undoActive, redoActive, cancelGestures,
   camCount, camRect, setCamRect, camLabel, hitCutFrame, hitCutHandle, selectCutFrame, rebakeFromCam,
+  get lru(){ return { list: gLru.slice(), resident: cuts.filter(isResident).length, pending: gResidentPending }; },
+  ensureResident, isResident, getBase, getDraw, evictLru, encodeCut, bakeSize, calcBakeSize,
+  updateCoverage, invalidateCoverage, sizeEditCanvas, prefetchAround, withResident, rowLabel,
   camAt, drawCamFrame, camToBake, calcBakeRect, recalcDur, isCamCut, addCamFrame, delCamFrame,
   setCamDur, setBakeExpand, renderCamList, camStartFrame, relabelCam, easeT, migrateCutV2, drawCamGuide,
   clipSet, clipClear, clipConsume, clipPasteJson, renderClipBar, logUndo, logRedo, isHeic, decodeHeic,
+  exportProject, importProject, toggleHelp, renderHelp, rowDragMove, rowDragUp,
+  get editMode(){ return gEditMode; },
+  getColor, hasColor, colorBlendOf, colorAlphaOf, setColorBlend, setColorAlpha,
+  setEditMode, setPaintTarget, renderGrid, refreshGridCells, colorCells, cellSub,
+  paintCanvas, paintSnap, applySnap, syncEditPanels, toBakeCoord, drawColorLayer,
   fmtDur, parseDur, floodFill, sampleCompositeColor, saveAll, boardFit, updateTotals,
   totalFrames, cutIndexAt, cutStartFrame, seek, play, pause, togglePlay, seekCut, toggleLoop,
   layoutTL, renderTL, fitTLCanvas, exportVideo, finishExport, cancelExport, loadKeymap

@@ -55,9 +55,31 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 - ease は `easeT()`（LINEAR / EASE=smoothstep / HOLD=その枠で止まる＝タメ）
 - `key` はカラースクリプト一覧（§5h・D3）に出す枠。既定は始点と終点だけ true。
   ユーザーが★を触ると `keyUser` が立ち、以後 `relabelCam()` の既定計算から守られる
-- **V2-D2 でここが可変解像度になる**: `bakeW/bakeH` は今 1280×720 固定だが、
-  `drawCamFrame`/`camToBake`/`remapDraw` は最初から bakeW/bakeH 参照で書いてあるので、
-  D2 は「どこから寸法を取るか」を変えるだけで済む
+
+■ 可変ベイク解像度と遅延デコード（V2-D2・SPEC_13 §5c/§5d/§5e）
+- **`CONTE_W/CONTE_H` は出力解像度（本番枠）専用**。**キャンバス寸法として使わないこと**。
+  カットのビットマップ寸法は `bakeSize(cut)` → `cut.bakeW/bakeH`
+- 密度 = `CONTE_W / min(cam[].w)`（最寄り枠が等倍）→ `MAX_AREA = 3840×2160` でクランプ。
+  クランプ率は `cut.bakeClamp`（「0.82x」表示・**保存対象**）。
+  **FIXカット（枠1つ）は bakeExpand を掛けない**ので 1280×720 の等倍を保つ（掛けると画が2%縮む）
+- **静かに壊れる場所**（実測で通した）: FILLの `visited` 配列と走査幅／undoの `getImageData`／
+  `toCanvasCoord`。`toCanvasCoord` は **キャンバス自身の `el.width/height`** を見る形にしてある
+  （editCv=ベイク寸法 / tlCv=出力1280×720 が自動で切り替わる）
+- **遅延デコードLRU**: `loadAll()` はビットマップをデコードしない（Blobが正）。
+  `ensureResident(cut)` で復号し、`LRU_MAX = 8` を超えたら `evictLru()` が追い出す。
+  **`cut.baseC/drawC` を直接読まない** → `getBase()/getDraw()`（非常駐なら null を返し、
+  裏で `requestResident()` が走って完了時に再描画する）
+  - 保護対象（追い出さない）: EDIT中のカット / 選択中の枠のカット / プレイヘッド±1
+  - `touchLru()` からも `scheduleEvict()` を呼ぶ。**ensureResident 経由だけだと
+    新規作成やアクセスだけで溜まったぶんが掃かれない**（2026-08-02 に踏んだ）
+  - 焼き付けは `encodeCut()`: drawC=PNG／baseC は `cut.baseOpaque` が真なら JPEG q0.85、
+    偽なら PNG（透明部分が黒くなるため）
+- **枠の編集は常駐カット前提**。`selectCutFrame()` が `ensureResident` を呼び、
+  `rebakeFromCam()` は非常駐なら `withResident()` で読み込んでからやり直す
+  （非常駐のまま焼き直すと加筆を失う）
+- 被覆判定 `updateCoverage(cut)` は 48×27 グリッド。`cut.uncov`（⚠と赤ハッチ）と
+  `cut.baseOpaque`（JPEG可否）を同時に決める。写真を動かしたら `invalidateCoverage()` を
+  **操作の終わりにだけ**呼ぶ（renderBoard 毎に回すと重い）
 
 ■ BOARD（考える場）
 - `bDown/bMove/bUp` がMOVE/CUTツール共用のポインタハンドラ。V2-Bで判定順が
@@ -143,6 +165,34 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 - ショートカットは`SHORTCUT_ACTIONS`登録制＋`gKeymap`(`econte_keymap_v1`)。composer/OBANと同じレジストリパターン。
   再割当UIは未実装（P2以降・現状はlocalStorage手書き編集のみ）
 
+■ カラースクリプト層（V2-E2・SPEC_13 §9b）
+- `cut.colorC`（512×288・**ベイク空間**）／`colorBlend`／`colorAlpha`／`colorBlob`／`dirtyColor`。
+  **LRUに乗せない**（`getColor()` が必要時に作り、`evictLru()` は触らない）。
+  `loadAll()` では **colorBlob を即デコードして常駐させる**（一覧で待たせないため）
+- 合成順は 下地 → baseC → **colorC** → drawC。`drawColorLayer()` が1か所で面倒を見る
+  （`compositeTo` と `drawCamFrame` の両方から呼ばれる）
+- **描く先は `state.paintTarget`（'draw' | 'color'）**。`paintCanvas(cut)` が返すキャンバスに全部書く。
+  `paintSnap/applySnap` はターゲット種別をスナップショットに持つので、
+  線画と色でundoが混ざらない。**新しい描画処理を足すときは `getDraw()` 直呼びではなく `paintCanvas()`**
+- 座標は `toBakeCoord()`（画面→ベイク空間）→ `paintCoord()`（→ターゲット縮尺）の2段。
+  GRIDセルは `cv.dataset.ci/ck` を見て `camToBake` に流す。**スポイトは `toBakeCoord` の方を使う**
+- EDITのモードは `gEditMode`。`openEdit()` は `setEditMode('single', true)` で単票を強制する
+
+■ V2-E1 の小物
+- **HSVピッカー**: `gHsv{H,S,V}` は表示用の派生値で、**正は `state.fillColor`(hex)**。
+  `updateSwatch()` の末尾で `syncHsvFromColor()` が走る。スライダー操作中は `gHsvDriving` を立てて
+  この逆流を止める（立てないと hex→hsv の丸めでスライダーが跳ねる）。
+  無彩色(S=0)では色相が定まらないので、直前の H を保つ
+- **SHEET行ドラッグ**: `#sp-drop`（挿入線）は `#sheet-list` の子なので、
+  **`renderSheetPanel()` は innerHTML='' せず `.sp-row` だけ消す**。
+  行の取得も `spRows()`（`.children` だと挿入線が混ざる）。
+  6pxのしきい値で click と区別し、ドラッグ直後は `gRowDragged` で click を1回だけ捨てる。
+  ここも **setPointerCapture を使わない**（ダブルタップが死ぬ）
+- **ショートカット一覧**: `HELP_GROUPS`。TRANSPORT の行は `SHORTCUT_ACTIONS`＋`gKeymap` から自動生成
+  （キーマップを足したら勝手に載る）。開いている間はキー入力を素通りさせない
+- **プロジェクトZIP**: `exportProject()/importProject()`。**baseC は入れない**（派生物）。
+  読み込み後に各カットで `rebakeFromCam()` して焼き直す。JSZip はCDNから遅延ロード
+
 ■ FILLパレット
 - `animator-color-palette`スキルの正準を移植。localStorageキーは`econte_palette_v1`（他ツールと衝突しない専用キー）
 - **V2-Aで正準から意図的に逸脱**: `selectPalSlot()` は `setETool('fill')` を呼ばない（＝色を選んでもツールは変わらない）。
@@ -169,6 +219,12 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   HTMLだけ表示・コンソールも静か）を出した。check.js は `new Function` で必ず捕まえる
 - HEIC は保存blobを**必ずJPEGに落とす**（`decodeHeic`）。HEICのまま `photos[].blob` に入れると
   リロード時の `blobToImage` が失敗して写真が消える
+- **`window.__ECONTE__` の export リストに存在しない識別子を残すと ReferenceError で
+  スクリプト全体が死ぬ**（画面はHTMLだけ出てコンソールも静か）。関数を改名したら export も直すこと。
+  check.js はこれを検出できない（`$('#id')` と関数宣言しか見ていない）。2026-08-02 に
+  `drawSnap` → `paintSnap` の改名で踏んだ
+- `.etool` は**ツールボタンと描く先ボタンの2種類**ある。セレクタは必ず
+  `.etool[data-tool]` / `.etool[data-target]` と絞る（`.etool` 全部を触ると相手を壊す）
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 【V2-D（大判カメラ枠列）に着手する人へ・先読み必須】
@@ -209,12 +265,21 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
 - **V2-C: 実装済み（2026-08-02）** — `cut.baseAlpha` トレース透かし／EDITズーム・パン／
   指=操作・ペン=描画／2本指UNDO・3本指REDO
 - **V2-D1: 実装済み（2026-08-02）** — `cut.cam[]`／`bakeRect` 自動算出／枠列編集UI／
-  `drawCamFrame()`／meta.ver 1→2 マイグレーション。**ベイクは1280×720のまま**
-- V2-D2 / V2-D3: 未着手。
-  - **D2 は唯一の不可逆なデータ変更**（可変ベイク解像度＋遅延デコードLRU）。
-    着手前にIndexedDBの構造変更をユーザーに一言確認する。**遅延デコードは D2 と同時に入れる**
-    （後回しにすると大判カットを作った瞬間に落ちる）
-  - D3 は INFO帯＋MP4書き出し＋カラースクリプト一覧PNG（`cam[].key` で間引く）
+  `drawCamFrame()`／meta.ver 1→2 マイグレーション
+- **V2-D2: 実装済み（2026-08-02）** — 可変ベイク解像度（`bakeW/bakeH`・MAX_AREAクランプ）／
+  遅延デコードLRU（8カット常駐）／素材はみ出し警告
+- **V2-E1: 実装済み（2026-08-02）** — HSVピッカー／SHEET行ドラッグ並べ替え（▲▼撤去・Ctrl+↑↓）／
+  SETTINGSショートカット一覧（⚙ / `?`）／プロジェクトZIP入出力
+- **V2-E2: 実装済み（2026-08-02）** — EDITの`GRID`モード＋`cut.colorC`＋描画モード5種
+- 未着手（この順）: **V2-D3 → V2-E3**。
+  画面の役割は **SPEC_13 §9 で確定済み（着手前に必読）**。
+  **D3の一覧PNGは GRID をそのまま大きく描くだけ**（`colorCells()`／`cellSub()` が既にある）
+  - **E2** カラースクリプト編集: EDITに `GRID` モード＋`cut.colorC`（512×288・**LRU対象外で常駐**）
+    ＋ブレンド（既定=乗算）。合成順は bg→baseC→layers→**colorC**→drawC
+  - **D3** 出口: INFO帯＋MP4＋一覧PNG。**E2 のGRIDがそのまま一覧PNGになる**ので E2 を先にやる
+  - **E3** コラージュ: `cut.layers[]`（最大5・原本Blob＋アフィン変形＋投げ縄マスク＋ブレンド）
+    ＋ブラシチップ（**.abrパーサは作らない**・内蔵数種＋透過PNG読み込み）
+- **既存データの互換は当面考えなくてよい**（2026-08-02 ユーザー確認・テスト段階のため）
 
 【変更後チェック】
 node tools/check.js（6ファイル一括。econte.html含む）
