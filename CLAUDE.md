@@ -34,6 +34,13 @@
 - `SPEC_14_TIMELAPSE.md` — ANIMATOR 作画タイムラプス仕様（自動記録・専用ストア tl_shot・リングバッファ・**WORK/CELL 2通りの見せ方**・WebM書き出し。**P0〜P2 すべて実装済み。残タスクなし**（P3=区間トリム等は任意・将来））
 - `SPEC_12_PARALLAX_TAKE_BRIDGE.md` — PARALLAX_LAB×OBAN TAKEブリッジ仕様（TAKE JSONを貼ると3流儀で同一カメラワークを再生＝差分検証機。**実装先は `LP_motion-graphics/PARALLAX_LAB/`**、本リポジトリ側はTAKE形式互換の意識のみ。P0/P1/P2未着手）
 
+スキル（`.claude/skills/` — このフォルダ配下で作業するときだけ有効）:
+`animator-color-palette`（FILLパレット＋Altスポイト） / `animator-ref-overlay`（参照画像＋FRAME下絵） /
+`composer-timeline-kit`（ショートカット登録・座標規約・WA・マーカー・KFコピペ） /
+`floating-panel-kit`（パネル移動・▾最小化・項目スナップ・高さフィット・前面制御）。
+いずれも animator/composer の実装が正準。**最終照合 2026-08-08**（実コードと突き合わせ済み）。
+実装を大きく変えたら、対応するスキルの references も同じコミットで直すこと。
+
 GitHub: https://github.com/maso1737/animation-paint
 Pages: https://maso1737.github.io/animation-paint/
 

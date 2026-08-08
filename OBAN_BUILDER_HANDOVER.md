@@ -254,6 +254,90 @@ cd verify && npm run verify:oban
 - `updateCvOff()` は `onResize()`（バーの折り返しが変わる）と `toggleCleanView()`（バーが消える＝オフセット0）で呼ぶ
 - 結果: 760×900 で枠の上下余白が **198px / 198px** に一致
 
-**QUICK EDIT の位置**: `bottom:16px` の下端基準をやめ、他のパネルと同じ **`top:88px` の上基準**に変更
-（中身が短くても常に画面下辺に貼り付いて見えるため）。`max-height:calc(100vh - 104px)` と
-`#qe-body{flex:0 1 auto;min-height:0}` で、長いときだけ中身がスクロールする。
+**QUICK EDIT の位置**: `bottom:16px` の下端基準をやめ、他のパネルと同じ **上基準**に変更
+（中身が短くても常に画面下辺に貼り付いて見えるため）。`#qe-body{flex:0 1 auto;min-height:0}` で、
+長いときだけ中身がスクロールする。※上端の値は 2026-08-08 に `top:var(--bartop)` へ変更（後述）。
+
+## 表示ズーム・パネル操作・DOFの可視化・iPad（2026-08-08 実装済み）
+
+発注者フィードバック「フローティングUIがフレームに被って全体が見えない」「DOFのA/Bが何にどれだけ
+効いているか分からない」「iPadでキーボードが無い」への対応。
+
+### 表示ズーム VS（AEの表示倍率相当・`,` / `.` / `0`）
+
+- **キャンバスごと CSS `transform: scale()` で縮める**。`prect`/`drawGuides`/`computeWipeP`/書き出しは
+  **一切触らない**ので構図も出力も不変。**VERIFY HARNESS のベースラインも不変**（0.000% で確認済み）。
+  CVOFF と同じ「見え方だけ動かす」やり方の拡張
+- 段は `VS_STEPS=[1,0.8,0.66,0.5,0.4,0.33,0.25]`。`,`=縮小 / `.`=拡大 / `0`=原寸（`<` `>` も同じ）。
+  `localStorage('oban-viewscale')` に保存（**検証窓 `?harness=1` では読まない＝常に原寸**）
+- **CVOFF は VS 連動で計算し直す**：縮小するとキャンバス上端が下がってバーに隠れなくなるので、
+  `CVOFF = max(0, barH - (VH-VH*VS)/2)/2`。VS=1 なら従来どおり `barH/2`
+- **ポインタ変換の一本化**：`evX/evY`（画面→キャンバス内）・`scrX/scrY`（キャンバス内→画面）。
+  **ドラッグの移動量も evX/evY の差分で取る**（`drag.px/py` に evX/evY を入れる）ので、
+  縮小中でも指の動きと絵の動きが 1:1（実測 dx 60.01/dy -40.00 vs 期待 60/-40）
+- テキストエディタは DOM＝画面座標なので `openTextEditor` 内で `scrX/scrY` に通し、フォントも `*VS`
+  （`editTextAt` は**キャンバス内座標のまま**渡す。旧実装の `+CVOFF` は廃止）
+- **`visBottomPx()`**: 画面の下辺に当たるキャンバス内y。CVOFF で下がったぶんキャンバスの底は画面外に
+  出るので、**画面に出すUI（DOF定規・PREVIEW表記）はこの値を基準に描く**。これを忘れると下が切れる
+
+### フローティングパネル（cards / QUICK EDIT / FX 共通）
+
+- **`▾` で最小化**（`.mini` クラス。ヘッダだけ残る）。COMPOSER の INSPECTOR ▾ と同じ作法。
+  ボタンのラベルは `▾ ⇄ ▸` で入れ替わる
+- **下端リサイズが項目の切れ目にスナップ**（`makePanelResizable(handle, body, snapSel)`。±14px）。
+  snapSel は cards=`.dofstrip,.edc-title,.edc` / QE=`.qe-row,.qe-sect` / FX=`.fx-master,.fx-ent`
+- **QUICK EDIT は中身の高さぴったりに畳む**（`fitQe()`）＝ **DELETE の直下でパネルが終わる**。
+  FRAME を選んで項目が増えても同じ（実測 コマ=187px / FRAME=435px、いずれも scrollHeight と一致）。
+  手で高さを変えると `qeUserH=true` で尊重し、**選び直すとフィットに戻る**
+  - **注意**: `position:fixed` は `offsetParent` が常に null。可視判定は `getClientRects().length` で行う
+  - TAKEモード中は `#qe` が display:none で測れないので、`setMode('place')` で `fitQe(true)` を呼ぶ
+- **`--bartop`**: パネルの上端を `top:var(--bartop,88px)` にして、`updateCvOff()` が
+  「バーの実高さ+12」を入れる。**窓が狭くてバーが2〜3段に折り返しても潜り込まない**
+- **`bringToFront(p,force)`** に force を追加。`toggleFxModal(true)` は必ず `force` で前面へ出し、
+  `.mini` も解除する ＝ **TAKEパネルの「詳細…」を押せば、FXが既に開いていて下敷きでも必ず前に出る**
+
+### DOF：何がどれだけ効いているかを見せる
+
+**ピン送りは1本だけ**（A→B・KFひとつ）という仕様は変えていない。分からなかったのは「効き」なので、
+状態を3か所に出した：
+
+- **奥行き定規 `drawDofRuler()`**（画面下・編集ビューのみ・書き出さない）: 0..1 の軸に
+  **各コマのDEPTH目盛り**（ボケているものは薄く／選択中はピンク＋名前）・**A/Bの旗**・
+  **いまのピント（白い縦線＋PIN値）**・**合焦帯（±range）**を重ねる。ピッカー待機中は行き先を大きく表示
+- **コマの上のバッジ `drawDofBadge()`**: `D0.60  A:9.1  B:10.9` ＝ そのコマが
+  **Aのとき／Bのときのボケ量（CSS px。`IN`＝合焦）**。数字は `cv.height/DPR` 基準なので DPR で倍にならない
+- **QUICK EDIT の「ピント」行**: `A くっきり ／ B 10.9px`（DOFがONのときだけ出る）
+- ストリップの文言を **「A 今の画 / B 次の画」** に変更し、それぞれの下に
+  **`→ そのピント位置にいるコマ名`**（`dofNearest()`）を出す
+- **「画面から取る」を押した瞬間に `dofPrev` をその側へ寄せる**（A→0 / B→1）。
+  取り込んだ直後も同じ側で表示＋**取ったコマを `sel` にする**ので、定規とバッジが同時に変わって
+  「効いた」のが目で分かる。トーストも「いま A の見え方です」と言う
+- 「見え方」行に **A / B のワンクリック切替ボタン**を追加（スライダーの両端に配置）
+- `dofBlurFor(depth,P,H)` は `dofBlurAtFocus(depth,focus,H)` に分離（UIが任意のピント位置で引けるように）
+
+### 素材の複製（`Ctrl+D`）
+
+- `duplicateSel()`。コマは**名前を変えない**＝`IMGCACHE` を引くキーが同じなので絵をそのまま共有する。
+  FRAME は `nextName()` で `FRAME 01 copy` を付け、**子パネル・フレーム内テキストごと丸ごと複製**
+  （quad は deep copy）。テキストも可。ルートは +0.05 / フレーム内は +0.06 ずらして最前へ
+- 複製したものが `sel` になり、TAKE中なら PLACE に切り替わる
+
+### iPad
+
+- **指の本数でショートカット**（`gTap`・econte の実装と同型・capture段で拾う）:
+  **2本=UNDO / 3本=CAPTURE（TAKEへ自動切替）/ 4本=PREVIEW 再生・停止**。
+  判定は「全部離れた瞬間」＋最大本数＋260ms以内＋12px以上動いていない。
+  **2本目が触れた時点で `drag=null`** にするので、指を置いただけで視点やコマが動かない
+  - ※ econte は 3本指=REDO だが、**OBANは発注者要望で 3本指=CAPTURE**。語彙が違う点に注意
+- `canvas#cv{touch-action:none}` を追加（ブラウザ側のピンチ/スクロールに取られない）
+- **全画面が戻る件**: Safari の Fullscreen API はタブ切替・分割ビュー・回転などで解除される。
+  恒久的に消したいなら **共有 ▸ ホーム画面に追加**。そのために
+  `apple-mobile-web-app-capable` / `mobile-web-app-capable` / `status-bar-style` / `apple-mobile-web-app-title`
+  と `viewport-fit=cover, user-scalable=no` を head に追加した（通常のSafari表示には影響しない）
+
+### 検証（2026-08-08）
+
+`node tools/check.js` ALL PASS ／ `npm run verify:oban` **6点すべて 0.000%**（表示ズームはCSSのみ＝
+ベースライン不変）／ ビューアをBlobで実生成してiframe起動＝エラーなし・`focusAt`/`dofBlurFor` 生存。
+実クリック・実ドラッグで座標系（VS=0.5 と VS=1）、リサイズのスナップ、複製、最小化、詳細…の前面化を確認。
+**マルチタッチだけは合成 PointerEvent での確認（実機iPad未確認）。**
