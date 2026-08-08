@@ -188,7 +188,7 @@ body{
   -webkit-user-select:text;user-select:text;
 }
 #edit-dur-f{color:var(--grey);font-size:9px}
-#edit-main{flex:1;display:flex;min-height:0}
+#edit-main{flex:1;display:flex;min-height:0;position:relative}
 #edit-main.side-right{flex-direction:row-reverse}
 #edit-main.side-right #edit-side{border-right:none;border-left:1px solid var(--border)}
 #edit-side{
@@ -240,25 +240,47 @@ body{
   background:radial-gradient(ellipse 60% 60% at 50% 40%,rgba(184,80,255,0.07),transparent 70%);
 }
 #edit-cv{background:#888;box-shadow:0 0 30px rgba(0,0,0,.6);touch-action:none;cursor:crosshair;flex:none}
-/* ---------- EDIT GRID（カラースクリプト編集・SPEC_13 §9b） ---------- */
+/* ---------- EDIT GRID（カラースクリプト編集・SPEC_13 §9b）
+   色を正しく読むため **背景は黒**。装飾は最小限にする。 ---------- */
 #edit-grid{
-  flex:1;min-width:0;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding:14px;background:radial-gradient(ellipse 60% 60% at 50% 30%,rgba(184,80,255,0.06),transparent 70%);
+  flex:1;min-width:0;display:none;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;background:#000;padding:14px 12px 40px;
 }
 #edit-main.grid #edit-stage{display:none}
 #edit-main.grid #edit-grid{display:block}
-#grid-wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.gc{position:relative}
+#grid-wrap{display:flex;flex-direction:column;align-items:center}
+.gr{width:100%;display:flex;flex-direction:column;align-items:center}
+.gr-cells{display:flex;justify-content:flex-start}
+.gr-pal{display:block;width:100%;height:11px;margin-top:3px}
+.gc{position:relative;flex:none}
+.gc-bar{height:2px;background:rgba(255,210,122,.55);margin-bottom:2px}
 .gc-cv{
-  width:100%;height:auto;aspect-ratio:16/9;display:block;background:#222;
-  border:1px solid var(--border);touch-action:none;cursor:crosshair;
+  width:100%;height:auto;aspect-ratio:16/9;display:block;background:#111;
+  touch-action:none;cursor:crosshair;
 }
-.gc.on .gc-cv{border-color:var(--acid);box-shadow:0 0 12px rgba(255,79,168,.35)}
-.gc-cap{display:flex;align-items:baseline;gap:6px;margin-top:3px;font-size:9px;letter-spacing:.06em}
-.gc-no{font-family:var(--bank);color:var(--acid)}
-.gc-sub{color:var(--grey);font-family:var(--mono);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.gc-cap .btn{padding:1px 5px;font-size:8px}
-.gc-sep{grid-column:1/-1;height:1px;background:rgba(255,210,122,.22);margin:2px 0}
+.gc.on{outline:1px solid var(--acid);outline-offset:2px}
+/* 同じカットの続き（B枠以降）は `C3-A / C3-B` のラベルで読めるので、縦の連結線は出さない */
+.gc-cap{
+  display:flex;align-items:baseline;gap:5px;height:13px;
+  font-size:8px;letter-spacing:.06em;overflow:hidden;
+}
+.gc-no{font-family:var(--bank);color:rgba(255,79,168,.9)}
+.gc-sub{color:rgba(157,141,179,.85);font-family:var(--mono);flex:1;overflow:hidden;white-space:nowrap}
+.gc-edit{
+  display:none;position:absolute;right:3px;top:3px;z-index:2;
+  padding:1px 5px;font-size:8px;background:rgba(7,3,15,.75);
+}
+.gc:hover .gc-edit{display:block}   /* 選択中でも出しっぱなしにしない（画を隠さないため） */
+#grid-hud{
+  position:absolute;right:14px;bottom:10px;z-index:4;display:flex;align-items:center;gap:8px;
+  background:rgba(7,3,15,.72);border:1px solid var(--border);padding:4px 8px;
+  font-family:var(--mono);font-size:9px;color:var(--gold);
+}
+#grid-hud .btn{padding:2px 6px;font-size:8px}
+#grid-hud{display:none}
+#edit-main.grid #grid-hud{display:flex}
+#grid-pal-label{display:flex;align-items:center;gap:3px;font-family:var(--jp);color:var(--grey);cursor:pointer}
+#grid-pal-label input{accent-color:var(--acid)}
 #grid-empty{color:var(--grey);font-family:var(--jp);font-size:12px;padding:20px;text-align:center}
 #edit-zoom{color:var(--gold);font-size:10px;letter-spacing:.08em;min-width:42px}
 /* ---------- TIMELINE（STUDIO中央のプレビュー＋最下段の帯） ---------- */
@@ -629,6 +651,13 @@ body{
     </div>
     <div id="edit-stage"><canvas id="edit-cv" width="1280" height="720"></canvas></div>
     <div id="edit-grid"><div id="grid-wrap"></div><div id="grid-empty">カットがありません</div></div>
+    <div id="grid-hud">
+      <button class="btn" id="btn-grid-out" title="縮小">−</button>
+      <span id="grid-zoom">100%</span>
+      <button class="btn" id="btn-grid-in" title="拡大">＋</button>
+      <button class="btn" id="btn-grid-fit" title="既定の大きさへ">FIT</button>
+      <label id="grid-pal-label"><input type="checkbox" id="chk-grid-pal" checked> 色帯</label>
+    </div>
   </div>
 </div>
 
@@ -2553,7 +2582,6 @@ const UNDO_MAX = 10;
    セル ＝ cam[].key が true の枠。**§5h の一覧PNGと同じ単位**なので、
    ここで描いた画がそのまま出力になる（描く画面と出す画面を同じにする）。 */
 let gEditMode = 'single';
-const GC_W = 320, GC_H = 180;
 function colorCells(){
   const cells = [];
   cuts.forEach((c, i) => {
@@ -2574,57 +2602,215 @@ function cellSub(cut, k){
   return nx ? (cut.cam[k].k + '→' + nx.k + ' ' + Math.max(1, cut.cam[k].dur | 0) + 'Fr')
             : (camStartFrame(cut, k) + 'f / ' + fmtDur(cut.durF));
 }
+/* --- 代表色の抽出（カラー帯用）。粗いヒストグラムなので軽い・保存はしない＝導出値 --- */
+function extractPalette(cv, n){
+  const t = blankCanvas(32, 18);
+  const tx = ctx2d(t);
+  tx.drawImage(cv, 0, 0, 32, 18);
+  let d;
+  try{ d = tx.getImageData(0, 0, 32, 18).data; }catch(e){ return []; }
+  const map = new Map();
+  for(let i = 0; i < d.length; i += 4){
+    if(d[i + 3] < 8) continue;
+    const key = ((d[i] >> 4) << 8) | ((d[i + 1] >> 4) << 4) | (d[i + 2] >> 4);
+    const e = map.get(key) || { n: 0, r: 0, g: 0, b: 0 };
+    e.n++; e.r += d[i]; e.g += d[i + 1]; e.b += d[i + 2];
+    map.set(key, e);
+  }
+  const top = [...map.values()].sort((a, b) => b.n - a.n).slice(0, n || 6);
+  top.forEach(e => { e.R = e.r / e.n; e.G = e.g / e.n; e.B = e.b / e.n; });
+  top.sort((a, b) => (a.R + a.G + a.B) - (b.R + b.G + b.B));   // 明度順に並べると帯として読める
+  return top.map(e => rgbToHex(Math.round(e.R), Math.round(e.G), Math.round(e.B)));
+}
+/* --- GRID（カラースクリプト一覧） --- */
+let gGridRows = [];        // [{el, palCv, cells:[{box,cv,i,k}]}]
+let gGridZoom = 1;         // セル幅 = GC_BASE * zoom
+const GC_BASE = 200, GC_GAP = 10, GC_MIN_RES = 320, GC_MAX_RES = 1280;
+function gridCellW(){
+  const view = $('#edit-grid').clientWidth - 24;
+  return clamp(Math.round(GC_BASE * gGridZoom), 90, Math.max(120, view));
+}
 function renderGrid(){
   const wrap = $('#grid-wrap');
   wrap.innerHTML = '';
+  gGridRows = [];
   const cells = colorCells();
   $('#grid-empty').style.display = cells.length ? 'none' : 'block';
-  let prev = -1;
-  cells.forEach(ce => {
-    const cut = cuts[ce.i];
-    if(prev >= 0 && ce.i !== prev){        // カット境界に区切り線（§5h）
-      const sep = document.createElement('div');
-      sep.className = 'gc-sep';
-      wrap.appendChild(sep);
+  $('#grid-zoom').textContent = Math.round(gGridZoom * 100) + '%';
+  if(!cells.length) return;
+  const cw = gridCellW(), ch = Math.round(cw * 9 / 16);
+  const view = $('#edit-grid').clientWidth - 24;
+  const cols = Math.max(1, Math.floor((view + GC_GAP) / (cw + GC_GAP)));
+  const maxF = Math.max(1, ...cells.map(ce => cellFrames(cuts[ce.i], ce.k)));
+  const showPal = $('#chk-grid-pal').checked;
+  for(let s = 0; s < cells.length; s += cols){
+    const rowCells = cells.slice(s, s + cols);
+    const row = document.createElement('div');
+    row.className = 'gr';
+    const line = document.createElement('div');
+    line.className = 'gr-cells';
+    line.style.gap = GC_GAP + 'px';
+    line.style.width = (cols * cw + (cols - 1) * GC_GAP) + 'px';
+    const rec = { el: row, palCv: null, cells: [] };
+    rowCells.forEach(ce => {
+      const cut = cuts[ce.i];
+      const box = document.createElement('div');
+      box.className = 'gc' + (ce.i === state.curCut ? ' on' : '');
+      box.style.width = cw + 'px';
+      box.dataset.ci = ce.i;
+      const nf = cellFrames(cut, ce.k);
+      const bar = document.createElement('div');       // 尺バー（コマ数に比例・最終枠は出さない）
+      bar.className = 'gc-bar';
+      bar.style.width = nf ? Math.max(3, Math.round(nf / maxF * cw)) + 'px' : '0';
+      if(!nf) bar.style.background = 'transparent';
+      const cv = document.createElement('canvas');
+      cv.className = 'gc-cv';
+      cv.width = GC_MIN_RES; cv.height = Math.round(GC_MIN_RES * 9 / 16);
+      cv.dataset.ci = ce.i; cv.dataset.ck = ce.k;
+      cv.addEventListener('pointerdown', e => gridPaintDown(e, cv));
+      cv.addEventListener('pointermove', paintMove);
+      cv.addEventListener('pointerup', paintUp);
+      cv.addEventListener('pointercancel', paintUp);
+      bindDoubleTap(cv, e => { if(e.pointerType === 'touch'){ state.curCut = ce.i; openEdit(ce.i); } });
+      const cap = document.createElement('div');
+      cap.className = 'gc-cap';
+      const no = document.createElement('span');
+      no.className = 'gc-no';
+      no.textContent = camLabel(ce.i, ce.k);
+      const sub = document.createElement('span');
+      sub.className = 'gc-sub';
+      sub.textContent = cellSub(cut, ce.k);
+      cap.appendChild(no); cap.appendChild(sub);
+      const bt = document.createElement('button');     // ホバー/選択時だけ出す
+      bt.className = 'btn gc-edit';
+      bt.textContent = '✎';
+      bt.title = 'このカットを SINGLE で詰める';
+      bt.addEventListener('click', ev => { ev.stopPropagation(); openEdit(ce.i); });
+      box.appendChild(bar); box.appendChild(cv); box.appendChild(cap); box.appendChild(bt);
+      line.appendChild(box);
+      rec.cells.push({ box, cv, i: ce.i, k: ce.k });
+    });
+    row.appendChild(line);
+    row.style.marginBottom = Math.max(16, Math.round(ch * 0.34)) + 'px';   // 行間は参考画像なみに広く
+    if(showPal){
+      const pal = document.createElement('canvas');
+      pal.className = 'gr-pal';
+      pal.width = cols * 60; pal.height = 11;
+      pal.style.width = line.style.width;
+      row.appendChild(pal);
+      rec.palCv = pal;
     }
-    prev = ce.i;
-    const box = document.createElement('div');
-    box.className = 'gc' + (ce.i === state.curCut ? ' on' : '');
-    box.dataset.ci = ce.i;
-    const cv = document.createElement('canvas');
-    cv.className = 'gc-cv';
-    cv.width = GC_W; cv.height = GC_H;
-    cv.dataset.ci = ce.i; cv.dataset.ck = ce.k;
-    drawCamFrame(ctx2d(cv), cut, camStartFrame(cut, ce.k), GC_W, GC_H);
-    cv.addEventListener('pointerdown', e => gridPaintDown(e, cv));
-    cv.addEventListener('pointermove', paintMove);
-    cv.addEventListener('pointerup', paintUp);
-    cv.addEventListener('pointercancel', paintUp);
-    const cap = document.createElement('div');
-    cap.className = 'gc-cap';
-    const no = document.createElement('span');
-    no.className = 'gc-no';
-    no.textContent = camLabel(ce.i, ce.k);
-    const sub = document.createElement('span');
-    sub.className = 'gc-sub';
-    sub.textContent = cellSub(cut, ce.k);
-    const bt = document.createElement('button');
-    bt.className = 'btn';
-    bt.textContent = '✎';
-    bt.title = 'このカットを SINGLE で開く';
-    bt.addEventListener('click', ev => { ev.stopPropagation(); state.curCut = ce.i; setEditMode('single'); });
-    cap.appendChild(no); cap.appendChild(sub); cap.appendChild(bt);
-    box.appendChild(cv); box.appendChild(cap);
-    wrap.appendChild(box);
+    wrap.appendChild(row);
+    gGridRows.push(rec);
+  }
+  updateCellRes(true);
+}
+/* セルが画面に出ているコマ数。枠列の最終枠は「そこへ到着した状態」なので尺は持たない（0） */
+function cellFrames(cut, k){
+  if(!isCamCut(cut)) return cut.durF;
+  return (k < cut.cam.length - 1) ? Math.max(1, cut.cam[k].dur | 0) : 0;
+}
+function drawCell(cell){
+  const cut = cuts[cell.i];
+  if(!cut) return;
+  drawCamFrame(ctx2d(cell.cv), cut, camStartFrame(cut, cell.k), cell.cv.width, cell.cv.height);
+}
+function drawRowPalette(rec){
+  if(!rec.palCv) return;
+  const ctx = ctx2d(rec.palCv);
+  const W = rec.palCv.width, H = rec.palCv.height;
+  ctx.clearRect(0, 0, W, H);
+  const seg = W / Math.max(1, rec.cells.length);
+  rec.cells.forEach((cell, ci) => {
+    const pal = extractPalette(cell.cv, 6);
+    if(!pal.length) return;
+    const sw = seg / pal.length;
+    pal.forEach((hex, k) => {
+      ctx.fillStyle = hex;
+      ctx.fillRect(ci * seg + k * sw, 0, Math.ceil(sw) + 0.5, H);
+    });
   });
+}
+/* 見えているセルだけ表示サイズに合わせた解像度で描く（拡大してもボケない・
+   見えていないセルは 320px に戻してメモリを返す） */
+let gResT = 0;
+function updateCellRes(now){
+  clearTimeout(gResT);
+  const run = () => {
+    const vr = $('#edit-grid').getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    gGridRows.forEach(rec => {
+      let touched = false;
+      rec.cells.forEach(cell => {
+        const r = cell.cv.getBoundingClientRect();
+        const vis = r.bottom > vr.top - 240 && r.top < vr.bottom + 240;
+        let want = GC_MIN_RES;
+        if(vis){
+          want = clamp(Math.ceil(r.width * dpr / 160) * 160, GC_MIN_RES, GC_MAX_RES);
+        }
+        if(cell.cv.width !== want){
+          cell.cv.width = want;
+          cell.cv.height = Math.round(want * 9 / 16);
+          touched = true;
+        }
+        if(vis || touched) drawCell(cell);
+      });
+      drawRowPalette(rec);
+    });
+  };
+  if(now) run(); else gResT = setTimeout(run, 160);
 }
 /* 描いたカットのセルだけ描き直す（毎ストロークで全再構築はしない） */
 function refreshGridCells(i){
-  $('#grid-wrap').querySelectorAll('.gc-cv').forEach(cv => {
-    if(+cv.dataset.ci !== i) return;
-    const cut = cuts[i];
-    if(cut) drawCamFrame(ctx2d(cv), cut, camStartFrame(cut, +cv.dataset.ck || 0), GC_W, GC_H);
+  gGridRows.forEach(rec => {
+    let hit = false;
+    rec.cells.forEach(cell => { if(cell.i === i){ drawCell(cell); hit = true; } });
+    if(hit) drawRowPalette(rec);
   });
+}
+/* --- 拡縮（ホイール＝カーソル位置を保ったままセルの大きさを変える） --- */
+function gridZoom(factor, anchorY){
+  const box = $('#edit-grid');
+  const before = box.scrollTop + (anchorY == null ? box.clientHeight / 2 : anchorY - box.getBoundingClientRect().top);
+  const ratio = box.scrollHeight ? before / box.scrollHeight : 0;
+  gGridZoom = clamp(gGridZoom * factor, 0.25, 6);
+  renderGrid();
+  box.scrollTop = Math.max(0, ratio * box.scrollHeight - (anchorY == null ? box.clientHeight / 2 : anchorY - box.getBoundingClientRect().top));
+}
+function gridFit(){ gGridZoom = 1; renderGrid(); }
+/* 指の操作（ペンは描画に通すので touch だけ拾う） */
+const gGPtr = new Map();
+let gGest = null;
+function gridTouchDown(e){
+  if(e.pointerType !== 'touch') return;
+  gGPtr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const box = $('#edit-grid');
+  if(gGPtr.size === 2){
+    const p = [...gGPtr.values()];
+    gGest = { mode: 'pinch', d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) };
+  }else if(gGPtr.size === 1){
+    gGest = { mode: 'scroll', y0: e.clientY, top: box.scrollTop };
+  }
+}
+function gridTouchMove(e){
+  if(e.pointerType !== 'touch' || !gGPtr.has(e.pointerId) || !gGest) return;
+  gGPtr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const box = $('#edit-grid');
+  if(gGest.mode === 'pinch' && gGPtr.size === 2){
+    const p = [...gGPtr.values()];
+    const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+    if(gGest.d > 0 && Math.abs(d / gGest.d - 1) > 0.04){
+      gridZoom(d / gGest.d, (p[0].y + p[1].y) / 2);
+      gGest.d = d;
+    }
+  }else if(gGest.mode === 'scroll' && gGPtr.size === 1){
+    box.scrollTop = gGest.top - (e.clientY - gGest.y0);
+  }
+}
+function gridTouchUp(e){
+  if(e.pointerType !== 'touch') return;
+  gGPtr.delete(e.pointerId);
+  if(!gGPtr.size){ gGest = null; updateCellRes(); }
 }
 function gridPaintDown(e, cv){
   const i = +cv.dataset.ci;
@@ -2639,10 +2825,95 @@ function gridPaintDown(e, cv){
     ensureResident(cut).then(() => toast('読み込みました。もう一度なぞってください'));
     return;
   }
+  // ペン/消しゴム＋カラー層のときだけ「コマをまたぐ塗り」経路へ。
+  // FILL/スポイトはセル単位で完結させたいので従来どおり
+  if(state.paintTarget === 'color' && !e.altKey && (state.etool === 'pen' || state.etool === 'eraser')){
+    gridStrokeStart(e, cv);
+    return;
+  }
   paintDown(e, cv);
+}
+
+/* --- コマをまたぐ塗り（一覧の上を横断して色を流す） ---
+   1ストロークで複数カットの colorC に書くので、**Undoは触った全カットを1手にまとめる**。
+   セルの隙間ではペンを上げた扱いにして、線が空中を渡らないようにする。 */
+let gGridStroke = null;
+function cellAtPoint(cx, cy){
+  for(const rec of gGridRows){
+    for(const cell of rec.cells){
+      const r = cell.cv.getBoundingClientRect();
+      if(cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) return cell;
+    }
+  }
+  return null;
+}
+function cellColorCoord(cell, cx, cy){
+  const cut = cuts[cell.i];
+  const r = cell.cv.getBoundingClientRect();
+  const b = camToBake(cut, camStartFrame(cut, cell.k),
+                      (cx - r.left) / r.width * CONTE_W, (cy - r.top) / r.height * CONTE_H);
+  const s = bakeSize(cut);
+  return { x: b.x * COLOR_W / s.w, y: b.y * COLOR_H / s.h };
+}
+function gridStrokeStart(e, cv){
+  const cell = cellAtPoint(e.clientX, e.clientY);
+  if(!cell) return;
+  e.preventDefault();
+  try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+  gGridStroke = { id: e.pointerId, touched: new Map(), last: null };
+  gridStrokeTo(cell, e.clientX, e.clientY);
+}
+function gridStrokeTo(cell, cx, cy){
+  const g = gGridStroke;
+  const cut = cuts[cell.i];
+  const col = getColor(cut);
+  if(!g.touched.has(cell.i)){
+    g.touched.set(cell.i, { cut, before: ctx2d(col).getImageData(0, 0, col.width, col.height) });
+  }
+  const p = cellColorCoord(cell, cx, cy);
+  const prev = (g.last && g.last.i === cell.i) ? g.last.p : p;
+  // セルごとに基準を取り直す＝T.U.したカットでも画面上の太さが揃う
+  gStrokeK = strokeScaleFor(cut, COLOR_W, camStartFrame(cut, cell.k));
+  strokeSegOn(cut, col, prev, p);
+  g.last = { i: cell.i, p };
+  drawCell(cell);
+}
+function gridStrokeMove(e){
+  if(!gGridStroke || e.pointerId !== gGridStroke.id) return;
+  const cell = cellAtPoint(e.clientX, e.clientY);
+  if(!cell){ gGridStroke.last = null; return; }   // 隙間では描かない＝渡り線が出ない
+  gridStrokeTo(cell, e.clientX, e.clientY);
+}
+function gridStrokeUp(e){
+  if(!gGridStroke || (e && e.pointerId !== gGridStroke.id)) return;
+  const g = gGridStroke;
+  gGridStroke = null;
+  if(!g.touched.size) return;
+  const entries = [...g.touched.values()].map(t => {
+    const c = getColor(t.cut);
+    return { cut: t.cut, before: t.before, after: ctx2d(c).getImageData(0, 0, c.width, c.height) };
+  });
+  const put = (cut, data) => {
+    const c = getColor(cut);
+    if(c.width !== data.width || c.height !== data.height) return;
+    ctx2d(c).putImageData(data, 0, 0);
+    cut.dirtyColor = true;
+    cut.thumb = null;
+  };
+  pushLog({ type: 'paint',
+            undo(){ entries.forEach(en => put(en.cut, en.before)); renderGridTouched(entries); },
+            redo(){ entries.forEach(en => put(en.cut, en.after)); renderGridTouched(entries); } });
+  entries.forEach(en => refreshRow(cuts.indexOf(en.cut)));
+  gGridRows.forEach(drawRowPalette);
+  scheduleSave();
+}
+function renderGridTouched(entries){
+  if(gEditMode !== 'grid') return;
+  entries.forEach(en => refreshGridCells(cuts.indexOf(en.cut)));
 }
 function setEditMode(m, quiet){
   gEditMode = m;
+  undoStack = []; redoStack = [];   // カット別スタックは SINGLE 専用なのでモード切替で捨てる
   $('#edit-main').classList.toggle('grid', m === 'grid');
   $('#btn-mode-single').classList.toggle('on', m === 'single');
   $('#btn-mode-grid').classList.toggle('on', m === 'grid');
@@ -2658,6 +2929,7 @@ function setPaintTarget(t){
   document.querySelectorAll('.etool[data-target]').forEach(el =>
     el.classList.toggle('on', el.dataset.target === state.paintTarget));
   $('#btn-clear-draw').textContent = (state.paintTarget === 'color') ? 'CLEAR COLOR' : 'CLEAR DRAW';
+  setBrush(state.brush);   // 上限が変わるのでクランプし直す
 }
 /* カラー層の描画モード・不透明度（対象は現在カット） */
 function syncEditPanels(){
@@ -2809,9 +3081,14 @@ function updateSwatch(){
   });
   if(!gHsvDriving) syncHsvFromColor();   // パレット/スポイト側から色が変わったらHSVも追従
 }
+/* 色は面で塗るので上限を大きく取る（数値は出力1280px基準） */
+function brushMax(){ return state.paintTarget === 'color' ? 300 : 64; }
 function setBrush(v){
-  state.brush = clamp(Math.round(v), 1, 64);
-  ['#brush-size', '#tl-brush'].forEach(id => { const el = $(id); if(el) el.value = state.brush; });
+  state.brush = clamp(Math.round(v), 1, brushMax());
+  ['#brush-size', '#tl-brush'].forEach(id => {
+    const el = $(id);
+    if(el){ el.max = brushMax(); el.value = state.brush; }
+  });
   ['#brush-size-val', '#tl-brush-val'].forEach(id => { const el = $(id); if(el) el.textContent = state.brush; });
 }
 function setCutBg(v){
@@ -2880,8 +3157,11 @@ function pushUndo(){
 /* ペイントのundo: EDIT内は従来のカット別スタック、STUDIOでは統合ログの paint エントリ。
    カット参照をクロージャに閉じ込めるので、カットをまたいでも壊れない。 */
 let gPaintBefore = null;
+/* カット別スタックを使うのは **EDITのSINGLEだけ**。
+   GRIDは1ストロークで複数カットに書ける（コマまたぎ塗り）ので統合ログに乗せる */
+function useCutStack(){ return state.view === 'edit' && gEditMode === 'single'; }
 function beginPaintUndo(){
-  if(state.view === 'edit'){ pushUndo(); gPaintBefore = null; return; }
+  if(useCutStack()){ pushUndo(); gPaintBefore = null; return; }
   const cut = cuts[state.curCut];
   if(!cut) return;
   const snap = paintSnap(cut);
@@ -2929,13 +3209,30 @@ function doRedo(){
 function strokeSeg(a, b){
   const cut = cuts[state.curCut];
   if(!cut) return;
-  const d = paintCanvas(cut);
-  if(!d) return;
+  strokeSegOn(cut, paintCanvas(cut), a, b);
+}
+/* --- ブラシ幅の基準（SPEC_13 §9b） ---
+   ブラシの数値は **出力枠(1280px)基準** で解釈する。
+   T.U./PAN で枠がベイクの一部しか使っていないカットでも、画面上の太さが揃うようにするため。
+   （素直に「レイヤーのpx」にすると、寄った枠のカットだけ急に太く見える） */
+let gStrokeK = 1;
+function strokeScaleFor(cut, targetW, frame){
+  if(!cut) return 1;
+  let frac = 1;
+  if(isCamCut(cut) && cut.bakeRect){
+    const r = camAt(cut, frame || 0);
+    frac = r.w / cut.bakeRect.w;
+  }
+  return Math.max(0.02, frac * targetW / CONTE_W);
+}
+/* 対象キャンバスを明示して1セグメント描く（GRIDのコマまたぎ塗りが使う） */
+function strokeSegOn(cut, d, a, b){
+  if(!cut || !d) return;
   const ctx = ctx2d(d);
   ctx.save();
   if(state.etool === 'eraser') ctx.globalCompositeOperation = 'destination-out';
   ctx.strokeStyle = state.fillColor;
-  ctx.lineWidth = state.brush;
+  ctx.lineWidth = Math.max(0.5, state.brush * gStrokeK);   // 出力1280px基準 → このレイヤーのpxへ
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
@@ -2943,7 +3240,8 @@ function strokeSeg(a, b){
   ctx.lineTo(b.x + (a.x === b.x && a.y === b.y ? 0.01 : 0), b.y);
   ctx.stroke();
   ctx.restore();
-  markPainted(cut);
+  if(d === cut.colorC){ cut.dirtyColor = true; cut.thumb = null; }
+  else markPainted(cut);
 }
 function floodFill(cx, cy){
   const cut = cuts[state.curCut];
@@ -3190,6 +3488,12 @@ function paintDown(e, cv){
   e.preventDefault();
   cv.setPointerCapture(e.pointerId);
   paintCv = cv;
+  {   // ブラシ幅の基準を決める（tlCvは今のカメラ位置、EDITはA枠）
+    const cut = cuts[state.curCut];
+    const tgt = cut ? paintCanvas(cut) : null;
+    const ca = (cv === tlCv) ? cutIndexAt(state.tl.frame) : null;
+    gStrokeK = (cut && tgt) ? strokeScaleFor(cut, tgt.width, ca ? ca.local : 0) : 1;
+  }
   const p = paintCoord(e.clientX, e.clientY, cv);
   if(state.etool === 'eyedrop' || e.altKey){
     eyedropAt(e.clientX, e.clientY, cv);
@@ -3739,8 +4043,8 @@ function tapUp(e){
   else { redoActive(); toast('REDO（3本指）'); }
 }
 /* EDIT内はカット別スタック、STUDIOは統合ログ（キーボードと同じ振り分け） */
-function undoActive(){ if(state.view === 'edit') doUndo(); else logUndo(); }
-function redoActive(){ if(state.view === 'edit') doRedo(); else logRedo(); }
+function undoActive(){ if(useCutStack()) doUndo(); else logUndo(); }
+function redoActive(){ if(useCutStack()) doRedo(); else logRedo(); }
 
 /* --- iPad: ネイティブ dblclick が飛ばないことがあるので pointerup 2回で拾う（SPEC_13 §4-1） --- */
 function bindDoubleTap(el, fn){
@@ -3763,7 +4067,7 @@ const HELP_GROUPS = [
   { t: 'PAINT（STUDIO / EDIT）', rows: [
     ['B', 'ペン'], ['E', '消しゴム'], ['G', '塗りつぶし'], ['I', 'スポイト'],
     ['[ / ]', 'ブラシを細く／太く'], ['Alt+クリック', 'スポイト（ツールを問わず）'],
-    ['Ctrl+Z / Y', 'UNDO / REDO（STUDIO=統合ログ・EDIT=カット内）']
+    ['Ctrl+Z', 'UNDO'], ['Ctrl+Shift+Z', 'REDO（Ctrl+Y も可・ANIMATORと共通）']
   ] },
   { t: 'SHEETパネル', rows: [
     ['クリック', 'そのカット頭へ'], ['ダブルクリック', '加筆EDITへ'],
@@ -3814,10 +4118,22 @@ function toggleHelp(force){
 }
 
 /* ---------------- keyboard ---------------- */
+/* 文字入力中かどうか。**range/checkbox/select は「入力中」に含めない** —
+   ブラシスライダーを触った直後に Ctrl+Z が効かなくなる原因になるため（2026-08-02 の不具合） */
+function isTextEntry(el){
+  if(!el) return false;
+  if(el.tagName === 'TEXTAREA') return true;
+  if(el.tagName !== 'INPUT') return false;
+  const t = (el.type || 'text').toLowerCase();
+  return ['text', 'number', 'search', 'url', 'email', 'password', 'tel'].indexOf(t) >= 0;
+}
 function onKey(e){
   if($('#modal-ovl').classList.contains('on')) return;
-  const tag = (e.target && e.target.tagName) || '';
-  if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+  const el = e.target;
+  const tag = (el && el.tagName) || '';
+  if(isTextEntry(el)) return;
+  // range/select にフォーカスがある間、矢印はそのコントロールに渡す
+  if((tag === 'INPUT' || tag === 'SELECT') && e.key.indexOf('Arrow') === 0 && !e.ctrlKey && !e.metaKey) return;
   if($('#help-ovl').classList.contains('on')){
     if(e.key === 'Escape' || e.key === '?' || e.key === '/') toggleHelp(false);
     return;
@@ -3826,14 +4142,12 @@ function onKey(e){
   // STUDIO は統合ログ（写真・枠・ペイントを一列）、EDIT内は従来のカット別スタック
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
     e.preventDefault();
-    const redo = e.shiftKey;
-    if(state.view === 'edit'){ redo ? doRedo() : doUndo(); }
-    else { redo ? logRedo() : logUndo(); }
+    if(e.shiftKey) redoActive(); else undoActive();
     return;
   }
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){
     e.preventDefault();
-    if(state.view === 'edit') doRedo(); else logRedo();
+    redoActive();
     return;
   }
   if(state.view === 'studio'){
@@ -3868,8 +4182,8 @@ function onKey(e){
   else if(k === 'e') setETool('eraser');
   else if(k === 'g') setETool('fill');
   else if(k === 'i') setETool('eyedrop');
-  else if(k === '['){ setBrush(state.brush - 2); }
-  else if(k === ']'){ setBrush(state.brush + 2); }
+  else if(k === '['){ setBrush(state.brush - Math.max(1, Math.round(state.brush * 0.2))); }
+  else if(k === ']'){ setBrush(state.brush + Math.max(1, Math.round(state.brush * 0.2))); }
 }
 
 /* ---------------- wiring / init ---------------- */
@@ -3877,7 +4191,12 @@ function wire(){
   $('#btn-view-studio').addEventListener('click', () => setView('studio'));
   $('#btn-view-edit').addEventListener('click', () => {
     if(!cuts.length){ toast('カットがありません'); return; }
-    openEdit(gFocusCut >= 0 ? gFocusCut : 0);
+    // 編集画面はGRIDが主戦場。1カットを詰めるときだけ ✎ / ダブルクリックで SINGLE へ
+    state.curCut = clamp(gFocusCut >= 0 ? gFocusCut : 0, 0, cuts.length - 1);
+    undoStack = []; redoStack = [];
+    ensureResident(cuts[state.curCut]);
+    setEditMode('grid', true);
+    setView('edit');
   });
   $('#btn-fs').addEventListener('click', toggleFullscreen);
   $('#btn-help').addEventListener('click', () => toggleHelp());
@@ -3997,6 +4316,25 @@ function wire(){
   });
   $('#color-blend').addEventListener('change', e => setColorBlend(e.target.value));
   $('#color-alpha').addEventListener('input', e => setColorAlpha(+e.target.value / 100));
+  // GRID: ホイール=拡縮 / スクロール・リサイズで可視セルの解像度を追従
+  $('#edit-grid').addEventListener('wheel', e => {
+    e.preventDefault();
+    gridZoom(Math.exp(-e.deltaY * 0.0012), e.clientY);
+  }, { passive: false });
+  $('#edit-grid').addEventListener('scroll', () => updateCellRes());
+  $('#btn-grid-in').addEventListener('click', () => gridZoom(1.25));
+  $('#btn-grid-out').addEventListener('click', () => gridZoom(1 / 1.25));
+  $('#btn-grid-fit').addEventListener('click', gridFit);
+  $('#chk-grid-pal').addEventListener('change', renderGrid);
+  // 指: 1本=スクロール / 2本=ピンチ拡縮（セルは touch-action:none なので自前で処理する）
+  $('#edit-grid').addEventListener('pointerdown', gridTouchDown);
+  $('#edit-grid').addEventListener('pointermove', gridTouchMove);
+  $('#edit-grid').addEventListener('pointerup', gridTouchUp);
+  $('#edit-grid').addEventListener('pointercancel', gridTouchUp);
+  // コマまたぎ塗りはセル外へ出ても続くので window で拾う
+  window.addEventListener('pointermove', gridStrokeMove);
+  window.addEventListener('pointerup', gridStrokeUp);
+  window.addEventListener('pointercancel', gridStrokeUp);
   $('#btn-cut-prev').addEventListener('click', () => openEdit(state.curCut - 1));
   $('#btn-cut-next').addEventListener('click', () => openEdit(state.curCut + 1));
   $('#edit-dur').addEventListener('change', () => {
@@ -4144,6 +4482,7 @@ function wire(){
   window.addEventListener('keydown', onKey);
   const relayout = () => {
     if(state.view === 'studio') layoutStudio();
+    else if(gEditMode === 'grid') renderGrid();
     else fitEditCanvas();
   };
   window.addEventListener('resize', relayout);
@@ -4202,8 +4541,13 @@ window.__ECONTE__ = {
   exportProject, importProject, toggleHelp, renderHelp, rowDragMove, rowDragUp,
   get editMode(){ return gEditMode; },
   getColor, hasColor, colorBlendOf, colorAlphaOf, setColorBlend, setColorAlpha,
-  setEditMode, setPaintTarget, renderGrid, refreshGridCells, colorCells, cellSub,
-  paintCanvas, paintSnap, applySnap, syncEditPanels, toBakeCoord, drawColorLayer,
+  strokeScaleFor, brushMax, isTextEntry,
+  setEditMode, setPaintTarget, renderGrid, refreshGridCells, colorCells, cellSub, cellFrames,
+  extractPalette, drawRowPalette, drawCell, updateCellRes, gridZoom, gridFit, gridCellW,
+  gridTouchDown, gridTouchMove, gridTouchUp, strokeSegOn,
+  gridStrokeStart, gridStrokeMove, gridStrokeUp, cellAtPoint, cellColorCoord, renderGridTouched,
+  get gridRows(){ return gGridRows; }, get gridZoomLevel(){ return gGridZoom; },
+  paintCanvas, paintSnap, applySnap, syncEditPanels, toBakeCoord, drawColorLayer, useCutStack,
   fmtDur, parseDur, floodFill, sampleCompositeColor, saveAll, boardFit, updateTotals,
   totalFrames, cutIndexAt, cutStartFrame, seek, play, pause, togglePlay, seekCut, toggleLoop,
   layoutTL, renderTL, fitTLCanvas, exportVideo, finishExport, cancelExport, loadKeymap

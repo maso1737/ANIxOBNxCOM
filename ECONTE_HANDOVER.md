@@ -176,7 +176,34 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   線画と色でundoが混ざらない。**新しい描画処理を足すときは `getDraw()` 直呼びではなく `paintCanvas()`**
 - 座標は `toBakeCoord()`（画面→ベイク空間）→ `paintCoord()`（→ターゲット縮尺）の2段。
   GRIDセルは `cv.dataset.ci/ck` を見て `camToBake` に流す。**スポイトは `toBakeCoord` の方を使う**
-- EDITのモードは `gEditMode`。`openEdit()` は `setEditMode('single', true)` で単票を強制する
+- EDITのモードは `gEditMode`。**GRIDが主戦場**（トップバーの EDIT は GRID を開く）。
+  `openEdit()` は `setEditMode('single', true)` で単票を強制する＝✎/ダブルクリック専用の入口
+
+■ GRIDの作り（V2-E2b・参考画像＝TS3カラースクリプト準拠）
+- **DOM構成**: `#grid-wrap` > `.gr`（行） > `.gr-cells`（セル列）＋`.gr-pal`（行カラー帯canvas）。
+  行を明示的に組むのは**行ごとのカラー帯**を出すため（CSS gridのauto-fillだと行境界が取れない）
+- **拡縮は `gGridZoom`**（セル幅 = `GC_BASE(200) × zoom`）。列数は幅から自動計算するので
+  ズームすると列数が変わる＝スクロールは縦だけ。**CSS transform は使わない**（ボケるため）
+- **`updateCellRes()` が可視セルだけ表示サイズ相当の解像度で描き直す**（160px刻み・上限1280）。
+  非可視は320pxに戻す。**これを外すと拡大でボケるか、全セル高解像度でメモリが飛ぶ**
+- カラー帯は `extractPalette()`（32×18に縮小→4bit量子化ヒストグラム→上位6色→明度順）。
+  **導出値なので保存しない**。`drawRowPalette()` が行単位で描く
+- 尺バーは `cellFrames()`。**枠列の最終枠は 0 を返す**（到着状態なので尺を持たない）
+- セルは `touch-action:none`（ペンで描くため）なので、**指のスクロール/ピンチは自前**
+  （`gridTouchDown/Move/Up`）。ペンは `paintDown` に通る
+- **コマまたぎ塗り**（`gridStrokeStart/Move/Up`）: ペン/消しゴム×カラー層のときだけこの経路。
+  `cellAtPoint()` で今どのセルの上かを毎回引き直し、`strokeSegOn(cut, colorC, a, b)` で
+  そのカットに直接書く。**セル外（隙間）では `last=null` にして線を渡らせない**。
+  FILL/スポイトは従来どおりセル単位（`paintDown`）
+- **ブラシ幅は出力1280px基準**。`gStrokeK = strokeScaleFor(cut, targetW, frame)` を
+  ストローク開始時（コマまたぎ塗りは**セルごと**）に決め、`strokeSegOn` が
+  `state.brush * gStrokeK` を lineWidth にする。
+  これが無いと T.U. した枠のセルだけ4倍太く見える（枠がベイクの一部しか使わないため）。
+  上限は `brushMax()`（線画64 / 色300）
+- **Undoの分岐は `useCutStack()`＝「EDITのSINGLEだけカット別スタック」**。
+  GRIDは1ストロークで複数カットに書けるので統合ログ側。
+  **`state.view === 'edit'` で分岐していた箇所を全部これに置き換えてある**（戻すと
+  コマまたぎ塗りがUndoできなくなる）。モード切替時は `undoStack/redoStack` を捨てる
 
 ■ V2-E1 の小物
 - **HSVピッカー**: `gHsv{H,S,V}` は表示用の派生値で、**正は `state.fillColor`(hex)**。
@@ -225,6 +252,10 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   `drawSnap` → `paintSnap` の改名で踏んだ
 - `.etool` は**ツールボタンと描く先ボタンの2種類**ある。セレクタは必ず
   `.etool[data-tool]` / `.etool[data-target]` と絞る（`.etool` 全部を触ると相手を壊す）
+- **キー処理で `tagName === 'INPUT'` を一律 return にしない**。`range` スライダーは
+  フォーカスが残るので、ブラシを触った直後に **Ctrl+Z が無反応**になる（2026-08-02 に踏んだ）。
+  判定は `isTextEntry()`（textarea と文字系 input だけ）。range/select は矢印だけ本人に渡す
+- Undo/Redo は **`Ctrl+Z` / `Ctrl+Shift+Z`（`Ctrl+Y` も可）＝ ANIMATOR と同じ割り当て**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 【V2-D（大判カメラ枠列）に着手する人へ・先読み必須】
@@ -271,6 +302,8 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
 - **V2-E1: 実装済み（2026-08-02）** — HSVピッカー／SHEET行ドラッグ並べ替え（▲▼撤去・Ctrl+↑↓）／
   SETTINGSショートカット一覧（⚙ / `?`）／プロジェクトZIP入出力
 - **V2-E2: 実装済み（2026-08-02）** — EDITの`GRID`モード＋`cut.colorC`＋描画モード5種
+- **V2-E2b: 実装済み（2026-08-02）** — GRIDの作り直し（黒背景／ホイール拡縮／可視セル解像度追従／
+  行カラー帯／尺バー／装飾最小）。**GRIDが主戦場・SINGLEは詰め用**という主従もここで確定
 - 未着手（この順）: **V2-D3 → V2-E3**。
   画面の役割は **SPEC_13 §9 で確定済み（着手前に必読）**。
   **D3の一覧PNGは GRID をそのまま大きく描くだけ**（`colorCells()`／`cellSub()` が既にある）
