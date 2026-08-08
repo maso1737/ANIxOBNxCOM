@@ -695,3 +695,17 @@ pxToFrame(px) = start + px/width*span // 新規
 5. **パネル本文の説明テキストを選択・コピーできるように**（ANIMATOR と同じ流儀）。
    `#settings-panel-body` / `#inspector-body` / `#sfx-body` を `user-select:text` にし、
    **ボタン・スライダー・「掴んで値をこするラベル」(`.kf-row .k`) は `none` のまま**（ドラッグのたびに文字が選ばれると誤操作になるため）。
+
+### P8 追補（2026-08-04・push後）
+
+6. **フローティングUIは「触ったものが前面」**（`floating-panel-kit` スキル #5 に準拠。ANIMATOR / OBAN と統一）。
+   対象4枚＝`#fx-hud` / `#inspector` / `#sfx-modal` / `#settings-panel`。
+   `gPanelOrder`（後ろほど前面）を持ち、`bringToFront(sel,force)` が毎回 `FLOAT_Z_BASE`(60) から振り直す。
+   **zTop を足し続ける方式にしない**のは、値が青天井になると全画面オーバーレイやトーストを追い越すため。
+   - 旧 z-index は 50 / 60 / 115 / 121 とバラバラで、**撮影FX と SETTINGS が書き出しオーバーレイ(100)より
+     上にいて書き出し中も手前に残っていた**。60..63 に寄せたので `#export-overlay`(100) /
+     `#webx-modal`(110) / `#autosave-bar`(200) / `#live-toast`(300) が正しく覆う。
+   - `pointerdown` は capture で拾う（パネル内の `stopPropagation` を素通りさせるため）。
+   - **開く操作（`toggleSfxModal` / `showFxHud` / `toggleSettingsPanel(true)` / `dockInspector`）は
+     `force` で前面へ**。無いと「押したのに何も起きない（実は下敷き）」になる。
+7. トップバーの OBAN 読み込みボタンを **`▶ OBAN`** に変更（旧 `+ OBAN`）。

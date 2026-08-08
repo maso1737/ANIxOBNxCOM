@@ -283,6 +283,20 @@ ANIMATORの作画コマを複数トラックで重ね、トランスフォーム
   掴んで値を動かすUIを足したら、その要素も `none` 側に足すこと（でないとドラッグで文字が選ばれる）
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
+【2026-08-04 追加2（触ったパネルが前面へ / floating-panel-kit #5）】
+- **フローティングパネルの上下は固定ではなく「触った順」**。ANIMATOR / OBAN と手触りを揃えた。
+  対象は `#fx-hud`(QUICK TRANSFORM) / `#inspector` / `#sfx-modal`(撮影FX) / `#settings-panel` の4枚。
+- **zTop を足し続ける方式ではなく、`gPanelOrder`（後ろほど前面）を持って毎回 `FLOAT_Z_BASE`(60) から振り直す**。
+  値が青天井にならないので、`#export-overlay`(100) / `#webx-modal`(110) / `#autosave-bar`(200) /
+  `#live-toast`(300) を追い越す事故が起きない。**パネルを増やしたら `gPanelOrder` に足すだけ**
+- **旧 z-index は 50/60/115/121 でバラバラ**だった。sfx(115)・settings(121) が書き出しオーバーレイ(100)より
+  上にいて、**書き出し中もパネルが手前に残っていた**。60..63 に寄せたのでオーバーレイが正しく覆う
+- `pointerdown` は **capture** で拾う（パネル内の `stopPropagation` に邪魔されないように）
+- **パネルを開く関数は必ず `bringToFront(sel,true)`**（`toggleSfxModal` / `showFxHud` /
+  `toggleSettingsPanel(true)` / `dockInspector`）。無いと「押したのに何も起きない（実は下敷き）」に見える
+- トップバーの OBAN 読み込みボタンは **`▶ OBAN`**（旧 `+ OBAN` / さらに旧 `+ FROM OBAN`）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 【コードの注意点】
 - KF関数はkfsパラメータ明示。op=0は isNaN(v)?1:v で判定
 - ALL_PROPS にprop追加時は #kf-*/#fx-*/#dot-*/#fx-dot-* のUIも要追加（updateKfUI/Fxがループ参照）

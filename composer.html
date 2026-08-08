@@ -65,7 +65,7 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
 #empty-state .sub{font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.2);margin-top:4px;}
 
 /* INSPECTOR（フローティング：設定UI同様。ドラッグ移動＋内部スクロール＝タイムラインを上げても隠れない）*/
-#inspector{position:fixed;top:40px;right:12px;width:216px;max-height:calc(100dvh - 240px);background:rgba(8,8,8,0.96);border:1px solid var(--border-bright);box-shadow:0 8px 40px rgba(0,0,0,0.7),0 0 0 1px rgba(0,0,0,0.4);z-index:60;font-size:10px;display:flex;flex-direction:column;}
+#inspector{position:fixed;top:40px;right:12px;width:216px;max-height:calc(100dvh - 240px);background:rgba(8,8,8,0.96);border:1px solid var(--border-bright);box-shadow:0 8px 40px rgba(0,0,0,0.7),0 0 0 1px rgba(0,0,0,0.4);z-index:61;font-size:10px;display:flex;flex-direction:column;}
 #inspector-head{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;cursor:move;background:linear-gradient(90deg,rgba(255,79,168,0.10),transparent);border-bottom:1px solid var(--border);font-size:9px;letter-spacing:0.3em;color:var(--acid);user-select:none;flex-shrink:0;}
 .insp-head-btns{display:flex;align-items:center;gap:7px;}
 #inspector-collapse,#inspector-dock{cursor:pointer;color:rgba(255,255,255,0.5);font-size:12px;line-height:1;padding:0 2px;}
@@ -331,7 +331,7 @@ input[type=number]{-moz-appearance:textfield;}
 
 /* SATSUEI FX MODAL (SPEC_06) — 既存 #fx-hud(トランスフォーム)とは別物なので sfx- プレフィックス */
 /* フローティングパネル（INSPECTOR方式・makeFloatDragでヘッダドラッグ）— 画を見ながら調整できるよう非モーダル */
-#sfx-modal{display:none;position:fixed;top:64px;right:24px;z-index:115;}
+#sfx-modal{display:none;position:fixed;top:64px;right:24px;z-index:62;}
 #sfx-modal.show{display:block;}
 #sfx-panel{background:rgba(10,10,12,0.94);border:1px solid rgba(255,79,168,0.45);width:340px;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
 #sfx-head{padding:8px 14px;border-bottom:1px solid rgba(255,79,168,0.18);color:var(--acid);font-size:9px;letter-spacing:0.32em;background:linear-gradient(90deg,rgba(255,79,168,0.08),transparent);display:flex;justify-content:space-between;align-items:center;cursor:move;user-select:none;}
@@ -361,7 +361,7 @@ input[type=number]{-moz-appearance:textfield;}
 #file-input{display:none;}
 
 /* QUICK TRANSFORM（旧FX HUD。id は fx-hud-* のまま＝FXボタンのSATSUEI FXとは別物）*/
-#fx-hud{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.82);border:1px solid rgba(255,79,168,0.45);min-width:200px;z-index:50;display:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 8px 32px rgba(0,0,0,0.6),0 0 0 1px rgba(255,79,168,0.06);font-family:var(--mono);font-size:10px;color:var(--white);}
+#fx-hud{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.82);border:1px solid rgba(255,79,168,0.45);min-width:200px;z-index:60;display:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 8px 32px rgba(0,0,0,0.6),0 0 0 1px rgba(255,79,168,0.06);font-family:var(--mono);font-size:10px;color:var(--white);}
 #fx-hud.show{display:block;}
 #fx-hud-head{display:flex;justify-content:space-between;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(255,79,168,0.18);background:linear-gradient(90deg,rgba(255,79,168,0.08),transparent);font-size:8px;letter-spacing:0.32em;color:var(--acid);cursor:move;user-select:none;}
 #fx-hud-close{cursor:pointer;color:rgba(255,255,255,0.4);font-size:11px;line-height:1;padding:0 2px;}
@@ -383,7 +383,7 @@ input[type=number]{-moz-appearance:textfield;}
 
 /* SETTINGS PANEL (animator準拠・フローティング＋左右ドック) */
 /* 2026-07-26: 既定はINSPECTORと左右対称にドックする（Tabで両者が入れ替わる） */
-#settings-panel{position:fixed;top:40px;right:12px;width:300px;background:rgba(8,8,8,0.96);border:1px solid var(--border-bright);box-shadow:0 8px 40px rgba(0,0,0,0.7),0 0 0 1px rgba(0,0,0,0.4);z-index:121;font-family:var(--mono);color:#fff;display:none;}
+#settings-panel{position:fixed;top:40px;right:12px;width:300px;background:rgba(8,8,8,0.96);border:1px solid var(--border-bright);box-shadow:0 8px 40px rgba(0,0,0,0.7),0 0 0 1px rgba(0,0,0,0.4);z-index:63;font-family:var(--mono);color:#fff;display:none;}
 #settings-panel.show{display:block;}
 #settings-panel.dock-left{left:12px;right:auto;top:40px;}
 #settings-panel.dock-right{left:auto;right:12px;top:40px;}
@@ -528,7 +528,7 @@ input[type=number]{-moz-appearance:textfield;}
     <div class="g">
       <!-- 読み込み系 -->
       <button id="btn-import" class="primary" title="JSON / 画像(PNG等) / 音声を読み込み（既存トラックに追加。複数回で重ねられます）。連番PNGを4枚以上まとめて選ぶと1トラックのシーケンス、音声ファイルはBGM/SEトラックになります">IMPORT</button>
-      <button id="btn-paste-json" title="クリップボードのJSONを読み込み（OBANの COPY FOR COMPOSER / EXPORT JSON をそのまま貼り付け）">+ OBAN</button>
+      <button id="btn-paste-json" title="クリップボードのJSONを読み込み（OBANの COPY FOR COMPOSER / EXPORT JSON をそのまま貼り付け）">▶ OBAN</button>
       <span style="color:var(--dim)">/</span>
       <!-- トラック追加・設定 -->
       <button id="btn-camera" title="カメラトラックを追加（1つまで）— Ctrl+Alt+Shift+C（AE準拠）。X/Y=パン, Z=ドリー(パララックス), ROT=回転, SCL=ズーム">+ CAMERA</button>
@@ -1889,7 +1889,7 @@ function toggleUProp(){
 
 // ── QUICK TRANSFORM（P/S/A/R/T/U で開く浮動パネル。Escで閉じる）──
 // 注: id は歴史的経緯で fx-hud-* のまま。撮影処理の FX ボタン(#btn-fx / SATSUEI FX)とは無関係
-function showFxHud(){ $('#fx-hud').classList.add('show'); updateFxHud(); }
+function showFxHud(){ $('#fx-hud').classList.add('show'); bringToFront('#fx-hud',true); updateFxHud(); }
 function hideFxHud(){ $('#fx-hud').classList.remove('show'); }
 function updateFxHud(){
   if(!$('#fx-hud').classList.contains('show')) return;
@@ -4469,6 +4469,7 @@ function toggleSfxModal(){
   const m=$('#sfx-modal');
   if(m.classList.contains('show')){ closeSfxModal(); return; }
   buildSfxUI(); m.classList.add('show'); $('#btn-fx').classList.add('primary');
+  bringToFront('#sfx-modal',true); // 下敷きのまま開いて「押しても出ない」に見えるのを防ぐ
 }
 $('#btn-fx').addEventListener('click',toggleSfxModal);
 $('#sfx-close').addEventListener('click',closeSfxModal);
@@ -6087,6 +6088,7 @@ function toggleSettingsPanel(force){
   gCaptureId=null;
   if(show){
     p.classList.remove('collapsed');
+    bringToFront('#settings-panel',true);
     buildShortcutList(); applyGuideUI();
     applySettingsDefaultHeight(); // ★ shortcut list を組んだ後に測る
   }
@@ -6248,6 +6250,24 @@ try{ const s=localStorage.getItem('composer_insp_side'); if(s==='left'||s==='rig
 // ドック＝「CSSの定位置にきちんと収まる」状態に戻す（ANIMATORのパレットのドック挙動に合わせた）。
 // フリードラッグの inline left/top/right/transform と、リサイズハンドルが付けた
 // maxHeight/height を**すべて消して**からクラスで左右を決める。消し忘れると宙に浮いたままになる。
+// ── 触ったパネルが前面へ（floating-panel-kit #5）──
+// ANIMATOR / OBAN と同じ手触り。上下関係を固定にすると「押したのに何も起きない（実は下敷き）」になる。
+// zTop を無限に足していく方式ではなく、**順序配列を持って毎回 60.. に振り直す**（値が青天井にならず、
+// #export-overlay(100) / #webx-modal(110) / トースト(300) より上に出てしまう事故も起きない）。
+const FLOAT_Z_BASE=60;
+let gPanelOrder=['#fx-hud','#inspector','#sfx-modal','#settings-panel']; // 後ろほど前面（CSSの初期値と一致）
+function bringToFront(sel,force){
+  const i=gPanelOrder.indexOf(sel);
+  if(i<0) return;
+  if(!force&&i===gPanelOrder.length-1) return; // すでに最前なら触らない
+  gPanelOrder.splice(i,1); gPanelOrder.push(sel);
+  gPanelOrder.forEach((t,n)=>{ const el=$(t); if(el) el.style.zIndex=FLOAT_Z_BASE+n; });
+}
+// capture で拾う（パネル内の stopPropagation に邪魔されないように）
+gPanelOrder.slice().forEach(sel=>{
+  const el=$(sel);
+  if(el) el.addEventListener('pointerdown',()=>bringToFront(sel),true);
+});
 function dockInspector(side){
   const panel=$('#inspector'); if(!panel) return;
   if(side==='left'||side==='right') gInspSide=side;
@@ -6257,6 +6277,7 @@ function dockInspector(side){
   const body=$('#inspector-body'); if(body) body.style.height=''; // リサイズで固定した高さを解除
   panel.classList.toggle('dock-left', gInspSide==='left');
   panel.classList.toggle('dock-right', gInspSide!=='left');
+  bringToFront('#inspector',true);
   try{ localStorage.setItem('composer_insp_side',gInspSide); }catch(e){}
 }
 // 2026-07-26: SETTINGS は常に INSPECTOR の**反対側**へドックする（左右対称の対）。
