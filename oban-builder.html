@@ -47,7 +47,11 @@ body{
 a{color:var(--ice);text-decoration:none}
 a:hover{color:var(--acid)}
 /* touch-action:none = iPadでブラウザ側のピンチ/スクロールに取られず、指の操作を全部こちらで拾う */
-canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;position:fixed;z-index:1}
+/* 表示ズーム(,/.)で縮めるとキャンバスの箱ごと縮む＝外側は #cv に当たらない。
+   その余白でもパン・ズームできるよう、後ろに敷いた面で拾う */
+#void{position:fixed;inset:0;z-index:0;touch-action:none;cursor:grab}
+body.panning #void,body.panning canvas#cv{cursor:grabbing}
 
 /* corner viewfinder ticks — KINETIC stage gate (gold→rouge brackets) */
 #ticks{
@@ -166,8 +170,20 @@ body.take #cards{display:flex;flex-direction:column}
 .edc.now{background:rgba(255,79,168,.10);box-shadow:inset 0 0 0 1px rgba(255,79,168,.45)}
 .edc.now .edc-no{color:var(--acid);text-shadow:0 0 8px rgba(255,79,168,.6)}
 .edc-title{color:var(--ice);letter-spacing:.3em;margin-bottom:8px}
-/* DOF ピン送り（カメラの仕事なのでTAKEパネルに置く） */
-.dofstrip{border:1px solid rgba(255,201,79,.28);padding:7px 8px;margin-bottom:9px;background:rgba(255,201,79,.04)}
+/* DOF ピント（カメラの仕事なのでTAKEパネルに置く）。
+   KFが増えてもスクロールで上へ逃げないよう、パネル内で上端に貼り付ける（エクセルの固定と同じ狙い） */
+.dofstrip{border:1px solid rgba(255,201,79,.28);padding:7px 8px;margin-bottom:9px;background:rgba(255,201,79,.04);
+  position:sticky;top:-11px;z-index:2;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  background-color:rgba(22,12,38,.97)}
+/* 置いてあるピント点のチップ（クリック＝そのKFへ／✕で外す） */
+.dof-pts{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.dofpt{cursor:pointer;border:1px solid rgba(90,233,255,.35);background:transparent;color:var(--ice);
+  font-family:var(--mono);font-size:9px;letter-spacing:.06em;padding:2px 4px 2px 6px;display:flex;align-items:center;gap:4px}
+.dofpt b{font-weight:400;color:#fff;opacity:.85}
+.dofpt:hover{background:rgba(90,233,255,.12)}
+.dofpt.sel{border-color:var(--amber);color:var(--amber);background:rgba(255,201,79,.14)}
+.dofpt .x{opacity:.4;padding:0 2px}
+.dofpt .x:hover{opacity:1;color:var(--acid)}
 .dofstrip.on{border-color:rgba(255,201,79,.5)}
 .dofstrip .dof-h{display:flex;align-items:center;justify-content:space-between;gap:6px}
 .dofstrip .dof-h label{color:var(--amber);letter-spacing:.14em;cursor:pointer;display:flex;align-items:center;gap:5px}
@@ -394,6 +410,8 @@ body.cleanview{cursor:none}
 </head>
 <body class="place">
 
+<!-- 表示ズームで縮めたときにキャンバスの外側にできる余白。ここでもパン／ズームできるようにする -->
+<div id="void"></div>
 <canvas id="cv"></canvas>
 <div id="ticks"></div>
 
@@ -404,6 +422,8 @@ body.cleanview{cursor:none}
   <button class="btn mode ice" id="m-take" title="カメラモード：スクロールに沿ったカメラワークをキーフレームで打つ。C=CAPTURE / ↑↓=KF移動 / SPACE=PREVIEW">2. TAKE カメラ</button>
   <button class="btn ex" id="b-export" title="スクロール駆動のモーションコミックを単一HTMLビューアで書き出し（依存ゼロ・画像同梱）">3. EXPORT ▸ HTML</button>
   <!-- 作成中に使う道具（EXPORTのとなり）。GUIDEはボタン廃止＝Gキー/SETTINGS参照 -->
+  <button class="btn mode" id="b-img" title="画像を選んで追加（複数選択できます。連番4枚以上は自動でパラパラに。iPadはD&Dの代わりにこちら）">＋ 画像</button>
+  <input type="file" id="oban-img-input" accept="image/*" multiple style="display:none;">
   <button class="btn" id="b-clear" title="プロジェクトを空にする（元に戻せません）">CLEAR</button>
   <button class="btn mode" id="b-frame" title="フレーム（コマ枠）を追加。画像を重ねて格納できる">+ FRAME</button>
   <button class="btn fx" id="b-fx" title="撮影処理（SATSUEI FX）・DOFピン送り・クリックFXを編集（F）。ONの間はボタンが点灯します">FX [F]</button>
@@ -904,6 +924,10 @@ function stepViewScale(dir){    // dir<0 = 縮小（＜） / dir>0 = 拡大（�
   setViewScale(VS_STEPS[clamp(i+(dir<0?1:-1),0,VS_STEPS.length-1)]);
 }
 function onResize(){VW=innerWidth;VH=innerHeight;DPR=Math.min(devicePixelRatio||1,2);cv.width=Math.round(VW*DPR);cv.height=Math.round(VH*DPR);updateCvOff();if(bootedV2C)computeWipeP();}
+/* バーの折り返し段数はフォント読み込みや中身（パンくず）で後から変わる。
+   起動直後の1回だけだと CVOFF / --bartop が古いままになるので、確定したところで測り直す */
+try{if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>updateCvOff());}catch(e){}
+addEventListener('load',()=>updateCvOff());
 var bootedV2C=false;
 addEventListener('resize',onResize);onResize();
 
@@ -968,17 +992,26 @@ function migrate(p){
   if(p.clickFx===undefined)p.clickFx='invert';                  // V2-D: ビューアのクリックFX
   /* DOF（被写界深度）とピン送り。OBANのFXは画面全体の後処理なので、レイヤー別のボケはここで別建て。
      ピントは「コマのDEPTH（0=奥 / 1=手前）」で合わせる */
-  if(!p.dof)p.dof={on:false,a:0.75,b:0.30,kf:null,range:0.30,maxBlur:12,bounce:0.35};
-  else{
-    const d=p.dof;
-    if(typeof d.a!=='number'||!isFinite(d.a))d.a=0.75;
-    if(typeof d.b!=='number'||!isFinite(d.b))d.b=0.30;
-    if(d.kf===undefined)d.kf=null;
-    if(typeof d.range!=='number'||!isFinite(d.range))d.range=0.30;
-    if(typeof d.maxBlur!=='number'||!isFinite(d.maxBlur))d.maxBlur=12;
-    if(typeof d.bounce!=='number'||!isFinite(d.bounce))d.bounce=0.35;
-    d.on=!!d.on;
+  /* pts=[{kf,f}] … 「このKFではここにピント」を並べたピントのトラック（何点でも打てる）。
+     旧 {a,b,kf} の1本送りは pts 2点へ自動変換する（v1プロジェクトの見え方を保つ） */
+  if(!p.dof)p.dof={on:false,pts:[],range:0.30,maxBlur:12,bounce:0.35};
+  const d=p.dof;
+  if(!Array.isArray(d.pts)){
+    const a=(typeof d.a==='number'&&isFinite(d.a))?d.a:0.75;
+    const b=(typeof d.b==='number'&&isFinite(d.b))?d.b:0.30;
+    d.pts=(d.kf==null)?[{kf:0,f:a}]
+         :(d.kf===0)?[{kf:0,f:b}]
+         :[{kf:0,f:a},{kf:d.kf,f:b}];
   }
+  delete d.a;delete d.b;delete d.kf;
+  d.pts=d.pts.filter(pt=>pt&&isFinite(pt.kf)&&pt.kf>=0)
+             .map(pt=>({kf:Math.round(pt.kf),f:(typeof pt.f==='number'&&isFinite(pt.f))?clamp(pt.f,0,1):0.5}))
+             .sort((x,y)=>x.kf-y.kf)
+             .filter((pt,i,arr)=>i===0||pt.kf!==arr[i-1].kf);   // 同じKFに2点は持たせない
+  if(typeof d.range!=='number'||!isFinite(d.range))d.range=0.30;
+  if(typeof d.maxBlur!=='number'||!isFinite(d.maxBlur))d.maxBlur=12;
+  if(typeof d.bounce!=='number'||!isFinite(d.bounce))d.bounce=0.35;
+  d.on=!!d.on;
   if(!p.take)p.take={version:1,name:'take-A',kf:[]};
   if(!p.take.fx)p.take.fx=(typeof window!=='undefined'&&window.SatsueiFX)   // SPEC_06: fxスキーマv1
     ?window.SatsueiFX.makeDefaultFx():{version:1,enabled:false,chain:[]};
@@ -1411,24 +1444,56 @@ function visFrac(r){
  *   そのKFへ向かう「移動区間」= 送りの窓 / そのKFで止まる「dwell区間」の頭 = 着地とバウンド。
  * BOUNCE は着地でわずかに行き過ぎて戻る往復（実機のピント送りの気持ちよさ）。すべてPの純関数＝逆走可逆。
  * ビューアにも同式を複製すること。 */
-const CAN_FILTER=(function(){try{return typeof cx0.filter==='string';}catch(e){return false;}})();
-let dofPrev=0;   // 編集ビュー用の A⇔B 確認スライダー（保存しない）
+/* ctx.filter は「プロパティは在るのに無視される」環境があるので、実際に1回ぼかして確かめる。
+   （iOS Safari は 17 未満だと未対応＝ボケない。プロパティ有無だけの判定では見抜けなかった） */
+const CAN_FILTER=(function(){
+  try{
+    const c=document.createElement('canvas');c.width=c.height=9;
+    const g=c.getContext('2d',{willReadFrequently:true});
+    if(typeof g.filter!=='string')return false;
+    g.fillStyle='#fff';g.fillRect(0,0,9,9);
+    g.filter='blur(3px)';g.fillStyle='#000';g.fillRect(3,3,3,3);g.filter='none';
+    const d=g.getImageData(1,1,1,1).data;      // 角までにじんでいれば本当に効いている
+    return d[0]<250;
+  }catch(e){return false;}
+})();
+let dofPin=0.5;   // 編集ビューで見せているピント位置（HUDのキャレット。保存しない）
+/* ピントのトラック: pts=[{kf,f}] を P の純関数で読む。
+ * 点 i へは「i へ向かう travel 区間」で送り、着地後の dwell 頭35%で BOUNCE（行き過ぎて戻る一往復）。
+ * 点が1つなら送りは起きず、その値で合いっぱなし＝「各カットで合っている」状態になる。
+ * 逆スクロールでも同じ絵になるよう、時間や前フレームの状態は一切持たない。 */
 function focusAt(P){
   const d=PROJECT.dof;
-  if(!d||!d.on)return null;
-  const A=d.a,B=d.b;
-  if(P==null)return lerp(A,B,dofPrev);              // 編集中は手動スライダーの位置で見せる
-  if(d.kf==null||!PROJECT.take.kf[d.kf])return A;   // 送り先KF未指定＝Aで固定
-  const ki=d.kf;
-  const tSeg=(2*ki-1>=0)?TT.segs[2*ki-1]:null,dSeg=TT.segs[2*ki];
-  if(!tSeg)return B;                                // 先頭KFに紐づけたら最初からB
-  if(P<=tSeg.p0)return A;
-  if(P<tSeg.p1)return lerp(A,B,E.smooth(map(P,tSeg.p0,tSeg.p1)));
-  if(!dSeg||d.bounce<=0.001)return B;
+  if(!d||!d.on||!d.pts.length)return null;
+  if(P==null)return dofPin;                         // 編集中はHUDのキャレット位置で見せる
+  const pts=d.pts.filter(pt=>PROJECT.take.kf[pt.kf]);
+  if(!pts.length)return null;
+  let landed=null,before=null;                      // landed=着地済みの最後の点 / before=その1つ前
+  for(const pt of pts){
+    const t=(pt.kf>0)?TT.segs[2*pt.kf-1]:null;      // その点へ向かう travel（先頭KFは無い＝最初から合っている）
+    if(!t||P>=t.p1){before=landed;landed=pt;continue;}
+    if(P>t.p0)return lerp(landed?landed.f:pt.f,pt.f,E.smooth(map(P,t.p0,t.p1)));   // 送りの最中
+    break;                                          // まだ送りが始まっていない
+  }
+  if(!landed)return pts[0].f;                       // 最初の点より手前＝その値で固定
+  const dSeg=TT.segs[2*landed.kf];
+  if(!dSeg||d.bounce<=0.001||!before)return landed.f;
   const w=Math.max(dSeg.p1-dSeg.p0,1e-6);
-  const u=map(P,dSeg.p0,dSeg.p0+w*0.35);            // dwellの頭35%で収束
-  if(u>=1)return B;
-  return B+(B-A)*d.bounce*0.35*Math.sin(u*Math.PI*2)*(1-u);   // 行き過ぎ→戻り（減衰）
+  const u=map(P,dSeg.p0,dSeg.p0+w*0.35);
+  if(u<=0||u>=1)return landed.f;
+  return landed.f+(landed.f-before.f)*d.bounce*0.35*Math.sin(u*Math.PI*2)*(1-u);
+}
+/* pts の読み書きヘルパ（並びは常に kf 昇順・1KF1点） */
+const dofPtAt=kf=>PROJECT.dof.pts.findIndex(pt=>pt.kf===kf);
+function dofSetPoint(kf,f){
+  const d=PROJECT.dof,i=dofPtAt(kf);
+  if(i>=0)d.pts[i].f=+clamp(f,0,1).toFixed(2);
+  else{d.pts.push({kf,f:+clamp(f,0,1).toFixed(2)});d.pts.sort((x,y)=>x.kf-y.kf);}
+  return dofPtAt(kf);
+}
+function dofRemovePoint(kf){
+  const d=PROJECT.dof,i=dofPtAt(kf);
+  if(i>=0)d.pts.splice(i,1);
 }
 /* ピント位置 f を指定してのボケ量。UI側で「Aのとき／Bのとき」を別々に出せるように分離してある */
 function dofBlurAtFocus(depth,f,H){
@@ -1759,36 +1824,53 @@ function drawDofRuler(){
     cx.beginPath();cx.moveTo(px,y0-6*DPR);cx.lineTo(px,y0+6*DPR);cx.stroke();
     if(on){cx.fillStyle='#FF4FA8';cx.fillText(String(o.name).slice(0,14),px+5*DPR,y0-10*DPR);}
   }
-  const mark=(v,col,lab)=>{                               // A / B の旗
-    const px=X(v);
-    cx.fillStyle=col;
+  // 置いてある点の旗（選択中のKFの点は琥珀・他はアイス）
+  for(const pt of d.pts){
+    const px=X(pt.f),on=(pt.kf===selKf);
+    cx.fillStyle=on?'#FFC94F':'rgba(90,233,255,.75)';
     cx.beginPath();cx.moveTo(px,y0-11*DPR);cx.lineTo(px+5*DPR,y0-19*DPR);cx.lineTo(px-5*DPR,y0-19*DPR);cx.closePath();cx.fill();
-    cx.textAlign='center';cx.fillText(lab,px,y0-22*DPR);cx.textAlign='left';
-  };
-  mark(d.a,'#FFC94F','A '+d.a.toFixed(2));
-  mark(d.b,'#5AE9FF','B '+d.b.toFixed(2));
-  cx.strokeStyle='#F8EFFF';cx.lineWidth=2*DPR;            // いまのピント
-  cx.beginPath();cx.moveTo(X(f),y0-9*DPR);cx.lineTo(X(f),y0+9*DPR);cx.stroke();
-  cx.fillStyle='#F8EFFF';cx.fillText('PIN '+f.toFixed(2),X(f)+6*DPR,y0+17*DPR);
-  if(dofPick){                                            // 「画面から取る」待機中は行き先を明示
-    cx.fillStyle=dofPick==='a'?'#FFC94F':'#5AE9FF';
-    cx.font=`${11*DPR}px monospace`;cx.textAlign='center';
-    cx.fillText('FOCUS '+dofPick.toUpperCase()+' ← ピントを合わせたいコマをクリック（Escで取消）',x0+w/2,y0-40*DPR);
+    cx.textAlign='center';cx.fillText('#'+pad(pt.kf),px,y0-22*DPR);cx.textAlign='left';
   }
+  // いまのピント＝ドラッグできるキャレット ▼（HUDが操作面。ここが「今ここ」を置く場所）
+  const cxp=X(f);
+  cx.strokeStyle='#F8EFFF';cx.lineWidth=2*DPR;
+  cx.beginPath();cx.moveTo(cxp,y0-9*DPR);cx.lineTo(cxp,y0+9*DPR);cx.stroke();
+  cx.fillStyle='#F8EFFF';
+  cx.beginPath();cx.moveTo(cxp,y0+13*DPR);cx.lineTo(cxp+6*DPR,y0+23*DPR);cx.lineTo(cxp-6*DPR,y0+23*DPR);cx.closePath();cx.fill();
+  cx.fillText(f.toFixed(2),cxp+9*DPR,y0+22*DPR);
+  cx.font=`${9*DPR}px monospace`;cx.textAlign='center';
+  cx.fillStyle=dofPick?'#FFC94F':'rgba(242,238,252,.5)';
+  cx.fillText(dofPick?'ピントを合わせたいコマをクリック（Escで取消）'
+    :(selKf>=0?'▼ をドラッグ＝ピント調整／KFカードの ◎ で #'+pad(selKf)+' に置く':'▼ をドラッグ＝ピント調整'),
+    x0+w/2,y0-34*DPR);
   cx.restore();
+}
+/* HUDキャレットのドラッグ判定（キャンバス上のポインタを乗っ取る）。
+ * DOFがONで編集中のときだけ有効。定規の帯（上下24px）を掴んだらピント調整に入る */
+function dofRulerHit(cssX,cssY){
+  const d=PROJECT.dof;
+  if(!d||!d.on||PV.on||cleanView)return null;
+  const W=cv.width,H=cv.height;
+  const w=Math.min(W*0.52,560*DPR),x0=(W-w)/2,y0=visBottomPx()-58*DPR;
+  const px=cssX*DPR,py=cssY*DPR;
+  if(py<y0-26*DPR||py>y0+26*DPR)return null;
+  if(px<x0-10*DPR||px>x0+w+10*DPR)return null;
+  return clamp((px-x0)/w,0,1);
 }
 /* 各コマの「A/Bでどれだけボケるか」を絵の上に出す（数字で見せる＝推測させない） */
 function drawDofBadge(o,R){
   const d=PROJECT.dof,H=cv.height/DPR;   // 画面で見えるぶんのpxで出す（DPRで数字が2倍にならないように）
-  const fmt=b=>b<0.5?'IN':b.toFixed(1);
-  const bA=dofBlurAtFocus(o.depth,d.a,H),bB=dofBlurAtFocus(o.depth,d.b,H);
+  const now=dofBlurAtFocus(o.depth,dofPin,H);
+  // このコマにピントが合う点（＝そのKFではこのコマがくっきり）を列挙する
+  const hits=d.pts.filter(pt=>dofBlurAtFocus(o.depth,pt.f,H)<0.5).map(pt=>'#'+pad(pt.kf));
+  const lab='D'+(o.depth??0.5).toFixed(2)+'  '+(now<0.5?'合焦':now.toFixed(1)+'px');
   cx.save();
   cx.font=`${9*DPR}px monospace`;cx.textBaseline='alphabetic';
+  const w=(lab.length+(hits.length?hits.join(' ').length+3:0))*6.2*DPR;
   const y=R.y+R.h-7*DPR,x=R.x+5*DPR;
-  cx.fillStyle='rgba(7,3,15,.72)';cx.fillRect(x-3*DPR,y-11*DPR,118*DPR,15*DPR);
-  cx.fillStyle='rgba(242,238,252,.8)';cx.fillText('D'+(o.depth??0.5).toFixed(2),x,y);
-  cx.fillStyle='#FFC94F';cx.fillText('A:'+fmt(bA),x+42*DPR,y);
-  cx.fillStyle='#5AE9FF';cx.fillText('B:'+fmt(bB),x+80*DPR,y);
+  cx.fillStyle='rgba(7,3,15,.72)';cx.fillRect(x-3*DPR,y-11*DPR,w+8*DPR,15*DPR);
+  cx.fillStyle=now<0.5?'#F8EFFF':'rgba(242,238,252,.6)';cx.fillText(lab,x,y);
+  if(hits.length){cx.fillStyle='#5AE9FF';cx.fillText('◎ '+hits.join(' '),x+lab.length*6.2*DPR,y);}
   cx.restore();
 }
 
@@ -1804,27 +1886,34 @@ function dofNearest(v){
   if(!best)return '—';
   return escH(String(best.name).slice(0,14))+(bd<=Math.max(0.02,PROJECT.dof.range)?'':'（近いだけ）');
 }
+/* ピントのトラック UI。
+ * 操作は2手に絞る: ①KFを選ぶ ②「画面から取る」でコマをクリック → そのKFに点が入る。
+ * 微調整は画面下のHUD定規のキャレット（▼）を直接ドラッグする＝「今ここ・今ここ」と置いていける。 */
 function dofStripHTML(){
   const d=PROJECT.dof;
   let s=`<div class="dofstrip${d.on?' on':''}">
-    <div class="dof-h"><label title="奥行き（コマのDEPTH）でボケる。ピントをA→Bへ送れます"><input type="checkbox" data-dof="on"${d.on?' checked':''}> DOF ピン送り</label>
+    <div class="dof-h"><label title="奥行き（コマのDEPTH）でボケる。KFごとに「ここにピント」を何点でも置けます"><input type="checkbox" data-dof="on"${d.on?' checked':''}> DOF ピント</label>
       <button class="edb" data-dof="more" title="ピントの幅・ボケの強さ・BOUNCE は FX パネルにあります">詳細…</button></div>`;
-  if(d.on)s+=`
-    <div class="dof-r"><span class="k">A 今の画</span><span class="v">${d.a.toFixed(2)}</span>
-      <button class="edb${dofPick==='a'?' on':''}" data-dof="pick-a" title="押してから、最初にピントを合わせたいコマをキャンバスでクリック。取り込むとその見え方に切り替わります">${dofPick==='a'?'コマをクリック…':'画面から取る'}</button></div>
-    <div class="dof-r"><span class="k"></span><span class="dof-who">→ ${dofNearest(d.a)}</span></div>
-    <div class="dof-r"><span class="k">B 次の画</span><span class="v">${d.b.toFixed(2)}</span>
-      <button class="edb${dofPick==='b'?' on':''}" data-dof="pick-b" title="押してから、送り先のコマをキャンバスでクリック。取り込むとその見え方に切り替わります">${dofPick==='b'?'コマをクリック…':'画面から取る'}</button></div>
-    <div class="dof-r"><span class="k"></span><span class="dof-who">→ ${dofNearest(d.b)}</span></div>
-    <div class="dof-r"><span class="k">見え方</span>
-      <button class="edb${dofPrev<0.02?' on':''}" data-dof="prev-a" title="Aの見え方で表示">A</button>
-      <input type="range" data-dof="prev" min="0" max="1" step="0.01" value="${dofPrev}" title="編集画面での見え方を確認するスライダー（保存されません）">
-      <button class="edb${dofPrev>0.98?' on':''}" data-dof="prev-b" title="Bの見え方で表示">B</button>
-      <span class="v" id="dof-prevv">${dofPrev.toFixed(2)}</span></div>
-    <div class="dof-note">${d.kf==null
-      ? '送るKFが未設定です — 下のカードの <b>◎ ピン送り</b> を押すと、そのKFで A→B へ送ります'
-      : '<b>#'+pad(d.kf)+'</b> へ向かうカメラ移動の間に A → B へ送ります'}<br>
-      ピン送りは <b>1本だけ</b>（A→B・KFひとつ）。画面下の定規と、コマの上の <b>A: / B:</b> がボケ量（px・INは合焦）です</div>`;
+  if(d.on){
+    const at=(selKf>=0)?dofPtAt(selKf):-1;
+    s+=`
+    <div class="dof-r"><span class="k">ピント</span>
+      <input type="range" data-dof="pin" min="0" max="1" step="0.01" value="${dofPin}" title="編集画面のピント位置。画面下の定規の ▼ をドラッグしても動きます">
+      <span class="v" id="dof-pinv">${dofPin.toFixed(2)}</span></div>
+    <div class="dof-r"><span class="k"></span><span class="dof-who">→ ${dofNearest(dofPin)}</span></div>
+    <div class="dof-r"><span class="k"></span>
+      <button class="edb${dofPick?' on':''}" data-dof="pick" title="押してからコマをクリック＝そのコマにピントを合わせ、選択中のKFに置きます">${dofPick?'コマをクリック…':'画面から取る'}</button>
+      ${selKf>=0?`<button class="edb${at>=0?' on':''}" data-dof="set" title="選択中のKFに、いまのピント位置を置く（もう一度押すと外す）">${at>=0?'✓ #'+pad(selKf)+' に設定済':'#'+pad(selKf)+' に置く'}</button>`
+                :`<span class="dof-who">KFを選ぶと置けます</span>`}</div>`;
+    s+=`<div class="dof-pts">`;
+    if(!d.pts.length)s+=`<span class="dof-who">まだ点がありません — 1点だけ置けば「合いっぱなし」になります</span>`;
+    else s+=d.pts.map(pt=>`<button class="dofpt${pt.kf===selKf?' sel':''}" data-dof="go" data-kf="${pt.kf}"
+      title="クリック＝このKFへ／✕は点を外す">#${pad(pt.kf)}<b>${pt.f.toFixed(2)}</b><span class="x" data-dof="del" data-kf="${pt.kf}">✕</span></button>`).join('');
+    s+=`</div>
+    <div class="dof-note">${d.pts.length<=1
+      ? '点が1つ以下＝ピントは動きません（合いっぱなし）。2点以上でその間を送ります'
+      : '各点へ向かうカメラ移動の間に、前の点から次の点へピントを送ります'}</div>`;
+  }
   return s+`</div>`;
 }
 function renderCards(){
@@ -1840,7 +1929,7 @@ function renderCards(){
       </div>
       <div class="edc-btns sub">
         <button class="edb" data-i="${i}" data-act="upd" title="いまの画面の構図でこのKFを上書き">↻ UPD</button>
-        ${d.on?`<button class="edb pin${d.kf===i?' on':''}" data-i="${i}" data-act="pin" title="ここでピントを A→B へ送る（もう一度押すと解除）">◎ ピン送り</button>`:''}
+        ${d.on?(pt=>`<button class="edb pin${pt?' on':''}" data-i="${i}" data-act="pin" title="${pt?'このKFのピントを外す':'いまのピント位置（'+dofPin.toFixed(2)+'）をこのKFに置く'}">◎ ${pt?'ピント '+pt.f.toFixed(2):'ピントを置く'}</button>`)(d.pts.find(x=>x.kf===i)):''}
         <button class="edb del" data-i="${i}" data-act="del" title="このKFを削除">✕</button>
       </div>
       <label>EASE <select data-i="${i}" data-act="ease">
@@ -1907,7 +1996,12 @@ function selectKf(i,go=true){
 function remapKfRefs(fn){
   PROJECT.texts.forEach(t=>{if(t.kf!=null)t.kf=fn(t.kf);});
   PROJECT.frames.forEach(f=>{if(f.fx&&f.fx.kf!=null)f.fx.kf=fn(f.fx.kf);});
-  if(PROJECT.dof&&PROJECT.dof.kf!=null)PROJECT.dof.kf=fn(PROJECT.dof.kf);
+  if(PROJECT.dof&&PROJECT.dof.pts){                 // ピントの点（消えたKFの点は落とし、後続は番号を詰める）
+    PROJECT.dof.pts=PROJECT.dof.pts.map(pt=>({...pt,kf:fn(pt.kf)}))
+      .filter(pt=>pt.kf!=null&&isFinite(pt.kf))
+      .sort((x,y)=>x.kf-y.kf)
+      .filter((pt,i,arr)=>i===0||pt.kf!==arr[i-1].kf);
+  }
   PROJECT.texts=PROJECT.texts.filter(t=>!(t.type==='sub'&&t.kf==null));
 }
 /* 選択KFを from → to へ移動（カードのドラッグ / Ctrl+↑↓）。dwell/ease/字幕ごと動く */
@@ -1951,7 +2045,7 @@ function goKf(i){
 cards.addEventListener('click',e=>{
   const t=e.target;if(!t||!t.dataset)return;
   if(t.dataset.dof!==undefined){                                     // DOFストリップ
-    if(t.dataset.dof!=='on')onDofStrip(t.dataset.dof);               // ONはchangeで拾う（二重発火防止）
+    if(t.dataset.dof!=='on')onDofStrip(t.dataset.dof,t.dataset.kf);  // ONはchangeで拾う（二重発火防止）
     return;
   }
   if(t.dataset.act===undefined){                      // V2-A: カードクリック=フォーカス（カメラは動かさない）
@@ -1962,10 +2056,11 @@ cards.addEventListener('click',e=>{
   const i=+t.dataset.i,k=PROJECT.take.kf[i];if(!k)return;
   if(t.dataset.act==='go')goKf(i);
   else if(t.dataset.act==='upd'){Object.assign(k,{x:+VC.x.toFixed(3),y:+VC.y.toFixed(3),z:+VC.z.toFixed(3)});selKf=i;rebuild();}
-  else if(t.dataset.act==='pin'){   // ピン送りの着地KF（同じKFをもう一度押すと解除）
-    PROJECT.dof.kf=(PROJECT.dof.kf===i)?null:i;
+  else if(t.dataset.act==='pin'){   // このKFにピントを置く / 外す（もう一度押すと解除）
+    selKf=i;
+    if(dofPtAt(i)>=0){dofRemovePoint(i);toast('#'+pad(i)+' のピントを外しました');}
+    else{dofSetPoint(i,dofPin);toast('#'+pad(i)+' のピント = '+dofPin.toFixed(2)+'（'+dofNearest(dofPin).replace(/<[^>]*>/g,'')+'）');}
     renderCards();commit();
-    toast(PROJECT.dof.kf==null?'ピン送りの行き先を解除':'#'+pad(i)+' でピントを A → B へ送ります');
   }
   else if(t.dataset.act==='del'){
     PROJECT.take.kf.splice(i,1);
@@ -1973,8 +2068,8 @@ cards.addEventListener('click',e=>{
     if(selKf>=PROJECT.take.kf.length)selKf=PROJECT.take.kf.length-1;rebuild();
   }
 });
-/* DOFストリップ: ON / 画面から取る（ピッカー）/ 詳細（FXパネル） */
-function onDofStrip(act){
+/* DOFストリップ: ON / 画面から取る（ピッカー）/ KFに置く / 点の選択・削除 / 詳細（FXパネル） */
+function onDofStrip(act,kfAttr){
   const d=PROJECT.dof;
   if(act==='on'){
     d.on=!d.on;
@@ -1983,27 +2078,57 @@ function onDofStrip(act){
     return;
   }
   if(act==='more'){toggleFxModal(true);return;}
-  if(act==='prev-a'||act==='prev-b'){        // 「Aの見え方／Bの見え方」を1クリックで見比べる
-    dofPrev=(act==='prev-a')?0:1;
+  if(act==='pick'){
+    dofPick=dofPick?null:'pin';
+    document.body.classList.toggle('dofpick',!!dofPick);
     renderCards();
+    if(dofPick)toast('ピントを合わせたいコマをキャンバスでクリック（Escで取消）'
+      +(selKf>=0?' — #'+pad(selKf)+' に置きます':' — KF未選択なので見え方だけ変わります'));
     return;
   }
-  if(act==='pick-a'||act==='pick-b'){
-    const which=act.slice(-1);
-    dofPick=(dofPick===which)?null:which;
-    document.body.classList.toggle('dofpick',!!dofPick);
-    // 取りに行く側の見え方に切り替えておく＝クリックした瞬間に「効いた」のが目で分かる
-    if(dofPick)dofPrev=(dofPick==='a')?0:1;
-    renderCards();
-    if(dofPick)toast('FOCUS '+which.toUpperCase()+' — ピントを合わせたいコマをキャンバスでクリック（Escで取消）');
+  if(act==='set'){                                    // 選択中のKFに、いまのピント位置を置く／外す
+    if(selKf<0){toast('先にKFを選んでください');return;}
+    if(dofPtAt(selKf)>=0){dofRemovePoint(selKf);toast('#'+pad(selKf)+' のピントを外しました');}
+    else{dofSetPoint(selKf,dofPin);toast('#'+pad(selKf)+' のピント = '+dofPin.toFixed(2));}
+    renderCards();commit();
+    return;
+  }
+  if(act==='go'){                                     // 点をクリック＝そのKFへ飛んで、その見え方にする
+    const kf=+kfAttr,i=dofPtAt(kf);
+    if(i<0)return;
+    dofPin=PROJECT.dof.pts[i].f;
+    goKf(kf);
+    return;
+  }
+  if(act==='del'){
+    const kf=+kfAttr;
+    dofRemovePoint(kf);renderCards();commit();
+    toast('#'+pad(kf)+' のピントを外しました');
   }
 }
 cards.addEventListener('input',e=>{
   const t=e.target;
-  if(!t||!t.dataset||t.dataset.dof!=='prev')return;
-  dofPrev=parseFloat(t.value);                       // 確認用スライダー＝保存しない
-  const v=$('#dof-prevv');if(v)v.textContent=dofPrev.toFixed(2);
+  if(!t||!t.dataset||t.dataset.dof!=='pin')return;
+  setDofPin(parseFloat(t.value));                    // 編集ビューのピント位置＝保存しない
 });
+/* HUDのキャレットとストリップのスライダーで共有する「いまのピント位置」。
+ * 点を選んでいるときは、その点の値も一緒に動かす＝「触ったら決まる」ようにする */
+function setDofPin(v,writeThrough){
+  dofPin=clamp(v,0,1);
+  const s=cardsBody.querySelector('input[data-dof="pin"]');if(s)s.value=dofPin;
+  const o=$('#dof-pinv');if(o)o.textContent=dofPin.toFixed(2);
+  const who=cardsBody.querySelector('.dof-who');if(who)who.innerHTML='→ '+dofNearest(dofPin);
+  if(writeThrough&&selKf>=0&&dofPtAt(selKf)>=0){dofSetPoint(selKf,dofPin);commitD();renderDofPts();}
+}
+/* 点チップだけ描き直す（スライダーのドラッグ中にストリップ全体を作り直すと掴みが切れる） */
+function renderDofPts(){
+  const box=cardsBody.querySelector('.dof-pts');if(!box)return;
+  const d=PROJECT.dof;
+  box.innerHTML=d.pts.length
+    ? d.pts.map(pt=>`<button class="dofpt${pt.kf===selKf?' sel':''}" data-dof="go" data-kf="${pt.kf}"
+        title="クリック＝このKFへ／✕は点を外す">#${pad(pt.kf)}<b>${pt.f.toFixed(2)}</b><span class="x" data-dof="del" data-kf="${pt.kf}">✕</span></button>`).join('')
+    : `<span class="dof-who">まだ点がありません — 1点だけ置けば「合いっぱなし」になります</span>`;
+}
 cards.addEventListener('change',e=>{
   const t=e.target;
   if(t&&t.dataset&&t.dataset.dof==='on')onDofStrip('on');
@@ -2099,6 +2224,10 @@ const qeRow=(label,ctl,title,val)=>
   `<div class="qe-row"${title?` title="${title}"`:''}><span class="k">${label}</span><span class="ctl">${ctl}</span>${val==null?'':`<span class="v">${val}</span>`}</div>`;
 const qeSect=(t,hint)=>`<div class="qe-sect">${t}${hint?`<span class="hint">${hint}</span>`:''}</div>`;
 const qeOpts=(arr,cur)=>arr.map(m=>`<option${cur===m?' selected':''}>${m}</option>`).join('');
+/* SIZE スライダーは対数目盛り（0.05〜4）。線形だと小さい側が数pxに潰れて触れない */
+const H_MIN=0.05,H_MAX=4;
+const hToSlider=h=>Math.round(Math.log(clamp(h??1,H_MIN,H_MAX)/H_MIN)/Math.log(H_MAX/H_MIN)*1000);
+const sliderToH=v=>+(H_MIN*Math.pow(H_MAX/H_MIN,clamp(v,0,1000)/1000)).toFixed(4);
 const qeKfOpts=(cur,head)=>`<option value="">${head}</option>`+
   PROJECT.take.kf.map((k,i)=>`<option value="${i}"${cur===i?' selected':''}>#${pad(i)}</option>`).join('');
 function renderChip(){
@@ -2111,20 +2240,25 @@ function renderChip(){
   if(isText(o)){   // V2-D: テキスト（常に最前グループなのでORDERなし）
     s+=qeSect('TEXT 読み文字');
     s+=qeRow('COL',`<button class="btn" data-act="tcol">${o.col==='#000'?'黒':'白'}</button>`,'文字色を白/黒で切り替え（フチは反対色で自動）');
-    s+=qeRow('SIZE',`<button class="btn" data-act="minus">−</button><button class="btn" data-act="plus">＋</button>`,'文字の大きさ','<span id="chip-ts">'+(o.size??24)+'</span>');
+    s+=qeRow('SIZE',`<input type="range" data-act="tsl" min="4" max="400" step="1" value="${o.size??24}">`
+      +`<button class="btn" data-act="minus">−</button><button class="btn" data-act="plus">＋</button>`,'文字の大きさ','<span id="chip-ts">'+(o.size??24)+'</span>');
     s+=qeRow('表示',`<select data-act="tkf">${qeKfOpts(o.kf,'常時')}</select>`,'常時＝ずっと表示 / #n＝そのKFで止まっている間だけフェードで出す');
     s+=qeRow('文字',`<button class="btn" data-act="tedit">EDIT</button>`,'文字を打ち直す（キャンバスをダブルクリックでも開きます）');
   }else{
     s+=qeSect('配置',isFrame(o)?'FRAME':(o.seq?'SEQ':'コマ'));
     s+=qeRow('重なり',`<button class="btn" data-act="back">◀ 奥</button><button class="btn" data-act="front">手前 ▶</button>`,'前後の重ね順だけを変える（視差＝DEPTHとは別。[ ] キーでも動きます）');
-    s+=qeRow('SIZE',`<button class="btn" data-act="minus">−</button><button class="btn" data-act="plus">＋</button>`,'コマの大きさ');
+    // スライダー（対数）＋ ± の併用。スライダーで大づかみ、± で最後の詰め
+    s+=qeRow('SIZE',`<input type="range" data-act="hsl" min="0" max="1000" step="1" value="${hToSlider(o.h)}">`
+      +`<button class="btn" data-act="minus">−</button><button class="btn" data-act="plus">＋</button>`,
+      'コマの大きさ（画面高に対する比）。iPadでは2本指ピンチでも変えられます','<span id="chip-hv">'+(o.h??1).toFixed(2)+'</span>');
     s+=qeRow('DEPTH',`<input type="range" data-act="depth" min="0" max="1" step="0.05" value="${o.depth??0.5}">`,
       '奥行き（視差）。大きい＝手前で、カメラが動いたとき大きくずれる。ピン送りのピント位置もこの値で合わせます','<span id="chip-dv">'+(o.depth??0.5).toFixed(2)+'</span>');
-    if(PROJECT.dof&&PROJECT.dof.on){   // DOFがONのときだけ「このコマは A/B でどれだけボケるか」を数字で出す
-      const fmt=b=>b<0.5?'くっきり':b.toFixed(1)+'px';
-      const bA=dofBlurAtFocus(o.depth,PROJECT.dof.a,cv.height/DPR),bB=dofBlurAtFocus(o.depth,PROJECT.dof.b,cv.height/DPR);
-      s+=qeRow('ピント',`<span class="qe-dof"><span class="a">A ${fmt(bA)}</span> ／ <span class="b">B ${fmt(bB)}</span></span>`,
-        'このコマが、ピントA のときと B のときにどれだけボケるか。2.TAKE の「画面から取る」でA/Bを決めます');
+    if(PROJECT.dof&&PROJECT.dof.on){   // DOFがONのときだけ「このコマのボケ具合」を数字で出す
+      const H=cv.height/DPR,now=dofBlurAtFocus(o.depth,dofPin,H);
+      const hits=PROJECT.dof.pts.filter(pt=>dofBlurAtFocus(o.depth,pt.f,H)<0.5).map(pt=>'#'+pad(pt.kf));
+      s+=qeRow('ピント',`<span class="qe-dof"><span class="a">いま ${now<0.5?'くっきり':now.toFixed(1)+'px'}</span>`
+        +(hits.length?` ／ <span class="b">合う ${hits.join(' ')}</span>`:` ／ <span class="b">合うKFなし</span>`)+`</span>`,
+        'いまのピント位置でどれだけボケるか／このコマにピントが合うKF。2.TAKE の「画面から取る」で置きます');
     }
     if(isFrame(o)){
       s+=qeSect('コマの窓','FRAME');
@@ -2244,8 +2378,14 @@ chip.addEventListener('click',e=>{
   const t=e.target,act=t&&t.dataset&&t.dataset.act;if(!act||!sel)return;
   if(act==='back')reorder(sel,-1);
   else if(act==='front')reorder(sel,+1);
-  else if(act==='minus'){if(isText(sel)){sel.size=+clamp((sel.size??24)*0.88,4,400).toFixed(1);const d=$('#chip-ts');if(d)d.textContent=sel.size;}else sel.h=clamp(sel.h*0.88,0.05,4);commitD();}
-  else if(act==='plus'){if(isText(sel)){sel.size=+clamp((sel.size??24)*1.14,4,400).toFixed(1);const d=$('#chip-ts');if(d)d.textContent=sel.size;}else sel.h=clamp(sel.h*1.14,0.05,4);commitD();}
+  else if(act==='minus'||act==='plus'){
+    const k=(act==='minus')?0.88:1.14;
+    if(isText(sel)){sel.size=+clamp((sel.size??24)*k,4,400).toFixed(1);const d=$('#chip-ts');if(d)d.textContent=sel.size;
+      const s2=chip.querySelector('input[data-act="tsl"]');if(s2)s2.value=sel.size;}
+    else{sel.h=+clamp(sel.h*k,H_MIN,H_MAX).toFixed(4);const d=$('#chip-hv');if(d)d.textContent=sel.h.toFixed(2);
+      const s2=chip.querySelector('input[data-act="hsl"]');if(s2)s2.value=hToSlider(sel.h);}
+    commitD();
+  }
   else if(act==='tcol'&&isText(sel)){sel.col=sel.col==='#000'?'#fff':'#000';renderChip();commit();}   // V2-D
   else if(act==='tedit'&&isText(sel))editTextAt(sel);                                                 // V2-D
   else if(act==='mask')toggleMask();
@@ -2257,7 +2397,9 @@ chip.addEventListener('click',e=>{
 });
 chip.addEventListener('input',e=>{
   const t=e.target,act=t&&t.dataset&&t.dataset.act;if(!act||!sel)return;
-  if(act==='depth'){sel.depth=parseFloat(t.value);const d=$('#chip-dv');if(d)d.textContent=sel.depth.toFixed(2);commitD();}
+  if(act==='hsl'){sel.h=sliderToH(+t.value);const d=$('#chip-hv');if(d)d.textContent=sel.h.toFixed(2);commitD();}
+  else if(act==='tsl'&&isText(sel)){sel.size=+t.value;const d=$('#chip-ts');if(d)d.textContent=sel.size;commitD();}
+  else if(act==='depth'){sel.depth=parseFloat(t.value);const d=$('#chip-dv');if(d)d.textContent=sel.depth.toFixed(2);commitD();}
   else if(act==='par'&&isFrame(sel)){sel.par=parseFloat(t.value);commitD();}
   else if(act==='flw'&&isFrame(sel)&&sel.line){sel.line.w=parseInt(t.value)||10;const d=$('#chip-lw');if(d)d.textContent=sel.line.w;commitD();}   // SPEC_09 P4
   else if(act==='fps'&&sel.seq){sel.seq.fps=parseInt(t.value)||12;const d=$('#chip-fps');if(d)d.textContent=sel.seq.fps;commitD();}
@@ -2311,25 +2453,39 @@ function renderCrumb(){
     ?`ROOT ▸ <b>${ctxFrame.name}</b> <button class="btn" id="crumb-exit">↩ ROOT [Esc]</button>`:'';
   const b=$('#crumb-exit');
   if(b)b.addEventListener('click',exitFrame);
+  updateCvOff();   // パンくずの出入りでバーの段数が変わることがある
 }
 function exitFrame(){ctxFrame=null;maskEdit.on=false;maskEdit.f=null;sel=null;renderChip();renderCrumb();}
 function enterFrame(f){ctxFrame=f;sel=null;maskEdit.on=false;renderChip();renderCrumb();toast(f.name+' の中を編集中 — Escでルートへ');}
 
 cv.addEventListener('pointerdown',e=>{
+  if(e.button===1){startViewPan(e);return;}   // 中ボタン(ホイール押し込み)ドラッグ＝常にパン
+  if(touchPinchDown(e))return;                // iPad: 2本指が乗ったらピンチへ移行（単指ドラッグは打ち切る）
   if(PV.on){stopPreview();return;}
   if(textEd){closeTextEditor(true);return;}   // V2-D: 入力中に余白クリック=確定
-  if(dofPick){   // DOF「画面から取る」: クリックしたコマの奥行きをピント位置A/Bにする（TAKEモードのままでOK）
+  if(dofPick){   // DOF「画面から取る」: クリックしたコマにピントを合わせ、選択中のKFへ点を置く
     const hit=hitAt(evX(e),evY(e));
     if(hit&&!isText(hit.o)){
-      const which=dofPick;
-      PROJECT.dof[which]=+(hit.o.depth??0.5).toFixed(2);
-      dofPrev=(which==='a')?0:1;   // 取り込んだ側の見え方で表示＝その場でボケ具合が変わって見える
-      toast('FOCUS '+which.toUpperCase()+' = '+PROJECT.dof[which].toFixed(2)+'（'+hit.o.name+'）— いま '+which.toUpperCase()+' の見え方です');
+      dofPin=+clamp(hit.o.depth??0.5,0,1).toFixed(2);
+      if(selKf>=0){
+        dofSetPoint(selKf,dofPin);
+        toast('#'+pad(selKf)+' のピント = '+dofPin.toFixed(2)+'（'+hit.o.name+'）');
+      }else toast('ピント = '+dofPin.toFixed(2)+'（'+hit.o.name+'）— KFを選んでから取ると、そのKFに置きます');
       dofPick=null;document.body.classList.remove('dofpick');
       sel=hit.o;qeOpen=true;renderChip();   // どのコマを取ったかを QUICK EDIT でも見せる
       renderCards();commit();
     }else toast('コマの上でクリックしてください（Escで取消）');
     return;
+  }
+  /* DOF HUD: 定規の帯を掴んだらピント調整（選択中のKFに点があれば、その値も一緒に動く） */
+  {
+    const rv=dofRulerHit(evX(e),evY(e));
+    if(rv!=null){
+      setDofPin(rv,true);
+      drag={type:'dofpin'};
+      cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);
+      return;
+    }
   }
   /* マスク編集: 4隅ハンドルのドラッグ */
   if(maskEdit.on&&maskEdit.f){
@@ -2364,7 +2520,13 @@ cv.addEventListener('dblclick',e=>{
   else if(ctxFrame&&!hit)exitFrame();
 });
 addEventListener('pointermove',e=>{
+  if(touchPinchMove(e))return;   // iPad: ピンチ中は単指ドラッグを走らせない
   if(!drag)return;
+  if(drag.type==='dofpin'){
+    const W=cv.width,w=Math.min(W*0.52,560*DPR),x0=(W-w)/2;
+    setDofPin(clamp((evX(e)*DPR-x0)/w,0,1),true);
+    return;
+  }
   if(drag.type==='mask'){
     const q=maskEdit.f.quad[drag.i];
     let nx=clamp((evX(e)*DPR-drag.R.x)/drag.R.w,-0.5,1.5);
@@ -2417,6 +2579,86 @@ addEventListener('wheel',e=>{
   if(PV.on){stopPreview();return;}
   VC.z=clamp(VC.z*Math.exp(-e.deltaY*0.0012),0.15,4);
 },{passive:false});
+
+/* ---------- iPad: 2本指ピンチ ----------
+ * 素材の上で始めたら **その素材の拡大縮小＋移動**、余白で始めたら **視点のズーム＋パン**。
+ * 「いま何を掴んでいるか」は指を置いた瞬間の中点で決める＝途中で切り替わらないので迷わない。
+ * 2本目が触れた時点で単指ドラッグ(drag)を捨てるので、ピンチ開始でコマがカクッと飛ばない。 */
+const touchPts=new Map();
+let pinch=null;
+function pinchGeom(){
+  const a=[...touchPts.values()];
+  if(a.length<2)return null;
+  const dx=a[0].x-a[1].x,dy=a[0].y-a[1].y;
+  return {d:Math.max(Math.hypot(dx,dy),1e-3),cx:(a[0].x+a[1].x)/2,cy:(a[0].y+a[1].y)/2};
+}
+function touchPinchDown(e){
+  if(e.pointerType!=='touch')return false;
+  touchPts.set(e.pointerId,{x:evX(e),y:evY(e)});
+  if(touchPts.size!==2)return false;
+  const g=pinchGeom();
+  drag=null;                                   // 単指ドラッグは打ち切る（飛び防止）
+  if(PV.on)stopPreview();
+  const hit=(mode==='place')?hitAt(g.cx,g.cy):null;
+  if(hit&&!isText(hit.o)){                     // テキストはサイズ体系が別なのでピンチ対象外
+    sel=hit.o;qeOpen=true;renderChip();
+    const r=prect(hit.o,VC);
+    pinch={mode:'obj',o:hit.o,d0:g.d,c0:g,h0:hit.o.h,x0:hit.o.x,y0:hit.o.y,
+           S:(hit.o.parent?r.h/DPR:null),zi:r.zi};
+  }else{
+    pinch={mode:'view',d0:g.d,c0:g,z0:VC.z,x0:VC.x,y0:VC.y};
+  }
+  return true;
+}
+function touchPinchMove(e){
+  if(e.pointerType!=='touch'||!touchPts.has(e.pointerId))return false;
+  touchPts.set(e.pointerId,{x:evX(e),y:evY(e)});
+  if(!pinch||touchPts.size<2)return touchPts.size>0&&!!pinch;
+  const g=pinchGeom();if(!g)return true;
+  const k=g.d/pinch.d0;
+  if(pinch.mode==='view'){
+    VC.z=clamp(pinch.z0*k,0.15,4);
+    VC.x=pinch.x0-(g.cx-pinch.c0.cx)/(VW*VC.z);
+    VC.y=pinch.y0-(g.cy-pinch.c0.cy)/(VH*VC.z);
+  }else{
+    const o=pinch.o;
+    o.h=+clamp(pinch.h0*k,0.05,4).toFixed(4);
+    if(pinch.S){                               // フレームの子＝ローカル単位
+      o.x=+(pinch.x0+(g.cx-pinch.c0.cx)/pinch.S).toFixed(4);
+      o.y=+(pinch.y0+(g.cy-pinch.c0.cy)/pinch.S).toFixed(4);
+    }else{
+      o.x=+(pinch.x0+(g.cx-pinch.c0.cx)/(VW*pinch.zi)).toFixed(4);
+      o.y=+(pinch.y0+(g.cy-pinch.c0.cy)/(VH*pinch.zi)).toFixed(4);
+    }
+  }
+  return true;
+}
+function touchPinchUp(e){
+  if(e.pointerType!=='touch')return;
+  if(!touchPts.delete(e.pointerId))return;
+  if(touchPts.size<2&&pinch){
+    if(pinch.mode==='obj'){renderChip();commit();}
+    pinch=null;
+  }
+}
+addEventListener('pointerup',touchPinchUp,true);
+addEventListener('pointercancel',touchPinchUp,true);
+
+/* ---------- 余白（#void）と中ボタンでのパン ----------
+ * 表示ズームで縮めた外側の余白でも視点を動かせるようにする（中央固定だと寄れない）。
+ * ホイールボタン（中ボタン）ドラッグはキャンバス上でも常にパン＝AE/Blender と同じ手癖。 */
+function startViewPan(e){
+  if(PV.on){stopPreview();return;}
+  drag={type:'view',px:evX(e),py:evY(e),x:VC.x,y:VC.y,fine:e.shiftKey?0.2:1};
+  document.body.classList.add('panning');
+  e.preventDefault();
+}
+$('#void').addEventListener('pointerdown',e=>{
+  if(mode==='place'&&sel){sel=null;renderChip();}   // 余白クリック＝選択解除（キャンバスと同じ）
+  startViewPan(e);
+});
+addEventListener('pointerup',()=>document.body.classList.remove('panning'));
+addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault();});           // 中ボタンの既定（オートスクロール）を殺す
 
 function setMode(m){
   mode=m;
@@ -2594,7 +2836,9 @@ addEventListener('keydown',e=>{
 });
 
 /* ---------- iPad: 指の本数でショートカット（キーボードが無いとき用） ----------
- * 2本=UNDO（econte と同じ語彙）/ 3本=CAPTURE（C・カメラのセット）/ 4本=PREVIEW（SPACE）。
+ * 2本=UNDO（econte と同じ語彙）/ 4本=PREVIEW（SPACE）/ 5本=CAPTURE（C・カメラのセット）。
+ * ※ 3本指は **iPadOS 自身が「取り消し／やり直し」に使っている**（3本指スワイプ・タップ）ので空けてある。
+ *   2026-08 の実機で「3本指タップ＝進む」が発火したため、CAPTURE を 5本指へ移した。
  * capture段で拾うので canvas 側の pointerdown より先に走る。2本目が触れた時点で
  * ドラッグを打ち切るので、指を置いただけで視点やコマが動かない。
  * 判定は「指が全部離れた瞬間」＋「最大本数」＋「260ms以内」＋「12px以上動いていない」。 */
@@ -2618,12 +2862,12 @@ function tapUp(e){
   if(gTap.pts.size)return;                       // まだ指が残っている
   const n=gTap.max,dt=performance.now()-gTap.t0;
   gTap.max=0;
-  if(gTap.moved||dt>260||n<2||n>4)return;
+  if(gTap.moved||dt>260||n<2||n>5||n===3)return;   // 3本指はiPadOSの取り消し/やり直しに譲る
   drag=null;
   if(n===2)undo();                               // 2本指 = 元に戻す
-  else if(n===3){                                // 3本指 = いまの構図を CAPTURE
+  else if(n===5){                                // 5本指 = いまの構図を CAPTURE
     if(mode!=='take')setMode('take');
-    capture();toast('CAPTURE（3本指タップ）');
+    capture();toast('CAPTURE（5本指タップ）');
   }else{                                         // 4本指 = プレビュー再生／停止
     if(PV.on){stopPreview();toast('PREVIEW 停止（4本指タップ）');}
     else{startPreview();toast('PREVIEW 再生（4本指タップ）');}
@@ -2696,7 +2940,7 @@ function buildFxUI(){
   }
 }
 /* ---------- DOF / ピン送り（FXパネル側＝細かい詰めだけ） ----------
- * よく触る ON / FOCUS A・B / 送るKF は 2.TAKE カメラ パネルに置いてある（配置モードへ往復しないため）。
+ * よく触る ON / ピント位置 / KFへ置く は 2.TAKE カメラ パネルに置いてある（配置モードへ往復しないため）。
  * ここには「一度決めたらあまり触らない」ピントの幅・ボケの強さ・BOUNCE だけを残す。 */
 function buildDofUI(root){
   const d=PROJECT.dof;
@@ -2711,7 +2955,7 @@ function buildDofUI(root){
    +rng('dof-blur','ボケの強さ',0,40,1,d.maxBlur,'いちばんボケるところのぼかし量（px・画面高1000px基準）',0)
    +rng('dof-bounce','BOUNCE',0,1,0.01,d.bounce,'着地でわずかに行き過ぎて戻る量。実機のピント送りらしい一瞬の往復が出ます')
    +'<div class="fx-row" style="opacity:.45;font-family:var(--jp);letter-spacing:.02em;line-height:1.6;display:block">'
-     +'<b>FOCUS A / B と 送るKF は「2. TAKE カメラ」パネル</b>にあります（コマをクリックしてピントを取る／KFカードの ◎ ピン送り）。'
+     +'<b>ピントを置く操作は「2. TAKE カメラ」パネル</b>にあります（KFを選ぶ → 画面から取る／KFカードの ◎、画面下の定規の ▼ をドラッグ）。'
      +(CAN_FILTER?'':'<br><b style="color:var(--acid)">このブラウザはcanvasのぼかしに未対応のため効きません</b>')+'</div>';
   root.appendChild(box);
   const g=id=>box.querySelector('#'+id);
@@ -2929,6 +3173,14 @@ $('#oban-json-input').addEventListener('change',async e=>{
   const f=e.target.files&&e.target.files[0]; e.target.value='';
   if(f) loadProjFromText(await f.text());
 });
+/* 画像を「選んで」追加する経路。iPad Safari は複数ファイルのD&Dが実質使えないので、
+   ファイル選択（multiple）を正規の入口として用意する。連番のグループ化は addFiles が同じロジックで面倒を見る */
+$('#b-img').addEventListener('click',()=>$('#oban-img-input').click());
+$('#oban-img-input').addEventListener('change',e=>{
+  const fs=[...(e.target.files||[])];
+  e.target.value='';
+  if(fs.length)addFiles(fs);
+});
 $('#b-home').addEventListener('click',()=>{ location.href='index.html'; });
 /* GUIDEはボタンを廃止（Gキー／SETTINGSの一覧に集約）。トグル自体は toggleGuides() が持つ */
 
@@ -2954,6 +3206,8 @@ const SET_GROUPS=[
     ['0','表示を原寸（100%）に戻す'],
     ['▾（各パネル）','パネルをヘッダだけに最小化／展開'],
     ['パネル下端のバー','高さ調整。<b>項目の切れ目でスナップ</b>する'],
+    ['外側の余白','縮小したときの外側でも<b>ドラッグでパン</b>できる（中央固定にならない）'],
+    ['ホイール押しドラッグ','どこでもパン（中ボタン。AE/Blenderと同じ手癖）'],
     ['※','表示の縮小は<b>画面上の見え方だけ</b>。構図も書き出し結果も変わりません'],
   ]},
   {t:'2. TAKE カメラ',rows:[
@@ -2964,13 +3218,14 @@ const SET_GROUPS=[
     ['↻ UPD','いまの画面の構図でそのKFを上書き'],
     ['SUB 欄','そのKFで出る英字幕（空にすると削除）'],
   ]},
-  {t:'DOF ピン送り',rows:[
-    ['ピン送りは1本','<b>A（今の画）→ B（次の画）を、KFひとつ</b>で送る。複数は打てません'],
-    ['画面から取る','押してからコマをクリック＝そのコマの奥行きが A / B に入る。<b>取り込んだ側の見え方に自動で切り替わる</b>'],
-    ['◎ ピン送り','KFカードのボタン。押したKFへ向かうカメラ移動の間に A→B へ送る'],
-    ['見え方 A / B','編集画面をAの見え方／Bの見え方に切り替えて見比べる（保存されない）'],
-    ['画面下の定規','コマの奥行き・A・B・いまのピント・合焦の幅を1本の軸で表示'],
-    ['コマの A: B:','そのコマがAのとき／Bのときのボケ量（px。<b>IN</b>＝くっきり）'],
+  {t:'DOF ピント',rows:[
+    ['考え方','<b>「このKFではここにピント」を何点でも置く</b>。点と点の間はカメラ移動に合わせて送られる'],
+    ['基本の2手','① KFカードを選ぶ ② <b>画面から取る</b> → 合わせたいコマをクリック。そのKFに点が入る'],
+    ['◎（KFカード）','そのKFに、いまのピント位置を置く／外す'],
+    ['画面下の定規 ▼','<b>ドラッグでピント調整</b>。選択中のKFに点があれば、その点も一緒に動く'],
+    ['点チップ','クリック＝そのKFへ飛んでその見え方に／<b>✕</b>で点を外す'],
+    ['点が1つだけ','ピントは動かない（合いっぱなし）。<b>2点以上で送りが起きる</b>'],
+    ['コマのバッジ','いまのボケ量と、<b>◎ そのコマにピントが合うKF番号</b>'],
     ['詳細…','ピントの幅・ボケの強さ・BOUNCE は FX パネル側（押すと必ず前面に出る）'],
   ]},
   {t:'プレビュー / 表示',rows:[
@@ -2986,9 +3241,12 @@ const SET_GROUPS=[
     ['⚙ / ⛶ / HOME','この一覧／全画面／ランディングページ'],
   ]},
   {t:'iPad（キーボードなし）',rows:[
+    ['＋ 画像','<b>複数選択で読み込める</b>（D&Dの代わり）。連番4枚以上は自動でパラパラになる'],
+    ['2本指ピンチ','余白＝視点のズーム＋パン ／ <b>コマの上＝そのコマの拡大縮小＋移動</b>'],
     ['2本指タップ','UNDO（元に戻す）'],
-    ['3本指タップ','CAPTURE ＝ いまの構図でカメラをセット（TAKEへ自動で切替）'],
+    ['3本指','<b>使っていない</b>（iPadOS の取り消し／やり直しに譲っている）'],
     ['4本指タップ','PREVIEW 再生／停止'],
+    ['5本指タップ','CAPTURE ＝ いまの構図でカメラをセット（TAKEへ自動で切替）'],
     ['全画面','⛶ は Safari だと戻りやすい。<b>共有 ▸ ホーム画面に追加</b>で起動すると、バーごと消えた状態が続きます'],
   ]},
 ];
@@ -3188,21 +3446,34 @@ function drawP(p,r,tS,W,H){
 }
 /* ---- DOF / ピン送り（ビルダーと同式） ---- */
 const DOF=PROJ.dof||null;
-const CAN_FILTER=(function(){try{return typeof cx.filter==='string';}catch(e){return false;}})();
+/* ビルダーと同じ実測判定（プロパティが在っても無視される環境があるため実際にぼかして確かめる） */
+const CAN_FILTER=(function(){try{
+  var c=document.createElement('canvas');c.width=c.height=9;
+  var g=c.getContext('2d',{willReadFrequently:true});
+  if(typeof g.filter!=='string')return false;
+  g.fillStyle='#fff';g.fillRect(0,0,9,9);
+  g.filter='blur(3px)';g.fillStyle='#000';g.fillRect(3,3,3,3);g.filter='none';
+  return g.getImageData(1,1,1,1).data[0]<250;
+}catch(e){return false;}})();
 function focusAt(P){
-  if(!DOF||!DOF.on)return null;
-  const A=DOF.a,B=DOF.b;
-  if(DOF.kf==null||!PROJ.take.kf[DOF.kf])return A;
-  const ki=DOF.kf;
-  const tSeg=(2*ki-1>=0)?TT.segs[2*ki-1]:null,dSeg=TT.segs[2*ki];
-  if(!tSeg)return B;
-  if(P<=tSeg.p0)return A;
-  if(P<tSeg.p1)return lerp(A,B,E.smooth(map(P,tSeg.p0,tSeg.p1)));
-  if(!dSeg||DOF.bounce<=0.001)return B;
-  const w=Math.max(dSeg.p1-dSeg.p0,1e-6);
-  const u=map(P,dSeg.p0,dSeg.p0+w*0.35);
-  if(u>=1)return B;
-  return B+(B-A)*DOF.bounce*0.35*Math.sin(u*Math.PI*2)*(1-u);
+  if(!DOF||!DOF.on||!DOF.pts||!DOF.pts.length)return null;
+  const pts=DOF.pts.filter(function(pt){return !!PROJ.take.kf[pt.kf];});
+  if(!pts.length)return null;
+  var landed=null,before=null;
+  for(var i=0;i<pts.length;i++){
+    var pt=pts[i];
+    var t=(pt.kf>0)?TT.segs[2*pt.kf-1]:null;
+    if(!t||P>=t.p1){before=landed;landed=pt;continue;}
+    if(P>t.p0)return lerp(landed?landed.f:pt.f,pt.f,E.smooth(map(P,t.p0,t.p1)));
+    break;
+  }
+  if(!landed)return pts[0].f;
+  var dSeg=TT.segs[2*landed.kf];
+  if(!dSeg||DOF.bounce<=0.001||!before)return landed.f;
+  var w=Math.max(dSeg.p1-dSeg.p0,1e-6);
+  var u=map(P,dSeg.p0,dSeg.p0+w*0.35);
+  if(u<=0||u>=1)return landed.f;
+  return landed.f+(landed.f-before.f)*DOF.bounce*0.35*Math.sin(u*Math.PI*2)*(1-u);
 }
 function dofBlurFor(depth,P,H){
   if(!DOF||!DOF.on||!CAN_FILTER)return 0;

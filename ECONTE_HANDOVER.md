@@ -165,12 +165,18 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 - ショートカットは`SHORTCUT_ACTIONS`登録制＋`gKeymap`(`econte_keymap_v1`)。composer/OBANと同じレジストリパターン。
   再割当UIは未実装（P2以降・現状はlocalStorage手書き編集のみ）
 
-■ カラースクリプト層（V2-E2・SPEC_13 §9b）
-- `cut.colorC`（512×288・**ベイク空間**）／`colorBlend`／`colorAlpha`／`colorBlob`／`dirtyColor`。
-  **LRUに乗せない**（`getColor()` が必要時に作り、`evictLru()` は触らない）。
-  `loadAll()` では **colorBlob を即デコードして常駐させる**（一覧で待たせないため）
-- 合成順は 下地 → baseC → **colorC** → drawC。`drawColorLayer()` が1か所で面倒を見る
-  （`compositeTo` と `drawCamFrame` の両方から呼ばれる）
+■ カラースクリプト層（V2-E2 / E2c・SPEC_13 §9b）
+- **`cut.colors[k]`＝枠ごとに1枚**（`{c, blob, blend, alpha, dirty}`）。
+  `c` は 512×288 で **出力枠(1280×720)の空間**。アクセサは `colorSlots()/colorSlot()/getColorAt()`
+  - **ベイク空間で持ってはいけない**: T.U.のB枠はA枠の内側なので、A/Bが必ず同じ色になる
+    （2026-08-02 に作り直した）。出力枠空間なら独立するうえ、座標変換もブラシ倍率補正も要らない
+  - `cam[]` を splice したら **`colors` も同じ位置で splice する**。`snapshotCam()` は両方を持つ
+  - **LRUに乗せない**（小さいので常駐。`loadAll()` で即デコード）
+- 合成順は 下地 → baseC → **色** → drawC。入口は2つ:
+  - `drawColorFrame(ctx, cut, f, W, H)` … 出力枠へ。区間の始点/終点を
+    **通常合成でクロスフェードしてからブレンドを1回だけ**掛ける（2回重ねると中間が濁る）
+  - `drawColorPlate(ctx, cut, W, H)` … ベイク空間へ。各枠の色をその枠の位置に置く（SINGLE表示・FILL判定元）
+- 色を編集するのは **GRIDだけ**。`state.curFrame` が編集中の枠index
 - **描く先は `state.paintTarget`（'draw' | 'color'）**。`paintCanvas(cut)` が返すキャンバスに全部書く。
   `paintSnap/applySnap` はターゲット種別をスナップショットに持つので、
   線画と色でundoが混ざらない。**新しい描画処理を足すときは `getDraw()` 直呼びではなく `paintCanvas()`**
@@ -195,15 +201,38 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   `cellAtPoint()` で今どのセルの上かを毎回引き直し、`strokeSegOn(cut, colorC, a, b)` で
   そのカットに直接書く。**セル外（隙間）では `last=null` にして線を渡らせない**。
   FILL/スポイトは従来どおりセル単位（`paintDown`）
+- **セルの複数選択**は `gSelCells`（"i:k" の配列）。キャプションクリックで選択、Ctrl=追加/解除、
+  Shift=範囲。`eachSelSlot()` が「選択中（無ければ現在セル）」へ一括適用する入口で、
+  濃・描画モードはここを通す。`moveSelCuts(d)` が選択カットのまとめ移動
 - **ブラシ幅は出力1280px基準**。`gStrokeK = strokeScaleFor(cut, targetW, frame)` を
   ストローク開始時（コマまたぎ塗りは**セルごと**）に決め、`strokeSegOn` が
   `state.brush * gStrokeK` を lineWidth にする。
   これが無いと T.U. した枠のセルだけ4倍太く見える（枠がベイクの一部しか使わないため）。
   上限は `brushMax()`（線画64 / 色300）
-- **Undoの分岐は `useCutStack()`＝「EDITのSINGLEだけカット別スタック」**。
+- **Undoの行き先は3つ。混ぜてはいけない（2026-08-02 にユーザーのカットが消えた）**:
+  - EDIT SINGLE → `undoStack/redoStack`（カット別スナップショット）
+  - **EDIT GRID → `gColorLog/gColorRedo`（カラーの塗りだけ）**
+  - STUDIO → `gLog/gLogRedo`（統合ログ: photo-* / cut-* / paint）
+  事故の内容: GRIDのCtrl+Zが統合ログを叩いていたため、連打すると `cut-add`/`photo-add` まで
+  遡ってカットと写真が消え、そのまま自動保存された。**paint は `pushPaintLog()` を通すこと**
+- Undoの分岐は `useCutStack()`＝「EDITのSINGLEだけカット別スタック」／`inGrid()` でカラーログ。
   GRIDは1ストロークで複数カットに書けるので統合ログ側。
   **`state.view === 'edit'` で分岐していた箇所を全部これに置き換えてある**（戻すと
   コマまたぎ塗りがUndoできなくなる）。モード切替時は `undoStack/redoStack` を捨てる
+
+■ ブラシまわりの手癖（V2-E2d・正準は animator / スキル `animator-brush-ops`）
+- **EYEツールは無い**。`paintDown` 冒頭の `e.altKey` でスポイト。色帯クリックでも拾える
+- `onDoubleActivate`（350ms/28px）… PEN=筆圧トグル / ERASE=今の描く先をCLEAR
+- `onLongPress`（500ms/12px）… FILL=バケツ⇔投げ縄（ラベルも FILL⇔LASSO に変わる）
+- `bindSizeDrag` … 右ドラッグでブラシサイズ。**`contextmenu` の preventDefault が必須**、
+  move/up は window。上限が大きい色ターゲットでは1段の幅を `brushMax()/64` 倍する
+- 筆圧は `pressFactor(e)` を都度更新して `state.brush * gStrokeK * gStrokePress`。
+  **ペン軸のときだけ**効かせる（指で細ると事故る）
+- 投げ縄は `lassoFillPolygon()`（スキャンライン）。頂点は塗る先の座標、プレビュー用に
+  表示座標も別に持つ。プレビューは「下地を描き直して破線」で、**描画レイヤーには描かない**
+- **CLEAR系は `pushUndo()` を直呼びしない**。`beginPaintUndo()/endPaintUndo()` を通すこと
+  （場面ごとにUndoの行き先が違うため。2026-08-02 に GRID で戻せない不具合を出した）
+- Tab = TOOLパネル左右入替
 
 ■ V2-E1 の小物
 - **HSVピッカー**: `gHsv{H,S,V}` は表示用の派生値で、**正は `state.fillColor`(hex)**。
@@ -304,6 +333,12 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
 - **V2-E2: 実装済み（2026-08-02）** — EDITの`GRID`モード＋`cut.colorC`＋描画モード5種
 - **V2-E2b: 実装済み（2026-08-02）** — GRIDの作り直し（黒背景／ホイール拡縮／可視セル解像度追従／
   行カラー帯／尺バー／装飾最小）。**GRIDが主戦場・SINGLEは詰め用**という主従もここで確定
+- **V2-E2c: 実装済み（2026-08-02）** — カラー層を**枠ごと・出力枠空間**へ作り直し（A/B独立）／
+  セル複数選択→濃・描画モードの一括変更／選択カットの一括並べ替え／Undoの場面別分離／
+  ✎をキャプション行へ／行間トグル／↑↓でカット選択
+- **V2-E2d: 実装済み（2026-08-02）** — ANIMATOR準拠のブラシ操作（右ドラッグでサイズ／
+  PEN Wクリックで筆圧／ERASE WクリックでCLEAR／FILL長押しで投げ縄塗り／EYE撤去＋Altスポイト／
+  色帯スポイト／Tabで左右入替）。スキル `animator-brush-ops` に正準を書き出し済み
 - 未着手（この順）: **V2-D3 → V2-E3**。
   画面の役割は **SPEC_13 §9 で確定済み（着手前に必読）**。
   **D3の一覧PNGは GRID をそのまま大きく描くだけ**（`colorCells()`／`cellSub()` が既にある）
