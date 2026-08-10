@@ -29,7 +29,7 @@
 - `SPEC_07_ANIMATOR_OBAN_BRIDGE.md` — animator⇄OBAN 連番往復ブリッジ仕様
 - `SPEC_09_MANGA_PLATE.md` — パラメトリック漫画素材ツール仕様（P4=OBANコマ枠線含む）
 - `SPEC_10_ECONTE.md` — プリプロツール仕様（cuts[]単一データ・BOARD/SHEET/TIMELINE設計。P0+P1実装済み、P2=animator連携/カラースクリプト）
-- `SPEC_13_ECONTE_V2.md` — ECONTE V2「STUDIO」仕様（1画面統合・BOARD強化・**大判カメラ枠列＋可変ベイク**・MP4書き出し・カラースクリプト・iPad操作。**V2-A〜V2-D2・E1・E2（a〜d）実装済み（2026-08-02）／残りは D3→E3**）。※§5は2026-07に差し替え済み（旧「のりしろ1.2x固定＋カメラプリセット」は廃止）。**画面の役割（STUDIO=プレビュー+コラージュ／EDIT=単票+カラースクリプト一覧）は §9 で確定済み。着手前に §9 を読む**
+- `SPEC_13_ECONTE_V2.md` — ECONTE V2「STUDIO」仕様（1画面統合・BOARD強化・**大判カメラ枠列＋可変ベイク**・MP4書き出し・カラースクリプト・iPad操作。**V2-A〜D3・E1・E2(a〜d) 実装済み（2026-08-09）／残りは E3 フォトバッシュのみ**）。※§5は2026-07に差し替え済み（旧「のりしろ1.2x固定＋カメラプリセット」は廃止）。**画面の役割（STUDIO=プレビュー+コラージュ／EDIT=単票+カラースクリプト一覧）は §9 で確定済み。着手前に §9 を読む**
 - `SPEC_11_COMPOSER_POLISH.md` — COMPOSER磨き込み仕様（**P0〜P7 すべて実装済み**。残タスクなし。P7=出力解像度のアスペクト保持／のりしろ1.2／Zソート／フォルダ書き出し／タイムライン時間軸ズーム）
 - `SPEC_14_TIMELAPSE.md` — ANIMATOR 作画タイムラプス仕様（自動記録・専用ストア tl_shot・リングバッファ・**WORK/CELL 2通りの見せ方**・WebM書き出し。**P0〜P2 すべて実装済み。残タスクなし**（P3=区間トリム等は任意・将来））
 - `SPEC_12_PARALLAX_TAKE_BRIDGE.md` — PARALLAX_LAB×OBAN TAKEブリッジ仕様（TAKE JSONを貼ると3流儀で同一カメラワークを再生＝差分検証機。**実装先は `LP_motion-graphics/PARALLAX_LAB/`**、本リポジトリ側はTAKE形式互換の意識のみ。P0/P1/P2未着手）
@@ -37,9 +37,13 @@
 スキル（`.claude/skills/` — このフォルダ配下で作業するときだけ有効）:
 `animator-color-palette`（FILLパレット＋Altスポイト） / `animator-ref-overlay`（参照画像＋FRAME下絵） /
 `composer-timeline-kit`（ショートカット登録・座標規約・WA・マーカー・KFコピペ） /
-`floating-panel-kit`（パネル移動・▾最小化・項目スナップ・高さフィット・前面制御）。
-いずれも animator/composer の実装が正準。**最終照合 2026-08-08**（実コードと突き合わせ済み）。
+`floating-panel-kit`（パネル移動・▾最小化・項目スナップ・高さフィット・前面制御） /
+`animator-brush-ops`（右ドラッグでサイズ・PEN/FILL/ERASEのWクリック・FILL長押しで投げ縄・Altスポイト・TAB）。
+いずれも animator/composer の実装が正準。**最終照合 2026-08-10**（実コードと突き合わせ済み）。
 実装を大きく変えたら、対応するスキルの references も同じコミットで直すこと。
+
+> ⚠ **`.claude/` は `.gitignore` 済み＝スキルは git に乗らない。**
+> 2台目PCへは手動コピーが要る（`_Claude/SKILL/` に配布パッケージを置く運用）。
 
 GitHub: https://github.com/maso1737/animation-paint
 Pages: https://maso1737.github.io/animation-paint/

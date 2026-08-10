@@ -223,6 +223,12 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 ■ ブラシまわりの手癖（V2-E2d・正準は animator / スキル `animator-brush-ops`）
 - **EYEツールは無い**。`paintDown` 冒頭の `e.altKey` でスポイト。色帯クリックでも拾える
 - `onDoubleActivate`（350ms/28px）… PEN=筆圧トグル / ERASE=今の描く先をCLEAR
+  - **ERASE WクリックはANIMATORにも既にある**（`animator.html` L5798。ただし helper を使わず
+    click の時刻差380msを自前で測る書き方＝`onDoubleActivate(` の grep では見つからない）。
+    2026-08-10 にこれを見落として animator に二重実装しかけた。**要素側でも grep すること**
+- `onDoubleActivate` … **FILL=透明消し（`state.fillErase`）**。バケツ・投げ縄の両方に効く
+  （RGBA全部0で書く）。**erase判定に `state.etool === 'eraser'` を使わないこと**——
+  投げ縄/バケツはFILLツールでしか起動しないので永遠にfalseになる（2026-08-09 に踏んだ）
 - `onLongPress`（500ms/12px）… FILL=バケツ⇔投げ縄（ラベルも FILL⇔LASSO に変わる）
 - `bindSizeDrag` … 右ドラッグでブラシサイズ。**`contextmenu` の preventDefault が必須**、
   move/up は window。上限が大きい色ターゲットでは1段の幅を `brushMax()/64` 倍する
@@ -339,15 +345,26 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
 - **V2-E2d: 実装済み（2026-08-02）** — ANIMATOR準拠のブラシ操作（右ドラッグでサイズ／
   PEN Wクリックで筆圧／ERASE WクリックでCLEAR／FILL長押しで投げ縄塗り／EYE撤去＋Altスポイト／
   色帯スポイト／Tabで左右入替）。スキル `animator-brush-ops` に正準を書き出し済み
-- 未着手（この順）: **V2-D3 → V2-E3**。
-  画面の役割は **SPEC_13 §9 で確定済み（着手前に必読）**。
-  **D3の一覧PNGは GRID をそのまま大きく描くだけ**（`colorCells()`／`cellSub()` が既にある）
-  - **E2** カラースクリプト編集: EDITに `GRID` モード＋`cut.colorC`（512×288・**LRU対象外で常駐**）
-    ＋ブレンド（既定=乗算）。合成順は bg→baseC→layers→**colorC**→drawC
-  - **D3** 出口: INFO帯＋MP4＋一覧PNG。**E2 のGRIDがそのまま一覧PNGになる**ので E2 を先にやる
-  - **E3** コラージュ: `cut.layers[]`（最大5・原本Blob＋アフィン変形＋投げ縄マスク＋ブレンド）
+- **V2-D3: 実装済み（2026-08-09）** — 焼き込み3モード（OFF/画面内/INFO帯）／MP4書き出し／
+  カラースクリプト一覧PNG
+  - **出力1フレームは `renderOutputFrame(ctx, ca)` 一本**。プレビュー・MP4・録画が全部ここを通る＝WYSIWYG。
+    焼き込みを足すときはここだけ触る
+  - MP4は `WebCodecs(avc1.42001f) + mp4-muxer(CDN)` の**非実時間**。
+    `canWebCodecs()` が false のときだけ `exportRecord()`（従来のMediaRecorder実時間録画）へ落ちる。
+    **非実時間経路はタブが非表示でも焼ける**（rAFを使わないため）
+  - 一覧PNGは `exportColorScript()`。GRIDの部品（`colorCells/cellFrames/cellSub/extractPalette`）を
+    そのまま大きく描くだけ。**プリント体裁は作らない**（1枚の長いPNG）
+- **未着手は V2-E3 のみ**（フォトバッシュ・SINGLE限定）。他のフェーズは全部入っている
+  - `cut.layers[]`（最大5・原本Blob＋アフィン変形＋投げ縄マスク＋ブレンド）
     ＋ブラシチップ（**.abrパーサは作らない**・内蔵数種＋透過PNG読み込み）
+  - 着手前に **SPEC_13 §9（画面の役割）を必読**。E3 は **SINGLE 専用**で、
+    GRID（＝主戦場）には出さない。GRID に重い変形UIを持ち込むとセル数ぶん効く
+  - 合成順は bg → baseC → **layers** → 色 → drawC。`compositeTo()` に1段挟む形になる
+  - **LRUの扱いを先に決めること**。原本Blobを5枚持つとカット1つの常駐コストが跳ねるので、
+    `layers` を LRU 対象にするか（色と違って大きい）を D2 の設計に合わせて判断する
 - **既存データの互換は当面考えなくてよい**（2026-08-02 ユーザー確認・テスト段階のため）
+- **ユーザーからの持ち越し依頼**: 「いつも使うのは数種なのでこのブラシみたいにしたい」と
+  ブラシチップの具体指定が**後から来る**。E3 の実装時に先回りで作り込まず、指定を待つこと
 
 【変更後チェック】
 node tools/check.js（6ファイル一括。econte.html含む）

@@ -211,6 +211,9 @@ body{
 .etool.lasso-on::before{             /* 投げ縄塗り */
   content:'';position:absolute;left:2px;top:2px;width:5px;height:5px;background:var(--acid);
 }
+.etool.fe-on{                        /* 透明消し（FILL Wクリック） */
+  outline:1px dashed rgba(255,210,122,.9);outline-offset:-3px;
+}
 #grid-sel{color:var(--acid);font-family:var(--mono);font-size:9px}
 .sld-row{display:flex;align-items:center;gap:8px}
 .sld-row input[type=range]{flex:1;accent-color:var(--acid)}
@@ -286,8 +289,8 @@ body{
 #grid-hud .btn{padding:2px 6px;font-size:8px}
 #grid-hud{display:none}
 #edit-main.grid #grid-hud{display:flex}
-#grid-pal-label,#grid-gap-label{display:flex;align-items:center;gap:3px;font-family:var(--jp);color:var(--grey);cursor:pointer}
-#grid-pal-label input,#grid-gap-label input{accent-color:var(--acid)}
+#grid-pal-label,#grid-gap-label,#grid-col-label{display:flex;align-items:center;gap:3px;font-family:var(--jp);color:var(--grey);cursor:pointer}
+#grid-pal-label input,#grid-gap-label input,#grid-col-label input{accent-color:var(--acid)}
 #grid-empty{color:var(--grey);font-family:var(--jp);font-size:12px;padding:20px;text-align:center}
 #edit-zoom{color:var(--gold);font-size:10px;letter-spacing:.08em;min-width:42px}
 /* ---------- TIMELINE（STUDIO中央のプレビュー＋最下段の帯） ---------- */
@@ -320,7 +323,7 @@ body{
 #tl-cutlabel{font-family:var(--bank);color:var(--ice);font-size:13px;letter-spacing:.12em;min-width:34px;text-align:center}
 #tl-time{color:var(--gold);font-size:11px;letter-spacing:.08em}
 #burnin-label{color:var(--grey);font-size:10px;font-family:var(--jp);display:flex;align-items:center;gap:5px;cursor:pointer}
-#burnin-label input{accent-color:var(--acid)}
+#burnin-mode{background:var(--black);border:1px solid var(--border);color:var(--gold);font-family:var(--mono);font-size:9px;padding:3px 2px}
 #tl-strip{position:relative;height:66px;touch-action:none;-webkit-user-select:none;user-select:none}
 #tl-ruler-cv{position:absolute;left:0;top:0;width:100%;height:18px;display:block}
 #tl-clips{position:absolute;left:0;top:18px;right:0;bottom:0}
@@ -400,8 +403,15 @@ body{
   <button class="btn" id="btn-proj-export" title="プロジェクトをZIPで書き出し（写真＋枠列＋加筆。ベイクは含めない）">&#8681; PROJ</button>
   <button class="btn" id="btn-proj-import" title="プロジェクトZIPを読み込み（現在の内容は置き換わります）">&#8679; PROJ</button>
   <input type="file" id="proj-file-input" accept=".zip,application/zip" style="display:none;">
-  <label id="burnin-label"><input type="checkbox" id="chk-burnin"> C#/尺 焼き込み</label>
-  <button class="btn ex" id="btn-export" title="実時間で再生しながら録画します（タブを前面のまま待つ）">EXPORT VIDEO</button>
+  <label id="burnin-label">焼込
+    <select id="burnin-mode" title="C#/尺の焼き込み方">
+      <option value="off">OFF</option>
+      <option value="in">画面内</option>
+      <option value="band">INFO帯</option>
+    </select>
+  </label>
+  <button class="btn ex" id="btn-export" title="MP4で書き出し（WebCodecs対応なら非実時間・未対応なら実時間録画）">EXPORT VIDEO</button>
+  <button class="btn ex" id="btn-export-cs" title="カラースクリプト一覧をPNGで書き出し（枠単位・4列）">&#8681; C.SCRIPT</button>
   <span id="bar-total">0 CUTS</span>
   <span id="save-dot"></span>
   <button class="btn" id="btn-help" title="ショートカット一覧 (?)">&#9881;</button>
@@ -663,6 +673,7 @@ body{
       <button class="btn" id="btn-grid-fit" title="既定の大きさへ">FIT</button>
       <label id="grid-pal-label"><input type="checkbox" id="chk-grid-pal" checked> 色帯</label>
       <label id="grid-gap-label"><input type="checkbox" id="chk-grid-gap" checked> 行間</label>
+      <label id="grid-col-label"><input type="checkbox" id="chk-grid-col" checked> 列間</label>
       <span id="grid-sel"></span>
     </div>
   </div>
@@ -711,6 +722,7 @@ const LS_CLIP = 'refboard.clip.v1';
 const BC_NAME = 'refboard_live';
 const CLIP_MAX_AGE = 24 * 60 * 60 * 1000;   // 24時間以上前のクリップは無視（貼り忘れの誤爆防止）
 const HEIC_CDN = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+const MUXER_CDN = 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.5/build/mp4-muxer.min.js';
 const JSZIP_CDN = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
 const PROJ_FORMAT = 'ECONTE_PROJECT_v1';
 /* カラースクリプト専用レイヤー（SPEC_13 §9b）。ベイク空間の低解像度版・LRU対象外で常駐 */
@@ -736,6 +748,7 @@ const state = {
   curCut: -1,
   selPhoto: null,
   pressurePen: false,    // PENボタンWクリックで切替（ANIMATOR準拠）
+  fillErase: false,      // FILLボタンWクリックで切替＝透明塗りつぶし消し（ANIMATOR準拠）
   fillMode: 'flood',     // FILL長押しで 'flood'⇔'lasso'（投げ縄塗り）
   paintTarget: 'draw',   // 'draw'=線画レイヤー / 'color'=カラースクリプト層（V2-E2）
   curFrame: 0,           // 色を編集している枠index（cam[]の何枚目か）
@@ -2732,7 +2745,9 @@ function extractPalette(cv, n){
 /* --- GRID（カラースクリプト一覧） --- */
 let gGridRows = [];        // [{el, palCv, cells:[{box,cv,i,k}]}]
 let gGridZoom = 1;         // セル幅 = GC_BASE * zoom
-const GC_BASE = 200, GC_GAP = 10, GC_MIN_RES = 320, GC_MAX_RES = 1280;
+const GC_BASE = 200, GC_MIN_RES = 320, GC_MAX_RES = 1280;
+/* 列間（セル同士の横の隙間）は HUD の「列間」でON/OFF。密に並べたいとき用 */
+function colGap(){ const el = $('#chk-grid-col'); return (el && !el.checked) ? 0 : 10; }
 function gridCellW(){
   const view = $('#edit-grid').clientWidth - 24;
   return clamp(Math.round(GC_BASE * gGridZoom), 90, Math.max(120, view));
@@ -2746,8 +2761,9 @@ function renderGrid(){
   $('#grid-zoom').textContent = Math.round(gGridZoom * 100) + '%';
   if(!cells.length) return;
   const cw = gridCellW(), ch = Math.round(cw * 9 / 16);
+  const gap = colGap();
   const view = $('#edit-grid').clientWidth - 24;
-  const cols = Math.max(1, Math.floor((view + GC_GAP) / (cw + GC_GAP)));
+  const cols = Math.max(1, Math.floor((view + gap) / (cw + gap)));
   const maxF = Math.max(1, ...cells.map(ce => cellFrames(cuts[ce.i], ce.k)));
   const showPal = $('#chk-grid-pal').checked;
   for(let s = 0; s < cells.length; s += cols){
@@ -2756,8 +2772,8 @@ function renderGrid(){
     row.className = 'gr';
     const line = document.createElement('div');
     line.className = 'gr-cells';
-    line.style.gap = GC_GAP + 'px';
-    line.style.width = (cols * cw + (cols - 1) * GC_GAP) + 'px';
+    line.style.gap = gap + 'px';
+    line.style.width = (cols * cw + (cols - 1) * gap) + 'px';
     const rec = { el: row, palCv: null, cells: [] };
     rowCells.forEach(ce => {
       const cut = cuts[ce.i];
@@ -3459,6 +3475,7 @@ function floodFill(cx, cy){
   const di = dctx.getImageData(0, 0, W, H);
   const dd = di.data;
   const fc = hexToRgb(state.fillColor);
+  const erase = !!state.fillErase;   // FILLボタンWクリックで透明消し（ANIMATOR準拠）
   const t0 = (cy * W + cx) * 4;
   const tr = src[t0], tg = src[t0 + 1], tb = src[t0 + 2];
   const TOL = 2600;
@@ -3471,7 +3488,8 @@ function floodFill(cx, cy){
     const o = p * 4;
     const dr = src[o] - tr, dg = src[o + 1] - tg, db2 = src[o + 2] - tb;
     if(dr * dr + dg * dg + db2 * db2 > TOL) continue;
-    dd[o] = fc.r; dd[o + 1] = fc.g; dd[o + 2] = fc.b; dd[o + 3] = 255;
+    if(erase){ dd[o] = 0; dd[o + 1] = 0; dd[o + 2] = 0; dd[o + 3] = 0; }
+    else { dd[o] = fc.r; dd[o + 1] = fc.g; dd[o + 2] = fc.b; dd[o + 3] = 255; }
     const px = p % W, py = (p / W) | 0;
     if(px > 0) stack.push(p - 1);
     if(px < W - 1) stack.push(p + 1);
@@ -3565,7 +3583,7 @@ function lassoEnd(){
   if(g.pts.length >= 3){
     beginPaintUndo();
     lassoFillPolygon(ctx2d(g.target), g.target.width, g.target.height,
-                     g.pts, state.fillColor, state.etool === 'eraser');
+                     g.pts, state.fillColor, !!state.fillErase);
     markPainted(g.cut);
     endPaintUndo();
     refreshRow(cuts.indexOf(g.cut));
@@ -3892,22 +3910,70 @@ function renderTL(){
     tlCtx.fillRect(0, 0, CONTE_W, CONTE_H);
   }else{
     const ca = cutIndexAt(state.tl.frame);
-    prefetchAround(ca.i);                        // 再生に間に合うよう前後1カットを先読み
-    drawCamFrame(tlCtx, cuts[ca.i], ca.local);   // 枠列カットはここでカメラが効く
-    if($('#chk-burnin').checked) drawBurnin(ca);
+    prefetchAround(ca.i);            // 再生に間に合うよう前後1カットを先読み
+    renderOutputFrame(tlCtx, ca);    // ★書き出しと同じ関数（焼き込みモードもここ）
   }
   updateTLHud();
   renderStudioSync();   // STUDIO 3ペインのフォーカス同期（SPEC_13 §1）
 }
-function drawBurnin(ca){
+/* --- 出力1フレームの決定版（プレビュー・録画・書き出しは全部ここを通す＝WYSIWYG） ---
+   焼き込みは OFF / 画面内 / INFO帯 の3モード（SPEC_13 §5f） */
+function burnMode(){ const el = $('#burnin-mode'); return el ? el.value : 'off'; }
+function burnLabel(ca){
   const cut = cuts[ca.i];
-  tlCtx.save();
-  tlCtx.fillStyle = 'rgba(0,0,0,0.5)';
-  tlCtx.fillRect(20, 20, 302, 62);
-  tlCtx.fillStyle = '#ffffff';
-  tlCtx.font = 'bold 36px monospace';
-  tlCtx.fillText('C' + (ca.i + 1) + '  ' + fmtDur(cut.durF), 36, 64);
-  tlCtx.restore();
+  let s = 'C' + (ca.i + 1);
+  if(isCamCut(cut)){
+    const cam = cut.cam;
+    let acc = 0, seg = cam.length - 1;
+    for(let i = 0; i < cam.length - 1; i++){
+      const d = Math.max(1, cam[i].dur | 0);
+      if(ca.local < acc + d){ seg = i; break; }
+      acc += d;
+    }
+    s += (seg < cam.length - 1) ? ('-' + cam[seg].k + '→' + cam[seg + 1].k) : ('-' + cam[cam.length - 1].k);
+  }
+  return s + '  ' + fmtDur(cut.durF);
+}
+let gBandTmp = null;
+function renderOutputFrame(ctx, ca){
+  const cut = cuts[ca.i];
+  const mode = burnMode();
+  if(mode !== 'band'){
+    drawCamFrame(ctx, cut, ca.local);
+    if(mode === 'in'){
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(20, 20, 372, 62);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 34px monospace';
+      ctx.fillText(burnLabel(ca), 34, 64);
+      ctx.restore();
+    }
+    return;
+  }
+  // INFO帯: 絵を 1/1.2 に縮めて中央に置き、余白の帯に情報を描く（画に重ならない）
+  if(!gBandTmp) gBandTmp = blankCanvas(CONTE_W, CONTE_H);
+  drawCamFrame(ctx2d(gBandTmp), cut, ca.local);
+  const w = Math.round(CONTE_W / 1.2), h = Math.round(CONTE_H / 1.2);
+  const ox = Math.round((CONTE_W - w) / 2), oy = Math.round((CONTE_H - h) / 2);
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, CONTE_W, CONTE_H);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(gBandTmp, ox, oy, w, h);
+  ctx.save();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 30px monospace';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(burnLabel(ca), ox, CONTE_H - oy / 2);
+  const note = (cut.note || '').split('\n')[0];
+  if(note){
+    ctx.font = '22px ' + "'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif";
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.textAlign = 'right';
+    ctx.fillText(note, CONTE_W - ox, CONTE_H - oy / 2);
+  }
+  ctx.restore();
 }
 function updateTLHud(){
   const T = totalFrames();
@@ -4084,14 +4150,111 @@ function pickMime(){
   for(const m of list){ if(MediaRecorder.isTypeSupported(m)) return m; }
   return '';
 }
-function exportVideo(){
+/* --- MP4書き出し（SPEC_13 §5g） ---
+   優先順: WebCodecs(H.264)+mp4-muxer → MediaRecorder(mp4) → MediaRecorder(webm)。
+   WebCodecs経路は**非実時間**なので、タブを前面に置いておく必要がない。 */
+let gMuxLoad = null;
+function loadMuxer(){
+  if(window.Mp4Muxer) return Promise.resolve();
+  if(gMuxLoad) return gMuxLoad;
+  gMuxLoad = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = MUXER_CDN;
+    s.onload = () => res();
+    s.onerror = () => { gMuxLoad = null; rej(new Error('mp4-muxer を読み込めませんでした')); };
+    document.head.appendChild(s);
+  });
+  return gMuxLoad;
+}
+async function canWebCodecs(){
+  if(!window.VideoEncoder || !window.VideoFrame) return false;
+  try{
+    const s = await VideoEncoder.isConfigSupported({
+      codec: 'avc1.42001f', width: CONTE_W, height: CONTE_H, bitrate: 8000000, framerate: FPS });
+    return !!(s && s.supported);
+  }catch(e){ return false; }
+}
+async function exportMP4(){
+  const T = totalFrames();
+  await loadMuxer();
+  const M = window.Mp4Muxer;
+  const target = new M.ArrayBufferTarget();
+  const muxer = new M.Muxer({
+    target,
+    video: { codec: 'avc', width: CONTE_W, height: CONTE_H, frameRate: FPS },
+    fastStart: 'in-memory'
+  });
+  const enc = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: e => { throw e; }
+  });
+  enc.configure({ codec: 'avc1.42001f', width: CONTE_W, height: CONTE_H,
+                  bitrate: 8000000, framerate: FPS });
+  const cv = blankCanvas(CONTE_W, CONTE_H);
+  const ctx = ctx2d(cv);
+  const usPerFrame = Math.round(1000000 / FPS);
+  for(let f = 0; f < T; f++){
+    if(gExportAbort) break;
+    const ca = cutIndexAt(f);
+    await ensureResident(cuts[ca.i]);              // 非常駐カットも確実に焼く
+    renderOutputFrame(ctx, ca);
+    const vf = new VideoFrame(cv, { timestamp: f * usPerFrame, duration: usPerFrame });
+    enc.encode(vf, { keyFrame: f % (FPS * 2) === 0 });
+    vf.close();
+    if(f % 12 === 0){
+      $('#btn-export').textContent = 'MP4 ' + Math.round(f / T * 100) + '%';
+      await new Promise(r => setTimeout(r, 0));    // UIを固めない
+    }
+  }
+  await enc.flush();
+  enc.close();
+  muxer.finalize();
+  if(gExportAbort) return null;
+  return new Blob([target.buffer], { type: 'video/mp4' });
+}
+async function exportVideo(){
   if(gExporting) return;
   const T = totalFrames();
   if(!T){ toast('カットがありません'); return; }
-  const mime = pickMime();
-  if(!mime){ toast('このブラウザは録画に未対応です'); return; }
   if(state.view !== 'studio') setView('studio');   // 録画元は STUDIO のプレビュー
   pause();
+  // --- WebCodecs 経路（非実時間・こちらが本命） ---
+  if(await canWebCodecs()){
+    gExporting = true; gExportAbort = false;
+    $('#btn-export').disabled = false;             // 中断できるように押せるまま
+    $('#btn-export').textContent = 'MP4 0%';
+    try{
+      const blob = await exportMP4();
+      if(blob){
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        a.href = url; a.download = 'econte_' + ts + '.mp4'; a.click();
+        URL.revokeObjectURL(url);
+        toast('MP4を書き出しました（' + Math.round(blob.size / 1024) + 'KB）');
+      }else{
+        toast('書き出しを中断しました');
+      }
+    }catch(e){
+      console.error('exportMP4 failed', e);
+      toast('MP4書き出しに失敗: ' + (e.message || e) + ' → 録画方式に切替えます');
+      gExporting = false;
+      $('#btn-export').textContent = 'EXPORT VIDEO';
+      exportRecord();
+      return;
+    }
+    gExporting = false;
+    $('#btn-export').disabled = false;
+    $('#btn-export').textContent = 'EXPORT VIDEO';
+    return;
+  }
+  exportRecord();
+}
+/* --- 実時間録画（フォールバック。タブを前面のまま待つ） --- */
+function exportRecord(){
+  if(gExporting) return;
+  const mime = pickMime();
+  if(!mime){ toast('このブラウザは録画に未対応です'); return; }
   seek(0);
   gRecChunks = [];
   gExportAbort = false;
@@ -4132,6 +4295,63 @@ function saveExportBlob(){
   a.click();
   URL.revokeObjectURL(url);
   toast('動画コンテを書き出しました（' + ext.toUpperCase() + '）');
+}
+/* --- カラースクリプト一覧PNG（SPEC_13 §5h） ---
+   **GRIDで見えているものをそのまま大きく描く**（描く画面と出す画面を同じにする）。
+   プリント体裁は作らない。1枚の長いPNG。 */
+async function exportColorScript(){
+  const cells = colorCells();
+  if(!cells.length){ toast('カットがありません'); return; }
+  const COLS = 4, CW = 480, CH = 270, GAP = 14, MG = 28;
+  const BAR = 5, CAP = 30, PAL = 20, ROWGAP = 34;
+  const rows = Math.ceil(cells.length / COLS);
+  const W = MG * 2 + COLS * CW + (COLS - 1) * GAP;
+  const H = MG * 2 + 46 + rows * (BAR + CH + CAP + PAL + ROWGAP);
+  const out = blankCanvas(W, H);
+  const ctx = ctx2d(out);
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(255,79,168,0.95)';
+  ctx.font = 'bold 22px monospace';
+  ctx.fillText('COLOR SCRIPT  ' + cuts.length + ' CUTS / ' + fmtDur(totalFrames()), MG, MG + 22);
+  const cell = blankCanvas(CW, CH);
+  const cctx = ctx2d(cell);
+  const maxF = Math.max(1, ...cells.map(ce => cellFrames(cuts[ce.i], ce.k)));
+  let y = MG + 46;
+  for(let s = 0; s < cells.length; s += COLS){
+    const row = cells.slice(s, s + COLS);
+    for(let c = 0; c < row.length; c++){
+      const ce = row[c], cut = cuts[ce.i];
+      await ensureResident(cut);
+      const x = MG + c * (CW + GAP);
+      const nf = cellFrames(cut, ce.k);
+      if(nf){                                    // 尺バー
+        ctx.fillStyle = 'rgba(255,210,122,0.55)';
+        ctx.fillRect(x, y, Math.max(3, Math.round(nf / maxF * CW)), 2);
+      }
+      drawCamFrame(cctx, cut, camStartFrame(cut, ce.k), CW, CH);
+      ctx.drawImage(cell, x, y + BAR);
+      ctx.fillStyle = 'rgba(255,79,168,0.95)';   // キャプション
+      ctx.font = 'bold 15px monospace';
+      ctx.fillText(camLabel(ce.i, ce.k), x, y + BAR + CH + 18);
+      ctx.fillStyle = 'rgba(157,141,179,0.9)';
+      ctx.font = '13px monospace';
+      ctx.fillText(cellSub(cut, ce.k), x + 74, y + BAR + CH + 18);
+      const pal = extractPalette(cell, 6);       // 代表色（セル下に直接）
+      if(pal.length){
+        const sw = CW / pal.length;
+        pal.forEach((hex, k) => { ctx.fillStyle = hex; ctx.fillRect(x + k * sw, y + BAR + CH + CAP, Math.ceil(sw) + 0.5, PAL - 4); });
+      }
+    }
+    y += BAR + CH + CAP + PAL + ROWGAP;
+  }
+  const blob = await canvasToBlob(out, 'image/png');
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  a.href = url; a.download = 'econte_colorscript_' + ts + '.png'; a.click();
+  URL.revokeObjectURL(url);
+  toast('カラースクリプトを書き出しました（' + W + '×' + H + '・' + Math.round(blob.size / 1024) + 'KB）');
 }
 function tlPaintDown(e){
   if(gExporting) return;
@@ -4426,6 +4646,7 @@ const HELP_GROUPS = [
     ['[ / ]', 'ブラシを細く／太く'], ['右ドラッグ', 'ブラシサイズ（右=太く/左=細く）'],
     ['Alt+クリック', 'スポイト'], ['色帯をクリック', 'その色を拾う'],
     ['PEN をWクリック', '筆圧ペン ON/OFF'], ['ERASE をWクリック', '今の描く先をCLEAR'],
+    ['FILL をWクリック', '透明消し ON/OFF（囲った所を消す）'],
     ['FILL を長押し', 'バケツ ⇔ 投げ縄塗り'], ['Tab', 'TOOLパネルを左右入替'],
     ['Ctrl+Z', 'UNDO'], ['Ctrl+Shift+Z', 'REDO（Ctrl+Y も可）']
   ] },
@@ -4701,6 +4922,7 @@ function wire(){
   $('#btn-grid-fit').addEventListener('click', gridFit);
   $('#chk-grid-pal').addEventListener('change', renderGrid);
   $('#chk-grid-gap').addEventListener('change', renderGrid);
+  $('#chk-grid-col').addEventListener('change', renderGrid);
   // 指: 1本=スクロール / 2本=ピンチ拡縮（セルは touch-action:none なので自前で処理する）
   $('#edit-grid').addEventListener('pointerdown', gridTouchDown);
   $('#edit-grid').addEventListener('pointermove', gridTouchMove);
@@ -4737,13 +4959,26 @@ function wire(){
     clearDraw();
     toast(state.paintTarget === 'color' ? '色を消しました' : '加筆を消しました');
   }));
+  // FILL Wクリック = 透明消し（ANIMATOR準拠）／FILL 長押し = バケツ⇔投げ縄
+  const syncFillUI = () => {
+    document.querySelectorAll('.etool[data-tool="fill"]').forEach(b => {
+      b.classList.toggle('lasso-on', state.fillMode === 'lasso');
+      b.classList.toggle('fe-on', state.fillErase);
+      b.textContent = state.fillMode === 'lasso' ? 'LASSO' : 'FILL';
+      b.title = '塗りつぶし (G)：' + (state.fillMode === 'lasso' ? '投げ縄' : 'バケツ')
+              + (state.fillErase ? '／透明消し' : '') + ' ／ Wクリックで透明消し・長押しで投げ縄';
+    });
+  };
+  document.querySelectorAll('.etool[data-tool="fill"]').forEach(el => onDoubleActivate(el, () => {
+    state.fillErase = !state.fillErase;
+    setETool('fill');
+    syncFillUI();
+    toast('塗りつぶし: ' + (state.fillErase ? '透明消し ON' : '透明消し OFF'));
+  }));
   document.querySelectorAll('.etool[data-tool="fill"]').forEach(el => onLongPress(el, () => {
     state.fillMode = (state.fillMode === 'lasso') ? 'flood' : 'lasso';
     setETool('fill');
-    document.querySelectorAll('.etool[data-tool="fill"]').forEach(b => {
-      b.classList.toggle('lasso-on', state.fillMode === 'lasso');
-      b.textContent = state.fillMode === 'lasso' ? 'LASSO' : 'FILL';
-    });
+    syncFillUI();
     toast('塗りつぶし: ' + (state.fillMode === 'lasso' ? '投げ縄' : 'バケツ'));
   }));
   // 右ドラッグでブラシサイズ（描画面すべて）
@@ -4787,8 +5022,9 @@ function wire(){
   $('#btn-tl-prevcut').addEventListener('click', () => seekCut(-1));
   $('#btn-tl-nextcut').addEventListener('click', () => seekCut(1));
   $('#btn-loop').addEventListener('click', toggleLoop);
-  $('#chk-burnin').addEventListener('change', renderTL);
+  $('#burnin-mode').addEventListener('change', renderTL);
   $('#btn-export').addEventListener('click', exportVideo);
+  $('#btn-export-cs').addEventListener('click', exportColorScript);
   const strip = $('#tl-strip');
   // setPointerCapture は使わない（クリップの dblclick=EDIT を殺さないため）。
   // 追従は window の move/up で拾う（gScrub フラグで判定）。
@@ -4956,7 +5192,9 @@ window.__ECONTE__ = {
   paintCanvas, paintSnap, applySnap, syncEditPanels, toBakeCoord, useCutStack,
   fmtDur, parseDur, floodFill, sampleCompositeColor, saveAll, boardFit, updateTotals,
   totalFrames, cutIndexAt, cutStartFrame, seek, play, pause, togglePlay, seekCut, toggleLoop,
-  layoutTL, renderTL, fitTLCanvas, exportVideo, finishExport, cancelExport, loadKeymap
+  layoutTL, renderTL, fitTLCanvas, exportVideo, finishExport, cancelExport, loadKeymap,
+  renderOutputFrame, burnMode, burnLabel, exportColorScript, exportRecord, exportMP4,
+  canWebCodecs, loadMuxer, colGap
 };
 </script>
 </body>
