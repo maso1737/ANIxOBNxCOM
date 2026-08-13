@@ -400,8 +400,6 @@ body{
   <button class="btn ex" id="btn-import">+ IMPORT PHOTO</button>
   <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none;">
   <button class="btn" id="btn-clip-paste" title="ref-board の ⧉ でコピーしたクリップJSONを貼り付け（別オリジン/file:// 用）">&#9187; CLIP</button>
-  <button class="btn" id="btn-proj-export" title="プロジェクトをZIPで書き出し（写真＋枠列＋加筆。ベイクは含めない）">&#8681; PROJ</button>
-  <button class="btn" id="btn-proj-import" title="プロジェクトZIPを読み込み（現在の内容は置き換わります）">&#8679; PROJ</button>
   <input type="file" id="proj-file-input" accept=".zip,application/zip" style="display:none;">
   <label id="burnin-label">焼込
     <select id="burnin-mode" title="C#/尺の焼き込み方">
@@ -414,8 +412,11 @@ body{
   <button class="btn ex" id="btn-export-cs" title="カラースクリプト一覧をPNGで書き出し（枠単位・4列）">&#8681; C.SCRIPT</button>
   <span id="bar-total">0 CUTS</span>
   <span id="save-dot"></span>
+  <!-- プロジェクト入出力は設定の隣。この並びは manga-plate / OBAN と揃えている
+       （ツールを渡り歩いても同じ場所にある）。ZIPなので表記は PROJ のまま -->
+  <button class="btn" id="btn-proj-export" title="プロジェクトをZIPで書き出し（写真＋枠列＋加筆。ベイクは含めない）">&#8681; PROJ</button>
+  <button class="btn" id="btn-proj-import" title="プロジェクトZIPを読み込み（現在の内容は置き換わります）">&#8679; PROJ</button>
   <button class="btn" id="btn-help" title="ショートカット一覧 (?)">&#9881;</button>
-  <button class="btn mode on" id="btn-sheet-toggle" title="右のSHEETパネルを開閉">≡</button>
   <button class="btn" id="btn-fs" title="フルスクリーン切替">⛶</button>
   <button class="btn" id="btn-home" title="ランディングページに戻る">HOME</button>
 </div>
@@ -4376,7 +4377,8 @@ const SHORTCUT_ACTIONS = [
   { id: 'last',      label: '末尾',                 def: 'End',        prevent: true, run: () => { pause(); seek(totalFrames() - 1); } },
   { id: 'prevCut',   label: '前のカット頭',         def: 'J',          run: () => seekCut(-1) },
   { id: 'nextCut',   label: '次のカット頭',         def: 'K',          run: () => seekCut(1) },
-  { id: 'loop',      label: 'ループ切替',           def: 'L',          run: () => toggleLoop() }
+  { id: 'loop',      label: 'ループ切替',           def: 'L',          run: () => toggleLoop() },
+  { id: 'sheet',     label: 'SHEETパネル 開閉',     def: 'S',          run: () => toggleSheetPanel() }
 ];
 let gKeymap = {};
 function defaultKeymap(){ const m = {}; SHORTCUT_ACTIONS.forEach(a => m[a.id] = a.def); return m; }
@@ -4417,7 +4419,6 @@ function applyUi(){
   $('#btn-tl-tools').classList.toggle('right', right);
   $('#studio-sheet').classList.toggle('hidden', !gUi.sheet);
   $('#split-sheet').style.display = gUi.sheet ? 'block' : 'none';
-  $('#btn-sheet-toggle').classList.toggle('on', gUi.sheet);
   $('#studio-board').style.width = gUi.boardW + '%';
   $('#studio-sheet').style.width = gUi.sheetW + '%';
 }
@@ -4475,6 +4476,8 @@ function toggleSheetPanel(){
   applyUi();
   saveUi();
   if(state.view === 'studio') layoutStudio();
+  // ボタンを廃したので、閉じたときだけ戻し方を出す（開け方が分からなくなるのを防ぐ）
+  if(!gUi.sheet) toast('SHEETパネルを閉じました — ' + (gKeymap.sheet || 'S') + ' で開きます');
 }
 function toggleFullscreen(){
   const el = document.documentElement;
@@ -4640,7 +4643,7 @@ function bindDoubleTap(el, fn){
 
 /* ---------------- SETTINGS: ショートカット一覧（表示のみ・SPEC_13 §9f） ---------------- */
 const HELP_GROUPS = [
-  { t: 'TRANSPORT（STUDIO）', rows: 'keymap' },   // SHORTCUT_ACTIONS から自動生成
+  { t: 'TRANSPORT / 表示（STUDIO）', rows: 'keymap' },   // SHORTCUT_ACTIONS から自動生成＝再割当も反映される
   { t: 'PAINT（ANIMATOR準拠）', rows: [
     ['B', 'ペン'], ['E', '消しゴム'], ['G', '塗りつぶし'],
     ['[ / ]', 'ブラシを細く／太く'], ['右ドラッグ', 'ブラシサイズ（右=太く/左=細く）'],
@@ -4651,6 +4654,7 @@ const HELP_GROUPS = [
     ['Ctrl+Z', 'UNDO'], ['Ctrl+Shift+Z', 'REDO（Ctrl+Y も可）']
   ] },
   { t: 'SHEETパネル', rows: [
+    ['S', 'パネルの開閉'],
     ['クリック', 'そのカット頭へ'], ['ダブルクリック', '加筆EDITへ'],
     ['↑ / ↓', '前/次のカットを選ぶ'], ['上下ドラッグ', 'カットの並べ替え'],
     ['Ctrl+↑ / ↓', '現在カットを上へ／下へ移動']
@@ -4797,7 +4801,6 @@ function wire(){
   $('#btn-help').addEventListener('click', () => toggleHelp());
   $('#btn-help-close').addEventListener('click', () => toggleHelp(false));
   $('#help-ovl').addEventListener('click', e => { if(e.target === $('#help-ovl')) toggleHelp(false); });
-  $('#btn-sheet-toggle').addEventListener('click', toggleSheetPanel);
   $('#btn-ui-side').addEventListener('click', toggleUiSide);
   $('#btn-ui-side-mini').addEventListener('click', toggleUiSide);
   bindSplit($('#split-board'), 'board');

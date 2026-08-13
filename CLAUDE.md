@@ -58,6 +58,22 @@ https://claude.ai/code/artifact/a57e3c0b-064f-4e1b-97d2-a158602ab07b
 **新チャットでこのページを更新するときは、必ず上のURLを Artifact ツールの `url` に渡すこと**
 （渡さずに新規publishすると別URLが発行され、ここのリンクが古くなる）。
 
+## トップバー右端の並び（3ツール共通・2026-08-13）
+
+**プロジェクト入出力は必ず ⚙ の左隣**。ツールを渡り歩いても同じ場所にあるようにする。
+
+```
+… [プロジェクト入出力] [⚙ 設定] [⛶ 全画面] [HOME]      ← HOME は常に一番右
+```
+
+| ツール | 入出力ボタン | 備考 |
+|---|---|---|
+| `manga-plate` | EXPORT JSON / IMPORT JSON | 880px以下は `⇩JSON`/`⇧JSON` に短縮（iPad縦でHOMEまで届くこと） |
+| `oban-builder` | EXPORT JSON / IMPORT JSON | `#bar-right` の中 |
+| `econte` | ⇩ PROJ / ⇧ PROJ | **ZIP**なので表記は PROJ のまま（形式が違うものを同じ名前にしない） |
+
+`animator` / `composer` は入出力の性格が違う（ANIMATOR_v1・PROJECT_v2・連番・動画）ので**この並びには揃えない**。
+
 ## 変更後に必ず行うチェック
 ```
 node tools/check.js

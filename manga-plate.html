@@ -44,6 +44,19 @@ body.swap #side{border-right:1px solid rgba(255,210,122,.18);border-left:0}
 #topbar .t-sp{flex:1}
 #pg-indic{color:var(--ice);font-size:11px;letter-spacing:.2em;white-space:nowrap}
 #topbar .t-lb{color:var(--lavender);font-size:9px;letter-spacing:.2em;white-space:nowrap}
+#topbar .t-gap{width:8px;flex:none}
+#topbar .btn{white-space:nowrap}
+#topbar .btn b{font-weight:inherit}
+#topbar .btn .sm{display:none}
+/* 幅が足りないときは、左の識別表示 → ラベル短縮 の順に畳む。ボタン自体は最後まで残す
+   （iPad縦 768px でも HOME まで届くこと） */
+@media (max-width:1180px){#topbar .t-id{display:none}}
+@media (max-width:980px){#topbar .t-title{font-size:15px}#topbar .t-lb{display:none}#book-title{width:88px}}
+@media (max-width:880px){#topbar .btn .lg{display:none}#topbar .btn .sm{display:inline}
+  #topbar{gap:8px;padding:0 10px}#topbar .t-gap{width:2px}}
+@media (max-width:700px){#topbar .t-title{display:none}}
+#topbar{overflow-x:auto;overflow-y:hidden}
+#topbar::-webkit-scrollbar{height:0}
 #book-title{background:var(--cell);border:1px solid rgba(255,210,122,.3);color:var(--gold);font-family:var(--mono);
   font-size:10px;letter-spacing:.15em;padding:4px 8px;width:120px}
 
@@ -117,6 +130,11 @@ select{width:100%}
 .el-row .el-ty{font-size:8px;color:var(--lavender);letter-spacing:.14em}
 .el-row .el-pin{font-size:8px;color:var(--gold);letter-spacing:.1em}
 .el-row .el-ud{color:var(--gold);cursor:pointer;padding:0 1px}
+.el-row .el-x{color:rgba(255,79,168,.6);cursor:pointer;padding:0 1px;font-size:10px}
+.el-row .el-x:hover{color:var(--rouge)}
+.el-row .el-nm{cursor:grab}
+.el-row .el-nm input.el-edit{width:100%;background:var(--bg-0);border:1px solid var(--rouge);color:var(--white);
+  font-family:var(--mono);font-size:10px;padding:1px 3px}
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 .fp{font-size:8px;letter-spacing:.12em;padding:3px 7px;border:1px solid rgba(255,210,122,.4);color:var(--gold);
   cursor:pointer;text-transform:uppercase;user-select:none}
@@ -194,7 +212,14 @@ select{width:100%}
     <span class="t-lb">作品名</span>
     <input id="book-title" value="name-01" spellcheck="false"
            title="作品名。書き出しファイル名（name-01_p001.png / name-01_book.json）と、ANIMATOR等へ送るときのIDになります">
+    <button class="btn" id="io-export" title="作品全体をJSONファイルで書き出し（画像も同梱）"><b class="lg">EXPORT JSON</b><b class="sm">⇩JSON</b></button>
+    <button class="btn" id="io-import" title="JSONファイルから読み込み（現在の内容は置き換わります）"><b class="lg">IMPORT JSON</b><b class="sm">⇧JSON</b></button>
+    <input type="file" id="io-file" accept="application/json,.json" style="display:none">
+    <span class="t-gap"></span>
+    <button class="btn gold" id="pg-prev" title="前のページへ（[）">◀</button>
     <button class="btn gold" id="btn-pages" title="ページ一覧（Wクリックでそのページへ）">PAGES</button>
+    <button class="btn gold" id="pg-next" title="次のページへ（]）">▶</button>
+    <span class="t-gap"></span>
     <button class="btn gold" id="btn-settings" title="操作一覧・設定（?）">⚙</button>
     <button class="btn gold" id="btn-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
     <button class="btn" id="btn-home" title="ランディングページに戻る">HOME</button>
@@ -232,6 +257,9 @@ select{width:100%}
       </div>
       <div class="btnrow">
         <button class="btn ice" id="pn-merge" title="直前の分割を戻す（隣のコマと結合）">⤺ 分割を戻す</button>
+      </div>
+      <div class="btnrow" style="margin-top:12px">
+        <button class="btn gold" id="io-reset" title="全ページ・全素材を消して新規に戻す（元に戻せません）">✕ 全消去（新規）</button>
       </div>
     </div></details>
 
@@ -295,15 +323,6 @@ select{width:100%}
         <button class="btn ice" id="ex-all">PNG 全ページ</button>
       </div>
       <div class="note">網点は「グレーで塗った中間調」だけを変換し、線画と白は元のまま残します（<b>◆Items</b>の画像ごとに網点ONが要ります）。</div>
-    </div></details>
-
-    <details class="sp"><summary>◆ File</summary><div class="spb">
-      <div class="btnrow">
-        <button class="btn" id="io-export">EXPORT JSON</button>
-        <button class="btn" id="io-import">IMPORT JSON</button>
-      </div>
-      <input type="file" id="io-file" accept="application/json,.json" style="display:none">
-      <div class="btnrow"><button class="btn gold" id="io-reset">✕ 全消去（新規）</button></div>
     </div></details>
 
   </div>
@@ -893,6 +912,8 @@ function itemBounds(it){
 function updateStatus(){
   const pg=curPage(), n=BOOK.pages.length;
   $('#pg-indic').textContent='P '+(curPageIdx+1)+' / '+n;
+  $('#pg-prev').disabled=curPageIdx<=0;
+  $('#pg-next').disabled=curPageIdx>=n-1;
   $('#bb-info').textContent=PAPER.w+'×'+PAPER.h+'  '+PAPER.dpi+'dpi  Z'+(view.z*100).toFixed(0)+'%  コマ'+pg.panels.length;
   const H={
     sel:(selMode==='panel'
@@ -1313,26 +1334,86 @@ function deleteItem(it){
   if(selItem===it)selItem=null;
   commit();renderItemList();renderItemParams();
 }
+/* 名前をその場で書き換え（行のWクリック） */
+function startRename(row,it){
+  const nm=row.querySelector('.el-nm');
+  if(!nm||nm.querySelector('input'))return;
+  const inp=document.createElement('input');
+  inp.type='text';inp.value=it.name;inp.className='el-edit';
+  nm.textContent='';nm.appendChild(inp);
+  inp.focus();inp.select();
+  let done=false;
+  const fin=keep=>{
+    if(done)return;done=true;
+    if(keep){const v=inp.value.trim();if(v)it.name=v.slice(0,24);}
+    commit();renderItemList();
+  };
+  inp.addEventListener('keydown',e=>{
+    e.stopPropagation();
+    if(e.key==='Enter')fin(true);
+    else if(e.key==='Escape')fin(false);
+  });
+  inp.addEventListener('blur',()=>fin(true));
+}
+let rowDrag=null;
 function renderItemList(){
   const pg=curPage(), box=$('#item-list');box.innerHTML='';
   if(!pg.items.length){box.innerHTML='<div class="note">まだ素材がありません。<br>コマを選んでから追加すると、そのコマの中に入ります。</div>';return;}
+  /* 表示は前面が上。ドラッグの並べ替えもこの見た目どおりに動かす */
   [...pg.items].reverse().forEach(it=>{
     const row=document.createElement('div');
     row.className='el-row'+(it===selItem?' sel':'');
     const kIdx=it.panelId?(pg.panels.findIndex(k=>k.id===it.panelId)+1):0;
-    row.innerHTML='<span class="el-vis'+(it.visible?'':' off')+'" data-a="vis">'+(it.visible?'◉':'○')+'</span>'
-      +'<span class="el-nm">'+esc(it.name)+'</span>'
+    row.innerHTML='<span class="el-vis'+(it.visible?'':' off')+'" data-a="vis" title="表示 ON/OFF">'+(it.visible?'◉':'○')+'</span>'
+      +'<span class="el-nm" title="Wクリックで名前を変更／つかんで上下に並べ替え">'+esc(it.name)+'</span>'
       +'<span class="el-pin">'+(kIdx?'▣'+kIdx:'上')+'</span>'
       +'<span class="el-ty">'+it.type.toUpperCase()+'</span>'
-      +'<span class="el-ud" data-a="up">▲</span><span class="el-ud" data-a="dn">▼</span>';
+      +'<span class="el-ud" data-a="up" title="前面へ">▲</span>'
+      +'<span class="el-ud" data-a="dn" title="背面へ">▼</span>'
+      +'<span class="el-x" data-a="del" title="この素材を削除">✕</span>';
+    row.dataset.id=it.id;
+
     row.addEventListener('click',ev=>{
       const a=ev.target.dataset&&ev.target.dataset.a, i=pg.items.indexOf(it);
       if(a==='vis'){it.visible=!it.visible;commit();renderItemList();return;}
       if(a==='up'){if(i<pg.items.length-1){pg.items.splice(i,1);pg.items.splice(i+1,0,it);commit();renderItemList();}return;}
       if(a==='dn'){if(i>0){pg.items.splice(i,1);pg.items.splice(i-1,0,it);commit();renderItemList();}return;}
+      if(a==='del'){modalConfirm(it.name+' を削除しますか？',()=>deleteItem(it));return;}
+      if(rowDrag&&rowDrag.moved)return;                      // 並べ替えたクリックは選択に使わない
       selItem=it;selPanel=null;
-      if(selMode!=='item'){selMode='item';syncToolLabels();}   // リストで選んだら掴める状態にしておく
+      if(selMode!=='item'){selMode='item';syncToolLabels();}  // リストで選んだら掴める状態にしておく
       renderItemList();renderItemParams();renderPanelSec();render();
+    });
+    row.addEventListener('dblclick',ev=>{
+      if(ev.target.dataset&&ev.target.dataset.a)return;
+      startRename(row,it);
+    });
+    /* 行の本体をつかんで上下に並べ替え */
+    row.addEventListener('pointerdown',ev=>{
+      const a=ev.target.dataset&&ev.target.dataset.a;
+      if(a||ev.target.tagName==='INPUT')return;
+      rowDrag={id:it.id,y0:ev.clientY,moved:false};
+      row.setPointerCapture(ev.pointerId);
+    });
+    row.addEventListener('pointermove',ev=>{
+      if(!rowDrag||rowDrag.id!==it.id)return;
+      if(!rowDrag.moved&&Math.abs(ev.clientY-rowDrag.y0)<5)return;
+      rowDrag.moved=true;
+      const rows=[...box.querySelectorAll('.el-row')];
+      let to=rows.length-1;
+      for(let d=0;d<rows.length;d++){
+        const r=rows[d].getBoundingClientRect();
+        if(ev.clientY<r.top+r.height/2){to=d;break;}
+      }
+      const from=pg.items.indexOf(it);
+      const toIdx=pg.items.length-1-to;                       // 表示index → 配列index
+      if(toIdx===from||toIdx<0||toIdx>=pg.items.length)return;
+      pg.items.splice(from,1);pg.items.splice(toIdx,0,it);
+      selItem=it;renderItemList();commitD();
+    });
+    row.addEventListener('pointerup',()=>{
+      if(rowDrag&&rowDrag.moved){commit();renderItemList();}
+      setTimeout(()=>{rowDrag=null;},0);
     });
     box.appendChild(row);
   });
@@ -1420,11 +1501,6 @@ function renderItemParams(){
       box.appendChild(r5);
     }
   }
-  const del=document.createElement('div');del.className='btnrow';
-  del.innerHTML='<button class="btn" style="width:100%">✕ この素材を削除</button>';
-  del.querySelector('button').addEventListener('click',()=>{
-    modalConfirm(selItem.name+' を削除しますか？',()=>deleteItem(it));});
-  box.appendChild(del);
   renderPalette();
 }
 function updateCov(){
@@ -1620,12 +1696,15 @@ function renderPages(){
 }
 function gotoPage(i){
   curPageIdx=clamp(i,0,BOOK.pages.length-1);
-  selPanel=null;selItem=null;
+  selPanel=null;selItem=null;selCut=null;
   renderItemList();renderItemParams();renderPanelSec();render();
 }
 function openPages(){pagesSel=curPageIdx;$('#pages-ov').style.display='flex';renderPages();}
 function closePages(){$('#pages-ov').style.display='none';}
 $('#btn-pages').addEventListener('click',openPages);
+/* 一覧を開かずにページを行き来する */
+$('#pg-prev').addEventListener('click',()=>gotoPage(curPageIdx-1));
+$('#pg-next').addEventListener('click',()=>gotoPage(curPageIdx+1));
 $('#pages-close').addEventListener('click',closePages);
 $('#pg-add').addEventListener('click',()=>{
   BOOK.pages.splice(pagesSel+1,0,newPage());pagesSel++;commit();renderPages();toast('ページを追加しました');});

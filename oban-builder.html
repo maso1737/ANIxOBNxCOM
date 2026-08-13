@@ -431,12 +431,13 @@ body.cleanview{cursor:none}
   <!-- 入出力（読み込み・書き出し・連携）。矢印はパイプラインの向き -->
   <button class="btn" id="b-ap" title="ANIMATORの連番をPNG書き出しなしで取り込み（同一ブラウザ・EX_DB経由。保存で自動同期）">▶ ANIMATOR</button>
   <button class="btn" id="b-comp" title="TAKEをCOMPOSERのCAMERAトラックJSONに変換してコピー（COMPOSER側の + FROM OBAN で貼り付け）">COMPOSER ▶</button>
-  <button class="btn" id="b-export-json" title="プロジェクト全体をJSONファイルで書き出し">EXPORT JSON</button>
-  <button class="btn" id="b-import-json" title="JSONファイルからプロジェクトを読み込み（既存を置換）">IMPORT JSON</button>
   <input type="file" id="oban-json-input" accept="application/json,.json" style="display:none;">
   <span id="crumb"></span>
-  <!-- 右端グループ（設定・全画面・HOME。HOMEは常に一番右） -->
+  <!-- 右端グループ（プロジェクト入出力・設定・全画面・HOME。HOMEは常に一番右。
+       この並びは manga-plate / econte と揃えている＝ツールを渡り歩いても同じ場所にある） -->
   <span id="bar-right">
+    <button class="btn" id="b-export-json" title="プロジェクト全体をJSONファイルで書き出し">EXPORT JSON</button>
+    <button class="btn" id="b-import-json" title="JSONファイルからプロジェクトを読み込み（既存を置換）">IMPORT JSON</button>
     <button class="btn" id="b-set" title="設定・使い方・ショートカット一覧">⚙</button>
     <button class="btn" id="b-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
     <button class="btn" id="b-home" title="ランディングページに戻る">HOME</button>

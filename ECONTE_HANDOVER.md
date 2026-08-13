@@ -163,7 +163,13 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   書き出し中のSpaceキーは`togglePlay()`経由で`cancelExport()`に分岐（`gExporting`フラグ）。
   **非表示タブではrAFが止まり録画も止まる**ので、書き出し中はタブを前面のままにする必要がある（UIに明記済み）
 - ショートカットは`SHORTCUT_ACTIONS`登録制＋`gKeymap`(`econte_keymap_v1`)。composer/OBANと同じレジストリパターン。
-  再割当UIは未実装（P2以降・現状はlocalStorage手書き編集のみ）
+  再割当UIは未実装（P2以降・現状はlocalStorage手書き編集のみ）。
+  **⚙一覧に「再割当できる」と書かないこと**（animatorと違いUIが無いため）
+- **2026-08-13: SHEETパネルの開閉ボタン（`≡`）を廃止し、`sheet`アクション（既定`S`）に置き換えた。**
+  トップバーを空けるため。`SHORTCUT_ACTIONS`に載せたので⚙一覧へ自動掲載され、将来の再割当UIにもそのまま乗る。
+  ショートカット判定は`state.view==='studio'`ブロック内＝**EDITでは反応しない**（SHEETはSTUDIO専用のため意図どおり）。
+  ボタンが無くなり「閉じたら戻し方が分からない」事故が起きうるので、**閉じたときだけ**`toggleSheetPanel()`が
+  「Sで開きます」とtoastを出す。開閉状態は`gUi.sheet`でlocalStorage保存＝**閉じたままリロードしても`S`で復帰できる**
 
 ■ カラースクリプト層（V2-E2 / E2c・SPEC_13 §9b）
 - **`cut.colors[k]`＝枠ごとに1枚**（`{c, blob, blend, alpha, dirty}`）。
