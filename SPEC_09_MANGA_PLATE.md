@@ -121,6 +121,90 @@ v1では PNG 書き出し→D&D で十分なので急がない
 - [ ] `node tools/check.js` ALL PASS（manga-plate.html 追加後）
 - [ ] `PIPELINE.md` 更新（MANGA PLATE の行を追加、OBAN の入口に「MANGA PLATE PNG」を追記）
 
+---
+
+# v2 — PAGE / PANEL COMPOSER（2026-08-13 実装済み）
+
+> v1 は「板（素材）を作る」ツールだった。v2 は **原稿用紙とコマ割りが主役**になり、v1 の
+> tone/focus/stream は「コマに割り当てる仕上げアイテム」として残っている（描画コードは無改造）。
+
+## v2-1. 用紙（ジャンプ規定・600dpi B4）
+
+`PAPER_PRESETS` / `paperOf()`。mm を dpi で px 化して保持する。
+
+| プリセット | 裁ち落とし | 仕上がり | 内枠 |
+|---|---|---|---|
+| `B4_600`（既定・モノクロ） | 230×320mm = **5433×7559px** | 220×310mm = 5197×7323px | 180×270mm = 4252×6378px |
+| `B4_350`（カラー） | 同 mm・350dpi | 〃 | 〃 |
+| `B5_600`（同人誌） | 192×267mm | 182×257mm | 150×220mm |
+
+用紙を切り替えると全ページのコマ・素材が dpi 比で拡縮される（確認モーダルあり）。
+トンボ／仕上がり／内枠は `guide` 表示のみで**書き出しに入らない**。
+
+## v2-2. コマ＝多角形。分割は半平面クリップ
+
+- `PAGE.panels[] = {id, poly:[{x,y}...], border, bleed, from}`。初期値は**内枠いっぱいの1枚**
+- `splitPanels(pg, targets, px,py, dx,dy)` … 直線で `clipHalf()`（Sutherland–Hodgman）を2回かけ、
+  **コマ間隔の半分ずつ内側へオフセット**して2枚にする。斜めも同じ式で通る
+- **間隔は線の向きで補間**: `gap = gut.lr*|nx| + gut.tb*|ny|`
+  （縦線＝左右の間隔60 ／ 横線＝上下の間隔180 ／ 斜めはその中間）。クリスタ既定値と一致
+- 対象は **コマ選択中＝そのコマだけ／未選択＝線が横切る全コマ**（モード切替UIを増やさないための規約）
+- `sortPanels()` が読み順（右綴じ＝上から、同じ帯なら右が先）に並べ替える。コマ番号表示がこの順
+- `dispPoly()` … `bleed` ONのコマは、**内枠に接している辺だけ**用紙の端まで伸ばす（ブチ抜き）
+- `mergePanel()` … 同じ `from` を持つ兄弟、無ければ隣接コマと結合（＝分割を戻す）
+
+## v2-3. 素材とマスク
+
+`PAGE.items[]` は `img / tone / focus / stream / frame` の共通配列。`panelId` が要（かなめ）:
+
+- **`panelId` あり** … そのコマのポリゴンで `clip()` してから描く → **枠の下**（はみ出しがカットされる）
+- **`panelId` なし** … 枠線より**上**に描く → 擬音・飛び出し
+
+この1本のルールだけで「コマ内の絵」と「上に乗せる擬音」が分かれる（フラグを増やさない）。
+
+- **境界効果**: `edgeSprite()` がアルファを2リング×24方向にずらして描き `source-in` で単色化 → 本体の下に敷く。
+  キャッシュキーは呼び出し側が渡す（網点化後は canvas で `.src` が無いため **tag 引数が必須**）
+- 画像は `MATSRC{srcId→dataURL}` に持ち、**undo履歴には積まない**（`snapshot()` は BOOK のみ）
+- 保存は **IndexedDB `manga_plate/book/'current'`**（dataURL が localStorage に乗らないため）。
+  v1 の `localStorage['manga-plate']` は初回起動時に1ページ目の items へ引き継ぐ
+
+## v2-4. 連携（受け側の改修ゼロ）
+
+**既存の共通配管にそのまま乗る**のが設計の要。新しい語彙を作っていない。
+
+| 方向 | 手段 | 受け側 |
+|---|---|---|
+| → ANIMATOR REF | `exPut()` で `tdr_exchange` に `PROJECT_v1`（1セル＝コマ画像）＋ `tdr_live` の `project-update` | ANIMATOR `REF ▸ ＋FROM SAVED`（`exGetAll()` を読む既存経路） |
+| ← ANIMATOR 取込 | `exGetAll()` から選んで画像素材化 | — |
+| ← 自動更新（往来） | `tdr_live` の `project-update` を購読し、`item.linkId === projectId` の素材を差し替え | — |
+| → COMPOSER | `exPut()` 後 `composer.html?id=<pid>` | COMPOSER 既存の `?id=` ディープリンク |
+| → OBAN | `exPut()` ＋ `project-update` | OBAN `＋FROM ANIMATOR`（`apCandidates()` が EX_DB と `gApSeen` を併せて見る） |
+
+- 起動時に `composer-hello` を投げて ANIMATOR 側の `gLiveActive` を立てる（composer/OBAN と同じ作法）
+- `BOOK.links[projectId] = {pageId, panelId, box, scale, ox, oy, w, h}` を送信時に記録し、
+  戻りは `placeLinked()` が `scale = 1/lk.scale` でコマにピタリ収める（**送った矩形にピクセル一致で戻る**）
+- 送信解像度が縦長コマと合っていないと画素が無駄になるため、`updateLinkNote()` が**使用率%**を出し、
+  55%未満なら `コマ比` を促す（`fitLinkToPanel()` = 長辺2048でコマ比に合わせる）
+
+## v2-5. モアレ対策（グレー→網点）
+
+`tonizeImage(img, it)` … **画像1枚ごと**の変換で、ページ全体は舐めない（作業解像度が小さいので速い）。
+
+1. 画素を輝度で3分割 — `l<0.10`＝線画は**原画のまま**残す／`0.10≦l≦0.94`＝中間調を網点対象／`l>0.94`＝白
+2. 中間調の被覆率からセルごとにドット半径を決めて 45° 格子で打つ（セル＝`dpi/lpi/scale`）
+3. `destination-in` で中間調マスク外へはみ出さないようにし、線画を上から戻す
+
+**線画とトーンが同じ絵に混ざっていても線が潰れない**のがこの3分割の狙い。
+既定 50線（Gemini 資料の「WEBは50線が最も安全」に合わせた）。書き出しの階調は
+**生グレー（既定・モアレ皆無）／網点化／カラー**の3択。`網点プレビュー` で画面でも確認できる。
+
+## v2-6. まだ無いもの（意図的）
+
+- 制御点の**移動**（v2は選択＋頂点表示のみ。ユーザー確認済みのスコープ）
+- 手描き・ラスタブラシ（ANIMATOR の領分。v1 の大原則を維持）
+- テキスト組版（擬音は手描き＝MOTION_COMIC_SPEC の思想どおり）
+- ZIP一括書き出し（依存ゼロを保つため `<a download>` の連続で代替）
+
 ## 9. 決定事項（2026-07-16 実装済み）
 
 1. ファイル名: `manga-plate.html`（確定・実装済み。P0〜P3 一括実装）

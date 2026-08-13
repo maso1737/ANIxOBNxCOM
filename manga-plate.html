@@ -3,12 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>MANGA PLATE — parametric comic materials</title>
+<title>MANGA PLATE — page / panel composer</title>
 <!--
-  MANGA PLATE (SPEC_09) — パラメトリック漫画素材ツール
-  コマ枠(frame)・網点トーン(tone)・集中線(focus)・流線(stream) を
-  パラメータで生成し、透過PNGで OBAN / COMPOSER に渡す。
-  正はパラメータJSON（COPY/PASTE PLATE）。seed決定論（mulberry32、Math.random禁止）。
+  MANGA PLATE v2 (SPEC_09) — 漫画ページ＆コマ枠オーサリング
+  ・ジャンプ規定の用紙（B4 600dpi / トンボ・仕上がり・内枠）でページを持つ
+  ・コマは「内枠いっぱいの1枚」から縦/横/斜めの線で分割していくベクター多角形
+  ・各コマ＝マスク。素材（ANIMATORの絵）はコマ内でカットされる／擬音はコマの上に乗る
+  ・仕上げのトーン・集中線・流線はパラメトリック（seed決定論・mulberry32）
+  ・連携は既存の共通配管に相乗り（tdr_exchange IndexedDB ／ tdr_live BroadcastChannel）
+    → animator / composer / oban-builder 側の改修はゼロ
   単一HTML・依存ゼロ・file://直開きOK。UI は KINETIC STAGE デザインシステム準拠。
 -->
 <style>
@@ -22,16 +25,35 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg-1);color:var(--white);font-family:var(--mono)}
-#app{display:grid;width:100%;height:100%;grid-template-rows:44px 1fr 44px;grid-template-columns:1fr 300px;
-  grid-template-areas:"top top" "main side" "bottom bottom"}
-#topbar{grid-area:top;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel-2);
+#app{display:grid;width:100%;height:100%;grid-template-rows:44px 1fr 40px;grid-template-columns:54px 1fr 318px;
+  grid-template-areas:"top top top" "rail main side" "bottom bottom bottom"}
+
+/* ---- topbar ---- */
+#topbar{grid-area:top;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--panel-2);
   border-bottom:1px solid rgba(255,210,122,.18);font-size:10px;letter-spacing:.3em;text-transform:uppercase}
-#topbar .t-id{color:var(--gold)}
-#topbar .t-title{font-family:var(--disp);font-style:italic;font-weight:900;font-size:19px;letter-spacing:.06em;
+#topbar .t-id{color:var(--gold);white-space:nowrap}
+#topbar .t-title{font-family:var(--disp);font-style:italic;font-weight:900;font-size:19px;letter-spacing:.06em;white-space:nowrap;
   background:linear-gradient(120deg,#FFE9B0,#FFD27A 26%,#FF4FA8 62%,#B58EFF 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
 #topbar .t-sp{flex:1}
-#plate-name{background:var(--cell);border:1px solid rgba(255,210,122,.3);color:var(--gold);font-family:var(--mono);
-  font-size:10px;letter-spacing:.15em;padding:4px 8px;width:130px}
+#pg-indic{color:var(--ice);font-size:11px;letter-spacing:.2em;white-space:nowrap}
+#book-title{background:var(--cell);border:1px solid rgba(255,210,122,.3);color:var(--gold);font-family:var(--mono);
+  font-size:10px;letter-spacing:.15em;padding:4px 8px;width:120px}
+
+/* ---- tool rail ---- */
+#rail{grid-area:rail;background:var(--panel-2);border-right:1px solid rgba(255,210,122,.18);
+  display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;overflow:hidden}
+.tool{width:38px;height:38px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;
+  background:transparent;border:1px solid rgba(255,79,168,.35);color:var(--rouge);cursor:pointer;user-select:none;
+  font-family:var(--mono);font-size:15px;line-height:1;flex:none}
+.tool small{font-size:6px;letter-spacing:.1em}
+.tool:hover{background:rgba(255,79,168,.12)}
+.tool.on{background:var(--grad-btn);border-color:transparent;color:#fff;box-shadow:0 0 14px rgba(255,79,168,.55)}
+.rail-sep{width:24px;height:1px;background:rgba(255,210,122,.25);flex:none;margin:3px 0}
+.sub{width:38px;height:22px;display:flex;align-items:center;justify-content:center;flex:none;
+  background:transparent;border:1px solid rgba(90,233,255,.35);color:var(--ice);cursor:pointer;font-size:9px;letter-spacing:.1em;user-select:none}
+.sub.on{background:rgba(90,233,255,.9);border-color:transparent;color:#04202a;font-weight:600}
+
+/* ---- stage ---- */
 #main{grid-area:main;position:relative;background:var(--bg-0);overflow:hidden}
 #cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
 .corner{position:absolute;width:18px;height:18px;border:1px solid rgba(255,210,122,.4);pointer-events:none}
@@ -40,540 +62,1646 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg-1);color:va
 .corner.bl{bottom:10px;left:10px;border-right:0;border-top:0}
 .corner.br{bottom:10px;right:10px;border-left:0;border-top:0}
 #stage-label{position:absolute;left:16px;bottom:12px;font-size:9px;letter-spacing:.35em;color:var(--lavender);
-  opacity:.7;pointer-events:none;text-transform:uppercase}
+  opacity:.65;pointer-events:none;text-transform:uppercase}
+
+/* ---- side ---- */
 #side{grid-area:side;background:var(--panel);border-left:1px solid rgba(255,210,122,.18);overflow-y:auto;overflow-x:hidden}
-#side::-webkit-scrollbar{width:2px}
+#side::-webkit-scrollbar{width:3px}
 #side::-webkit-scrollbar-thumb{background:var(--rouge)}
-.sp{padding:12px 14px;border-bottom:1px solid rgba(181,142,255,.12)}
-.spl{font-size:9px;letter-spacing:.4em;color:var(--gold);text-transform:uppercase;margin-bottom:9px}
+details.sp{border-bottom:1px solid rgba(181,142,255,.12)}
+details.sp>summary{list-style:none;cursor:pointer;padding:9px 14px;font-size:9px;letter-spacing:.35em;color:var(--gold);
+  text-transform:uppercase;user-select:none;display:flex;align-items:center;gap:6px}
+details.sp>summary::-webkit-details-marker{display:none}
+details.sp>summary:before{content:'▸';font-size:8px;color:var(--rouge)}
+details.sp[open]>summary:before{content:'▾'}
+details.sp>summary:hover{background:rgba(255,79,168,.07)}
+.spb{padding:2px 14px 12px}
 .tr{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0;font-size:10px}
-.tr .lb{color:var(--lavender);letter-spacing:.15em;text-transform:uppercase;font-size:9px;white-space:nowrap}
-.tr .vv{color:var(--gold);min-width:38px;text-align:right;font-size:10px}
-input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:2px;background:rgba(255,210,122,.25);outline:0}
+.tr .lb{color:var(--lavender);letter-spacing:.12em;text-transform:uppercase;font-size:9px;white-space:nowrap}
+.tr .vv{color:var(--gold);min-width:40px;text-align:right;font-size:10px}
+.note{font-family:var(--jp);font-size:9px;line-height:1.6;color:rgba(181,142,255,.75);margin:6px 0 2px}
+input[type=range]{flex:1;min-width:40px;-webkit-appearance:none;appearance:none;height:2px;background:rgba(255,210,122,.25);outline:0}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;
   background:linear-gradient(135deg,#FFD27A,#FF4FA8);cursor:pointer}
-input[type=number],select{background:var(--cell);border:1px solid rgba(255,210,122,.3);color:var(--white);
-  font-family:var(--mono);font-size:10px;padding:3px 5px;width:64px}
+input[type=range]:disabled{opacity:.3}
+input[type=number],select,input[type=text]{background:var(--cell);border:1px solid rgba(255,210,122,.3);color:var(--white);
+  font-family:var(--mono);font-size:10px;padding:3px 5px;width:70px}
+select{width:100%}
 .btn{background:transparent;border:1px solid rgba(255,79,168,.55);color:var(--rouge);font-family:var(--mono);
-  font-size:9px;letter-spacing:.2em;text-transform:uppercase;padding:5px 9px;cursor:pointer;user-select:none}
+  font-size:9px;letter-spacing:.18em;text-transform:uppercase;padding:5px 9px;cursor:pointer;user-select:none}
 .btn:hover{background:rgba(255,79,168,.12);box-shadow:0 0 8px rgba(255,79,168,.5)}
 .btn.on{background:var(--grad-btn);border-color:transparent;color:#fff;box-shadow:0 0 14px rgba(255,79,168,.6)}
 .btn.gold{border-color:rgba(255,210,122,.55);color:var(--gold)}
 .btn.gold:hover{background:rgba(255,210,122,.1);box-shadow:0 0 8px rgba(255,210,122,.4)}
+.btn.gold.on{background:linear-gradient(135deg,#FFD27A,#FF9A3C);border-color:transparent;color:#2a1600}
 .btn.ice{border-color:rgba(90,233,255,.55);color:var(--ice)}
 .btn.ice:hover{background:rgba(90,233,255,.1);box-shadow:0 0 8px rgba(90,233,255,.4)}
-.btnrow{display:flex;flex-wrap:wrap;gap:6px}
-#elem-list{display:flex;flex-direction:column;gap:4px}
-.el-row{display:flex;align-items:center;gap:7px;padding:5px 7px;background:var(--cell);border:1px solid transparent;
+.btn:disabled{opacity:.28;cursor:default;box-shadow:none;background:transparent}
+.btnrow{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+#item-list{display:flex;flex-direction:column;gap:3px}
+.el-row{display:flex;align-items:center;gap:6px;padding:5px 6px;background:var(--cell);border:1px solid transparent;
   font-size:10px;cursor:pointer;user-select:none}
 .el-row:hover{border-color:rgba(255,79,168,.3)}
 .el-row.sel{border-color:var(--rouge);box-shadow:0 0 10px rgba(255,79,168,.35)}
-.el-row .el-vis{cursor:pointer;color:var(--ice);width:14px;text-align:center}
+.el-row .el-vis{cursor:pointer;color:var(--ice);width:12px;text-align:center}
 .el-row .el-vis.off{color:rgba(181,142,255,.35)}
-.el-row .el-nm{flex:1;letter-spacing:.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.el-row .el-ty{font-size:8px;color:var(--lavender);letter-spacing:.2em}
-.el-row .el-ud{color:var(--gold);cursor:pointer;padding:0 2px}
+.el-row .el-nm{flex:1;letter-spacing:.06em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.el-row .el-ty{font-size:8px;color:var(--lavender);letter-spacing:.14em}
+.el-row .el-pin{font-size:8px;color:var(--gold);letter-spacing:.1em}
+.el-row .el-ud{color:var(--gold);cursor:pointer;padding:0 1px}
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
-.fp{font-size:8px;letter-spacing:.15em;padding:3px 7px;border:1px solid rgba(255,210,122,.4);color:var(--gold);
+.fp{font-size:8px;letter-spacing:.12em;padding:3px 7px;border:1px solid rgba(255,210,122,.4);color:var(--gold);
   cursor:pointer;text-transform:uppercase;user-select:none}
 .fp:hover{background:rgba(255,210,122,.12)}
 .pal{display:flex;flex-wrap:wrap;gap:5px}
-.pal .sw{width:20px;height:20px;border:1px solid rgba(248,239,255,.3);cursor:pointer}
+.pal .sw{width:19px;height:19px;border:1px solid rgba(248,239,255,.3);cursor:pointer}
 .pal .sw.sel{border:2px solid var(--rouge);box-shadow:0 0 8px rgba(255,79,168,.6)}
-#bottombar{grid-area:bottom;display:flex;align-items:center;gap:16px;padding:0 14px;background:var(--panel-2);
-  border-top:1px solid rgba(255,210,122,.18);font-size:9px;letter-spacing:.2em;color:var(--lavender);text-transform:uppercase}
-#bb-info{color:var(--ice)}
+
+/* ---- bottom ---- */
+#bottombar{grid-area:bottom;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel-2);
+  border-top:1px solid rgba(255,210,122,.18);font-size:9px;letter-spacing:.14em;color:var(--lavender);text-transform:uppercase;overflow:hidden}
+#bb-hint{color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#bb-info{color:var(--ice);white-space:nowrap}
 .kbd{font-size:8px;border:1px solid rgba(255,79,168,.25);padding:1px 5px;color:var(--white)}
+
+/* ---- overlays ---- */
 #toast{position:absolute;left:50%;top:56px;transform:translateX(-50%);background:var(--panel);color:var(--gold);
-  border:1px solid rgba(255,210,122,.5);padding:7px 16px;font-size:10px;letter-spacing:.15em;display:none;z-index:50;
-  box-shadow:0 0 18px rgba(0,0,0,.6)}
-#modal{position:absolute;inset:0;background:rgba(7,3,15,.75);display:none;align-items:center;justify-content:center;z-index:60}
-#modal-box{background:var(--panel);border:1px solid rgba(255,210,122,.4);padding:20px 24px;max-width:340px}
-#modal-msg{font-size:11px;line-height:1.7;color:var(--white);font-family:var(--jp);margin-bottom:14px}
+  border:1px solid rgba(255,210,122,.5);padding:7px 16px;font-size:10px;letter-spacing:.12em;display:none;z-index:70;
+  box-shadow:0 0 18px rgba(0,0,0,.6);font-family:var(--jp);max-width:80%;text-align:center}
+#modal{position:fixed;inset:0;background:rgba(7,3,15,.78);display:none;align-items:center;justify-content:center;z-index:90}
+#modal-box{background:var(--panel);border:1px solid rgba(255,210,122,.4);padding:20px 22px;max-width:420px;min-width:300px}
+#modal-msg{font-size:11px;line-height:1.75;color:var(--white);font-family:var(--jp);margin-bottom:14px;white-space:pre-wrap}
+#modal-list{max-height:44vh;overflow-y:auto;margin-bottom:14px;display:none;flex-direction:column;gap:4px}
+#modal-list .mrow{padding:7px 9px;background:var(--cell);border:1px solid transparent;cursor:pointer}
+#modal-list .mrow:hover{border-color:var(--rouge)}
+#modal-list .mrow b{font-size:11px;color:var(--white);letter-spacing:.06em;font-weight:500}
+#modal-list .mrow span{display:block;font-size:9px;color:var(--lavender);letter-spacing:.08em;margin-top:2px}
 #modal-btns{display:flex;gap:10px;justify-content:flex-end}
+
+/* ---- pages overlay (一覧ウィンドウ) ---- */
+#pages-ov{position:fixed;inset:0;background:rgba(7,3,15,.94);display:none;flex-direction:column;z-index:80}
+#pages-head{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--panel-2);
+  border-bottom:1px solid rgba(255,210,122,.2);font-size:10px;letter-spacing:.3em;color:var(--gold);text-transform:uppercase}
+#pages-grid{flex:1;overflow-y:auto;padding:18px 20px 60px;display:flex;flex-direction:column;align-items:center;gap:14px}
+#pages-grid::-webkit-scrollbar{width:4px}
+#pages-grid::-webkit-scrollbar-thumb{background:var(--rouge)}
+.spread{display:flex;gap:10px;background:#191919;padding:10px;border:1px solid rgba(255,255,255,.06)}
+.pcard{width:150px;display:flex;flex-direction:column;align-items:center;gap:0;cursor:pointer;user-select:none;
+  border:2px solid transparent;background:#111}
+.pcard.blank{visibility:hidden}
+.pcard.cur{border-color:var(--rouge);box-shadow:0 0 14px rgba(255,79,168,.5)}
+.pcard.sel{border-color:var(--ice)}
+.pcard canvas{display:block;width:150px;height:auto;background:#fff}
+.pcard .cap{width:100%;text-align:center;font-size:10px;letter-spacing:.16em;color:#cfcfcf;background:#2a2a2a;padding:3px 0}
+.pcard.cur .cap{background:var(--rouge);color:#fff}
+.pcard.sel .cap{background:#2f4a7a;color:#fff}
 </style>
 </head>
 <body>
 <div id="app">
+
   <div id="topbar">
     <span class="t-id">ANI×OBN×COM // SPEC_09</span>
     <span class="t-title">MANGA PLATE</span>
+    <span id="pg-indic">—</span>
     <span class="t-sp"></span>
-    <input id="plate-name" value="plate-A" spellcheck="false">
+    <input id="book-title" value="name-01" spellcheck="false" title="作品名（書き出しファイル名になる）">
+    <button class="btn gold" id="btn-pages" title="ページ一覧（Wクリックでそのページへ）">PAGES</button>
     <button class="btn" id="btn-home" title="ランディングページに戻る">HOME</button>
   </div>
+
+  <div id="rail">
+    <div class="tool on" id="t-sel" title="コマ選択 / 素材選択（V）">▣<small>SEL</small></div>
+    <div class="tool" id="t-div" title="コマ分割（D）— ドラッグで分割線">╱<small>DIV</small></div>
+    <div class="tool" id="t-pt" title="制御点（P）— 選択のみ">◈<small>PT</small></div>
+    <div class="rail-sep"></div>
+    <div class="sub on" id="dm-v" title="縦に分割">│縦</div>
+    <div class="sub" id="dm-h" title="横に分割">─横</div>
+    <div class="sub" id="dm-f" title="斜め自由（Shiftで15°スナップ）">╱斜</div>
+    <div class="rail-sep"></div>
+    <div class="tool" id="t-shade" title="選択コマ以外を青くする（S）">▩<small>BLUE</small></div>
+    <div class="tool" id="t-guide" title="トンボ・内枠ガイド表示（G）">⊹<small>GUIDE</small></div>
+  </div>
+
   <div id="main">
     <canvas id="cv"></canvas>
     <div class="corner tl"></div><div class="corner tr"></div>
     <div class="corner bl"></div><div class="corner br"></div>
-    <div id="stage-label">PARAMETRIC COMIC MATERIALS — TONE / FOCUS / STREAM / FRAME</div>
+    <div id="stage-label">PAGE / PANEL COMPOSER — B4 JUMP PRESET</div>
     <div id="toast"></div>
-    <div id="modal"><div id="modal-box"><div id="modal-msg"></div><div id="modal-btns">
-      <button class="btn gold" id="modal-cancel">CANCEL</button>
-      <button class="btn" id="modal-ok">OK</button>
-    </div></div></div>
   </div>
+
   <div id="side">
-    <div class="sp">
-      <div class="spl">✦ Plate</div>
-      <div class="tr"><span class="lb">W</span><input type="number" id="plate-w" min="64" max="8192" step="1">
-        <span class="lb">H</span><input type="number" id="plate-h" min="64" max="8192" step="1"></div>
-      <div class="tr"><span class="lb">BG</span>
-        <select id="plate-bg"><option value="transparent">transparent</option><option value="#FFFFFF">white</option><option value="#F5F1E8">paper</option></select>
-        <button class="btn gold" id="btn-fit">FIT</button></div>
-    </div>
-    <div class="sp">
-      <div class="spl">✦ Add Element</div>
+
+    <details class="sp" open><summary>◆ Panel（選択コマ）</summary><div class="spb">
+      <div class="note" id="pn-info">コマを選択してください。</div>
       <div class="btnrow">
-        <button class="btn" id="add-frame">+ FRAME</button>
-        <button class="btn" id="add-tone">+ TONE</button>
-        <button class="btn" id="add-focus">+ FOCUS</button>
-        <button class="btn" id="add-stream">+ STREAM</button>
+        <button class="btn gold" id="pn-border" title="枠線のON/OFF（枠なしの絵のとき消す）">枠線</button>
+        <button class="btn gold" id="pn-bleed" title="内枠に接した辺を用紙の端まで伸ばす（ブチ抜き）">断ち切り</button>
+        <button class="btn" id="pn-del" title="このコマを削除（余白になる）">✕ コマ削除</button>
       </div>
-    </div>
-    <div class="sp">
-      <div class="spl">✦ Elements <span style="color:var(--lavender)">（上=前面）</span></div>
-      <div id="elem-list"></div>
-    </div>
-    <div class="sp" id="param-sp">
-      <div class="spl">✦ Params</div>
-      <div id="params"><div class="tr"><span class="lb" style="color:rgba(181,142,255,.5)">エレメントを選択</span></div></div>
+      <div class="btnrow">
+        <button class="btn ice" id="pn-merge" title="直前の分割を戻す（隣のコマと結合）">⤺ 分割を戻す</button>
+      </div>
+    </div></details>
+
+    <details class="sp"><summary>◆ Book（用紙・コマ規定）</summary><div class="spb">
+      <div class="tr"><span class="lb">用紙</span><select id="paper-preset"></select></div>
+      <div class="tr"><span class="lb">左右の間隔<br><span style="opacity:.6">次の分割から</span></span><input type="range" id="gut-lr" min="0" max="400" step="1"><span class="vv" id="gut-lr-v">60</span></div>
+      <div class="tr"><span class="lb">上下の間隔<br><span style="opacity:.6">次の分割から</span></span><input type="range" id="gut-tb" min="0" max="600" step="1"><span class="vv" id="gut-tb-v">180</span></div>
+      <div class="tr"><span class="lb">枠線の太さ<br><span style="opacity:.6">全コマ即時</span></span><input type="range" id="lw" min="1" max="80" step="1"><span class="vv" id="lw-v">18</span></div>
+      <div class="tr"><span class="lb">用紙の色</span><select id="paper-bg">
+        <option value="#FFFFFF">白（通常）</option><option value="transparent">透過（OBAN用）</option></select></div>
+      <div class="btnrow"><button class="btn gold" id="bind-r" title="右綴じ＝右のページが先（日本の漫画）">右綴じ</button></div>
+      <div class="note"><b>間隔</b>は既にあるコマを動かしません（これから引く分割に効く）。<b>太さ</b>は全コマの線に即反映。
+        どちらも最初に決めたら触らなくてOK。既定はクリスタのコマフォルダー分割と同じ 60 / 180。</div>
+    </div></details>
+
+    <details class="sp" open><summary>◆ Items（素材・仕上げ）</summary><div class="spb">
+      <div class="btnrow">
+        <button class="btn ice" id="add-img">＋ 画像</button>
+        <button class="btn" id="add-tone">＋ トーン</button>
+        <button class="btn" id="add-focus">＋ 集中線</button>
+        <button class="btn" id="add-stream">＋ 流線</button>
+      </div>
+      <input type="file" id="img-file" accept="image/*" multiple style="display:none">
+      <div id="item-list"></div>
+      <div id="item-params"></div>
       <div class="chips" id="presets"></div>
-      <div class="spl" style="margin-top:10px">Color</div>
-      <div class="pal" id="palette"></div>
-    </div>
-    <div class="sp">
-      <div class="spl">✦ Ref（下敷き — 書き出し非含有）</div>
+      <div class="pal" id="palette" style="margin-top:8px"></div>
+    </div></details>
+
+    <details class="sp" open><summary>◆ Link（ANIMATOR / COMPOSER / OBAN）</summary><div class="spb">
+      <div class="tr"><span class="lb">解像度</span>
+        <input type="number" id="lk-w" min="64" max="8192" step="1" style="width:62px">
+        <span class="lb">×</span>
+        <input type="number" id="lk-h" min="64" max="8192" step="1" style="width:62px"></div>
+      <div class="chips" id="lk-presets"></div>
       <div class="btnrow">
-        <button class="btn gold" id="ref-load">LOAD</button>
-        <button class="btn gold" id="ref-mode">MOVE</button>
-        <button class="btn gold" id="ref-clear">CLEAR</button>
+        <button class="btn gold" id="lk-to-ani">▶ ANIMATOR REF</button>
+        <button class="btn gold" id="lk-from-ani">◀ ANIMATOR 取込</button>
       </div>
-      <div class="tr"><span class="lb">OPACITY</span><input type="range" id="ref-op" min="0.05" max="1" step="0.05" value="0.4"><span class="vv" id="ref-op-v">0.40</span></div>
-      <input type="file" id="ref-file" accept="image/*" style="display:none">
-    </div>
-    <div class="sp">
-      <div class="spl">✦ Export</div>
-      <div class="tr"><span class="lb">SCALE</span>
-        <button class="btn ice" id="ex-s1">×1</button><button class="btn ice" id="ex-s2">×2</button><span class="t-sp" style="flex:1"></span></div>
       <div class="btnrow">
-        <button class="btn ice" id="ex-elem">PNG ELEM</button>
-        <button class="btn ice" id="ex-full">PNG FULL</button>
-        <button class="btn ice" id="ex-seeds">PNG ×4 SEEDS</button>
+        <button class="btn ice" id="lk-to-comp">▶ COMPOSER</button>
+        <button class="btn ice" id="lk-to-oban">▶ OBAN</button>
       </div>
-    </div>
-    <div class="sp">
-      <div class="spl">✦ Copy / Paste Plate</div>
+      <div class="note" id="lk-note">選択コマを上の解像度に合わせて送ります。ANIMATOR側は <b>REF ▸ ＋ FROM SAVED</b> で拾えます。戻りは <b>◀ ANIMATOR 取込</b>、以後は保存のたび自動更新（LIVE）。</div>
+    </div></details>
+
+    <details class="sp"><summary>◆ Export</summary><div class="spb">
+      <div class="tr"><span class="lb">サイズ</span><select id="ex-size">
+        <option value="1200">WEB 横1200px（ジャンプ＋推奨）</option>
+        <option value="800">WEB 横800px</option>
+        <option value="0">原寸（600dpi B4）</option></select></div>
+      <div class="tr"><span class="lb">階調</span><select id="ex-mode">
+        <option value="gray">生グレー（モアレ皆無・推奨）</option>
+        <option value="tone">網点化（グレー塗り→トーン）</option>
+        <option value="color">そのまま（カラー）</option></select></div>
+      <div class="tr"><span class="lb">網点 線数<br><span style="opacity:.6" id="ex-lpi-cond">網点化 / プレビュー時</span></span><input type="range" id="ex-lpi" min="25" max="85" step="5"><span class="vv" id="ex-lpi-v">50</span></div>
+      <div class="btnrow"><button class="btn gold" id="ex-preview" title="画面でも網点を確認する（重いときはOFF）">網点プレビュー</button></div>
       <div class="btnrow">
-        <button class="btn" id="cp-copy">COPY PLATE</button>
-        <button class="btn" id="cp-paste">PASTE PLATE</button>
+        <button class="btn ice" id="ex-page">PNG ページ</button>
+        <button class="btn ice" id="ex-panels">PNG コマ別</button>
+        <button class="btn ice" id="ex-all">PNG 全ページ</button>
       </div>
-    </div>
+      <div class="note">網点は「グレーで塗った中間調」だけを変換し、線画と白は元のまま残します（<b>◆Items</b>の画像ごとに網点ONが要ります）。</div>
+    </div></details>
+
+    <details class="sp"><summary>◆ File</summary><div class="spb">
+      <div class="btnrow">
+        <button class="btn" id="io-export">EXPORT JSON</button>
+        <button class="btn" id="io-import">IMPORT JSON</button>
+      </div>
+      <input type="file" id="io-file" accept="application/json,.json" style="display:none">
+      <div class="btnrow"><button class="btn gold" id="io-reset">✕ 全消去（新規）</button></div>
+    </div></details>
+
   </div>
+
   <div id="bottombar">
-    <span>DRAG=MOVE ELEM / 空白DRAG=PAN / WHEEL=ZOOM</span>
-    <span><span class="kbd">DEL</span> DELETE</span>
-    <span><span class="kbd">CTRL+Z</span> UNDO</span>
-    <span><span class="kbd">ESC</span> DESELECT</span>
+    <span id="bb-hint"></span>
     <span style="flex:1"></span>
+    <span><span class="kbd">CTRL+Z</span> UNDO</span>
+    <span><span class="kbd">F</span> FIT</span>
+    <span><span class="kbd">ESC</span> 選択解除</span>
     <span id="bb-info"></span>
   </div>
 </div>
+
+<!-- ページ一覧ウィンドウ -->
+<div id="pages-ov">
+  <div id="pages-head">
+    <span>PAGES</span>
+    <button class="btn gold" id="pg-add">＋ 追加</button>
+    <button class="btn gold" id="pg-dup">複製</button>
+    <button class="btn gold" id="pg-left">◀ 前へ</button>
+    <button class="btn gold" id="pg-right">後へ ▶</button>
+    <button class="btn" id="pg-del">✕ 削除</button>
+    <span style="flex:1"></span>
+    <span style="color:var(--lavender);font-size:9px">クリック=選択 ／ Wクリック=そのページを開く</span>
+    <button class="btn ice" id="pages-close">CLOSE</button>
+  </div>
+  <div id="pages-grid"></div>
+</div>
+
+<!-- 共通モーダル（native confirm 禁止） -->
+<div id="modal"><div id="modal-box">
+  <div id="modal-msg"></div>
+  <div id="modal-list"></div>
+  <div id="modal-btns">
+    <button class="btn gold" id="modal-cancel">CANCEL</button>
+    <button class="btn" id="modal-ok">OK</button>
+  </div>
+</div></div>
+
 <script>
 'use strict';
 const $=s=>document.querySelector(s);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const DPR=Math.min(window.devicePixelRatio||1,2);
 const TAU=Math.PI*2;
+const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
-/* ---------- seed決定論PRNG（Math.random禁止 — single-html-verify契約） ---------- */
+/* ============================================================
+   seed決定論PRNG（Math.random禁止 — single-html-verify契約）
+   ============================================================ */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
   t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 
-/* ---------- state ---------- */
-let PLATE={version:1,name:'plate-A',w:1920,h:1080,bg:'transparent',elems:[]};
-let sel=null, eid=1;
-const view={x:0,y:0,z:0.4};
-const ref={image:null,opacity:0.4,x:0,y:0,scale:1};   // 保存対象外（画像はセッション限り）
-let refMode=false, exScale=1;
+/* ============================================================
+   用紙プリセット（ジャンプ規定 = B4原寸・600dpi モノクロ）
+   裁ち落とし 230×320 / 仕上がり 220×310 / 内枠 180×270 mm
+   ============================================================ */
+const PAPER_PRESETS={
+  B4_600:{label:'B4 600dpi モノクロ（ジャンプ規定）',dpi:600,mm:{w:230,h:320,fw:220,fh:310,bw:180,bh:270}},
+  B4_350:{label:'B4 350dpi カラー',              dpi:350,mm:{w:230,h:320,fw:220,fh:310,bw:180,bh:270}},
+  B5_600:{label:'B5 600dpi（同人誌）',            dpi:600,mm:{w:192,h:267,fw:182,fh:257,bw:150,bh:220}},
+};
+function paperOf(key){
+  const p=PAPER_PRESETS[key]||PAPER_PRESETS.B4_600, k=p.dpi/25.4, R=v=>Math.round(v*k);
+  const w=R(p.mm.w),h=R(p.mm.h),fw=R(p.mm.fw),fh=R(p.mm.fh),bw=R(p.mm.bw),bh=R(p.mm.bh);
+  return {key:key,dpi:p.dpi,w:w,h:h,
+    fin:{x:(w-fw)/2,y:(h-fh)/2,w:fw,h:fh},      // 仕上がり枠（断裁線）
+    bas:{x:(w-bw)/2,y:(h-bh)/2,w:bw,h:bh}};     // 内枠（基本枠）
+}
+let PAPER=paperOf('B4_600');
 
+/* ============================================================
+   モデル
+   ============================================================ */
+let BOOK=null, MATSRC={}, MATIMG={};   // MATSRC: srcId→dataURL（保存対象） / MATIMG: srcId→Image（実行時）
+let curPageIdx=0, selPanel=null, selItem=null;
+let tool='sel', divMode='v', showShade=true, showGuide=true;
+const view={x:0,y:0,z:0.1};
+
+function rectPoly(r){return[{x:r.x,y:r.y},{x:r.x+r.w,y:r.y},{x:r.x+r.w,y:r.y+r.h},{x:r.x,y:r.y+r.h}];}
+function newPage(name){
+  return {id:uid('p_'),name:name||'',panels:[{id:uid('k_'),poly:rectPoly(PAPER.bas),border:true,bleed:false}],items:[]};
+}
+function newBook(){
+  return {version:2,title:'name-01',paper:'B4_600',bg:'#FFFFFF',
+    gut:{lr:60,tb:180},lw:18,bindRight:true,
+    link:{w:1920,h:1080},              // ANIMATOR側の作業解像度
+    links:{},                          // projectId → {pageId,panelId,box}
+    pages:[newPage()]};
+}
+function migrate(b){
+  if(!b||typeof b!=='object')return newBook();
+  const d=newBook();
+  b.version=2;
+  if(!b.title)b.title=d.title;
+  if(!PAPER_PRESETS[b.paper])b.paper=d.paper;
+  if(!b.bg)b.bg=d.bg;
+  b.gut=Object.assign({},d.gut,b.gut||{});
+  b.lw=b.lw||d.lw;
+  if(b.bindRight===undefined)b.bindRight=true;
+  b.link=Object.assign({},d.link,b.link||{});
+  if(!b.links||typeof b.links!=='object')b.links={};
+  if(!Array.isArray(b.pages)||!b.pages.length)b.pages=[newPage()];
+  b.pages.forEach(pg=>{
+    if(!pg.id)pg.id=uid('p_');
+    if(!Array.isArray(pg.panels))pg.panels=[];
+    pg.panels.forEach(k=>{
+      if(!k.id)k.id=uid('k_');
+      if(!Array.isArray(k.poly)||k.poly.length<3)k.poly=rectPoly(PAPER.bas);
+      if(k.border===undefined)k.border=true;
+      if(k.bleed===undefined)k.bleed=false;
+    });
+    if(!Array.isArray(pg.items))pg.items=[];
+    pg.items=pg.items.filter(it=>it&&ITEM_DEFS[it.type]);
+    pg.items.forEach(it=>{
+      if(!it.id)it.id=uid('i_');
+      if(it.visible===undefined)it.visible=true;
+      if(it.panelId===undefined)it.panelId=null;
+      if(!it.name)it.name=it.type.toUpperCase();
+      const def=defaultsFor(it.type,PAPER.bas);
+      for(const k in def)if(it[k]===undefined)it[k]=def[k];
+      if(it.type==='img'){
+        it.edge=Object.assign({on:false,w:24,color:'#FFFFFF'},it.edge||{});
+        it.tone=Object.assign({on:false},it.tone||{});
+      }
+    });
+  });
+  return b;
+}
+function curPage(){return BOOK.pages[clamp(curPageIdx,0,BOOK.pages.length-1)];}
+function findPanel(pg,id){return id?pg.panels.find(k=>k.id===id)||null:null;}
+
+/* ---- アイテム定義（スライダーは DEFS から自動生成） ---- */
+const ITEM_DEFS={img:1,tone:1,focus:1,stream:1,frame:1};
+function defaultsFor(type,box){
+  const S=PAPER.dpi/600;                       // 600dpi基準のpxを解像度に合わせる
+  if(type==='img')   return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,scale:1,opacity:1,srcId:null,linkId:null,
+                             edge:{on:false,w:Math.round(24*S),color:'#FFFFFF'},tone:{on:false}};
+  if(type==='tone')  return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,w:Math.round(box.w),h:Math.round(box.h),
+                             dot:Math.round(16*S),gap:Math.round(22*S),angle:45,shape:'dot',color:'#000000'};
+  if(type==='focus') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,r0:Math.round(Math.min(box.w,box.h)*0.22),
+                             r1:Math.round(Math.hypot(box.w,box.h)*0.62),count:110,lw:Math.round(7*S),
+                             taper:0.9,jitter:0.35,seed:1,color:'#000000'};
+  if(type==='stream')return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,w:Math.round(box.w),h:Math.round(box.h),
+                             count:34,lw:Math.round(6*S),taper:0.85,jitter:0.3,seed:1,color:'#000000'};
+  return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,w:Math.round(box.w),h:Math.round(box.h),lw:Math.round(14*S),color:'#000000'};
+}
+const DEFS={
+  img:   [['scale',0.05,4,0.01,'SCALE'],['rot',-180,180,1,'ROT'],['opacity',0.05,1,0.05,'不透明度']],
+  tone:  [['w',50,9000,1,'W'],['h',50,9000,1,'H'],['dot',2,120,1,'ドット径'],['gap',4,240,1,'間隔'],['angle',0,90,1,'角度'],['rot',-90,90,1,'ROT']],
+  focus: [['r0',0,4000,1,'R0 白場'],['r1',100,9000,1,'R1 長さ'],['count',10,400,1,'本数'],['lw',1,60,1,'太さ'],['taper',0,1,0.05,'先細り'],['jitter',0,1,0.05,'ゆらぎ'],['seed',1,99,1,'SEED'],['rot',-180,180,1,'ROT']],
+  stream:[['w',50,9000,1,'W'],['h',50,9000,1,'H'],['count',2,200,1,'本数'],['lw',1,60,1,'太さ'],['taper',0,1,0.05,'先細り'],['jitter',0,1,0.05,'ゆらぎ'],['seed',1,99,1,'SEED'],['rot',-180,180,1,'ROT']],
+  frame: [['w',50,9000,1,'W'],['h',50,9000,1,'H'],['lw',2,120,1,'太さ'],['rot',-90,90,1,'ROT']],
+};
+const TONE_PRESETS=[['10%',0.42],['20%',0.55],['40%',0.74],['60%',0.90]];   // dot = gap × 比
+const FOCUS_PRESETS=[['標準',{count:110,taper:0.9,jitter:0.35}],['密',{count:220,taper:0.95,jitter:0.25}]];
+const STREAM_PRESETS=[['標準',{count:34,taper:0.85}],['太',{count:16,taper:0.6}]];
 const MANGA_PAL=['#000000','#FFFFFF','#EBEBEB','#D4D4D4','#ABABAB','#808080','#555555','#2B2B2B','#F5F1E8','#FF3355'];
 
-/* type別デフォルト＋スライダー定義 [key,min,max,step,label] */
-const DEFAULTS={
-  frame:{w:900,h:600,lw:12,rot:0,color:'#000000'},
-  tone:{w:700,h:460,dot:16,gap:22,angle:45,rot:0,shape:'dot',color:'#000000'},
-  focus:{r0:150,r1:900,count:90,lw:6,taper:0.9,jitter:0.35,seed:1,rot:0,color:'#000000'},
-  stream:{w:900,h:500,count:24,lw:5,taper:0.85,jitter:0.3,seed:1,rot:0,color:'#000000'},
-};
-const DEFS={
-  frame:[['w',50,4000,1,'W'],['h',50,4000,1,'H'],['lw',2,80,1,'LINE W'],['rot',-90,90,1,'ROT']],
-  tone:[['w',50,4000,1,'W'],['h',50,4000,1,'H'],['dot',2,80,1,'DOT'],['gap',4,160,1,'GAP'],['angle',0,90,1,'ANGLE'],['rot',-90,90,1,'ROT']],
-  focus:[['r0',0,1500,1,'R0 白場'],['r1',100,4000,1,'R1'],['count',10,300,1,'COUNT'],['lw',1,40,1,'LINE W'],['taper',0,1,0.05,'TAPER'],['jitter',0,1,0.05,'JITTER'],['seed',1,99,1,'SEED'],['rot',-180,180,1,'ROT']],
-  stream:[['w',50,4000,1,'W'],['h',50,4000,1,'H'],['count',2,120,1,'COUNT'],['lw',1,40,1,'LINE W'],['taper',0,1,0.05,'TAPER'],['jitter',0,1,0.05,'JITTER'],['seed',1,99,1,'SEED'],['rot',-180,180,1,'ROT']],
-};
-/* トーン濃度プリセット: gap=22固定で 10/20/40/60%（MANGAパレットのグレー4段に対応） */
-const TONE_PRESETS=[['10%',8],['20%',11],['40%',16],['60%',19]];
-const FOCUS_PRESETS=[['標準',{count:90,lw:6,jitter:0.35}],['密',{count:180,lw:4,jitter:0.25}]];
-const STREAM_PRESETS=[['標準',{count:24,lw:5}],['太',{count:12,lw:12}]];
-
-/* ---------- undo（OBANのcommit/commitDと同型） ---------- */
-const hist=[]; let hi=-1, dTimer=null;
-function snapshot(){return JSON.stringify({plate:PLATE,eid:eid});}
-function commit(){hist.splice(hi+1);hist.push(snapshot());if(hist.length>60)hist.shift();hi=hist.length-1;save();render();}
-function commitD(){save();render();clearTimeout(dTimer);dTimer=setTimeout(()=>{hist.splice(hi+1);hist.push(snapshot());if(hist.length>60)hist.shift();hi=hist.length-1;},300);}
-function applyHist(s){const o=JSON.parse(s);PLATE=o.plate;eid=o.eid;sel=null;save();renderList();renderParams();render();}
-function undo(){if(hi>0){hi--;applyHist(hist[hi]);}}
-function redo(){if(hi<hist.length-1){hi++;applyHist(hist[hi]);}}
-
-/* ---------- 保存（localStorage。REF画像は含めない） ---------- */
-function save(){try{localStorage.setItem('manga-plate',JSON.stringify({plate:PLATE,eid:eid}));}catch(e){}}
-function load(){try{const s=localStorage.getItem('manga-plate');if(!s)return;const o=JSON.parse(s);
-  if(o&&o.plate&&Array.isArray(o.plate.elems)){PLATE=migrate(o.plate);eid=o.eid||PLATE.elems.length+1;}}catch(e){}}
-function migrate(p){
-  p.version=1;
-  if(!p.name)p.name='plate-A';
-  p.w=clamp(p.w||1920,64,8192);p.h=clamp(p.h||1080,64,8192);
-  if(!p.bg)p.bg='transparent';
-  p.elems.forEach(e=>{const d=DEFAULTS[e.type];if(!d)return;
-    for(const k in d)if(e[k]===undefined)e[k]=d[k];
-    if(e.visible===undefined)e.visible=true;});
-  p.elems=p.elems.filter(e=>DEFAULTS[e.type]);
-  return p;
-}
-
-/* ---------- エレメント描画（プレート座標系。builder/exportで共用＝ピクセル一致） ---------- */
-function drawElem(c,e){
-  c.save();c.translate(e.x,e.y);c.rotate((e.rot||0)*Math.PI/180);
-  c.fillStyle=e.color;c.strokeStyle=e.color;
-  if(e.type==='frame'){
-    c.lineWidth=e.lw;c.lineJoin='miter';
-    c.strokeRect(-e.w/2,-e.h/2,e.w,e.h);
-  }else if(e.type==='tone'){
-    c.beginPath();c.rect(-e.w/2,-e.h/2,e.w,e.h);c.clip();
-    c.rotate(e.angle*Math.PI/180);
-    const R=Math.hypot(e.w,e.h)/2, g=Math.max(2,e.gap), r=e.dot/2;
-    const n=Math.ceil(R/g);
-    for(let j=-n;j<=n;j++)for(let i=-n;i<=n;i++){
-      const px=i*g, py=j*g;
-      if(e.shape==='square')c.fillRect(px-r,py-r,e.dot,e.dot);
-      else{c.beginPath();c.arc(px,py,r,0,TAU);c.fill();}
-    }
-  }else if(e.type==='focus'){
-    const rnd=mulberry32(e.seed|0);
-    for(let i=0;i<e.count;i++){
-      const a=(i/e.count)*TAU+(rnd()-0.5)*(TAU/e.count)*e.jitter*2;
-      const len=Math.max(e.r0+4,e.r1*(1-rnd()*e.jitter*0.4));
-      const w0=(e.lw*(0.6+rnd()*0.8))/2, w1=w0*(1-e.taper);
-      const ca=Math.cos(a),sa=Math.sin(a), px=-sa,py=ca;   // 進行方向と直交
-      c.beginPath();
-      c.moveTo(ca*e.r0+px*w0, sa*e.r0+py*w0);
-      c.lineTo(ca*len+px*w1, sa*len+py*w1);
-      c.lineTo(ca*len-px*w1, sa*len-py*w1);
-      c.lineTo(ca*e.r0-px*w0, sa*e.r0-py*w0);
-      c.closePath();c.fill();
-    }
-  }else if(e.type==='stream'){
-    const rnd=mulberry32(e.seed|0);
-    for(let i=0;i<e.count;i++){
-      const yy=-e.h/2+((i+0.5)/e.count+(rnd()-0.5)*e.jitter/e.count)*e.h;
-      const x0=-e.w/2+(rnd()-0.5)*e.jitter*e.w*0.5;
-      const x1=e.w/2*(1-rnd()*e.jitter*0.3);
-      const w0=(e.lw*(0.5+rnd()))/2, w1=w0*(1-e.taper);
-      c.beginPath();
-      c.moveTo(x0,yy-w0);c.lineTo(x1,yy-w1);c.lineTo(x1,yy+w1);c.lineTo(x0,yy+w0);
-      c.closePath();c.fill();
-    }
+/* ============================================================
+   幾何（多角形＝コマ）
+   ============================================================ */
+function polyArea(p){let a=0;for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length];a+=p[i].x*q.y-q.x*p[i].y;}return Math.abs(a)/2;}
+function polyBounds(p){let x0=1e12,y0=1e12,x1=-1e12,y1=-1e12;
+  for(const q of p){if(q.x<x0)x0=q.x;if(q.y<y0)y0=q.y;if(q.x>x1)x1=q.x;if(q.y>y1)y1=q.y;}
+  return{x:x0,y:y0,w:x1-x0,h:y1-y0,cx:(x0+x1)/2,cy:(y0+y1)/2};}
+function pointInPoly(p,x,y){let c=false;
+  for(let i=0,j=p.length-1;i<p.length;j=i++){
+    if((p[i].y>y)!==(p[j].y>y)&&x<(p[j].x-p[i].x)*(y-p[i].y)/(p[j].y-p[i].y)+p[i].x)c=!c;}
+  return c;}
+/* 半平面 n·P <= d を残す（Sutherland–Hodgman） */
+function clipHalf(poly,nx,ny,d){
+  const out=[];
+  for(let i=0;i<poly.length;i++){
+    const a=poly[i], b=poly[(i+1)%poly.length];
+    const da=nx*a.x+ny*a.y-d, db=nx*b.x+ny*b.y-d;
+    if(da<=0)out.push(a);
+    if((da<0&&db>0)||(da>0&&db<0)){const t=da/(da-db);out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});}
   }
-  c.restore();
+  return out;
 }
-/* エレメントのバウンディング（選択枠・ヒット用。プレート座標） */
-function elemBounds(e){
-  if(e.type==='focus')return{w:e.r1*2,h:e.r1*2};
-  return{w:e.w,h:e.h};
+function pathPoly(g,p){g.beginPath();g.moveTo(p[0].x,p[0].y);for(let i=1;i<p.length;i++)g.lineTo(p[i].x,p[i].y);g.closePath();}
+/* 断ち切り: 内枠に接した辺を用紙の端まで伸ばす */
+function dispPoly(k){
+  if(!k.bleed)return k.poly;
+  const b=PAPER.bas, E=Math.max(4,PAPER.w*0.006);
+  return k.poly.map(q=>({
+    x:Math.abs(q.x-b.x)<E?0:(Math.abs(q.x-(b.x+b.w))<E?PAPER.w:q.x),
+    y:Math.abs(q.y-b.y)<E?0:(Math.abs(q.y-(b.y+b.h))<E?PAPER.h:q.y)}));
 }
-function hitElem(e,px,py){
-  const dx=px-e.x, dy=py-e.y, a=-(e.rot||0)*Math.PI/180;
-  const lx=dx*Math.cos(a)-dy*Math.sin(a), ly=dx*Math.sin(a)+dy*Math.cos(a);
-  const b=elemBounds(e);
-  return Math.abs(lx)<=b.w/2&&Math.abs(ly)<=b.h/2;
+/* 読み順（右綴じ=右上から）で並べ替え。コマ番号表示用 */
+function sortPanels(pg){
+  const band=PAPER.h/26, dir=BOOK.bindRight?-1:1;
+  pg.panels.sort((a,b)=>{
+    const A=polyBounds(a.poly),B=polyBounds(b.poly);
+    const ra=Math.round(A.y/band), rb=Math.round(B.y/band);
+    if(ra!==rb)return ra-rb;
+    return (A.cx-B.cx)*dir;
+  });
+}
+/* 分割: 点Pを通り方向Dの直線で targets を切る。コマ間隔は線の向きで補間 */
+function splitPanels(pg,targets,px,py,dx,dy){
+  const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
+  let nx=-dy, ny=dx;                                  // 法線
+  const d=nx*px+ny*py;
+  const gap=BOOK.gut.lr*Math.abs(nx)+BOOK.gut.tb*Math.abs(ny);
+  const MIN=Math.pow(PAPER.dpi/600*90,2);             // これ未満の面積は「切れていない」
+  let n=0;
+  for(const k of targets){
+    const A=clipHalf(k.poly,nx,ny,d-gap/2);
+    const B=clipHalf(k.poly,-nx,-ny,-(d+gap/2));
+    if(A.length<3||B.length<3)continue;
+    if(polyArea(A)<MIN||polyArea(B)<MIN)continue;
+    const i=pg.panels.indexOf(k);if(i<0)continue;
+    const mk=poly=>({id:uid('k_'),poly:poly,border:k.border,bleed:k.bleed,from:k.id});
+    pg.panels.splice(i,1,mk(A),mk(B));
+    n++;
+  }
+  if(n)sortPanels(pg);
+  return n;
+}
+/* 分割を戻す: 同じ from を持つ兄弟（または隣接コマ）を凸包的に結合 */
+function mergePanel(pg,k){
+  const sib=pg.panels.filter(o=>o!==k&&o.from&&k.from&&o.from===k.from);
+  const mates=sib.length?sib:pg.panels.filter(o=>o!==k&&adjacent(o,k));
+  if(!mates.length)return null;
+  const m=mates[0];
+  const b=polyBounds(k.poly.concat(m.poly));
+  const nk={id:uid('k_'),poly:rectPoly(b),border:k.border||m.border,bleed:k.bleed||m.bleed,from:k.from||null};
+  pg.panels=pg.panels.filter(o=>o!==k&&o!==m);
+  pg.panels.push(nk);sortPanels(pg);
+  return nk;
+}
+function adjacent(a,b){
+  const A=polyBounds(a.poly),B=polyBounds(b.poly);
+  const g=Math.max(BOOK.gut.lr,BOOK.gut.tb)*1.6;
+  const ox=Math.min(A.x+A.w,B.x+B.w)-Math.max(A.x,B.x);
+  const oy=Math.min(A.y+A.h,B.y+B.h)-Math.max(A.y,B.y);
+  return (ox>-g&&oy>-g)&&(ox<g*2||oy<g*2);
 }
 
-/* ---------- ステージ描画 ---------- */
+/* ============================================================
+   描画（ステージ / 書き出し / サムネで完全共用＝ピクセル一致）
+   ============================================================ */
+function drawItem(g,it){
+  if(it.type==='img')return drawImgItem(g,it);
+  g.save();g.translate(it.x,it.y);g.rotate((it.rot||0)*Math.PI/180);
+  g.fillStyle=it.color;g.strokeStyle=it.color;
+  if(it.type==='frame'){g.lineWidth=it.lw;g.lineJoin='miter';g.strokeRect(-it.w/2,-it.h/2,it.w,it.h);}
+  else if(it.type==='tone')drawTone(g,it);
+  else if(it.type==='focus')drawFocus(g,it);
+  else if(it.type==='stream')drawStream(g,it);
+  g.restore();
+}
+function drawTone(g,it){
+  g.beginPath();g.rect(-it.w/2,-it.h/2,it.w,it.h);g.clip();
+  g.rotate(it.angle*Math.PI/180);
+  const gp=Math.max(2,it.gap), r=it.dot/2;
+  /* 回転後の空間で矩形4隅を包む範囲だけ回す（全周回すと重い） */
+  const ca=Math.cos(-it.angle*Math.PI/180), sa=Math.sin(-it.angle*Math.PI/180);
+  let i0=1e12,i1=-1e12,j0=1e12,j1=-1e12;
+  for(const c of [[-it.w/2,-it.h/2],[it.w/2,-it.h/2],[it.w/2,it.h/2],[-it.w/2,it.h/2]]){
+    const lx=c[0]*ca-c[1]*sa, ly=c[0]*sa+c[1]*ca;
+    i0=Math.min(i0,lx);i1=Math.max(i1,lx);j0=Math.min(j0,ly);j1=Math.max(j1,ly);
+  }
+  const ia=Math.floor(i0/gp)-1, ib=Math.ceil(i1/gp)+1, ja=Math.floor(j0/gp)-1, jb=Math.ceil(j1/gp)+1;
+  if((ib-ia)*(jb-ja)>400000)return;      // 事故防止（間隔が細かすぎ）
+  for(let j=ja;j<=jb;j++)for(let i=ia;i<=ib;i++){
+    const px=i*gp, py=j*gp;
+    if(it.shape==='square')g.fillRect(px-r,py-r,it.dot,it.dot);
+    else{g.beginPath();g.arc(px,py,r,0,TAU);g.fill();}
+  }
+}
+function drawFocus(g,it){
+  const rnd=mulberry32(it.seed|0);
+  for(let i=0;i<it.count;i++){
+    const a=(i/it.count)*TAU+(rnd()-0.5)*(TAU/it.count)*it.jitter*2;
+    const len=Math.max(it.r0+4,it.r1*(1-rnd()*it.jitter*0.4));
+    const w0=(it.lw*(0.6+rnd()*0.8))/2, w1=w0*(1-it.taper);
+    const ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca;
+    g.beginPath();
+    g.moveTo(ca*it.r0+px*w0, sa*it.r0+py*w0);
+    g.lineTo(ca*len+px*w1, sa*len+py*w1);
+    g.lineTo(ca*len-px*w1, sa*len-py*w1);
+    g.lineTo(ca*it.r0-px*w0, sa*it.r0-py*w0);
+    g.closePath();g.fill();
+  }
+}
+function drawStream(g,it){
+  const rnd=mulberry32(it.seed|0);
+  for(let i=0;i<it.count;i++){
+    const yy=-it.h/2+((i+0.5)/it.count+(rnd()-0.5)*it.jitter/it.count)*it.h;
+    const x0=-it.w/2+(rnd()-0.5)*it.jitter*it.w*0.5;
+    const x1=it.w/2*(1-rnd()*it.jitter*0.3);
+    const w0=(it.lw*(0.5+rnd()))/2, w1=w0*(1-it.taper);
+    g.beginPath();
+    g.moveTo(x0,yy-w0);g.lineTo(x1,yy-w1);g.lineTo(x1,yy+w1);g.lineTo(x0,yy+w0);
+    g.closePath();g.fill();
+  }
+}
+/* ---- 境界効果（アルファの外側に白フチ） ---- */
+const edgeCache=new Map();
+function edgeSprite(img,w,color,tag){
+  /* tag は呼び出し側が渡す安定キー（img は Image のことも 網点化後の canvas のこともある） */
+  const key=tag+'|'+img.width+'x'+img.height+'|'+Math.round(w)+'|'+color;
+  const hit=edgeCache.get(key);if(hit)return hit;
+  const pad=Math.ceil(w)+2;
+  const c=document.createElement('canvas');c.width=img.width+pad*2;c.height=img.height+pad*2;
+  const g=c.getContext('2d');
+  const N=24;
+  for(const rr of [w,w*0.55])for(let i=0;i<N;i++){
+    const a=i/N*TAU;g.drawImage(img,pad+Math.cos(a)*rr,pad+Math.sin(a)*rr);
+  }
+  g.globalCompositeOperation='source-in';g.fillStyle=color;g.fillRect(0,0,c.width,c.height);
+  const out={canvas:c,pad:pad};
+  if(edgeCache.size>24)edgeCache.clear();
+  edgeCache.set(key,out);
+  return out;
+}
+function drawImgItem(g,it){
+  const img=MATIMG[it.srcId];if(!img||!img.width)return;
+  const toned=!!(it.tone&&it.tone.on&&gToneOn);
+  const use=toned?tonizeImage(img,it):img;
+  g.save();
+  g.globalAlpha=clamp(it.opacity===undefined?1:it.opacity,0,1);
+  g.translate(it.x,it.y);g.rotate((it.rot||0)*Math.PI/180);g.scale(it.scale,it.scale);
+  if(it.edge&&it.edge.on&&it.edge.w>0){
+    const e=edgeSprite(use,Math.max(1,it.edge.w/Math.max(0.01,it.scale)),it.edge.color,
+                       it.srcId+(toned?'|t'+gLpi:''));
+    g.drawImage(e.canvas,-use.width/2-e.pad,-use.height/2-e.pad);
+  }
+  g.drawImage(use,-use.width/2,-use.height/2);
+  g.restore();
+}
+/* ---- ページ1枚を描く（唯一の真実。ステージ/書き出し/サムネが共用） ---- */
+function renderPage(g,pg,o){
+  o=o||{};
+  const lw=BOOK.lw;
+  if(BOOK.bg!=='transparent'){g.fillStyle=BOOK.bg;g.fillRect(0,0,PAPER.w,PAPER.h);}
+  /* 1) コマに割り当てた素材＝コマ内でカット */
+  for(const it of pg.items){
+    if(!it.visible||!it.panelId)continue;
+    const k=findPanel(pg,it.panelId);if(!k)continue;
+    g.save();pathPoly(g,dispPoly(k));g.clip();drawItem(g,it);g.restore();
+  }
+  /* 2) コマ枠線（絵の上に乗る） */
+  g.strokeStyle='#000';g.lineJoin='miter';g.lineWidth=lw;
+  for(const k of pg.panels){
+    if(!k.border)continue;
+    g.save();pathPoly(g,dispPoly(k));
+    /* 断ち切り部分は用紙外へ出るので、線は仕上がりの外まで自然に切れる */
+    g.stroke();g.restore();
+  }
+  /* 3) コマに属さない素材＝枠の上（擬音・飛び出し） */
+  for(const it of pg.items){
+    if(!it.visible||it.panelId)continue;
+    drawItem(g,it);
+  }
+}
+
+/* ============================================================
+   ステージ
+   ============================================================ */
 const cvs=$('#cv'), cx=cvs.getContext('2d');
 function setupCanvas(){
   const r=cvs.parentElement.getBoundingClientRect();
-  cvs.width=Math.round(r.width*DPR);cvs.height=Math.round(r.height*DPR);
+  cvs.width=Math.max(1,Math.round(r.width*DPR));cvs.height=Math.max(1,Math.round(r.height*DPR));
   render();
 }
-function k(){return view.z*DPR;}
-function s2p(sx,sy){   // screen(device px)→plate
-  return{x:(sx-cvs.width/2)/k()+PLATE.w/2-view.x, y:(sy-cvs.height/2)/k()+PLATE.h/2-view.y};
-}
-function render(){
-  const W=cvs.width,H=cvs.height;
-  cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,W,H);
-  cx.translate(W/2,H/2);cx.scale(k(),k());cx.translate(-PLATE.w/2+view.x,-PLATE.h/2+view.y);
-  /* プレート面: 透過=市松、指定色=塗り */
-  if(PLATE.bg==='transparent'){
-    cx.fillStyle='#e8e4ee';cx.fillRect(0,0,PLATE.w,PLATE.h);
-    cx.fillStyle='#cfc9dc';const cs=Math.max(16,Math.round(48/view.z/2)*2);
-    for(let yy=0;yy<PLATE.h;yy+=cs)for(let xx=(yy/cs)%2?cs:0;xx<PLATE.w;xx+=cs*2)
-      cx.fillRect(xx,yy,Math.min(cs,PLATE.w-xx),Math.min(cs,PLATE.h-yy));
-  }else{cx.fillStyle=PLATE.bg;cx.fillRect(0,0,PLATE.w,PLATE.h);}
-  cx.save();cx.beginPath();cx.rect(0,0,PLATE.w,PLATE.h);cx.clip();
-  /* REF下敷き（書き出し非含有） */
-  if(ref.image){cx.save();cx.globalAlpha=ref.opacity;
-    cx.drawImage(ref.image,ref.x,ref.y,ref.image.width*ref.scale,ref.image.height*ref.scale);cx.restore();}
-  for(const e of PLATE.elems)if(e.visible)drawElem(cx,e);
-  cx.restore();
-  /* プレート枠 */
-  cx.strokeStyle='rgba(255,210,122,.6)';cx.lineWidth=1.5/view.z;cx.strokeRect(0,0,PLATE.w,PLATE.h);
-  /* 選択表示 */
-  if(sel){
-    const b=elemBounds(sel);
-    cx.save();cx.translate(sel.x,sel.y);cx.rotate((sel.rot||0)*Math.PI/180);
-    cx.strokeStyle='#FF4FA8';cx.lineWidth=2/view.z;cx.setLineDash([8/view.z,6/view.z]);
-    cx.strokeRect(-b.w/2,-b.h/2,b.w,b.h);cx.setLineDash([]);cx.restore();
-  }
-  $('#bb-info').textContent=PLATE.w+'×'+PLATE.h+'  Z '+(view.z*100).toFixed(0)+'%'
-    +(sel?'  ▸ '+sel.name:'')+(refMode?'  [REF MOVE]':'');
-}
+function kz(){return view.z*DPR;}
+function s2p(sx,sy){return{x:(sx-cvs.width/2)/kz()+PAPER.w/2-view.x, y:(sy-cvs.height/2)/kz()+PAPER.h/2-view.y};}
+function evPt(ev){const r=cvs.getBoundingClientRect();return s2p((ev.clientX-r.left)*DPR,(ev.clientY-r.top)*DPR);}
 function fitView(){
-  view.z=clamp(Math.min(cvs.width/DPR/PLATE.w,cvs.height/DPR/PLATE.h)*0.85,0.02,8);
+  view.z=clamp(Math.min(cvs.width/DPR/PAPER.w,cvs.height/DPR/PAPER.h)*0.88,0.005,4);
   view.x=0;view.y=0;render();
 }
+let gToneOn=false;      // 網点プレビューは書き出し時のみON
+let divPreview=null;    // {x0,y0,x1,y1}
 
-/* ---------- UI: エレメントリスト ---------- */
-function renderList(){
-  const box=$('#elem-list');box.innerHTML='';
-  const arr=[...PLATE.elems].reverse();   // 表示は前面が上
-  arr.forEach(e=>{
+function render(){
+  if(!BOOK)return;
+  const W=cvs.width,H=cvs.height,pg=curPage();
+  cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,W,H);
+  cx.translate(W/2,H/2);cx.scale(kz(),kz());cx.translate(-PAPER.w/2+view.x,-PAPER.h/2+view.y);
+  /* 用紙面 */
+  if(BOOK.bg==='transparent'){
+    cx.fillStyle='#e8e4ee';cx.fillRect(0,0,PAPER.w,PAPER.h);
+    cx.fillStyle='#cfc9dc';const cs=Math.max(PAPER.w/60,Math.round(48/view.z/2)*2);
+    for(let yy=0;yy<PAPER.h;yy+=cs)for(let xx=(Math.round(yy/cs))%2?cs:0;xx<PAPER.w;xx+=cs*2)
+      cx.fillRect(xx,yy,Math.min(cs,PAPER.w-xx),Math.min(cs,PAPER.h-yy));
+  }else{cx.fillStyle='#fff';cx.fillRect(0,0,PAPER.w,PAPER.h);}
+  cx.save();cx.beginPath();cx.rect(0,0,PAPER.w,PAPER.h);cx.clip();
+  renderPage(cx,pg,{});
+  cx.restore();
+  /* 選択以外を青くする（クリスタのコマ作業表示） */
+  if(showShade&&selPanel){
+    cx.save();
+    cx.beginPath();cx.rect(0,0,PAPER.w,PAPER.h);cx.clip();
+    cx.beginPath();cx.rect(0,0,PAPER.w,PAPER.h);
+    const dp=dispPoly(selPanel);
+    cx.moveTo(dp[0].x,dp[0].y);for(let i=dp.length-1;i>=1;i--)cx.lineTo(dp[i].x,dp[i].y);cx.closePath();
+    cx.fillStyle='rgba(120,136,255,.45)';cx.fill('evenodd');
+    cx.restore();
+  }
+  /* ガイド（トンボ・仕上がり・内枠）— 表示のみ。書き出しに入らない */
+  if(showGuide){
+    const u=1/view.z;
+    cx.save();cx.lineWidth=Math.max(1.2*u,PAPER.w*0.0006);
+    cx.strokeStyle='rgba(90,140,255,.85)';strokeRectO(cx,PAPER.fin);
+    cx.strokeStyle='rgba(90,140,255,.55)';strokeRectO(cx,PAPER.bas);
+    cx.strokeStyle='rgba(90,140,255,.9)';
+    const m=PAPER.w*0.03;
+    [[PAPER.fin.x,PAPER.fin.y],[PAPER.fin.x+PAPER.fin.w,PAPER.fin.y],
+     [PAPER.fin.x,PAPER.fin.y+PAPER.fin.h],[PAPER.fin.x+PAPER.fin.w,PAPER.fin.y+PAPER.fin.h]].forEach(c=>{
+      cx.beginPath();cx.moveTo(c[0]-m,c[1]);cx.lineTo(c[0]+m,c[1]);
+      cx.moveTo(c[0],c[1]-m);cx.lineTo(c[0],c[1]+m);cx.stroke();
+    });
+    cx.restore();
+  }
+  /* コマ番号 */
+  cx.save();
+  cx.fillStyle='rgba(255,79,168,.85)';
+  const fs=Math.max(PAPER.w*0.022,16/view.z);
+  cx.font='700 '+fs+'px '+'IBM Plex Mono, monospace';cx.textBaseline='top';
+  pg.panels.forEach((k,i)=>{const b=polyBounds(dispPoly(k));
+    cx.fillText(String(i+1),b.x+b.w-fs*0.9,b.y+fs*0.2);});
+  cx.restore();
+  /* 選択コマ */
+  if(selPanel){
+    cx.save();pathPoly(cx,dispPoly(selPanel));
+    cx.strokeStyle='#FF4FA8';cx.lineWidth=Math.max(2/view.z,PAPER.w*0.0012);
+    cx.setLineDash([14/view.z,10/view.z]);cx.stroke();cx.setLineDash([]);
+    if(tool==='pt'){   /* 制御点（表示のみ） */
+      const r=Math.max(6/view.z,PAPER.w*0.004);
+      cx.fillStyle='#FFD27A';cx.strokeStyle='#0a0612';cx.lineWidth=Math.max(1/view.z,PAPER.w*0.0006);
+      for(const q of selPanel.poly){cx.beginPath();cx.rect(q.x-r,q.y-r,r*2,r*2);cx.fill();cx.stroke();}
+    }
+    cx.restore();
+  }
+  /* 選択素材 */
+  if(selItem){
+    const b=itemBounds(selItem);
+    cx.save();cx.translate(selItem.x,selItem.y);cx.rotate((selItem.rot||0)*Math.PI/180);
+    cx.strokeStyle='#5AE9FF';cx.lineWidth=Math.max(2/view.z,PAPER.w*0.0012);
+    cx.setLineDash([10/view.z,8/view.z]);cx.strokeRect(-b.w/2,-b.h/2,b.w,b.h);cx.setLineDash([]);cx.restore();
+  }
+  /* 分割プレビュー */
+  if(divPreview){
+    cx.save();cx.strokeStyle='#5AE9FF';cx.lineWidth=Math.max(2/view.z,PAPER.w*0.0014);
+    cx.setLineDash([20/view.z,14/view.z]);
+    const L=Math.hypot(PAPER.w,PAPER.h)*2;
+    let dx=divPreview.x1-divPreview.x0, dy=divPreview.y1-divPreview.y0;
+    const n=Math.hypot(dx,dy)||1;dx/=n;dy/=n;
+    cx.beginPath();
+    cx.moveTo(divPreview.x0-dx*L,divPreview.y0-dy*L);
+    cx.lineTo(divPreview.x0+dx*L,divPreview.y0+dy*L);
+    cx.stroke();cx.setLineDash([]);cx.restore();
+  }
+  updateStatus();
+}
+function strokeRectO(g,r){g.strokeRect(r.x,r.y,r.w,r.h);}
+function itemBounds(it){
+  if(it.type==='focus')return{w:it.r1*2,h:it.r1*2};
+  if(it.type==='img'){const im=MATIMG[it.srcId];const s=it.scale||1;
+    return im&&im.width?{w:im.width*s,h:im.height*s}:{w:200,h:200};}
+  return{w:it.w,h:it.h};
+}
+function updateStatus(){
+  const pg=curPage(), n=BOOK.pages.length;
+  $('#pg-indic').textContent='P '+(curPageIdx+1)+' / '+n;
+  $('#bb-info').textContent=PAPER.w+'×'+PAPER.h+'  '+PAPER.dpi+'dpi  Z'+(view.z*100).toFixed(0)+'%  コマ'+pg.panels.length;
+  const H={sel:'クリック=コマ選択 ／ 素材はドラッグで移動 ／ 空白ドラッグ=パン・ホイール=ズーム',
+    div:'ドラッグで分割線（'+(divMode==='v'?'縦':divMode==='h'?'横':'斜め・Shiftで15°')+'）。コマ選択中はそのコマだけ、未選択なら線が横切る全コマを分割',
+    pt:'制御点表示（v2は選択のみ）。コマをクリックすると頂点が出ます'};
+  $('#bb-hint').textContent=H[tool]||'';
+}
+
+/* ============================================================
+   保存（IndexedDB。素材のdataURLがlocalStorageに乗らないため）
+   ============================================================ */
+const DB_NAME='manga_plate', DB_STORE='book', DB_VER=1;
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(DB_NAME,DB_VER);
+    r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(DB_STORE))d.createObjectStore(DB_STORE);};
+    r.onsuccess=e=>res(e.target.result);r.onerror=e=>rej(e.target.error);
+  });
+}
+let saveT=null;
+function save(){
+  clearTimeout(saveT);
+  saveT=setTimeout(async()=>{
+    try{
+      const db=await idbOpen();
+      await new Promise((res,rej)=>{
+        const tx=db.transaction(DB_STORE,'readwrite');
+        tx.objectStore(DB_STORE).put({book:BOOK,src:MATSRC},'current');
+        tx.oncomplete=res;tx.onerror=()=>rej(tx.error);
+      });
+    }catch(e){}
+  },400);
+}
+async function loadBook(){
+  try{
+    const db=await idbOpen();
+    const rec=await new Promise((res,rej)=>{
+      const tx=db.transaction(DB_STORE,'readonly');
+      const r=tx.objectStore(DB_STORE).get('current');
+      r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error);
+    });
+    if(rec&&rec.book){BOOK=rec.book;MATSRC=rec.src||{};return true;}
+  }catch(e){}
+  /* v1（localStorage の PLATE）からの引き継ぎ */
+  try{
+    const s=localStorage.getItem('manga-plate');
+    if(s){const o=JSON.parse(s);
+      if(o&&o.plate&&Array.isArray(o.plate.elems)&&o.plate.elems.length){
+        BOOK=newBook();BOOK.pages[0].items=o.plate.elems.map(e=>Object.assign({},e,{panelId:null,id:uid('i_')}));
+        return true;}}
+  }catch(e){}
+  return false;
+}
+async function rebuildImages(){
+  const jobs=Object.keys(MATSRC).map(id=>new Promise(res=>{
+    const im=new Image();im.onload=()=>{MATIMG[id]=im;res();};im.onerror=()=>res();im.src=MATSRC[id];
+  }));
+  await Promise.all(jobs);
+}
+
+/* ---- undo（素材のdataURLは履歴に積まない） ---- */
+const hist=[];let hi=-1,dT=null;
+function snapshot(){return JSON.stringify(BOOK);}
+function pushHist(){hist.splice(hi+1);hist.push(snapshot());if(hist.length>50)hist.shift();hi=hist.length-1;}
+function commit(){pushHist();save();thumbCache={};render();}
+function commitD(){save();thumbCache={};render();clearTimeout(dT);dT=setTimeout(pushHist,300);}
+function applyHist(s){
+  BOOK=JSON.parse(s);PAPER=paperOf(BOOK.paper);
+  curPageIdx=clamp(curPageIdx,0,BOOK.pages.length-1);
+  selPanel=null;selItem=null;thumbCache={};
+  save();syncUI();renderItemList();renderItemParams();renderPanelSec();render();
+}
+function undo(){if(hi>0){hi--;applyHist(hist[hi]);}}
+function redo(){if(hi<hist.length-1){hi++;applyHist(hist[hi]);}}
+
+/* ============================================================
+   ツール／ポインタ
+   ============================================================ */
+function setTool(t){
+  tool=t;
+  $('#t-sel').classList.toggle('on',t==='sel');
+  $('#t-div').classList.toggle('on',t==='div');
+  $('#t-pt').classList.toggle('on',t==='pt');
+  render();
+}
+function setDivMode(m){
+  divMode=m;
+  $('#dm-v').classList.toggle('on',m==='v');
+  $('#dm-h').classList.toggle('on',m==='h');
+  $('#dm-f').classList.toggle('on',m==='f');
+  updateStatus();
+}
+$('#t-sel').addEventListener('click',()=>setTool('sel'));
+$('#t-div').addEventListener('click',()=>setTool('div'));
+$('#t-pt').addEventListener('click',()=>setTool('pt'));
+$('#dm-v').addEventListener('click',()=>{setDivMode('v');setTool('div');});
+$('#dm-h').addEventListener('click',()=>{setDivMode('h');setTool('div');});
+$('#dm-f').addEventListener('click',()=>{setDivMode('f');setTool('div');});
+$('#t-shade').addEventListener('click',()=>{showShade=!showShade;$('#t-shade').classList.toggle('on',showShade);render();});
+$('#t-guide').addEventListener('click',()=>{showGuide=!showGuide;$('#t-guide').classList.toggle('on',showGuide);render();});
+
+function panelAt(pg,x,y){
+  for(let i=pg.panels.length-1;i>=0;i--)if(pointInPoly(dispPoly(pg.panels[i]),x,y))return pg.panels[i];
+  return null;
+}
+function itemAt(pg,x,y){
+  for(let i=pg.items.length-1;i>=0;i--){
+    const it=pg.items[i];if(!it.visible)continue;
+    const b=itemBounds(it), a=-(it.rot||0)*Math.PI/180;
+    const dx=x-it.x,dy=y-it.y;
+    const lx=dx*Math.cos(a)-dy*Math.sin(a), ly=dx*Math.sin(a)+dy*Math.cos(a);
+    if(Math.abs(lx)<=b.w/2&&Math.abs(ly)<=b.h/2)return it;
+  }
+  return null;
+}
+let drag=null;
+cvs.addEventListener('pointerdown',ev=>{
+  cvs.setPointerCapture(ev.pointerId);
+  const p=evPt(ev), pg=curPage();
+  if(tool==='div'){drag={t:'div',x0:p.x,y0:p.y,x1:p.x,y1:p.y,shift:ev.shiftKey};divPreview=divLine(drag);render();return;}
+  const it=(tool==='sel')?itemAt(pg,p.x,p.y):null;
+  if(it){selItem=it;selPanel=null;drag={t:'item',px:p.x,py:p.y,ox:it.x,oy:it.y};
+    renderItemList();renderItemParams();renderPanelSec();render();return;}
+  const k=panelAt(pg,p.x,p.y);
+  if(k){selPanel=k;selItem=null;drag={t:'none'};renderItemList();renderItemParams();renderPanelSec();render();return;}
+  selPanel=null;selItem=null;
+  const r=cvs.getBoundingClientRect();
+  drag={t:'pan',sx:ev.clientX-r.left,sy:ev.clientY-r.top,ox:view.x,oy:view.y};
+  renderItemList();renderItemParams();renderPanelSec();render();
+});
+function divLine(d){
+  if(divMode==='v')return{x0:d.x0,y0:d.y0-1,x1:d.x0,y1:d.y0+1};
+  if(divMode==='h')return{x0:d.x0-1,y0:d.y0,x1:d.x0+1,y1:d.y0};
+  let dx=d.x1-d.x0, dy=d.y1-d.y0;
+  if(Math.hypot(dx,dy)<1){dx=1;dy=0;}
+  if(d.shift){const a=Math.round(Math.atan2(dy,dx)/(Math.PI/12))*(Math.PI/12);const L=Math.hypot(dx,dy);dx=Math.cos(a)*L;dy=Math.sin(a)*L;}
+  return{x0:d.x0,y0:d.y0,x1:d.x0+dx,y1:d.y0+dy};
+}
+cvs.addEventListener('pointermove',ev=>{
+  if(!drag)return;
+  if(drag.t==='pan'){const r=cvs.getBoundingClientRect();
+    view.x=drag.ox+((ev.clientX-r.left)-drag.sx)/view.z;view.y=drag.oy+((ev.clientY-r.top)-drag.sy)/view.z;render();return;}
+  const p=evPt(ev);
+  if(drag.t==='div'){drag.x1=p.x;drag.y1=p.y;drag.shift=ev.shiftKey;
+    if(divMode==='v'||divMode==='h'){drag.x0=p.x;drag.y0=p.y;}
+    divPreview=divLine(drag);render();return;}
+  if(drag.t==='item'&&selItem){
+    selItem.x=Math.round(drag.ox+p.x-drag.px);selItem.y=Math.round(drag.oy+p.y-drag.py);commitD();return;}
+});
+cvs.addEventListener('pointerup',()=>{
+  if(drag&&drag.t==='div'&&divPreview){
+    const pg=curPage(), L=divPreview;
+    const targets=selPanel?[selPanel]:pg.panels.slice();
+    const n=splitPanels(pg,targets,L.x0,L.y0,L.x1-L.x0,L.y1-L.y0);
+    divPreview=null;drag=null;
+    if(n){selPanel=null;commit();renderPanelSec();toast('コマを '+n+' か所で分割しました');}
+    else{render();toast('コマに当たっていません（線がコマを横切るようにドラッグ）');}
+    return;
+  }
+  divPreview=null;drag=null;
+});
+cvs.addEventListener('pointercancel',()=>{divPreview=null;drag=null;render();});
+cvs.addEventListener('wheel',ev=>{
+  ev.preventDefault();
+  view.z=clamp(view.z*(ev.deltaY<0?1.12:0.89),0.005,4);render();
+},{passive:false});
+
+/* ============================================================
+   サイドパネル: Panel セクション
+   ============================================================ */
+function renderPanelSec(){
+  const pg=curPage(), on=!!selPanel;
+  const i=on?pg.panels.indexOf(selPanel)+1:0;
+  $('#pn-info').innerHTML=on
+    ? 'コマ <b style="color:var(--rouge)">'+i+'</b> / '+pg.panels.length+'　'+
+      Math.round(polyBounds(selPanel.poly).w)+'×'+Math.round(polyBounds(selPanel.poly).h)+' px'+
+      '　頂点 '+selPanel.poly.length
+    : 'コマを選択してください。<br>分割は左のツール <b>╱ DIV</b>。';
+  ['#pn-border','#pn-bleed','#pn-del','#pn-merge'].forEach(s=>{$(s).disabled=!on;});
+  $('#pn-border').classList.toggle('on',on&&selPanel.border);
+  $('#pn-bleed').classList.toggle('on',on&&selPanel.bleed);
+  updateLinkNote();
+}
+$('#pn-border').addEventListener('click',()=>{if(!selPanel)return;selPanel.border=!selPanel.border;commit();renderPanelSec();});
+$('#pn-bleed').addEventListener('click',()=>{if(!selPanel)return;selPanel.bleed=!selPanel.bleed;commit();renderPanelSec();});
+$('#pn-del').addEventListener('click',()=>{
+  if(!selPanel)return;
+  const pg=curPage(), id=selPanel.id;
+  modalConfirm('このコマを削除します（余白になります）。\nコマ内に置いた素材はコマ割当が外れて前面に出ます。',()=>{
+    pg.items.forEach(it=>{if(it.panelId===id)it.panelId=null;});
+    pg.panels=pg.panels.filter(k=>k.id!==id);
+    selPanel=null;commit();renderPanelSec();renderItemList();
+  });
+});
+$('#pn-merge').addEventListener('click',()=>{
+  if(!selPanel)return;
+  const pg=curPage(), nk=mergePanel(pg,selPanel);
+  if(!nk){toast('結合できる隣のコマがありません');return;}
+  selPanel=nk;commit();renderPanelSec();
+});
+
+/* ============================================================
+   サイドパネル: Book セクション
+   ============================================================ */
+(function initPaperSelect(){
+  const s=$('#paper-preset');
+  Object.keys(PAPER_PRESETS).forEach(k=>{
+    const o=document.createElement('option');o.value=k;o.textContent=PAPER_PRESETS[k].label;s.appendChild(o);});
+})();
+function syncUI(){
+  $('#book-title').value=BOOK.title;
+  $('#paper-preset').value=BOOK.paper;
+  $('#paper-bg').value=BOOK.bg;
+  $('#gut-lr').value=BOOK.gut.lr;$('#gut-lr-v').textContent=BOOK.gut.lr;
+  $('#gut-tb').value=BOOK.gut.tb;$('#gut-tb-v').textContent=BOOK.gut.tb;
+  $('#lw').value=BOOK.lw;$('#lw-v').textContent=BOOK.lw;
+  $('#bind-r').classList.toggle('on',BOOK.bindRight);
+  $('#lk-w').value=BOOK.link.w;$('#lk-h').value=BOOK.link.h;
+  $('#t-shade').classList.toggle('on',showShade);
+  $('#t-guide').classList.toggle('on',showGuide);
+}
+$('#book-title').addEventListener('change',()=>{BOOK.title=$('#book-title').value||'name-01';save();});
+$('#paper-preset').addEventListener('change',ev=>{
+  const old=PAPER, nk=ev.target.value, np=paperOf(nk);
+  const r=np.dpi/old.dpi;
+  modalConfirm('用紙を切り替えると、全ページのコマと素材が解像度比 ×'+r.toFixed(3)+' で拡縮されます。\n続けますか？',()=>{
+    BOOK.paper=nk;PAPER=np;
+    BOOK.gut.lr=Math.round(BOOK.gut.lr*r);BOOK.gut.tb=Math.round(BOOK.gut.tb*r);BOOK.lw=Math.max(1,Math.round(BOOK.lw*r));
+    const ox=old.w/2, oy=old.h/2, nx=np.w/2, ny=np.h/2;
+    const T=(x,y)=>({x:(x-ox)*r+nx, y:(y-oy)*r+ny});
+    BOOK.pages.forEach(pg=>{
+      pg.panels.forEach(k=>{k.poly=k.poly.map(q=>T(q.x,q.y));});
+      pg.items.forEach(it=>{const t=T(it.x,it.y);it.x=t.x;it.y=t.y;
+        ['w','h','r0','r1','dot','gap','lw'].forEach(f=>{if(typeof it[f]==='number')it[f]=Math.max(1,Math.round(it[f]*r));});
+        if(it.type==='img')it.scale=it.scale*r;
+        if(it.edge)it.edge.w=Math.max(1,Math.round(it.edge.w*r));});
+    });
+    selPanel=null;selItem=null;commit();syncUI();renderPanelSec();renderItemParams();fitView();
+  },()=>{$('#paper-preset').value=BOOK.paper;});
+});
+$('#paper-bg').addEventListener('change',ev=>{BOOK.bg=ev.target.value;commit();});
+$('#gut-lr').addEventListener('input',ev=>{BOOK.gut.lr=parseInt(ev.target.value);$('#gut-lr-v').textContent=BOOK.gut.lr;commitD();});
+$('#gut-tb').addEventListener('input',ev=>{BOOK.gut.tb=parseInt(ev.target.value);$('#gut-tb-v').textContent=BOOK.gut.tb;commitD();});
+$('#lw').addEventListener('input',ev=>{BOOK.lw=parseInt(ev.target.value);$('#lw-v').textContent=BOOK.lw;commitD();});
+$('#bind-r').addEventListener('click',()=>{
+  BOOK.bindRight=!BOOK.bindRight;$('#bind-r').classList.toggle('on',BOOK.bindRight);
+  BOOK.pages.forEach(sortPanels);commit();renderPages();});
+
+/* ============================================================
+   サイドパネル: Items
+   ============================================================ */
+function addItem(type,srcId,linkId){
+  const pg=curPage();
+  const box=selPanel?polyBounds(dispPoly(selPanel)):PAPER.bas;
+  const it=Object.assign({id:uid('i_'),type:type,visible:true,
+      panelId:selPanel?selPanel.id:null,
+      name:(type==='img'?'IMG':type.toUpperCase())+' '+(pg.items.length+1)},
+    JSON.parse(JSON.stringify(defaultsFor(type,box))));
+  if(type==='img'){
+    it.srcId=srcId||null;it.linkId=linkId||null;
+    const im=MATIMG[it.srcId];
+    if(im&&im.width)it.scale=Math.min(box.w/im.width,box.h/im.height);
+  }
+  pg.items.push(it);selItem=it;selPanel=null;
+  commit();renderItemList();renderItemParams();renderPanelSec();
+  return it;
+}
+$('#add-tone').addEventListener('click',()=>addItem('tone'));
+$('#add-focus').addEventListener('click',()=>addItem('focus'));
+$('#add-stream').addEventListener('click',()=>addItem('stream'));
+$('#add-img').addEventListener('click',()=>$('#img-file').click());
+$('#img-file').addEventListener('change',async ev=>{
+  const fs=[...ev.target.files];ev.target.value='';
+  for(const f of fs){const du=await fileToDataURL(f);await addImage(du,f.name.replace(/\.[^.]+$/,''),null);}
+});
+function fileToDataURL(f){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f);});}
+async function addImage(dataURL,name,linkId){
+  const srcId=uid('s_');
+  MATSRC[srcId]=dataURL;
+  await new Promise(res=>{const im=new Image();im.onload=()=>{MATIMG[srcId]=im;res();};im.onerror=res;im.src=dataURL;});
+  const it=addItem('img',srcId,linkId);
+  if(name)it.name=name.slice(0,20);
+  commit();renderItemList();renderItemParams();
+  return it;
+}
+function deleteItem(it){
+  const pg=curPage();
+  pg.items=pg.items.filter(o=>o!==it);
+  if(selItem===it)selItem=null;
+  commit();renderItemList();renderItemParams();
+}
+function renderItemList(){
+  const pg=curPage(), box=$('#item-list');box.innerHTML='';
+  if(!pg.items.length){box.innerHTML='<div class="note">まだ素材がありません。<br>コマを選んでから追加すると、そのコマの中に入ります。</div>';return;}
+  [...pg.items].reverse().forEach(it=>{
     const row=document.createElement('div');
-    row.className='el-row'+(e===sel?' sel':'');
-    row.innerHTML='<span class="el-vis'+(e.visible?'':' off')+'" data-a="vis">'+(e.visible?'◉':'○')+'</span>'
-      +'<span class="el-nm">'+e.name+'</span><span class="el-ty">'+e.type.toUpperCase()+'</span>'
+    row.className='el-row'+(it===selItem?' sel':'');
+    const kIdx=it.panelId?(pg.panels.findIndex(k=>k.id===it.panelId)+1):0;
+    row.innerHTML='<span class="el-vis'+(it.visible?'':' off')+'" data-a="vis">'+(it.visible?'◉':'○')+'</span>'
+      +'<span class="el-nm">'+esc(it.name)+'</span>'
+      +'<span class="el-pin">'+(kIdx?'▣'+kIdx:'上')+'</span>'
+      +'<span class="el-ty">'+it.type.toUpperCase()+'</span>'
       +'<span class="el-ud" data-a="up">▲</span><span class="el-ud" data-a="dn">▼</span>';
     row.addEventListener('click',ev=>{
-      const a=ev.target.dataset&&ev.target.dataset.a;
-      const i=PLATE.elems.indexOf(e);
-      if(a==='vis'){e.visible=!e.visible;commit();renderList();return;}
-      if(a==='up'){if(i<PLATE.elems.length-1){PLATE.elems.splice(i,1);PLATE.elems.splice(i+1,0,e);commit();renderList();}return;}
-      if(a==='dn'){if(i>0){PLATE.elems.splice(i,1);PLATE.elems.splice(i-1,0,e);commit();renderList();}return;}
-      sel=e;renderList();renderParams();render();
+      const a=ev.target.dataset&&ev.target.dataset.a, i=pg.items.indexOf(it);
+      if(a==='vis'){it.visible=!it.visible;commit();renderItemList();return;}
+      if(a==='up'){if(i<pg.items.length-1){pg.items.splice(i,1);pg.items.splice(i+1,0,it);commit();renderItemList();}return;}
+      if(a==='dn'){if(i>0){pg.items.splice(i,1);pg.items.splice(i-1,0,it);commit();renderItemList();}return;}
+      selItem=it;selPanel=null;renderItemList();renderItemParams();renderPanelSec();render();
     });
     box.appendChild(row);
   });
 }
-/* ---------- UI: パラメータ（DEFSから自動生成 — satsuei FX_DEFS方式） ---------- */
-function renderParams(){
-  const box=$('#params'), pr=$('#presets');box.innerHTML='';pr.innerHTML='';
-  if(!sel){box.innerHTML='<div class="tr"><span class="lb" style="color:rgba(181,142,255,.5)">エレメントを選択</span></div>';renderPalette();return;}
-  DEFS[sel.type].forEach(([key,mn,mx,st,lb])=>{
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function renderItemParams(){
+  const box=$('#item-params'), pr=$('#presets');box.innerHTML='';pr.innerHTML='';
+  if(!selItem){renderPalette();return;}
+  const it=selItem;
+  /* コマ割当 */
+  const pg=curPage();
+  const rowP=document.createElement('div');rowP.className='tr';
+  let opts='<option value="">（上に乗せる／擬音）</option>';
+  pg.panels.forEach((k,i)=>{opts+='<option value="'+k.id+'"'+(it.panelId===k.id?' selected':'')+'>コマ '+(i+1)+' の中</option>';});
+  rowP.innerHTML='<span class="lb">配置</span><select>'+opts+'</select>';
+  rowP.querySelector('select').addEventListener('change',e=>{it.panelId=e.target.value||null;commit();renderItemList();});
+  box.appendChild(rowP);
+  /* 数値スライダー */
+  DEFS[it.type].forEach(([key,mn,mx,st,lb])=>{
     const row=document.createElement('div');row.className='tr';
-    row.innerHTML='<span class="lb">'+lb+'</span><input type="range" min="'+mn+'" max="'+mx+'" step="'+st+'" value="'+sel[key]+'"><span class="vv">'+sel[key]+'</span>';
+    const v=it[key];
+    row.innerHTML='<span class="lb">'+lb+'</span><input type="range" min="'+mn+'" max="'+mx+'" step="'+st+'" value="'+v+'"><span class="vv">'+(st<1?Number(v).toFixed(2):v)+'</span>';
     const rg=row.querySelector('input'), vv=row.querySelector('.vv');
-    rg.addEventListener('input',()=>{sel[key]=st<1?parseFloat(rg.value):parseInt(rg.value);vv.textContent=sel[key];commitD();});
+    rg.addEventListener('input',()=>{
+      it[key]=st<1?parseFloat(rg.value):parseInt(rg.value);
+      vv.textContent=st<1?it[key].toFixed(2):it[key];
+      if(it.type==='tone')updateCov();
+      commitD();});
     box.appendChild(row);
   });
-  if(sel.type==='tone'){
+  if(it.type==='tone'){
     const row=document.createElement('div');row.className='tr';
-    row.innerHTML='<span class="lb">SHAPE</span><select><option value="dot">dot</option><option value="square">square</option></select>'
-      +'<span class="vv" id="tone-cov"></span>';
-    const sl=row.querySelector('select');sl.value=sel.shape;
-    sl.addEventListener('change',()=>{sel.shape=sl.value;commit();});
+    row.innerHTML='<span class="lb">形</span><select><option value="dot">丸</option><option value="square">角</option></select><span class="vv" id="tone-cov"></span>';
+    const sl=row.querySelector('select');sl.value=it.shape;
+    sl.addEventListener('change',()=>{it.shape=sl.value;commit();});
     box.appendChild(row);
-    TONE_PRESETS.forEach(([nm,dot])=>{
+    TONE_PRESETS.forEach(([nm,ratio])=>{
       const c=document.createElement('span');c.className='fp';c.textContent=nm;
-      c.addEventListener('click',()=>{sel.dot=dot;sel.gap=22;commit();renderParams();});pr.appendChild(c);
-    });
+      c.addEventListener('click',()=>{it.dot=Math.max(2,Math.round(it.gap*ratio));commit();renderItemParams();});pr.appendChild(c);});
     updateCov();
   }
-  if(sel.type==='focus')FOCUS_PRESETS.forEach(([nm,p])=>{
+  if(it.type==='focus')FOCUS_PRESETS.forEach(([nm,p])=>{
     const c=document.createElement('span');c.className='fp';c.textContent=nm;
-    c.addEventListener('click',()=>{Object.assign(sel,p);commit();renderParams();});pr.appendChild(c);
-  });
-  if(sel.type==='stream')STREAM_PRESETS.forEach(([nm,p])=>{
+    c.addEventListener('click',()=>{Object.assign(it,p);commit();renderItemParams();});pr.appendChild(c);});
+  if(it.type==='stream')STREAM_PRESETS.forEach(([nm,p])=>{
     const c=document.createElement('span');c.className='fp';c.textContent=nm;
-    c.addEventListener('click',()=>{Object.assign(sel,p);commit();renderParams();});pr.appendChild(c);
-  });
-  const del=document.createElement('div');del.className='tr';
-  del.innerHTML='<button class="btn" style="width:100%">✕ DELETE ELEM</button>';
-  del.querySelector('button').addEventListener('click',()=>deleteSel());
+    c.addEventListener('click',()=>{Object.assign(it,p);commit();renderItemParams();});pr.appendChild(c);});
+  /* 画像専用: 境界効果 ＋ 網点化 */
+  if(it.type==='img'){
+    const e=it.edge;
+    const r1=document.createElement('div');r1.className='tr';
+    r1.innerHTML='<span class="lb">境界効果</span><button class="btn gold'+(e.on?' on':'')+'" style="flex:1">フチ '+(e.on?'ON':'OFF')+'</button>';
+    r1.querySelector('button').addEventListener('click',()=>{e.on=!e.on;commit();renderItemParams();});
+    box.appendChild(r1);
+    const r2=document.createElement('div');r2.className='tr';
+    r2.innerHTML='<span class="lb">フチの太さ</span><input type="range" min="1" max="200" step="1" value="'+e.w+'"'+(e.on?'':' disabled')+'><span class="vv">'+e.w+'</span>';
+    const rg=r2.querySelector('input'),vv=r2.querySelector('.vv');
+    rg.addEventListener('input',()=>{e.w=parseInt(rg.value);vv.textContent=e.w;commitD();});
+    box.appendChild(r2);
+    const r3=document.createElement('div');r3.className='tr';
+    r3.innerHTML='<span class="lb">フチの色</span><button class="btn'+(e.color==='#FFFFFF'?' gold on':' gold')+'" style="flex:1">'+(e.color==='#FFFFFF'?'白':'黒')+'</button>';
+    r3.querySelector('button').addEventListener('click',()=>{e.color=e.color==='#FFFFFF'?'#000000':'#FFFFFF';edgeCache.clear();commit();renderItemParams();});
+    box.appendChild(r3);
+    const r4=document.createElement('div');r4.className='tr';
+    r4.innerHTML='<span class="lb">網点化</span><button class="btn ice'+(it.tone.on?' on':'')+'" style="flex:1">グレー→トーン '+(it.tone.on?'ON':'OFF')+'</button>';
+    r4.querySelector('button').addEventListener('click',()=>{it.tone.on=!it.tone.on;toneCache.clear();commit();renderItemParams();});
+    box.appendChild(r4);
+    if(it.linkId){
+      const r5=document.createElement('div');r5.className='note';
+      r5.innerHTML='🔗 ANIMATOR と連動中（向こうで保存すると自動で差し替わります）';
+      box.appendChild(r5);
+    }
+  }
+  const del=document.createElement('div');del.className='btnrow';
+  del.innerHTML='<button class="btn" style="width:100%">✕ この素材を削除</button>';
+  del.querySelector('button').addEventListener('click',()=>{
+    modalConfirm(selItem.name+' を削除しますか？',()=>deleteItem(it));});
   box.appendChild(del);
   renderPalette();
 }
 function updateCov(){
   const el=$('#tone-cov');
-  if(el&&sel&&sel.type==='tone')el.textContent=(Math.PI*(sel.dot/2)**2/(sel.gap**2)*100).toFixed(0)+'%';
+  if(el&&selItem&&selItem.type==='tone')
+    el.textContent=Math.min(100,(Math.PI*Math.pow(selItem.dot/2,2)/Math.pow(selItem.gap,2)*100)).toFixed(0)+'%';
 }
 function renderPalette(){
   const box=$('#palette');box.innerHTML='';
+  if(!selItem||selItem.type==='img')return;
   MANGA_PAL.forEach(col=>{
-    const sw=document.createElement('span');sw.className='sw'+(sel&&sel.color===col?' sel':'');
+    const sw=document.createElement('span');sw.className='sw'+(selItem.color===col?' sel':'');
     sw.style.background=col;
-    sw.addEventListener('click',()=>{if(!sel)return;sel.color=col;commit();renderPalette();});
+    sw.addEventListener('click',()=>{selItem.color=col;commit();renderPalette();});
     box.appendChild(sw);
   });
 }
-function addElem(type){
-  const e=Object.assign({id:'e'+(eid++),type:type,name:type.toUpperCase()+' '+String(eid-1).padStart(2,'0'),
-    x:PLATE.w/2,y:PLATE.h/2,visible:true},JSON.parse(JSON.stringify(DEFAULTS[type])));
-  PLATE.elems.push(e);sel=e;commit();renderList();renderParams();
+
+/* ============================================================
+   グレー→網点（モアレ対策）
+   「中間調だけ」を網点に置き換え、線画（暗）と白はそのまま残す
+   ============================================================ */
+const toneCache=new Map();
+function tonizeImage(img,it){
+  const cell=Math.max(3,(PAPER.dpi/gLpi)/Math.max(0.02,it.scale||1));
+  const key=it.srcId+'|'+Math.round(cell*10)+'|'+gLpi;
+  const hit=toneCache.get(key);if(hit)return hit;
+  const W=img.width,H=img.height;
+  const sc=document.createElement('canvas');sc.width=W;sc.height=H;
+  const sg=sc.getContext('2d',{willReadFrequently:true});
+  sg.drawImage(img,0,0);
+  let id;try{id=sg.getImageData(0,0,W,H);}catch(e){return img;}   // file:// のtaint等
+  const d=id.data;
+  const LO=0.10, HI=0.94;
+  const keep=document.createElement('canvas');keep.width=W;keep.height=H;
+  const kg=keep.getContext('2d'), kid=kg.createImageData(W,H), kd=kid.data;
+  const mask=document.createElement('canvas');mask.width=W;mask.height=H;
+  const mg=mask.getContext('2d'), mid=mg.createImageData(W,H), md=mid.data;
+  const cov=new Float32Array(W*H);
+  for(let i=0,p=0;i<d.length;i+=4,p++){
+    const a=d[i+3]/255;
+    if(a<0.5)continue;
+    const l=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])/255;
+    if(l<LO){kd[i]=d[i];kd[i+1]=d[i+1];kd[i+2]=d[i+2];kd[i+3]=d[i+3];}      // 線画は原画のまま
+    else if(l<=HI){cov[p]=(1-(l-LO)/(HI-LO))*a;md[i+3]=255;}                 // 中間調 → 網点対象
+  }
+  kg.putImageData(kid,0,0);mg.putImageData(mid,0,0);
+  const dots=document.createElement('canvas');dots.width=W;dots.height=H;
+  const dg=dots.getContext('2d');
+  const ang=45*Math.PI/180, ca=Math.cos(ang), sa=Math.sin(ang);
+  const R=Math.hypot(W,H)/2, n=Math.ceil(R/cell)+2;
+  dg.save();dg.translate(W/2,H/2);dg.rotate(ang);dg.fillStyle='#000';
+  for(let j=-n;j<=n;j++)for(let i=-n;i<=n;i++){
+    const lx=i*cell, ly=j*cell;
+    const px=Math.round(W/2+lx*ca-ly*sa), py=Math.round(H/2+lx*sa+ly*ca);
+    if(px<0||py<0||px>=W||py>=H)continue;
+    const c=cov[py*W+px];
+    if(c<=0.02)continue;
+    dg.beginPath();dg.arc(lx,ly,Math.min(cell*0.72,cell*Math.sqrt(Math.min(1,c)/Math.PI)),0,TAU);dg.fill();
+  }
+  dg.restore();
+  dg.globalCompositeOperation='destination-in';dg.drawImage(mask,0,0);   // 中間調の外へはみ出さない
+  const out=document.createElement('canvas');out.width=W;out.height=H;
+  const og=out.getContext('2d');
+  og.drawImage(dots,0,0);og.drawImage(keep,0,0);
+  if(toneCache.size>12)toneCache.clear();
+  toneCache.set(key,out);
+  return out;
 }
-function deleteSel(){
-  if(!sel)return;
-  PLATE.elems=PLATE.elems.filter(e=>e!==sel);sel=null;
-  commit();renderList();renderParams();
+
+/* ============================================================
+   書き出し
+   ============================================================ */
+let gLpi=50, gTonePrev=false;
+/* 線数は「網点化で書き出す」か「網点プレビューON」のときだけ効く → それ以外はグレーアウト */
+function syncLpiEnable(){
+  const live=(gTonePrev||$('#ex-mode').value==='tone');
+  $('#ex-lpi').disabled=!live;
+  $('#ex-lpi-cond').textContent=live?'有効':'網点化 / プレビュー時';
 }
-
-/* ---------- ポインタ操作（#cv一元化） ---------- */
-let drag=null;
-cvs.addEventListener('pointerdown',ev=>{
-  cvs.setPointerCapture(ev.pointerId);
-  const p=s2p(ev.offsetX*DPR,ev.offsetY*DPR);
-  if(refMode&&ref.image){drag={t:'ref',px:p.x,py:p.y,ox:ref.x,oy:ref.y};return;}
-  let hitE=null;
-  for(let i=PLATE.elems.length-1;i>=0;i--){const e=PLATE.elems[i];if(e.visible&&hitElem(e,p.x,p.y)){hitE=e;break;}}
-  if(hitE){sel=hitE;drag={t:'elem',px:p.x,py:p.y,ox:hitE.x,oy:hitE.y};renderList();renderParams();render();}
-  else{sel=null;drag={t:'pan',sx:ev.offsetX,sy:ev.offsetY,ox:view.x,oy:view.y};renderList();renderParams();render();}
-});
-cvs.addEventListener('pointermove',ev=>{
-  if(!drag)return;
-  if(drag.t==='pan'){view.x=drag.ox+(ev.offsetX-drag.sx)/view.z;view.y=drag.oy+(ev.offsetY-drag.sy)/view.z;render();return;}
-  const p=s2p(ev.offsetX*DPR,ev.offsetY*DPR);
-  if(drag.t==='elem'&&sel){sel.x=Math.round(drag.ox+p.x-drag.px);sel.y=Math.round(drag.oy+p.y-drag.py);commitD();}
-  else if(drag.t==='ref'){ref.x=drag.ox+p.x-drag.px;ref.y=drag.oy+p.y-drag.py;render();}
-});
-cvs.addEventListener('pointerup',()=>{drag=null;});
-cvs.addEventListener('wheel',ev=>{
-  ev.preventDefault();
-  if(refMode&&ref.image){ref.scale=clamp(ref.scale*(ev.deltaY<0?1.06:0.94),0.02,20);render();return;}
-  view.z=clamp(view.z*(ev.deltaY<0?1.1:0.9),0.02,8);render();
-},{passive:false});
-
-/* ---------- REF ---------- */
-$('#ref-load').addEventListener('click',()=>$('#ref-file').click());
-$('#ref-file').addEventListener('change',ev=>{
-  const f=ev.target.files[0];if(!f)return;
-  const rd=new FileReader();
-  rd.onload=()=>{const im=new Image();im.onload=()=>{ref.image=im;ref.x=0;ref.y=0;
-    ref.scale=Math.min(PLATE.w/im.width,PLATE.h/im.height);render();toast('REF読込 — MOVEで位置調整');};im.src=rd.result;};
-  rd.readAsDataURL(f);ev.target.value='';
-});
-$('#ref-mode').addEventListener('click',()=>{refMode=!refMode;$('#ref-mode').classList.toggle('on',refMode);render();});
-$('#ref-clear').addEventListener('click',()=>{ref.image=null;refMode=false;$('#ref-mode').classList.remove('on');render();});
-$('#ref-op').addEventListener('input',ev=>{ref.opacity=parseFloat(ev.target.value);$('#ref-op-v').textContent=ref.opacity.toFixed(2);render();});
-
-/* ---------- 書き出し ---------- */
-function renderPlate(elems,scale){
+$('#ex-mode').addEventListener('change',syncLpiEnable);
+$('#ex-lpi').addEventListener('input',ev=>{gLpi=parseInt(ev.target.value);$('#ex-lpi-v').textContent=gLpi;
+  toneCache.clear();edgeCache.clear();if(gTonePrev)render();});
+$('#ex-preview').addEventListener('click',()=>{
+  gTonePrev=!gTonePrev;gToneOn=gTonePrev;
+  $('#ex-preview').classList.toggle('on',gTonePrev);syncLpiEnable();render();});
+function exOpts(){
+  return {size:parseInt($('#ex-size').value), mode:$('#ex-mode').value};
+}
+function renderPageCanvas(pg,box,o){
+  /* box=切り出す矩形（null=用紙全体）。o.size=出力の横幅（0=原寸） */
+  const src=box||{x:0,y:0,w:PAPER.w,h:PAPER.h};
+  const scale=o.size?o.size/src.w:1;
   const c=document.createElement('canvas');
-  c.width=Math.round(PLATE.w*scale);c.height=Math.round(PLATE.h*scale);
+  c.width=Math.max(1,Math.round(src.w*scale));c.height=Math.max(1,Math.round(src.h*scale));
   const g=c.getContext('2d');
-  if(PLATE.bg!=='transparent'){g.fillStyle=PLATE.bg;g.fillRect(0,0,c.width,c.height);}
-  g.save();g.scale(scale,scale);
-  g.beginPath();g.rect(0,0,PLATE.w,PLATE.h);g.clip();
-  for(const e of elems)if(e.visible)drawElem(g,e);
+  gToneOn=(o.mode==='tone');
+  g.save();g.scale(scale,scale);g.translate(-src.x,-src.y);
+  g.beginPath();g.rect(src.x,src.y,src.w,src.h);g.clip();
+  renderPage(g,pg,{});
   g.restore();
+  gToneOn=gTonePrev;
+  if(o.mode==='gray'||o.mode==='tone')toGray(c);
   return c;
 }
-function dlPNG(canvas,name){
-  const a=document.createElement('a');a.download=name;a.href=canvas.toDataURL('image/png');a.click();
-}
-function pname(){return($('#plate-name').value||'plate').replace(/[^\w\-]/g,'_');}
-$('#ex-elem').addEventListener('click',()=>{
-  if(!sel){toast('エレメントを選択してください');return;}
-  dlPNG(renderPlate([sel],exScale),pname()+'_'+sel.name.replace(/\s+/g,'')+'.png');
-  toast('✓ '+sel.name+' を書き出しました（×'+exScale+'）');
-});
-$('#ex-full').addEventListener('click',()=>{
-  if(!PLATE.elems.length){toast('エレメントがありません');return;}
-  dlPNG(renderPlate(PLATE.elems,exScale),pname()+'_full.png');
-  toast('✓ FULL を書き出しました（×'+exScale+'）');
-});
-$('#ex-seeds').addEventListener('click',()=>{
-  if(!sel||(sel.type!=='focus'&&sel.type!=='stream')){toast('FOCUS / STREAM を選択してください（seedバリエーション）');return;}
-  for(let i=0;i<4;i++){   // 4枚=OBANの自動seqグループ化しきい値
-    const tmp=Object.assign({},sel,{seed:(sel.seed|0)+i});
-    dlPNG(renderPlate([tmp],exScale),pname()+'_'+sel.name.replace(/\s+/g,'')+'_'+String(i+1).padStart(3,'0')+'.png');
+function toGray(c){
+  const g=c.getContext('2d',{willReadFrequently:true});
+  let id;try{id=g.getImageData(0,0,c.width,c.height);}catch(e){return;}
+  const d=id.data;
+  for(let i=0;i<d.length;i+=4){
+    const v=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    d[i]=d[i+1]=d[i+2]=v;
   }
-  toast('✓ ×4 SEEDS 書き出し — OBANにD&Dでseqループ');
+  g.putImageData(id,0,0);
+}
+function dlCanvas(c,name){
+  const a=document.createElement('a');a.download=name;a.href=c.toDataURL('image/png');
+  document.body.appendChild(a);a.click();a.remove();
+}
+function bname(){return(BOOK.title||'plate').replace(/[^\w\-]/g,'_');}
+$('#ex-page').addEventListener('click',()=>{
+  const o=exOpts();
+  dlCanvas(renderPageCanvas(curPage(),null,o),bname()+'_p'+String(curPageIdx+1).padStart(3,'0')+'.png');
+  toast('✓ ページ '+(curPageIdx+1)+' を書き出しました');
 });
-function setScaleBtn(){$('#ex-s1').classList.toggle('on',exScale===1);$('#ex-s2').classList.toggle('on',exScale===2);}
-$('#ex-s1').addEventListener('click',()=>{exScale=1;setScaleBtn();});
-$('#ex-s2').addEventListener('click',()=>{exScale=2;setScaleBtn();});
-
-/* ---------- COPY/PASTE PLATE（KINETIC STAGE共通規約。file://はprompt窓フォールバック） ---------- */
-function plateJSON(){PLATE.name=$('#plate-name').value;return JSON.stringify({format:'PLATE_v1',plate:PLATE});}
-$('#cp-copy').addEventListener('click',()=>{
-  const j=plateJSON();
-  if(navigator.clipboard&&navigator.clipboard.writeText)
-    navigator.clipboard.writeText(j).then(()=>toast('✓ COPIED'),()=>window.prompt('コピーしてください:',j));
-  else window.prompt('コピーしてください:',j);
+$('#ex-panels').addEventListener('click',()=>{
+  const o=exOpts(), pg=curPage();
+  if(!pg.panels.length){toast('コマがありません');return;}
+  pg.panels.forEach((k,i)=>{
+    const b=polyBounds(dispPoly(k));
+    dlCanvas(renderPageCanvas(pg,b,o),bname()+'_p'+String(curPageIdx+1).padStart(3,'0')+'_k'+String(i+1).padStart(2,'0')+'.png');
+  });
+  toast('✓ コマ別 '+pg.panels.length+'枚を書き出しました');
 });
-$('#cp-paste').addEventListener('click',()=>{
-  const apply=t=>{try{
-      const o=JSON.parse(t);
-      if(!o||o.format!=='PLATE_v1'||!o.plate)throw 0;
-      PLATE=migrate(o.plate);sel=null;
-      $('#plate-name').value=PLATE.name;syncPlateUI();
-      commit();renderList();renderParams();fitView();toast('✓ APPLIED');
-    }catch(e){toast('✗ PLATE_v1 のJSONではありません');}};
-  if(navigator.clipboard&&navigator.clipboard.readText)
-    navigator.clipboard.readText().then(apply,()=>{const t=window.prompt('PLATE JSONを貼り付け:');if(t)apply(t);});
-  else{const t=window.prompt('PLATE JSONを貼り付け:');if(t)apply(t);}
+$('#ex-all').addEventListener('click',()=>{
+  const o=exOpts();
+  modalConfirm('全 '+BOOK.pages.length+' ページを書き出します。\nブラウザが複数ダウンロードの許可を聞くことがあります。',()=>{
+    BOOK.pages.forEach((pg,i)=>{
+      dlCanvas(renderPageCanvas(pg,null,o),bname()+'_p'+String(i+1).padStart(3,'0')+'.png');});
+    toast('✓ 全 '+BOOK.pages.length+' ページを書き出しました');
+  });
 });
 
-/* ---------- plate設定 ---------- */
-function syncPlateUI(){$('#plate-w').value=PLATE.w;$('#plate-h').value=PLATE.h;$('#plate-bg').value=PLATE.bg;}
-$('#plate-w').addEventListener('change',ev=>{PLATE.w=clamp(parseInt(ev.target.value)||1920,64,8192);syncPlateUI();commit();fitView();});
-$('#plate-h').addEventListener('change',ev=>{PLATE.h=clamp(parseInt(ev.target.value)||1080,64,8192);syncPlateUI();commit();fitView();});
-$('#plate-bg').addEventListener('change',ev=>{PLATE.bg=ev.target.value;commit();});
-$('#plate-name').addEventListener('change',()=>{PLATE.name=$('#plate-name').value;save();});
-$('#btn-home').addEventListener('click',()=>{location.href='index.html';});
-$('#btn-fit').addEventListener('click',fitView);
-$('#add-frame').addEventListener('click',()=>addElem('frame'));
-$('#add-tone').addEventListener('click',()=>addElem('tone'));
-$('#add-focus').addEventListener('click',()=>addElem('focus'));
-$('#add-stream').addEventListener('click',()=>addElem('stream'));
+/* ============================================================
+   ページ一覧（クリスタの一覧ウィンドウ相当）
+   ============================================================ */
+let thumbCache={}, pagesSel=0;
+function thumbFor(pg,i){
+  const key=pg.id+'|'+i;
+  if(thumbCache[key])return thumbCache[key];
+  const W=150, H=Math.round(150*PAPER.h/PAPER.w);
+  const c=document.createElement('canvas');c.width=W*2;c.height=H*2;
+  const g=c.getContext('2d');
+  g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);
+  g.save();g.scale(c.width/PAPER.w,c.height/PAPER.h);
+  renderPage(g,pg,{});
+  g.restore();
+  /* 内枠ガイド（一覧の目印） */
+  g.strokeStyle='rgba(90,110,220,.6)';g.lineWidth=1;
+  const s=c.width/PAPER.w;
+  g.strokeRect(PAPER.bas.x*s,PAPER.bas.y*s,PAPER.bas.w*s,PAPER.bas.h*s);
+  thumbCache[key]=c;
+  return c;
+}
+function renderPages(){
+  const grid=$('#pages-grid');if(!grid)return;
+  grid.innerHTML='';
+  const n=BOOK.pages.length;
+  /* 1p目は単独（表紙）、以降は 2p ずつの見開き。右綴じなら右が若い番号 */
+  const rows=[[0]];
+  for(let i=1;i<n;i+=2)rows.push(i+1<n?[i,i+1]:[i]);
+  rows.forEach(row=>{
+    const sp=document.createElement('div');sp.className='spread';
+    let cells=row.slice();
+    if(row.length===2)cells=BOOK.bindRight?[row[1],row[0]]:[row[0],row[1]];
+    else if(BOOK.bindRight&&row[0]!==0)cells=[null,row[0]];
+    else if(BOOK.bindRight&&row[0]===0)cells=[null,row[0]];
+    cells.forEach(idx=>{
+      const card=document.createElement('div');
+      if(idx===null){card.className='pcard blank';card.innerHTML='<canvas></canvas><div class="cap">-</div>';sp.appendChild(card);return;}
+      card.className='pcard'+(idx===curPageIdx?' cur':'')+(idx===pagesSel&&idx!==curPageIdx?' sel':'');
+      const th=thumbFor(BOOK.pages[idx],idx);
+      const cv=document.createElement('canvas');cv.width=th.width;cv.height=th.height;
+      cv.getContext('2d').drawImage(th,0,0);
+      const cap=document.createElement('div');cap.className='cap';cap.textContent=String(idx+1);
+      card.appendChild(cv);card.appendChild(cap);
+      card.addEventListener('click',()=>{pagesSel=idx;renderPages();});
+      card.addEventListener('dblclick',()=>{gotoPage(idx);closePages();});
+      sp.appendChild(card);
+    });
+    grid.appendChild(sp);
+  });
+}
+function gotoPage(i){
+  curPageIdx=clamp(i,0,BOOK.pages.length-1);
+  selPanel=null;selItem=null;
+  renderItemList();renderItemParams();renderPanelSec();render();
+}
+function openPages(){pagesSel=curPageIdx;$('#pages-ov').style.display='flex';renderPages();}
+function closePages(){$('#pages-ov').style.display='none';}
+$('#btn-pages').addEventListener('click',openPages);
+$('#pages-close').addEventListener('click',closePages);
+$('#pg-add').addEventListener('click',()=>{
+  BOOK.pages.splice(pagesSel+1,0,newPage());pagesSel++;commit();renderPages();toast('ページを追加しました');});
+$('#pg-dup').addEventListener('click',()=>{
+  const src=BOOK.pages[pagesSel];
+  const cp=JSON.parse(JSON.stringify(src));
+  cp.id=uid('p_');cp.panels.forEach(k=>{const o=k.id;k.id=uid('k_');
+    cp.items.forEach(it=>{if(it.panelId===o)it.panelId=k.id;});});
+  cp.items.forEach(it=>{it.id=uid('i_');it.linkId=null;});   // 連携リンクは複製しない
+  BOOK.pages.splice(pagesSel+1,0,cp);pagesSel++;commit();renderPages();toast('ページを複製しました');});
+$('#pg-del').addEventListener('click',()=>{
+  if(BOOK.pages.length<=1){toast('最後の1ページは削除できません');return;}
+  modalConfirm('ページ '+(pagesSel+1)+' を削除しますか？',()=>{
+    BOOK.pages.splice(pagesSel,1);
+    pagesSel=clamp(pagesSel,0,BOOK.pages.length-1);
+    curPageIdx=clamp(curPageIdx,0,BOOK.pages.length-1);
+    commit();renderPages();gotoPage(curPageIdx);});});
+function movePage(d){
+  const j=pagesSel+d;
+  if(j<0||j>=BOOK.pages.length)return;
+  const [p]=BOOK.pages.splice(pagesSel,1);BOOK.pages.splice(j,0,p);
+  if(curPageIdx===pagesSel)curPageIdx=j;else if(curPageIdx===j)curPageIdx=pagesSel;
+  pagesSel=j;commit();renderPages();
+}
+$('#pg-left').addEventListener('click',()=>movePage(-1));
+$('#pg-right').addEventListener('click',()=>movePage(1));
 
-/* ---------- modalConfirm（app風。native confirm禁止） ---------- */
-let modalCb=null;
-function modalConfirm(msg,cb){$('#modal-msg').textContent=msg;modalCb=cb;$('#modal').style.display='flex';}
-$('#modal-ok').addEventListener('click',()=>{$('#modal').style.display='none';if(modalCb)modalCb();modalCb=null;});
-$('#modal-cancel').addEventListener('click',()=>{$('#modal').style.display='none';modalCb=null;});
+/* ============================================================
+   連携（tdr_exchange IndexedDB ＋ tdr_live BroadcastChannel）
+   ANIMATOR / COMPOSER / OBAN 側の改修はゼロ。既存の語彙にそのまま乗る
+   ============================================================ */
+const EX_DB='tdr_exchange', EX_STORE='projects', EX_VER=1;
+function exOpenDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(EX_DB,EX_VER);
+    r.onupgradeneeded=e=>{const d=e.target.result;
+      if(!d.objectStoreNames.contains(EX_STORE))d.createObjectStore(EX_STORE,{keyPath:'projectId'});};
+    r.onsuccess=e=>res(e.target.result);r.onerror=e=>rej(e.target.error);
+  });
+}
+async function exPut(rec){
+  const d=await exOpenDB();
+  return new Promise((res,rej)=>{
+    const tx=d.transaction(EX_STORE,'readwrite');
+    tx.objectStore(EX_STORE).put(rec);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});
+}
+async function exGetAll(){
+  try{
+    const d=await exOpenDB();
+    return await new Promise((res,rej)=>{
+      const tx=d.transaction(EX_STORE,'readonly');
+      const r=tx.objectStore(EX_STORE).getAll();
+      r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error);});
+  }catch(e){return[];}
+}
+let gChan=null, gSeen={};      // gSeen: 共有DB未登録でも LIVE で流れてきたものを候補に持つ（OBANと同じ手）
+function postLive(m){if(gChan){try{gChan.postMessage(m);}catch(e){}}}
+function setupLive(){
+  if(typeof BroadcastChannel==='undefined')return;
+  try{gChan=new BroadcastChannel('tdr_live');}catch(e){return;}
+  gChan.onmessage=ev=>{
+    const m=ev.data;if(!m)return;
+    if(m.type==='project-update'&&m.payload){
+      const pid=m.projectId||m.payload.projectId;
+      if(pid&&String(pid).indexOf('mp_')!==0)gSeen[pid]=m.payload;
+      onAnimatorUpdate(pid,m.payload);
+    }
+    else if(m.type==='animator-hello')postLive({type:'composer-hello'});
+  };
+  /* ANIMATOR に「受け手が居る」と知らせて LIVE を立てる（composer/OBANと同じ作法） */
+  postLive({type:'composer-hello'});
+  setTimeout(()=>postLive({type:'composer-hello'}),700);
+  window.addEventListener('focus',()=>postLive({type:'composer-hello'}));
+}
+/* ANIMATOR の保存が飛んできたら、その projectId に紐づく画像素材を差し替える */
+async function onAnimatorUpdate(pid,payload){
+  if(!pid||!BOOK)return;
+  const cell=(payload.cells||[]).find(c=>c.kind==='draw'&&c.image);
+  if(!cell)return;
+  let hit=false;
+  for(const pg of BOOK.pages)for(const it of pg.items){
+    if(it.type!=='img'||it.linkId!==pid)continue;
+    MATSRC[it.srcId]=cell.image;
+    await new Promise(res=>{const im=new Image();im.onload=()=>{MATIMG[it.srcId]=im;res();};im.onerror=res;im.src=cell.image;});
+    hit=true;
+  }
+  if(hit){edgeCache.clear();toneCache.clear();thumbCache={};save();render();renderItemList();toast('● ANIMATOR の更新を反映しました');}
+}
+/* ---- 送信元の矩形（選択コマ or 用紙内枠） ---- */
+function linkBox(){
+  return selPanel?polyBounds(dispPoly(selPanel)):{x:PAPER.bas.x,y:PAPER.bas.y,w:PAPER.bas.w,h:PAPER.bas.h};
+}
+/* ---- 連携用に「そのコマを ANIMATOR 解像度へレターボックス」した画像を作る ---- */
+function linkCanvas(w,h){
+  const b=linkBox(), pg=curPage();
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  const g=c.getContext('2d');
+  g.fillStyle='#FFFFFF';g.fillRect(0,0,w,h);
+  const s=Math.min(w/b.w,h/b.h);
+  const ox=(w-b.w*s)/2, oy=(h-b.h*s)/2;
+  g.save();g.translate(ox,oy);g.scale(s,s);g.translate(-b.x,-b.y);
+  g.beginPath();g.rect(b.x,b.y,b.w,b.h);g.clip();
+  renderPage(g,pg,{});
+  g.restore();
+  return {canvas:c,box:b,scale:s,ox:ox,oy:oy};
+}
+function linkRecord(pid,name,w,h){
+  const L=linkCanvas(w,h);
+  return {rec:{
+    format:'PROJECT_v1',projectId:pid,name:name,scene:name,
+    exportedAt:new Date().toISOString(),
+    fps:24,durationUnit:'frames',width:w,height:h,bgBright:100,
+    workArea:{startFrame:0,endFrame:0},
+    cellCount:1,
+    cells:[{id:'c1',kind:'draw',duration:1,image:L.canvas.toDataURL('image/png')}],
+    composer:null},L:L};
+}
+$('#lk-to-ani').addEventListener('click',async()=>{
+  const w=BOOK.link.w, h=BOOK.link.h;
+  const pg=curPage();
+  const kIdx=selPanel?pg.panels.indexOf(selPanel)+1:0;
+  const pid='mp_'+BOOK.title.replace(/[^\w\-]/g,'')+'_p'+(curPageIdx+1)+(kIdx?'_k'+kIdx:'');
+  const name='MP '+(curPageIdx+1)+(kIdx?'-'+kIdx:'')+' '+BOOK.title;
+  const {rec,L}=linkRecord(pid,name,w,h);
+  BOOK.links[pid]={pageId:pg.id,panelId:selPanel?selPanel.id:null,
+    box:{x:L.box.x,y:L.box.y,w:L.box.w,h:L.box.h},scale:L.scale,ox:L.ox,oy:L.oy,w:w,h:h};
+  try{await exPut(rec);}catch(e){toast('✗ 共有DBに書けませんでした');return;}
+  postLive({type:'project-update',projectId:pid,payload:rec});
+  commit();
+  modalConfirm('ANIMATOR へ送りました（'+w+'×'+h+'）。\n\nANIMATOR を開いて  REF ▸ ＋ FROM SAVED  から\n「'+name+'」を選ぶと下敷きに乗ります。\n\nANIMATOR を新しいタブで開きますか？',
+    ()=>{window.open('animator.html','_blank');});
+});
+$('#lk-from-ani').addEventListener('click',async()=>{
+  postLive({type:'composer-hello'});                 // 開いているANIMATORへ最新を要求
+  await new Promise(r=>setTimeout(r,350));
+  const by={};
+  const ok=r=>r&&Array.isArray(r.cells)&&r.cells.some(c=>c.kind==='draw'&&c.image)&&String(r.projectId).indexOf('mp_')!==0;
+  (await exGetAll()).forEach(r=>{if(ok(r))by[r.projectId]=r;});
+  Object.keys(gSeen).forEach(id=>{const r=gSeen[id];   // LIVEで来た方が新しければそちら
+    if(ok(r)&&(!by[id]||String(r.exportedAt||'')>=String(by[id].exportedAt||'')))by[id]=r;});
+  const list=Object.values(by);
+  if(!list.length){
+    modalAlert('取り込めるANIMATORプロジェクトがありません。\n\nANIMATOR で LIVE を押すか「→ COMPOSER」を一度押すと\nここに出てきます（同一ブラウザ内のみ）。');
+    return;}
+  list.sort((a,b)=>String(b.exportedAt||'').localeCompare(String(a.exportedAt||'')));
+  modalPick('ANIMATOR から取り込む',list.map(r=>({
+    label:String(r.name||r.scene||r.projectId),
+    sub:(r.cellCount||r.cells.length)+'コマ · '+r.width+'×'+r.height+' · '+String(r.exportedAt||'').replace('T',' ').slice(5,16),
+    value:r})),async r=>{
+      const cell=r.cells.find(c=>c.kind==='draw'&&c.image);
+      const it=await addImage(cell.image,String(r.name||'ANI').slice(0,16),r.projectId);
+      placeLinked(it,r);
+      commit();renderItemList();renderItemParams();
+      toast('◀ 取り込みました（以後 ANIMATOR の保存で自動更新）');
+    });
+});
+/* 送った時の矩形が残っていれば、そのコマにピッタリ戻す */
+function placeLinked(it,rec){
+  const lk=BOOK.links[rec.projectId];
+  const pg=curPage();
+  if(!lk){const b=PAPER.bas;const im=MATIMG[it.srcId];
+    if(im&&im.width)it.scale=Math.min(b.w/im.width,b.h/im.height);
+    it.x=b.x+b.w/2;it.y=b.y+b.h/2;return;}
+  const pgIdx=BOOK.pages.findIndex(p=>p.id===lk.pageId);
+  if(pgIdx>=0&&pgIdx!==curPageIdx)gotoPage(pgIdx);
+  const tp=curPage();
+  const k=lk.panelId?findPanel(tp,lk.panelId):null;
+  it.panelId=k?k.id:null;
+  const im=MATIMG[it.srcId];
+  if(im&&im.width){
+    it.scale=1/lk.scale;                       // 送った倍率の逆
+    it.x=lk.box.x+lk.box.w/2;it.y=lk.box.y+lk.box.h/2;
+  }
+  if(pg!==tp){renderPanelSec();}
+}
+async function sendPageTo(target){
+  const w=BOOK.link.w, h=BOOK.link.h;
+  const pid='mp_'+target+'_'+BOOK.title.replace(/[^\w\-]/g,'')+'_p'+(curPageIdx+1);
+  const name='MP P'+(curPageIdx+1)+' '+BOOK.title;
+  const sp=selPanel;selPanel=null;                    // ページ全体を送る
+  const {rec}=linkRecord(pid,name,w,h);
+  selPanel=sp;
+  try{await exPut(rec);}catch(e){toast('✗ 共有DBに書けませんでした');return;}
+  postLive({type:'project-update',projectId:pid,payload:rec});
+  if(target==='comp'){
+    window.open('composer.html?id='+encodeURIComponent(pid),'_blank');
+    toast('▶ COMPOSER をトラック付きで開きました');
+  }else{
+    window.open('oban-builder.html','_blank');
+    modalAlert('OBAN へ送りました。\n\nOBAN 側の  ＋ FROM ANIMATOR  を開くと\n「'+name+'」が候補に出ます。それを選ぶとパネルになります。');
+  }
+}
+$('#lk-to-comp').addEventListener('click',()=>sendPageTo('comp'));
+$('#lk-to-oban').addEventListener('click',()=>sendPageTo('oban'));
+function setLinkWH(w,h){
+  BOOK.link.w=clamp(Math.round(w),64,8192);BOOK.link.h=clamp(Math.round(h),64,8192);
+  $('#lk-w').value=BOOK.link.w;$('#lk-h').value=BOOK.link.h;save();updateLinkNote();
+}
+/* 選択コマの比で長辺2048に合わせる（コマが縦長のとき 16:9 だと大半が余白になるため） */
+function fitLinkToPanel(){
+  const b=linkBox(), s=2048/Math.max(b.w,b.h);
+  setLinkWH(b.w*s,b.h*s);
+}
+function updateLinkNote(){
+  const b=linkBox(), w=BOOK.link.w, h=BOOK.link.h;
+  const s=Math.min(w/b.w,h/b.h);
+  const use=Math.round((b.w*s*b.h*s)/(w*h)*100);
+  const what=selPanel?('選択コマ '+Math.round(b.w)+'×'+Math.round(b.h)):'ページ内枠';
+  $('#lk-note').innerHTML=
+    what+' → <b>'+w+'×'+h+'</b> に収めて送ります（画素の使用率 <b style="color:'+
+    (use<55?'var(--rouge)':'var(--gold)')+'">'+use+'%</b>）。'+
+    (use<55?'<br><b>コマ比</b>を押すと余白なしの解像度になります。ANIMATOR側も同じ解像度にしてください。':'')+
+    '<br>ANIMATOR側は <b>REF ▸ ＋ FROM SAVED</b> で拾えます。戻りは <b>◀ ANIMATOR 取込</b>、以後は保存のたび自動更新（LIVE）。';
+}
+(function initLinkPresets(){
+  const box=$('#lk-presets');
+  [['1920×1080',1920,1080],['2048×2048',2048,2048],['1448×2048',1448,2048]].forEach(([nm,w,h])=>{
+    const c=document.createElement('span');c.className='fp';c.textContent=nm;
+    c.addEventListener('click',()=>setLinkWH(w,h));
+    box.appendChild(c);
+  });
+  const c=document.createElement('span');c.className='fp';c.textContent='コマ比';
+  c.addEventListener('click',fitLinkToPanel);
+  box.appendChild(c);
+})();
+$('#lk-w').addEventListener('change',()=>setLinkWH(parseInt($('#lk-w').value)||1920,BOOK.link.h));
+$('#lk-h').addEventListener('change',()=>setLinkWH(BOOK.link.w,parseInt($('#lk-h').value)||1080));
 
-/* ---------- toast ---------- */
+/* ============================================================
+   ファイル入出力
+   ============================================================ */
+$('#io-export').addEventListener('click',()=>{
+  const used={};
+  BOOK.pages.forEach(pg=>pg.items.forEach(it=>{if(it.srcId&&MATSRC[it.srcId])used[it.srcId]=MATSRC[it.srcId];}));
+  const blob=new Blob([JSON.stringify({format:'MANGA_BOOK_v2',book:BOOK,src:used})],{type:'application/json'});
+  const a=document.createElement('a');a.download=bname()+'_book.json';a.href=URL.createObjectURL(blob);
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  toast('✓ JSON を書き出しました');
+});
+$('#io-import').addEventListener('click',()=>$('#io-file').click());
+$('#io-file').addEventListener('change',async ev=>{
+  const f=ev.target.files[0];ev.target.value='';if(!f)return;
+  try{
+    const o=JSON.parse(await f.text());
+    if(!o||o.format!=='MANGA_BOOK_v2'||!o.book)throw 0;
+    BOOK=migrate(o.book);MATSRC=o.src||{};MATIMG={};
+    PAPER=paperOf(BOOK.paper);
+    await rebuildImages();
+    curPageIdx=0;selPanel=null;selItem=null;thumbCache={};
+    hist.length=0;hi=-1;commit();
+    syncUI();renderItemList();renderItemParams();renderPanelSec();fitView();
+    toast('✓ 読み込みました');
+  }catch(e){modalAlert('MANGA_BOOK_v2 のJSONではありません。');}
+});
+$('#io-reset').addEventListener('click',()=>{
+  modalConfirm('全ページ・全素材を消して新規に戻します。取り消せません。続けますか？',async()=>{
+    BOOK=newBook();MATSRC={};MATIMG={};PAPER=paperOf(BOOK.paper);
+    curPageIdx=0;selPanel=null;selItem=null;thumbCache={};
+    hist.length=0;hi=-1;commit();
+    syncUI();renderItemList();renderItemParams();renderPanelSec();fitView();
+    toast('新規に戻しました');
+  });
+});
+
+/* ============================================================
+   モーダル / toast
+   ============================================================ */
+let modalOk=null,modalCancel=null;
+function modalOpen(msg,list,onPick){
+  $('#modal-msg').textContent=msg;
+  const lb=$('#modal-list');lb.innerHTML='';
+  if(list&&list.length){
+    lb.style.display='flex';
+    list.forEach(o=>{
+      const r=document.createElement('div');r.className='mrow';
+      r.innerHTML='<b>'+esc(o.label)+'</b><span>'+esc(o.sub||'')+'</span>';
+      r.addEventListener('click',()=>{modalClose();if(onPick)onPick(o.value);});
+      lb.appendChild(r);});
+  }else lb.style.display='none';
+  $('#modal').style.display='flex';
+}
+function modalClose(){$('#modal').style.display='none';modalOk=null;modalCancel=null;}
+function modalConfirm(msg,ok,cancel){
+  modalOk=ok;modalCancel=cancel||null;
+  $('#modal-ok').style.display='';$('#modal-cancel').textContent='CANCEL';
+  modalOpen(msg,null,null);
+}
+function modalAlert(msg){
+  modalOk=null;modalCancel=null;
+  $('#modal-ok').style.display='none';$('#modal-cancel').textContent='CLOSE';
+  modalOpen(msg,null,null);
+}
+function modalPick(msg,list,onPick){
+  modalOk=null;modalCancel=null;
+  $('#modal-ok').style.display='none';$('#modal-cancel').textContent='CANCEL';
+  modalOpen(msg,list,onPick);
+}
+$('#modal-ok').addEventListener('click',()=>{const f=modalOk;modalClose();if(f)f();});
+$('#modal-cancel').addEventListener('click',()=>{const f=modalCancel;modalClose();if(f)f();});
 let toastT=null;
-function toast(msg){const t=$('#toast');t.textContent=msg;t.style.display='block';
-  clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',2200);}
+function toast(msg){const t=$('#toast');t.innerHTML=esc(msg);t.style.display='block';
+  clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',2600);}
 
-/* ---------- keyboard（フォーカスガード必須 — KINETIC STAGE規約） ---------- */
+/* ============================================================
+   D&D（画像をステージに落とす）
+   ============================================================ */
+$('#main').addEventListener('dragover',ev=>{ev.preventDefault();});
+$('#main').addEventListener('drop',async ev=>{
+  ev.preventDefault();
+  const fs=[...(ev.dataTransfer.files||[])].filter(f=>/^image\//.test(f.type));
+  if(!fs.length)return;
+  const p=evPt(ev), pg=curPage();
+  const k=panelAt(pg,p.x,p.y);
+  selPanel=k;
+  for(const f of fs)await addImage(await fileToDataURL(f),f.name.replace(/\.[^.]+$/,''),null);
+  toast(k?'コマの中に入れました':'ページの上に置きました');
+});
+
+/* ============================================================
+   キーボード（フォーカスガード必須 — KINETIC STAGE規約）
+   ============================================================ */
 window.addEventListener('keydown',ev=>{
   const tag=document.activeElement&&document.activeElement.tagName;
   if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA')return;
   if(ev.key==='Escape'){
-    if($('#modal').style.display==='flex'){$('#modal').style.display='none';modalCb=null;return;}
-    if(refMode){refMode=false;$('#ref-mode').classList.remove('on');render();return;}
-    if(sel){sel=null;renderList();renderParams();render();return;}
+    if($('#modal').style.display==='flex'){const f=modalCancel;modalClose();if(f)f();return;}
+    if($('#pages-ov').style.display==='flex'){closePages();return;}
+    if(selItem||selPanel){selItem=null;selPanel=null;renderItemList();renderItemParams();renderPanelSec();render();}
     return;
-  }
-  if((ev.key==='Delete'||ev.key==='Backspace')&&sel){
-    modalConfirm(sel.name+' を削除しますか？',()=>deleteSel());return;
   }
   if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();undo();return;}
   if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return;}
-  if(ev.key==='f'||ev.key==='F')fitView();
+  if(ev.ctrlKey||ev.metaKey||ev.altKey)return;
+  const k=ev.key.toLowerCase();
+  if(k==='v')setTool('sel');
+  else if(k==='d')setTool('div');
+  else if(k==='p')setTool('pt');
+  else if(k==='1')setDivMode('v');
+  else if(k==='2')setDivMode('h');
+  else if(k==='3')setDivMode('f');
+  else if(k==='s'){showShade=!showShade;$('#t-shade').classList.toggle('on',showShade);render();}
+  else if(k==='g'){showGuide=!showGuide;$('#t-guide').classList.toggle('on',showGuide);render();}
+  else if(k==='f')fitView();
+  else if(k==='delete'||k==='backspace'){
+    if(selItem)modalConfirm(selItem.name+' を削除しますか？',()=>deleteItem(selItem));
+    else if(selPanel)$('#pn-del').click();
+  }
+  else if(ev.key==='PageDown'||k===']')gotoPage(curPageIdx+1);
+  else if(ev.key==='PageUp'||k==='[')gotoPage(curPageIdx-1);
 });
+$('#btn-home').addEventListener('click',()=>{location.href='index.html';});
 
-/* ---------- boot ---------- */
+/* ============================================================
+   boot
+   ============================================================ */
 window.addEventListener('resize',setupCanvas);
-load();
-$('#plate-name').value=PLATE.name;
-syncPlateUI();setScaleBtn();
-setupCanvas();fitView();
-renderList();renderParams();
-commit();   // 履歴の初期状態を積む
+(async function boot(){
+  const had=await loadBook();
+  if(!had)BOOK=newBook();
+  BOOK=migrate(BOOK);
+  PAPER=paperOf(BOOK.paper);
+  await rebuildImages();
+  gLpi=50;$('#ex-lpi').value=gLpi;$('#ex-lpi-v').textContent=gLpi;syncLpiEnable();
+  syncUI();
+  setDivMode('v');setTool('sel');
+  setupCanvas();fitView();
+  renderItemList();renderItemParams();renderPanelSec();
+  pushHist();                 // 履歴の初期状態
+  setupLive();
+})();
 </script>
 </body>
 </html>

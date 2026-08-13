@@ -8,7 +8,7 @@
 - `animator.html` — メインの作画エディタ（実体。最重要）
 - `oban-builder.html` — OBAN BUILDER。モーションコミック製造機（画像→PLACE→TAKE→単一HTMLビューア書き出し）。パイプライン上は animator と composer の間
 - `composer.html` — マルチトラック合成（カメラ/キーフレーム/書き出し）
-- `manga-plate.html` — パラメトリック漫画素材（コマ枠/トーン/集中線/流線→透過PNG。SPEC_09）
+- `manga-plate.html` — **MANGA PLATE v2。漫画ページ＆コマ割り**（ジャンプ規定B4 600dpi・多角形コマの縦/横/斜め分割・コマ内マスク・境界効果・ページ一覧・グレー→網点。SPEC_09 §v2）
 - `econte.html` — ECONTE。プリプロ（紙ネーム写真→BOARD切り出し→SHEET絵コンテ→加筆。SPEC_10。パイプライン上は animator の前）
 - `index.html` — ランディングページ（**OBAN 追加予定**）
 - `inbetween_lab.html` / `inbetween_warp_lab.html` — 中割り実験ラボ
@@ -27,7 +27,9 @@
 - `SPEC_05_OBAN_BUILDER_V2.md` — OBAN BUILDER V2 拡張仕様
 - `SPEC_06_SATSUEI_KIT.md` — 撮影処理キット（fx共通スキーマ・composer/OBAN統合）
 - `SPEC_07_ANIMATOR_OBAN_BRIDGE.md` — animator⇄OBAN 連番往復ブリッジ仕様
-- `SPEC_09_MANGA_PLATE.md` — パラメトリック漫画素材ツール仕様（P4=OBANコマ枠線含む）
+- `SPEC_09_MANGA_PLATE.md` — MANGA PLATE 仕様。**v1=パラメトリック素材（P0〜P4実装済）／§v2=ページ・コマ割りツール（2026-08-13 実装済）**。
+  v2の要点: コマ＝多角形＋半平面クリップ分割（間隔は線の向きで lr/tb を補間）・`panelId` の有無だけで「コマ内マスク／枠の上」が決まる・
+  **連携は `tdr_exchange`＋`tdr_live` に相乗りするだけで animator/composer/oban の改修ゼロ**・保存はIndexedDB（dataURLのため）
 - `SPEC_10_ECONTE.md` — プリプロツール仕様（cuts[]単一データ・BOARD/SHEET/TIMELINE設計。P0+P1実装済み、P2=animator連携/カラースクリプト）
 - `SPEC_13_ECONTE_V2.md` — ECONTE V2「STUDIO」仕様（1画面統合・BOARD強化・**大判カメラ枠列＋可変ベイク**・MP4書き出し・カラースクリプト・iPad操作。**V2-A〜D3・E1・E2(a〜d) 実装済み（2026-08-09）／残りは E3 フォトバッシュのみ**）。※§5は2026-07に差し替え済み（旧「のりしろ1.2x固定＋カメラプリセット」は廃止）。**画面の役割（STUDIO=プレビュー+コラージュ／EDIT=単票+カラースクリプト一覧）は §9 で確定済み。着手前に §9 を読む**
 - `SPEC_11_COMPOSER_POLISH.md` — COMPOSER磨き込み仕様（**P0〜P7 すべて実装済み**。残タスクなし。P7=出力解像度のアスペクト保持／のりしろ1.2／Zソート／フォルダ書き出し／タイムライン時間軸ズーム）
