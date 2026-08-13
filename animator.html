@@ -1467,7 +1467,7 @@ input[type=range]::-moz-range-thumb{
       </svg>
       <span class="lbl">ERASE</span>
     </button>
-    <button class="tool" data-tool="fill" title="塗りつぶし (G)">
+    <button class="tool" data-tool="fill" title="塗りつぶし (G)（Wクリックで投げ縄塗り・長押しで投げ縄透明消し）">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M5 11l7-7 7 7-7 7-7-7z"></path>
         <path d="M5 11h14"></path>
@@ -1771,6 +1771,8 @@ input[type=range]::-moz-range-thumb{
       <div class="sc-row"><span class="sc-label">直線（前の終点から）</span><span class="sc-fixed">Shift+クリック</span></div>
       <div class="sc-row"><span class="sc-label">水平／垂直に拘束</span><span class="sc-fixed">Shift+ドラッグ</span></div>
       <div class="sc-row"><span class="sc-label">下書／指示の色を既定に戻す</span><span class="sc-fixed">長押し</span></div>
+      <div class="sc-row"><span class="sc-label">投げ縄塗り ⇔ バケツ</span><span class="sc-fixed">FILLをWクリック</span></div>
+      <div class="sc-row"><span class="sc-label">投げ縄透明消し ⇔ バケツ</span><span class="sc-fixed">FILLを長押し</span></div>
       <div class="sc-row"><span class="sc-label">パレット選択後の色送り</span><span class="sc-fixed">↑ / ↓</span></div>
     </div>
   </div>
@@ -2194,11 +2196,12 @@ const state = {
   inkColor: 'black',    // 'black'|'blue'|'orange'
   fillColor: '#000000',
   bgBright: 100,
-  // ペンボタン Wクリックで筆圧ペン / 塗りつぶしボタン Wクリックで透明消し
+  // ペンボタン Wクリックで筆圧ペン / 塗りつぶしボタン長押しで投げ縄透明消し
   pressurePen: false,
   fillErase: false,
   // 塗りつぶしの方式: 'flood'=バケツ（クリックで領域） / 'lasso'=投げ縄（囲って一括塗り）
-  // FILLボタン長押しで切替。ドット(トーン)選択中は投げ縄でも網点で塗れる。
+  // FILLボタン Wクリック=投げ縄塗り / 長押し=投げ縄透明消し。
+  // ドット(トーン)選択中は投げ縄でも網点で塗れる。
   fillMode: 'flood',
   // 直近にスクラブ/クリックしたティック（SPLITのクリック位置分割に使用）
   scrubTick: -1,
@@ -2507,8 +2510,12 @@ function renderRefLayer(tickOverride){
   for(let ri = refs.length - 1; ri >= 0; ri--){
     const r = refs[ri];
     if(!r.visible || !r.ticks) continue;
-    if(t < 0 || t >= r.ticks.length) continue;   // 参照側が尽きたら非表示
-    const img = r.ticks[t];
+    if(t < 0) continue;
+    // 1コマだけの参照＝静止画（MANGA PLATEのコマ枠など）は全ティックで出しっぱなしにする。
+    // 複数コマの参照は従来どおり、尽きたら非表示。
+    const still = r.ticks.length === 1;
+    if(!still && t >= r.ticks.length) continue;   // 参照側が尽きたら非表示
+    const img = r.ticks[still ? 0 : t];
     if(!img) continue;
     // 各参照に transform(x,y,scale) を適用（原寸基準・移動可）
     const sc = (typeof r.scale === 'number') ? r.scale : 1;
@@ -5513,7 +5520,7 @@ onDoubleActivate(penToolBtn, () => {
   penToolBtn.classList.toggle('pp-on', state.pressurePen);
   penToolBtn.title = '筆圧ペン: ' + (state.pressurePen ? 'ON（Wクリックで切替）' : 'OFF（Wクリックで切替）');
 });
-// ロングプレス検出（FILL長押し＝投げ縄塗り切替）。クリック/ダブルタップとは独立。
+// ロングプレス検出（FILL長押し＝投げ縄透明消し切替）。クリック/ダブルタップとは独立。
 function onLongPress(el, handler, ms = 500){
   if(!el) return;
   let timer = null, sx = 0, sy = 0;
@@ -5529,16 +5536,27 @@ function onLongPress(el, handler, ms = 500){
   ['pointerup','pointercancel','pointerleave'].forEach(ev => el.addEventListener(ev, clear));
 }
 
-// FILL ボタン ダブルクリック/ダブルタップ → 透明塗りつぶし消し ON/OFF
+// FILL ボタン ダブルクリック/ダブルタップ → 投げ縄塗り(lasso) ⇔ 通常の塗りつぶし(flood)
+// 投げ縄透明消しの状態から Wクリックしたときは「透明消しを解いて投げ縄塗り」に落とす。
 const fillToolBtn = document.querySelector('.tool[data-tool="fill"]');
 onDoubleActivate(fillToolBtn, () => {
-  state.fillErase = !state.fillErase;
-  fillToolBtn.classList.toggle('fe-on', state.fillErase);
+  const lassoFill = (state.fillMode === 'lasso' && !state.fillErase);
+  if(lassoFill){
+    state.fillMode = 'flood';           // もう一度Wクリックでバケツへ戻す
+  }else{
+    state.fillMode = 'lasso'; state.fillErase = false;
+  }
+  if(state.tool !== 'fill') fillToolBtn.click();
   applyFillModeUI();
 });
-// FILL ボタン 長押し → 投げ縄塗り(lasso) ⇔ 通常の塗りつぶし(flood) を切替
+// FILL ボタン 長押し → 投げ縄透明消し(lasso+erase) ⇔ 通常の塗りつぶし(flood) を切替
 onLongPress(fillToolBtn, () => {
-  state.fillMode = (state.fillMode === 'lasso') ? 'flood' : 'lasso';
+  const lassoErase = (state.fillMode === 'lasso' && state.fillErase);
+  if(lassoErase){
+    state.fillMode = 'flood'; state.fillErase = false;   // 長押しで通常塗りに戻す
+  }else{
+    state.fillMode = 'lasso'; state.fillErase = true;
+  }
   if(state.tool !== 'fill') fillToolBtn.click(); // 長押しで切替時はFILLを選択状態に
   applyFillModeUI();
 });
@@ -5546,12 +5564,15 @@ onLongPress(fillToolBtn, () => {
 function applyFillModeUI(){
   const lasso = state.fillMode === 'lasso';
   fillToolBtn.classList.toggle('lasso-on', lasso);
+  fillToolBtn.classList.toggle('fe-on', state.fillErase);
   const lbl = fillToolBtn.querySelector('.lbl');
-  if(lbl) lbl.textContent = lasso ? 'LASSO' : 'FILL';
-  const eraseNote = state.fillErase ? '／透明消しON' : '';
+  if(lbl) lbl.textContent = lasso ? (state.fillErase ? 'L-DEL' : 'LASSO') : 'FILL';
+  const hint = '（Wクリックで投げ縄塗り・長押しで投げ縄透明消し）';
   fillToolBtn.title = (lasso
-    ? '投げ縄塗り: 囲って一括塗り（長押しで通常塗りに戻す・Wクリックで透明消し）'
-    : '塗りつぶし (G)（長押しで投げ縄塗り・Wクリックで透明消し）') + eraseNote;
+    ? (state.fillErase
+        ? '投げ縄透明消し: 囲った内側を透明に消す'
+        : '投げ縄塗り: 囲って一括塗り')
+    : '塗りつぶし (G): クリックで領域を塗る') + hint;
   if(state.tool === 'fill') drawCanvas.style.cursor = lasso ? 'crosshair' : 'cell';
 }
 applyFillModeUI();

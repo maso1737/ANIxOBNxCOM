@@ -25,8 +25,15 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg-1);color:var(--white);font-family:var(--mono)}
-#app{display:grid;width:100%;height:100%;grid-template-rows:44px 1fr 40px;grid-template-columns:54px 1fr 318px;
-  grid-template-areas:"top top top" "rail main side" "bottom bottom bottom"}
+/* 既定=ツールレール右（キャンバスとサイドパネルの間＝手が届きやすい） / TABで左右入替 */
+#app{display:grid;width:100%;height:100%;grid-template-rows:44px 1fr 40px;grid-template-columns:1fr 54px 318px;
+  grid-template-areas:"top top top" "main rail side" "bottom bottom bottom"}
+body.swap #app{grid-template-columns:318px 54px 1fr;
+  grid-template-areas:"top top top" "side rail main" "bottom bottom bottom"}
+#rail{border-left:1px solid rgba(255,210,122,.18);border-right:0}
+body.swap #rail{border-right:1px solid rgba(255,210,122,.18);border-left:0}
+#side{border-left:1px solid rgba(255,210,122,.18);border-right:0}
+body.swap #side{border-right:1px solid rgba(255,210,122,.18);border-left:0}
 
 /* ---- topbar ---- */
 #topbar{grid-area:top;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--panel-2);
@@ -36,11 +43,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg-1);color:va
   background:linear-gradient(120deg,#FFE9B0,#FFD27A 26%,#FF4FA8 62%,#B58EFF 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
 #topbar .t-sp{flex:1}
 #pg-indic{color:var(--ice);font-size:11px;letter-spacing:.2em;white-space:nowrap}
+#topbar .t-lb{color:var(--lavender);font-size:9px;letter-spacing:.2em;white-space:nowrap}
 #book-title{background:var(--cell);border:1px solid rgba(255,210,122,.3);color:var(--gold);font-family:var(--mono);
   font-size:10px;letter-spacing:.15em;padding:4px 8px;width:120px}
 
 /* ---- tool rail ---- */
-#rail{grid-area:rail;background:var(--panel-2);border-right:1px solid rgba(255,210,122,.18);
+#rail{grid-area:rail;background:var(--panel-2);
   display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;overflow:hidden}
 .tool{width:38px;height:38px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;
   background:transparent;border:1px solid rgba(255,79,168,.35);color:var(--rouge);cursor:pointer;user-select:none;
@@ -65,7 +73,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg-1);color:va
   opacity:.65;pointer-events:none;text-transform:uppercase}
 
 /* ---- side ---- */
-#side{grid-area:side;background:var(--panel);border-left:1px solid rgba(255,210,122,.18);overflow-y:auto;overflow-x:hidden}
+#side{grid-area:side;background:var(--panel);overflow-y:auto;overflow-x:hidden}
 #side::-webkit-scrollbar{width:3px}
 #side::-webkit-scrollbar-thumb{background:var(--rouge)}
 details.sp{border-bottom:1px solid rgba(181,142,255,.12)}
@@ -138,6 +146,24 @@ select{width:100%}
 #modal-list .mrow span{display:block;font-size:9px;color:var(--lavender);letter-spacing:.08em;margin-top:2px}
 #modal-btns{display:flex;gap:10px;justify-content:flex-end}
 
+/* ---- help / settings overlay（econte 準拠：段組・解説付き） ---- */
+#help-ovl{position:fixed;inset:0;background:rgba(7,3,15,.9);display:none;align-items:center;justify-content:center;z-index:95;padding:24px}
+#help-ovl.on{display:flex}
+#help-box{background:var(--panel);border:1px solid rgba(255,210,122,.35);padding:18px 20px;
+  max-width:1080px;max-height:88vh;overflow-y:auto;width:100%}
+#help-box::-webkit-scrollbar{width:3px}
+#help-box::-webkit-scrollbar-thumb{background:var(--rouge)}
+#help-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+#help-head .t{font-family:var(--disp);font-style:italic;font-weight:900;font-size:16px;letter-spacing:.14em;color:var(--gold)}
+#help-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px}
+.help-grp{border:1px solid rgba(181,142,255,.22);padding:9px 11px}
+.help-grp h4{font-size:9px;letter-spacing:.24em;color:var(--gold);margin-bottom:7px;font-weight:400;text-transform:uppercase}
+.help-grp .r{display:flex;gap:9px;align-items:baseline;padding:2px 0;font-family:var(--jp);font-size:11px}
+.help-grp .k{flex:none;min-width:74px;font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--ice);
+  border:1px solid rgba(90,233,255,.3);padding:1px 5px;text-align:center}
+.help-grp .d{color:rgba(248,239,255,.8);line-height:1.55}
+#help-note{color:rgba(181,142,255,.8);font-size:10px;font-family:var(--jp);margin-top:12px;line-height:1.7}
+
 /* ---- pages overlay (一覧ウィンドウ) ---- */
 #pages-ov{position:fixed;inset:0;background:rgba(7,3,15,.94);display:none;flex-direction:column;z-index:80}
 #pages-head{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--panel-2);
@@ -165,19 +191,23 @@ select{width:100%}
     <span class="t-title">MANGA PLATE</span>
     <span id="pg-indic">—</span>
     <span class="t-sp"></span>
-    <input id="book-title" value="name-01" spellcheck="false" title="作品名（書き出しファイル名になる）">
+    <span class="t-lb">作品名</span>
+    <input id="book-title" value="name-01" spellcheck="false"
+           title="作品名。書き出しファイル名（name-01_p001.png / name-01_book.json）と、ANIMATOR等へ送るときのIDになります">
     <button class="btn gold" id="btn-pages" title="ページ一覧（Wクリックでそのページへ）">PAGES</button>
+    <button class="btn gold" id="btn-settings" title="操作一覧・設定（?）">⚙</button>
+    <button class="btn gold" id="btn-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
     <button class="btn" id="btn-home" title="ランディングページに戻る">HOME</button>
   </div>
 
   <div id="rail">
-    <div class="tool on" id="t-sel" title="コマ選択 / 素材選択（V）">▣<small>SEL</small></div>
-    <div class="tool" id="t-div" title="コマ分割（D）— ドラッグで分割線">╱<small>DIV</small></div>
-    <div class="tool" id="t-pt" title="制御点（P）— 選択のみ">◈<small>PT</small></div>
+    <div class="tool on" id="t-sel" title="選択（V）。Wクリックで コマ⇔素材 を切替">▣<small id="t-sel-lb">コマ</small></div>
+    <div class="tool" id="t-div" title="コマ分割（D）— ドラッグで分割線。用紙の外から引くと定規のように縦横が決まる">╱<small>DIV</small></div>
+    <div class="tool" id="t-edit" title="コマ線編集（P）。Wクリックで 線⇔ホワイト を切替">◈<small id="t-edit-lb">線</small></div>
     <div class="rail-sep"></div>
-    <div class="sub on" id="dm-v" title="縦に分割">│縦</div>
-    <div class="sub" id="dm-h" title="横に分割">─横</div>
-    <div class="sub" id="dm-f" title="斜め自由（Shiftで15°スナップ）">╱斜</div>
+    <div class="sub" id="dm-v" title="縦に分割（1）">│縦</div>
+    <div class="sub" id="dm-h" title="横に分割（2）">─横</div>
+    <div class="sub on" id="dm-f" title="斜め自由（3・Shiftで15°スナップ）">╱斜</div>
     <div class="rail-sep"></div>
     <div class="tool" id="t-shade" title="選択コマ以外を青くする（S）">▩<small>BLUE</small></div>
     <div class="tool" id="t-guide" title="トンボ・内枠ガイド表示（G）">⊹<small>GUIDE</small></div>
@@ -304,6 +334,20 @@ select{width:100%}
   <div id="pages-grid"></div>
 </div>
 
+<!-- 操作一覧・設定（econte の解説付きヘルプと同じ作り。縦スクロールでなく段組） -->
+<div id="help-ovl">
+  <div id="help-box">
+    <div id="help-head">
+      <span class="t">MANGA PLATE — 操作一覧</span>
+      <span style="flex:1"></span>
+      <button class="btn gold" id="btn-help-tab">左右入替（TAB）</button>
+      <button class="btn ice" id="btn-help-close">CLOSE</button>
+    </div>
+    <div id="help-body"></div>
+    <div id="help-note"></div>
+  </div>
+</div>
+
 <!-- 共通モーダル（native confirm 禁止） -->
 <div id="modal"><div id="modal-box">
   <div id="modal-msg"></div>
@@ -350,13 +394,20 @@ let PAPER=paperOf('B4_600');
    モデル
    ============================================================ */
 let BOOK=null, MATSRC={}, MATIMG={};   // MATSRC: srcId→dataURL（保存対象） / MATIMG: srcId→Image（実行時）
-let curPageIdx=0, selPanel=null, selItem=null;
-let tool='sel', divMode='v', showShade=true, showGuide=true;
+let curPageIdx=0, selPanel=null, selItem=null, selCut=null;
+let tool='sel', divMode='f', selMode='panel', editMode='line';
+let showShade=true, showGuide=true, swapUI=false;
 const view={x:0,y:0,z:0.1};
 
 function rectPoly(r){return[{x:r.x,y:r.y},{x:r.x+r.w,y:r.y},{x:r.x+r.w,y:r.y+r.h},{x:r.x,y:r.y+r.h}];}
+/* コマ = base（分割前の多角形）∩ cuts（半平面の列）。
+   poly は毎回 cuts から導出するので、分割線そのものを後から動かせる。 */
+function newPanel(base,cuts,border,bleed,from){
+  return {id:uid('k_'),base:base.map(q=>({x:q.x,y:q.y})),cuts:cuts||[],
+    poly:base.map(q=>({x:q.x,y:q.y})),border:border!==false,bleed:!!bleed,from:from||null};
+}
 function newPage(name){
-  return {id:uid('p_'),name:name||'',panels:[{id:uid('k_'),poly:rectPoly(PAPER.bas),border:true,bleed:false}],items:[]};
+  return {id:uid('p_'),name:name||'',panels:[newPanel(rectPoly(PAPER.bas),[],true,false,null)],items:[]};
 }
 function newBook(){
   return {version:2,title:'name-01',paper:'B4_600',bg:'#FFFFFF',
@@ -386,6 +437,8 @@ function migrate(b){
       if(!Array.isArray(k.poly)||k.poly.length<3)k.poly=rectPoly(PAPER.bas);
       if(k.border===undefined)k.border=true;
       if(k.bleed===undefined)k.bleed=false;
+      if(!Array.isArray(k.cuts))k.cuts=[];                      // v2.0 のコマは分割線を持たない＝線編集の対象外
+      if(!Array.isArray(k.base)||k.base.length<3)k.base=k.poly.map(q=>({x:q.x,y:q.y}));
     });
     if(!Array.isArray(pg.items))pg.items=[];
     pg.items=pg.items.filter(it=>it&&ITEM_DEFS[it.type]);
@@ -408,11 +461,13 @@ function curPage(){return BOOK.pages[clamp(curPageIdx,0,BOOK.pages.length-1)];}
 function findPanel(pg,id){return id?pg.panels.find(k=>k.id===id)||null:null;}
 
 /* ---- アイテム定義（スライダーは DEFS から自動生成） ---- */
-const ITEM_DEFS={img:1,tone:1,focus:1,stream:1,frame:1};
+const ITEM_DEFS={img:1,tone:1,focus:1,stream:1,frame:1,white:1};
 function defaultsFor(type,box){
   const S=PAPER.dpi/600;                       // 600dpi基準のpxを解像度に合わせる
   if(type==='img')   return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,scale:1,opacity:1,srcId:null,linkId:null,
+                             srcs:null,cell:0,
                              edge:{on:false,w:Math.round(24*S),color:'#FFFFFF'},tone:{on:false}};
+  if(type==='white') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,opacity:1,poly:[],color:'#FFFFFF'};
   if(type==='tone')  return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,w:Math.round(box.w),h:Math.round(box.h),
                              dot:Math.round(16*S),gap:Math.round(22*S),angle:45,shape:'dot',color:'#000000'};
   if(type==='focus') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,r0:Math.round(Math.min(box.w,box.h)*0.22),
@@ -428,6 +483,7 @@ const DEFS={
   focus: [['r0',0,4000,1,'R0 白場'],['r1',100,9000,1,'R1 長さ'],['count',10,400,1,'本数'],['lw',1,60,1,'太さ'],['taper',0,1,0.05,'先細り'],['jitter',0,1,0.05,'ゆらぎ'],['seed',1,99,1,'SEED'],['rot',-180,180,1,'ROT']],
   stream:[['w',50,9000,1,'W'],['h',50,9000,1,'H'],['count',2,200,1,'本数'],['lw',1,60,1,'太さ'],['taper',0,1,0.05,'先細り'],['jitter',0,1,0.05,'ゆらぎ'],['seed',1,99,1,'SEED'],['rot',-180,180,1,'ROT']],
   frame: [['w',50,9000,1,'W'],['h',50,9000,1,'H'],['lw',2,120,1,'太さ'],['rot',-90,90,1,'ROT']],
+  white: [['rot',-180,180,1,'ROT'],['opacity',0.05,1,0.05,'不透明度']],
 };
 const TONE_PRESETS=[['10%',0.42],['20%',0.55],['40%',0.74],['60%',0.90]];   // dot = gap × 比
 const FOCUS_PRESETS=[['標準',{count:110,taper:0.9,jitter:0.35}],['密',{count:220,taper:0.95,jitter:0.25}]];
@@ -475,45 +531,107 @@ function sortPanels(pg){
     return (A.cx-B.cx)*dir;
   });
 }
+function cutD(c){return c.nx*c.ax+c.ny*c.ay;}
+function gapFor(nx,ny){return BOOK.gut.lr*Math.abs(nx)+BOOK.gut.tb*Math.abs(ny);}
+function minArea(){return Math.pow(PAPER.dpi/600*90,2);}   // これ未満の面積は「切れていない」
+/* cuts から poly を導出。破綻したら false */
+function rebuildPanel(k){
+  if(!k.cuts||!k.cuts.length)return true;                  // 分割由来でないコマは poly をそのまま使う
+  let poly=k.base.map(q=>({x:q.x,y:q.y}));
+  for(const c of k.cuts){
+    poly=c.side>0?clipHalf(poly,c.nx,c.ny,cutD(c)-c.gap/2)
+                 :clipHalf(poly,-c.nx,-c.ny,-(cutD(c)+c.gap/2));
+    if(poly.length<3)return false;
+  }
+  k.poly=poly;
+  return true;
+}
 /* 分割: 点Pを通り方向Dの直線で targets を切る。コマ間隔は線の向きで補間 */
 function splitPanels(pg,targets,px,py,dx,dy){
   const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
-  let nx=-dy, ny=dx;                                  // 法線
-  const d=nx*px+ny*py;
-  const gap=BOOK.gut.lr*Math.abs(nx)+BOOK.gut.tb*Math.abs(ny);
-  const MIN=Math.pow(PAPER.dpi/600*90,2);             // これ未満の面積は「切れていない」
+  const nx=-dy, ny=dx;                                  // 法線
+  const gap=gapFor(nx,ny), cid=uid('c_'), MIN=minArea();
   let n=0;
   for(const k of targets){
-    const A=clipHalf(k.poly,nx,ny,d-gap/2);
-    const B=clipHalf(k.poly,-nx,-ny,-(d+gap/2));
-    if(A.length<3||B.length<3)continue;
-    if(polyArea(A)<MIN||polyArea(B)<MIN)continue;
+    const mk=side=>{
+      const nk=newPanel(k.base,(k.cuts||[]).map(c=>Object.assign({},c))
+        .concat([{id:cid,nx:nx,ny:ny,ax:px,ay:py,gap:gap,side:side}]),k.border,k.bleed,k.id);
+      return rebuildPanel(nk)?nk:null;
+    };
+    const A=mk(1), B=mk(-1);
+    if(!A||!B)continue;
+    if(polyArea(A.poly)<MIN||polyArea(B.poly)<MIN)continue;
     const i=pg.panels.indexOf(k);if(i<0)continue;
-    const mk=poly=>({id:uid('k_'),poly:poly,border:k.border,bleed:k.bleed,from:k.id});
-    pg.panels.splice(i,1,mk(A),mk(B));
+    pg.panels.splice(i,1,A,B);
+    /* 親コマに入っていた素材は、中心が入る方の子へ引き継ぐ（迷子にしない） */
+    pg.items.forEach(it=>{
+      if(it.panelId!==k.id)return;
+      it.panelId=pointInPoly(A.poly,it.x,it.y)?A.id:(pointInPoly(B.poly,it.x,it.y)?B.id:A.id);
+    });
     n++;
   }
   if(n)sortPanels(pg);
   return n;
 }
-/* 分割を戻す: 同じ from を持つ兄弟（または隣接コマ）を凸包的に結合 */
+/* ページ上の分割線を集める（同じ cut.id を共有するコマたち） */
+function cutsOfPage(pg){
+  const m=new Map();
+  pg.panels.forEach(k=>(k.cuts||[]).forEach(c=>{
+    if(!m.has(c.id))m.set(c.id,{id:c.id,nx:c.nx,ny:c.ny,ax:c.ax,ay:c.ay,gap:c.gap,panels:[]});
+    m.get(c.id).panels.push(k);}));
+  return [...m.values()];
+}
+/* 分割線の見える範囲（それを共有するコマの広がりぶん） */
+function cutSegment(cu){
+  const dx=-cu.ny, dy=cu.nx;
+  let t0=1e12,t1=-1e12;
+  cu.panels.forEach(k=>k.poly.forEach(q=>{
+    const t=(q.x-cu.ax)*dx+(q.y-cu.ay)*dy;
+    if(t<t0)t0=t; if(t>t1)t1=t;}));
+  if(t0>t1){t0=-200;t1=200;}
+  return {x0:cu.ax+dx*t0,y0:cu.ay+dy*t0,x1:cu.ax+dx*t1,y1:cu.ay+dy*t1,dx:dx,dy:dy,t0:t0,t1:t1};
+}
+/* 分割線を動かす／回す。全コマが成立するときだけ確定（破綻したら元に戻す） */
+function applyCut(pg,cid,nx,ny,ax,ay){
+  const L=Math.hypot(nx,ny)||1; nx/=L; ny/=L;
+  const snap=JSON.stringify(pg.panels);
+  const gap=gapFor(nx,ny);
+  pg.panels.forEach(k=>(k.cuts||[]).forEach(c=>{
+    if(c.id===cid){c.nx=nx;c.ny=ny;c.ax=ax;c.ay=ay;c.gap=gap;}}));
+  let ok=pg.panels.every(k=>rebuildPanel(k));
+  if(ok)ok=pg.panels.every(k=>polyArea(k.poly)>=minArea());
+  if(!ok){
+    pg.panels=JSON.parse(snap);
+    if(selPanel)selPanel=pg.panels.find(k=>k.id===selPanel.id)||null;   // 差し替わった実体へ選択を貼り直す
+  }
+  return ok;
+}
+/* 分割を戻す: 最後の分割線で分かれた相手を見つけて、その1本を取り除く＝分割の正確な逆操作 */
 function mergePanel(pg,k){
-  const sib=pg.panels.filter(o=>o!==k&&o.from&&k.from&&o.from===k.from);
-  const mates=sib.length?sib:pg.panels.filter(o=>o!==k&&adjacent(o,k));
-  if(!mates.length)return null;
-  const m=mates[0];
-  const b=polyBounds(k.poly.concat(m.poly));
-  const nk={id:uid('k_'),poly:rectPoly(b),border:k.border||m.border,bleed:k.bleed||m.bleed,from:k.from||null};
-  pg.panels=pg.panels.filter(o=>o!==k&&o!==m);
+  const kc=k.cuts||[];
+  if(!kc.length)return null;
+  let mate=null;
+  for(const o of pg.panels){
+    if(o===k)continue;
+    const oc=o.cuts||[];
+    if(oc.length!==kc.length)continue;
+    let diff=-1, bad=false;
+    for(let i=0;i<kc.length;i++){
+      if(kc[i].id!==oc[i].id){bad=true;break;}
+      if(kc[i].side!==oc[i].side){if(diff>=0){bad=true;break;}diff=i;}
+    }
+    if(bad||diff!==kc.length-1)continue;      // 最後の1本だけが違う＝兄弟
+    mate=o;break;
+  }
+  if(!mate)return null;
+  const nk=newPanel(k.base,kc.slice(0,-1).map(c=>Object.assign({},c)),
+                    k.border||mate.border,k.bleed||mate.bleed,k.from);
+  if(!rebuildPanel(nk))return null;
+  const ids=[k.id,mate.id];
+  pg.items.forEach(it=>{if(ids.indexOf(it.panelId)>=0)it.panelId=nk.id;});
+  pg.panels=pg.panels.filter(o=>o!==k&&o!==mate);
   pg.panels.push(nk);sortPanels(pg);
   return nk;
-}
-function adjacent(a,b){
-  const A=polyBounds(a.poly),B=polyBounds(b.poly);
-  const g=Math.max(BOOK.gut.lr,BOOK.gut.tb)*1.6;
-  const ox=Math.min(A.x+A.w,B.x+B.w)-Math.max(A.x,B.x);
-  const oy=Math.min(A.y+A.h,B.y+B.h)-Math.max(A.y,B.y);
-  return (ox>-g&&oy>-g)&&(ox<g*2||oy<g*2);
 }
 
 /* ============================================================
@@ -523,7 +641,13 @@ function drawItem(g,it){
   if(it.type==='img')return drawImgItem(g,it);
   g.save();g.translate(it.x,it.y);g.rotate((it.rot||0)*Math.PI/180);
   g.fillStyle=it.color;g.strokeStyle=it.color;
-  if(it.type==='frame'){g.lineWidth=it.lw;g.lineJoin='miter';g.strokeRect(-it.w/2,-it.h/2,it.w,it.h);}
+  if(it.type==='white'){
+    if(it.poly&&it.poly.length>2){
+      g.globalAlpha=clamp(it.opacity===undefined?1:it.opacity,0,1);
+      pathPoly(g,it.poly);g.fill();
+    }
+  }
+  else if(it.type==='frame'){g.lineWidth=it.lw;g.lineJoin='miter';g.strokeRect(-it.w/2,-it.h/2,it.w,it.h);}
   else if(it.type==='tone')drawTone(g,it);
   else if(it.type==='focus')drawFocus(g,it);
   else if(it.type==='stream')drawStream(g,it);
@@ -707,11 +831,32 @@ function render(){
     cx.save();pathPoly(cx,dispPoly(selPanel));
     cx.strokeStyle='#FF4FA8';cx.lineWidth=Math.max(2/view.z,PAPER.w*0.0012);
     cx.setLineDash([14/view.z,10/view.z]);cx.stroke();cx.setLineDash([]);
-    if(tool==='pt'){   /* 制御点（表示のみ） */
-      const r=Math.max(6/view.z,PAPER.w*0.004);
-      cx.fillStyle='#FFD27A';cx.strokeStyle='#0a0612';cx.lineWidth=Math.max(1/view.z,PAPER.w*0.0006);
-      for(const q of selPanel.poly){cx.beginPath();cx.rect(q.x-r,q.y-r,r*2,r*2);cx.fill();cx.stroke();}
+    cx.restore();
+  }
+  /* 分割線ハンドル（EDIT/線）— 中央=平行移動 / 両端=回転 */
+  if(tool==='edit'&&editMode==='line'){
+    const r=Math.max(7/view.z,PAPER.w*0.0042), lwl=Math.max(2/view.z,PAPER.w*0.0011);
+    for(const cu of cutsOfPage(pg)){
+      const s=cutSegment(cu), on=(selCut===cu.id);
+      cx.save();
+      cx.strokeStyle=on?'#FF4FA8':'#5AE9FF';cx.lineWidth=on?lwl*1.6:lwl;
+      cx.globalAlpha=on?1:.75;
+      cx.beginPath();cx.moveTo(s.x0,s.y0);cx.lineTo(s.x1,s.y1);cx.stroke();
+      cx.globalAlpha=1;
+      cx.fillStyle=on?'#FF4FA8':'#5AE9FF';
+      cx.beginPath();cx.arc(s.x0,s.y0,r,0,TAU);cx.fill();          // 回転ハンドル
+      cx.beginPath();cx.arc(s.x1,s.y1,r,0,TAU);cx.fill();
+      cx.fillRect((s.x0+s.x1)/2-r,(s.y0+s.y1)/2-r,r*2,r*2);        // 移動ハンドル
+      cx.restore();
     }
+  }
+  /* 投げ縄（EDIT/白）の途中経過 */
+  if(lasso&&lasso.pts.length>1){
+    cx.save();
+    cx.strokeStyle='#FFD27A';cx.lineWidth=Math.max(2/view.z,PAPER.w*0.0012);
+    cx.setLineDash([12/view.z,8/view.z]);
+    pathPoly(cx,lasso.pts);cx.stroke();cx.setLineDash([]);
+    cx.fillStyle='rgba(255,255,255,.45)';cx.fill();
     cx.restore();
   }
   /* 選択素材 */
@@ -740,15 +885,25 @@ function itemBounds(it){
   if(it.type==='focus')return{w:it.r1*2,h:it.r1*2};
   if(it.type==='img'){const im=MATIMG[it.srcId];const s=it.scale||1;
     return im&&im.width?{w:im.width*s,h:im.height*s}:{w:200,h:200};}
+  if(it.type==='white'){
+    if(!it.poly||!it.poly.length)return{w:100,h:100};
+    const b=polyBounds(it.poly);return{w:Math.max(b.w,20),h:Math.max(b.h,20)};}
   return{w:it.w,h:it.h};
 }
 function updateStatus(){
   const pg=curPage(), n=BOOK.pages.length;
   $('#pg-indic').textContent='P '+(curPageIdx+1)+' / '+n;
   $('#bb-info').textContent=PAPER.w+'×'+PAPER.h+'  '+PAPER.dpi+'dpi  Z'+(view.z*100).toFixed(0)+'%  コマ'+pg.panels.length;
-  const H={sel:'クリック=コマ選択 ／ 素材はドラッグで移動 ／ 空白ドラッグ=パン・ホイール=ズーム',
-    div:'ドラッグで分割線（'+(divMode==='v'?'縦':divMode==='h'?'横':'斜め・Shiftで15°')+'）。コマ選択中はそのコマだけ、未選択なら線が横切る全コマを分割',
-    pt:'制御点表示（v2は選択のみ）。コマをクリックすると頂点が出ます'};
+  const H={
+    sel:(selMode==='panel'
+      ?'クリック=コマ選択（SELをWクリックで素材選択に切替）'
+      :'クリック=素材を選ぶ／ドラッグで移動（SELをWクリックでコマ選択に戻る）')
+      +' ／ 空白ドラッグ=パン・ホイール=ズーム',
+    div:'ドラッグで分割線（'+(divMode==='v'?'縦':divMode==='h'?'横':'斜め・Shiftで15°')
+      +'）。用紙の外から引くと定規のように縦横が決まる。コマ選択中はそのコマだけ、未選択なら横切る全コマ',
+    edit:(editMode==='line'
+      ?'分割線の●=回転／■=平行移動（Shiftで15°）。破綻する動きは自動で戻ります'
+      :'ドラッグで投げ縄→離すと白でかぶさります（EDITをWクリックで線編集に戻る）')};
   $('#bb-hint').textContent=H[tool]||'';
 }
 
@@ -826,8 +981,26 @@ function setTool(t){
   tool=t;
   $('#t-sel').classList.toggle('on',t==='sel');
   $('#t-div').classList.toggle('on',t==='div');
-  $('#t-pt').classList.toggle('on',t==='pt');
-  render();
+  $('#t-edit').classList.toggle('on',t==='edit');
+  if(t!=='edit')selCut=null;
+  syncToolLabels();render();
+}
+function syncToolLabels(){
+  $('#t-sel-lb').textContent=selMode==='panel'?'コマ':'素材';
+  $('#t-edit-lb').textContent=editMode==='line'?'線':'白';
+}
+/* SEL の Wクリック: コマ選択 ⇔ 素材選択（トーン・流線が下敷きになっても掴める） */
+function toggleSelMode(){
+  selMode=selMode==='panel'?'item':'panel';
+  if(selMode==='item')selPanel=null;else selItem=null;
+  syncToolLabels();renderPanelSec();renderItemList();renderItemParams();render();
+  toast(selMode==='panel'?'SEL: コマを選ぶ':'SEL: 素材（トーン/流線/画像）を選ぶ');
+}
+/* EDIT の Wクリック: 分割線の移動・回転 ⇔ ホワイト（投げ縄で白かぶせ） */
+function toggleEditMode(){
+  editMode=editMode==='line'?'white':'line';
+  selCut=null;syncToolLabels();render();
+  toast(editMode==='line'?'EDIT: 分割線を動かす／回す':'EDIT: 投げ縄で白をかぶせる');
 }
 function setDivMode(m){
   divMode=m;
@@ -837,11 +1010,19 @@ function setDivMode(m){
   updateStatus();
 }
 $('#t-sel').addEventListener('click',()=>setTool('sel'));
+$('#t-sel').addEventListener('dblclick',toggleSelMode);
 $('#t-div').addEventListener('click',()=>setTool('div'));
-$('#t-pt').addEventListener('click',()=>setTool('pt'));
+$('#t-edit').addEventListener('click',()=>setTool('edit'));
+$('#t-edit').addEventListener('dblclick',toggleEditMode);
 $('#dm-v').addEventListener('click',()=>{setDivMode('v');setTool('div');});
 $('#dm-h').addEventListener('click',()=>{setDivMode('h');setTool('div');});
 $('#dm-f').addEventListener('click',()=>{setDivMode('f');setTool('div');});
+/* 左右入替（animator と同じ TAB） */
+function toggleSwapUI(){
+  swapUI=!swapUI;document.body.classList.toggle('swap',swapUI);
+  try{localStorage.setItem('mp_swap',swapUI?'1':'0');}catch(e){}
+  setTimeout(setupCanvas,30);
+}
 $('#t-shade').addEventListener('click',()=>{showShade=!showShade;$('#t-shade').classList.toggle('on',showShade);render();});
 $('#t-guide').addEventListener('click',()=>{showGuide=!showGuide;$('#t-guide').classList.toggle('on',showGuide);render();});
 
@@ -859,16 +1040,60 @@ function itemAt(pg,x,y){
   }
   return null;
 }
-let drag=null;
+/* 分割線のヒット判定（EDIT/線）。端＝回転・中＝移動 */
+function cutAt(pg,x,y){
+  const tol=Math.max(28/view.z,PAPER.w*0.012);
+  let best=null,bd=tol;
+  for(const cu of cutsOfPage(pg)){
+    const sg=cutSegment(cu);
+    const t=(x-cu.ax)*sg.dx+(y-cu.ay)*sg.dy;
+    if(t<sg.t0-tol||t>sg.t1+tol)continue;
+    const d=Math.abs((x-cu.ax)*cu.nx+(y-cu.ay)*cu.ny);
+    if(d<bd){bd=d;const span=Math.max(1,sg.t1-sg.t0);
+      const grab=(t-sg.t0)/span<0.25?'r0':((t-sg.t0)/span>0.75?'r1':'move');
+      best={cut:cu,seg:sg,grab:grab};}
+  }
+  return best;
+}
+let drag=null, lasso=null;
 cvs.addEventListener('pointerdown',ev=>{
   cvs.setPointerCapture(ev.pointerId);
   const p=evPt(ev), pg=curPage();
-  if(tool==='div'){drag={t:'div',x0:p.x,y0:p.y,x1:p.x,y1:p.y,shift:ev.shiftKey};divPreview=divLine(drag);render();return;}
-  const it=(tool==='sel')?itemAt(pg,p.x,p.y):null;
-  if(it){selItem=it;selPanel=null;drag={t:'item',px:p.x,py:p.y,ox:it.x,oy:it.y};
-    renderItemList();renderItemParams();renderPanelSec();render();return;}
-  const k=panelAt(pg,p.x,p.y);
-  if(k){selPanel=k;selItem=null;drag={t:'none'};renderItemList();renderItemParams();renderPanelSec();render();return;}
+
+  if(tool==='div'){
+    /* クリスタの定規のように、用紙の外から引き始めると縦横が自動で決まる */
+    const outSide=(p.x<0||p.x>PAPER.w), outTop=(p.y<0||p.y>PAPER.h);
+    if(outTop&&!outSide)setDivMode('h');        // 上下の外から引く＝横線
+    else if(outSide&&!outTop)setDivMode('v');   // 左右の外から引く＝縦線
+    drag={t:'div',x0:p.x,y0:p.y,x1:p.x,y1:p.y,shift:ev.shiftKey};
+    divPreview=divLine(drag);render();return;
+  }
+
+  if(tool==='edit'&&editMode==='white'){
+    const k=panelAt(pg,p.x,p.y);
+    lasso={pts:[{x:p.x,y:p.y}],panelId:k?k.id:null};
+    drag={t:'lasso'};render();return;
+  }
+
+  if(tool==='edit'&&editMode==='line'){
+    const h=cutAt(pg,p.x,p.y);
+    if(h){selCut=h.cut.id;selPanel=null;selItem=null;
+      drag={t:'cut',cid:h.cut.id,grab:h.grab,seg:h.seg};
+      renderPanelSec();renderItemList();renderItemParams();render();return;}
+    selCut=null;
+  }
+
+  if(tool==='sel'){
+    if(selMode==='item'){
+      const it=itemAt(pg,p.x,p.y);
+      if(it){selItem=it;selPanel=null;drag={t:'item',px:p.x,py:p.y,ox:it.x,oy:it.y};
+        renderItemList();renderItemParams();renderPanelSec();render();return;}
+    }else{
+      const k=panelAt(pg,p.x,p.y);
+      if(k){selPanel=k;selItem=null;drag={t:'none'};
+        renderItemList();renderItemParams();renderPanelSec();render();return;}
+    }
+  }
   selPanel=null;selItem=null;
   const r=cvs.getBoundingClientRect();
   drag={t:'pan',sx:ev.clientX-r.left,sy:ev.clientY-r.top,ox:view.x,oy:view.y};
@@ -890,6 +1115,27 @@ cvs.addEventListener('pointermove',ev=>{
   if(drag.t==='div'){drag.x1=p.x;drag.y1=p.y;drag.shift=ev.shiftKey;
     if(divMode==='v'||divMode==='h'){drag.x0=p.x;drag.y0=p.y;}
     divPreview=divLine(drag);render();return;}
+  if(drag.t==='lasso'&&lasso){
+    const q=lasso.pts[lasso.pts.length-1], mn=Math.max(6/view.z,PAPER.w*0.002);
+    if(Math.hypot(p.x-q.x,p.y-q.y)>mn)lasso.pts.push({x:p.x,y:p.y});
+    render();return;}
+  if(drag.t==='cut'){
+    const pg=curPage(), cu=cutsOfPage(pg).find(c=>c.id===drag.cid);
+    if(!cu)return;
+    if(drag.grab==='move'){
+      const dd=(p.x-cu.ax)*cu.nx+(p.y-cu.ay)*cu.ny;      // 法線方向のずれぶんだけ平行移動
+      applyCut(pg,cu.id,cu.nx,cu.ny,cu.ax+cu.nx*dd,cu.ay+cu.ny*dd);
+    }else{
+      const s=drag.seg;                                   // 反対の端を軸にして回す
+      const px=(drag.grab==='r0')?s.x1:s.x0, py=(drag.grab==='r0')?s.y1:s.y0;
+      let dx=p.x-px, dy=p.y-py;
+      if(Math.hypot(dx,dy)<1)return;
+      if(ev.shiftKey){const a=Math.round(Math.atan2(dy,dx)/(Math.PI/12))*(Math.PI/12);
+        const L=Math.hypot(dx,dy);dx=Math.cos(a)*L;dy=Math.sin(a)*L;}
+      const L=Math.hypot(dx,dy);
+      applyCut(pg,cu.id,-dy/L,dx/L,px,py);
+    }
+    commitD();return;}
   if(drag.t==='item'&&selItem){
     selItem.x=Math.round(drag.ox+p.x-drag.px);selItem.y=Math.round(drag.oy+p.y-drag.py);commitD();return;}
 });
@@ -899,13 +1145,30 @@ cvs.addEventListener('pointerup',()=>{
     const targets=selPanel?[selPanel]:pg.panels.slice();
     const n=splitPanels(pg,targets,L.x0,L.y0,L.x1-L.x0,L.y1-L.y0);
     divPreview=null;drag=null;
-    if(n){selPanel=null;commit();renderPanelSec();toast('コマを '+n+' か所で分割しました');}
+    if(n){selPanel=null;commit();renderPanelSec();renderItemList();toast('コマを '+n+' か所で分割しました');}
     else{render();toast('コマに当たっていません（線がコマを横切るようにドラッグ）');}
+    return;
+  }
+  if(drag&&drag.t==='lasso'&&lasso){
+    const pts=lasso.pts, pid=lasso.panelId;
+    lasso=null;drag=null;
+    if(pts.length>2&&polyArea(pts)>minArea()){
+      const b=polyBounds(pts);
+      const pg=curPage();
+      const it=Object.assign({id:uid('i_'),type:'white',visible:true,panelId:pid,
+          name:'WHITE '+(pg.items.length+1)},
+        JSON.parse(JSON.stringify(defaultsFor('white',PAPER.bas))));
+      it.x=Math.round(b.cx);it.y=Math.round(b.cy);
+      it.poly=pts.map(q=>({x:q.x-b.cx,y:q.y-b.cy}));
+      pg.items.push(it);selItem=it;selPanel=null;
+      commit();renderItemList();renderItemParams();renderPanelSec();
+      toast('ホワイトをかぶせました（◆Items で色や不透明度を変更できます）');
+    }else render();
     return;
   }
   divPreview=null;drag=null;
 });
-cvs.addEventListener('pointercancel',()=>{divPreview=null;drag=null;render();});
+cvs.addEventListener('pointercancel',()=>{divPreview=null;drag=null;lasso=null;render();});
 cvs.addEventListener('wheel',ev=>{
   ev.preventDefault();
   view.z=clamp(view.z*(ev.deltaY<0?1.12:0.89),0.005,4);render();
@@ -1020,14 +1283,29 @@ $('#img-file').addEventListener('change',async ev=>{
   for(const f of fs){const du=await fileToDataURL(f);await addImage(du,f.name.replace(/\.[^.]+$/,''),null);}
 });
 function fileToDataURL(f){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f);});}
-async function addImage(dataURL,name,linkId){
+async function putSrc(dataURL){
   const srcId=uid('s_');
   MATSRC[srcId]=dataURL;
   await new Promise(res=>{const im=new Image();im.onload=()=>{MATIMG[srcId]=im;res();};im.onerror=res;im.src=dataURL;});
-  const it=addItem('img',srcId,linkId);
+  return srcId;
+}
+/* 1枚でも複数コマでも同じ入口。複数なら ◆Items に「コマ送り」が出る */
+async function addImage(dataURLs,name,linkId){
+  const arr=Array.isArray(dataURLs)?dataURLs:[dataURLs];
+  const srcs=[];
+  for(const du of arr)srcs.push(await putSrc(du));
+  const it=addItem('img',srcs[0],linkId);
+  it.srcs=srcs;it.cell=0;
   if(name)it.name=name.slice(0,20);
   commit();renderItemList();renderItemParams();
   return it;
+}
+function setItemCell(it,i){
+  if(!it.srcs||!it.srcs.length)return;
+  it.cell=clamp(i,0,it.srcs.length-1);
+  it.srcId=it.srcs[it.cell];
+  edgeCache.clear();toneCache.clear();
+  commit();renderItemParams();
 }
 function deleteItem(it){
   const pg=curPage();
@@ -1052,7 +1330,9 @@ function renderItemList(){
       if(a==='vis'){it.visible=!it.visible;commit();renderItemList();return;}
       if(a==='up'){if(i<pg.items.length-1){pg.items.splice(i,1);pg.items.splice(i+1,0,it);commit();renderItemList();}return;}
       if(a==='dn'){if(i>0){pg.items.splice(i,1);pg.items.splice(i-1,0,it);commit();renderItemList();}return;}
-      selItem=it;selPanel=null;renderItemList();renderItemParams();renderPanelSec();render();
+      selItem=it;selPanel=null;
+      if(selMode!=='item'){selMode='item';syncToolLabels();}   // リストで選んだら掴める状態にしておく
+      renderItemList();renderItemParams();renderPanelSec();render();
     });
     box.appendChild(row);
   });
@@ -1120,6 +1400,20 @@ function renderItemParams(){
     r4.innerHTML='<span class="lb">網点化</span><button class="btn ice'+(it.tone.on?' on':'')+'" style="flex:1">グレー→トーン '+(it.tone.on?'ON':'OFF')+'</button>';
     r4.querySelector('button').addEventListener('click',()=>{it.tone.on=!it.tone.on;toneCache.clear();commit();renderItemParams();});
     box.appendChild(r4);
+    /* ANIMATOR から複数コマで来たものは、ここで送って絵を見比べられる */
+    if(it.srcs&&it.srcs.length>1){
+      const r6=document.createElement('div');r6.className='tr';
+      r6.innerHTML='<span class="lb">コマ送り</span>'
+        +'<button class="btn ice" style="padding:3px 7px">◀</button>'
+        +'<input type="range" min="0" max="'+(it.srcs.length-1)+'" step="1" value="'+it.cell+'">'
+        +'<button class="btn ice" style="padding:3px 7px">▶</button>'
+        +'<span class="vv">'+(it.cell+1)+'/'+it.srcs.length+'</span>';
+      const bs=r6.querySelectorAll('button'), rg=r6.querySelector('input');
+      bs[0].addEventListener('click',()=>setItemCell(it,it.cell-1));
+      bs[1].addEventListener('click',()=>setItemCell(it,it.cell+1));
+      rg.addEventListener('input',()=>setItemCell(it,parseInt(rg.value)));
+      box.appendChild(r6);
+    }
     if(it.linkId){
       const r5=document.createElement('div');r5.className='note';
       r5.innerHTML='🔗 ANIMATOR と連動中（向こうで保存すると自動で差し替わります）';
@@ -1409,16 +1703,25 @@ function setupLive(){
 /* ANIMATOR の保存が飛んできたら、その projectId に紐づく画像素材を差し替える */
 async function onAnimatorUpdate(pid,payload){
   if(!pid||!BOOK)return;
-  const cell=(payload.cells||[]).find(c=>c.kind==='draw'&&c.image);
-  if(!cell)return;
+  const imgs=(payload.cells||[]).filter(c=>c.kind==='draw'&&c.image).map(c=>c.image);
+  if(!imgs.length)return;
   let hit=false;
   for(const pg of BOOK.pages)for(const it of pg.items){
     if(it.type!=='img'||it.linkId!==pid)continue;
-    MATSRC[it.srcId]=cell.image;
-    await new Promise(res=>{const im=new Image();im.onload=()=>{MATIMG[it.srcId]=im;res();};im.onerror=res;im.src=cell.image;});
+    if(!it.srcs||!it.srcs.length)it.srcs=[it.srcId];
+    for(let i=0;i<imgs.length;i++){                     // 既存スロットは差し替え、増えた分は足す
+      if(i<it.srcs.length){
+        const sid=it.srcs[i];MATSRC[sid]=imgs[i];
+        await new Promise(res=>{const im=new Image();im.onload=()=>{MATIMG[sid]=im;res();};im.onerror=res;im.src=imgs[i];});
+      }else it.srcs.push(await putSrc(imgs[i]));
+    }
+    it.srcs.length=imgs.length;                          // 減った分は捨てる
+    it.cell=clamp(it.cell|0,0,it.srcs.length-1);
+    it.srcId=it.srcs[it.cell];
     hit=true;
   }
-  if(hit){edgeCache.clear();toneCache.clear();thumbCache={};save();render();renderItemList();toast('● ANIMATOR の更新を反映しました');}
+  if(hit){edgeCache.clear();toneCache.clear();thumbCache={};save();render();renderItemList();renderItemParams();
+    toast('● ANIMATOR の更新を反映しました（'+imgs.length+'コマ）');}
 }
 /* ---- 送信元の矩形（選択コマ or 用紙内枠） ---- */
 function linkBox(){
@@ -1481,11 +1784,13 @@ $('#lk-from-ani').addEventListener('click',async()=>{
     label:String(r.name||r.scene||r.projectId),
     sub:(r.cellCount||r.cells.length)+'コマ · '+r.width+'×'+r.height+' · '+String(r.exportedAt||'').replace('T',' ').slice(5,16),
     value:r})),async r=>{
-      const cell=r.cells.find(c=>c.kind==='draw'&&c.image);
-      const it=await addImage(cell.image,String(r.name||'ANI').slice(0,16),r.projectId);
+      const imgs=r.cells.filter(c=>c.kind==='draw'&&c.image).map(c=>c.image);
+      const it=await addImage(imgs,String(r.name||'ANI').slice(0,16),r.projectId);
       placeLinked(it,r);
       commit();renderItemList();renderItemParams();
-      toast('◀ 取り込みました（以後 ANIMATOR の保存で自動更新）');
+      toast(imgs.length>1
+        ?'◀ '+imgs.length+'コマ取り込みました（◆Items の コマ送り で切替）'
+        :'◀ 取り込みました（以後 ANIMATOR の保存で自動更新）');
     });
 });
 /* 送った時の矩形が残っていれば、そのコマにピッタリ戻す */
@@ -1597,6 +1902,110 @@ $('#io-reset').addEventListener('click',()=>{
 });
 
 /* ============================================================
+   操作一覧・設定（econte の解説付きヘルプと同じ作り）
+   ============================================================ */
+const HELP_GROUPS=[
+  ['ツール（右のレール）',[
+    ['V','<b>SEL</b> 選択。<b>Wクリックで コマ⇔素材</b> を切替（トーンや流線が下敷きになっても掴める）'],
+    ['D','<b>DIV</b> コマ分割。ドラッグで線を引く'],
+    ['P','<b>EDIT</b> コマ線編集。<b>Wクリックで 線⇔白</b> を切替'],
+    ['1 / 2 / 3','分割の向き 縦 / 横 / 斜め（既定は斜め）'],
+    ['TAB','ツールとパネルの左右入替'],
+  ]],
+  ['コマを割る（DIV）',[
+    ['ドラッグ','線を引いた位置で分割。コマ間隔は線の向きで 左右／上下 が自動で選ばれる'],
+    ['用紙の外から','クリスタの定規と同じ。<b>上下の外から引くと横線・左右の外から引くと縦線</b>になり、向きボタンも自動で切替わる'],
+    ['Shift','斜めのとき15°ずつスナップ'],
+    ['コマ選択中','そのコマだけを分割。未選択なら線が横切る全コマ'],
+  ]],
+  ['コマ線をあとから直す（EDIT / 線）',[
+    ['■ 中央','分割線を平行移動。両側のコマが同時に追従する'],
+    ['● 両端','反対の端を軸にして回転（Shiftで15°）'],
+    ['—','コマが潰れる動きは自動で元に戻る。分割の履歴を持っているので何度でも直せる'],
+  ]],
+  ['仕上げのホワイト（EDIT / 白）',[
+    ['ドラッグ','投げ縄。離すとその形で白がかぶさる＝トーンや流線を部分的に消す'],
+    ['—','始めた位置のコマに割り当たるので、コマの外へはみ出さない'],
+    ['◆Items','色を黒に変えれば「足す」側にも使える'],
+  ]],
+  ['素材（◆Items）',[
+    ['↑ / ↓','リストの素材を順に選択'],
+    ['DEL','選択中の素材／コマを削除'],
+    ['配置','「コマNの中」＝マスクされて枠の下 ／「上に乗せる」＝枠の上（擬音）'],
+    ['境界効果','擬音などのアルファに白フチ。フチONのときだけ太さが効く'],
+    ['網点化','グレーで塗った中間調だけをトーンに。線画と白はそのまま残る'],
+  ]],
+  ['ページ',[
+    ['PAGES','一覧を開く。Wクリックでそのページへ'],
+    ['[ / ]','前のページ / 次のページ'],
+    ['—','1ページ目は単独（表紙）、以降は見開き。右綴じなら右が若い番号'],
+  ]],
+  ['連携',[
+    ['▶ ANIMATOR REF','選択コマを送る。ANIMATOR側は <b>REF ▸ ＋FROM SAVED</b>。1コマなので全ティックで出しっぱなしになる'],
+    ['◀ ANIMATOR 取込','送った位置にピタリ戻る。複数コマなら <b>コマ送り</b> が出る'],
+    ['—','以後 ANIMATOR で保存するたび自動で差し替わる（LIVE）'],
+    ['▶ COMPOSER / OBAN','ページを送って向こうで開く'],
+  ]],
+  ['表示・その他',[
+    ['S','選択コマ以外を青くする ON/OFF'],
+    ['G','トンボ・内枠ガイド ON/OFF'],
+    ['F','用紙を画面に合わせる'],
+    ['Ctrl+Z / Ctrl+Y','元に戻す / やり直し'],
+    ['ESC','選択解除・オーバーレイを閉じる'],
+  ]],
+];
+function buildHelp(){
+  const body=$('#help-body');body.innerHTML='';
+  HELP_GROUPS.forEach(([title,rows])=>{
+    const g=document.createElement('div');g.className='help-grp';
+    g.innerHTML='<h4>'+esc(title)+'</h4>'+rows.map(([k,d])=>
+      '<div class="r"><span class="k">'+esc(k)+'</span><span class="d">'+d+'</span></div>').join('');
+    body.appendChild(g);
+  });
+  $('#help-note').innerHTML='<b>作品名（上のバー）</b>は書き出しファイル名と連携IDのもとになります'
+    +'（例: <b>name-01</b> → <code>name-01_p001.png</code> / <code>name-01_book.json</code> / 送信ID <code>mp_name-01_p1_k5</code>）。'
+    +'<br>保存はこのブラウザの IndexedDB に自動。別PCへ持ち出すときは <b>◆File ▸ EXPORT JSON</b>（画像も同梱）を使ってください。';
+}
+function toggleHelp(force){
+  const ov=$('#help-ovl');
+  const on=force!==undefined?force:!ov.classList.contains('on');
+  if(on)buildHelp();
+  ov.classList.toggle('on',on);
+}
+$('#btn-settings').addEventListener('click',()=>toggleHelp());
+$('#btn-help-close').addEventListener('click',()=>toggleHelp(false));
+$('#btn-help-tab').addEventListener('click',toggleSwapUI);
+$('#help-ovl').addEventListener('click',e=>{if(e.target===$('#help-ovl'))toggleHelp(false);});
+
+/* ===== 全画面表示（animator と同じ実装。iPhone Safari は非対応なので隠す）===== */
+(function(){
+  const btn=$('#btn-fullscreen'), root=document.documentElement;
+  const canFS=!!(root.requestFullscreen||root.webkitRequestFullscreen||document.body.webkitRequestFullscreen);
+  if(!canFS){btn.style.display='none';return;}
+  const isFS=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+  function syncFS(){
+    const on=isFS();
+    btn.classList.toggle('on',on);
+    btn.title=on?'全画面を解除（Escでも解除）':'全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）';
+    setTimeout(setupCanvas,120);
+  }
+  btn.addEventListener('click',async()=>{
+    try{
+      if(isFS()){
+        if(document.exitFullscreen)await document.exitFullscreen();
+        else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+      }else{
+        if(root.requestFullscreen)await root.requestFullscreen({navigationUI:'hide'});
+        else if(root.webkitRequestFullscreen)root.webkitRequestFullscreen();
+        else if(document.body.webkitRequestFullscreen)document.body.webkitRequestFullscreen();
+      }
+    }catch(e){}
+  });
+  document.addEventListener('fullscreenchange',syncFS);
+  document.addEventListener('webkitfullscreenchange',syncFS);
+})();
+
+/* ============================================================
    モーダル / toast
    ============================================================ */
 let modalOk=null,modalCancel=null;
@@ -1653,22 +2062,38 @@ $('#main').addEventListener('drop',async ev=>{
 /* ============================================================
    キーボード（フォーカスガード必須 — KINETIC STAGE規約）
    ============================================================ */
+/* ◆Items を ↑↓ で送る（表示は前面が上なので ↑=前面へ） */
+function stepItemSel(d){
+  const pg=curPage();
+  if(!pg.items.length)return;
+  const i=pg.items.indexOf(selItem);
+  const n=(i<0)?(d<0?pg.items.length-1:0):clamp(i+d,0,pg.items.length-1);
+  selItem=pg.items[n];selPanel=null;
+  if(selMode!=='item'){selMode='item';syncToolLabels();}
+  renderItemList();renderItemParams();renderPanelSec();render();
+}
 window.addEventListener('keydown',ev=>{
   const tag=document.activeElement&&document.activeElement.tagName;
   if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA')return;
   if(ev.key==='Escape'){
+    if($('#help-ovl').classList.contains('on')){toggleHelp(false);return;}
     if($('#modal').style.display==='flex'){const f=modalCancel;modalClose();if(f)f();return;}
     if($('#pages-ov').style.display==='flex'){closePages();return;}
+    if(selCut){selCut=null;render();return;}
     if(selItem||selPanel){selItem=null;selPanel=null;renderItemList();renderItemParams();renderPanelSec();render();}
     return;
   }
+  if(ev.key==='Tab'){ev.preventDefault();toggleSwapUI();return;}
+  if(ev.key==='ArrowUp'){ev.preventDefault();stepItemSel(1);return;}
+  if(ev.key==='ArrowDown'){ev.preventDefault();stepItemSel(-1);return;}
+  if(ev.key==='?'||(ev.shiftKey&&ev.key==='/')){toggleHelp();return;}
   if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();undo();return;}
   if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return;}
   if(ev.ctrlKey||ev.metaKey||ev.altKey)return;
   const k=ev.key.toLowerCase();
   if(k==='v')setTool('sel');
   else if(k==='d')setTool('div');
-  else if(k==='p')setTool('pt');
+  else if(k==='p')setTool('edit');
   else if(k==='1')setDivMode('v');
   else if(k==='2')setDivMode('h');
   else if(k==='3')setDivMode('f');
@@ -1695,8 +2120,10 @@ window.addEventListener('resize',setupCanvas);
   PAPER=paperOf(BOOK.paper);
   await rebuildImages();
   gLpi=50;$('#ex-lpi').value=gLpi;$('#ex-lpi-v').textContent=gLpi;syncLpiEnable();
+  try{swapUI=localStorage.getItem('mp_swap')==='1';}catch(e){}
+  document.body.classList.toggle('swap',swapUI);
   syncUI();
-  setDivMode('v');setTool('sel');
+  setDivMode('f');setTool('sel');
   setupCanvas();fitView();
   renderItemList();renderItemParams();renderPanelSec();
   pushHist();                 // 履歴の初期状態

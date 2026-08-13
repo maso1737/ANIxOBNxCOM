@@ -211,7 +211,7 @@ body{
 .etool.lasso-on::before{             /* 投げ縄塗り */
   content:'';position:absolute;left:2px;top:2px;width:5px;height:5px;background:var(--acid);
 }
-.etool.fe-on{                        /* 透明消し（FILL Wクリック） */
+.etool.fe-on{                        /* 透明消し（FILL 長押し＝投げ縄透明消し） */
   outline:1px dashed rgba(255,210,122,.9);outline-offset:-3px;
 }
 #grid-sel{color:var(--acid);font-family:var(--mono);font-size:9px}
@@ -494,7 +494,7 @@ body{
           <div class="etools">
             <div class="etool on" data-tool="pen" title="ペン (B) ／ Wクリックで筆圧">PEN</div>
             <div class="etool" data-tool="eraser" title="消しゴム (E) ／ WクリックでCLEAR">ERASE</div>
-            <div class="etool" data-tool="fill" title="塗りつぶし (G) ／ 長押しで投げ縄塗り">FILL</div>
+            <div class="etool" data-tool="fill" title="塗りつぶし (G) ／ Wクリックで投げ縄塗り・長押しで投げ縄透明消し">FILL</div>
           </div>
           <div class="sld-row">
             <input type="range" id="tl-brush" min="1" max="64" value="6" title="ブラシサイズ">
@@ -596,7 +596,7 @@ body{
         <div class="etools">
           <div class="etool on" data-tool="pen" title="ペン (B) ／ Wクリックで筆圧">PEN</div>
           <div class="etool" data-tool="eraser" title="消しゴム (E) ／ WクリックでCLEAR">ERASE</div>
-          <div class="etool" data-tool="fill" title="塗りつぶし (G) ／ 長押しで投げ縄塗り">FILL</div>
+          <div class="etool" data-tool="fill" title="塗りつぶし (G) ／ Wクリックで投げ縄塗り・長押しで投げ縄透明消し">FILL</div>
         </div>
       </div>
       <div>
@@ -748,8 +748,8 @@ const state = {
   curCut: -1,
   selPhoto: null,
   pressurePen: false,    // PENボタンWクリックで切替（ANIMATOR準拠）
-  fillErase: false,      // FILLボタンWクリックで切替＝透明塗りつぶし消し（ANIMATOR準拠）
-  fillMode: 'flood',     // FILL長押しで 'flood'⇔'lasso'（投げ縄塗り）
+  fillErase: false,      // FILLボタン長押しで切替＝投げ縄透明消し（ANIMATOR準拠）
+  fillMode: 'flood',     // FILL Wクリックで 'flood'⇔'lasso'（投げ縄塗り）
   paintTarget: 'draw',   // 'draw'=線画レイヤー / 'color'=カラースクリプト層（V2-E2）
   curFrame: 0,           // 色を編集している枠index（cam[]の何枚目か）
   selCut: null,          // {i,k} 選択中のCUT枠（k = cam[]の枠index）
@@ -3475,7 +3475,7 @@ function floodFill(cx, cy){
   const di = dctx.getImageData(0, 0, W, H);
   const dd = di.data;
   const fc = hexToRgb(state.fillColor);
-  const erase = !!state.fillErase;   // FILLボタンWクリックで透明消し（ANIMATOR準拠）
+  const erase = !!state.fillErase;   // FILLボタン長押しで投げ縄透明消し（ANIMATOR準拠）
   const t0 = (cy * W + cx) * 4;
   const tr = src[t0], tg = src[t0 + 1], tb = src[t0 + 2];
   const TOL = 2600;
@@ -4646,8 +4646,8 @@ const HELP_GROUPS = [
     ['[ / ]', 'ブラシを細く／太く'], ['右ドラッグ', 'ブラシサイズ（右=太く/左=細く）'],
     ['Alt+クリック', 'スポイト'], ['色帯をクリック', 'その色を拾う'],
     ['PEN をWクリック', '筆圧ペン ON/OFF'], ['ERASE をWクリック', '今の描く先をCLEAR'],
-    ['FILL をWクリック', '透明消し ON/OFF（囲った所を消す）'],
-    ['FILL を長押し', 'バケツ ⇔ 投げ縄塗り'], ['Tab', 'TOOLパネルを左右入替'],
+    ['FILL をWクリック', '投げ縄塗り ⇔ バケツ'],
+    ['FILL を長押し', '投げ縄透明消し ⇔ バケツ（囲った所を消す）'], ['Tab', 'TOOLパネルを左右入替'],
     ['Ctrl+Z', 'UNDO'], ['Ctrl+Shift+Z', 'REDO（Ctrl+Y も可）']
   ] },
   { t: 'SHEETパネル', rows: [
@@ -4948,7 +4948,7 @@ function wire(){
   document.querySelectorAll('.etool[data-tool]').forEach(el => {
     el.addEventListener('click', () => setETool(el.dataset.tool));
   });
-  // ANIMATOR準拠: PEN Wクリック=筆圧 / ERASE Wクリック=CLEAR / FILL 長押し=投げ縄塗り
+  // ANIMATOR準拠: PEN Wクリック=筆圧 / ERASE Wクリック=CLEAR / FILL Wクリック=投げ縄塗り・長押し=投げ縄透明消し
   document.querySelectorAll('.etool[data-tool="pen"]').forEach(el => onDoubleActivate(el, () => {
     state.pressurePen = !state.pressurePen;
     document.querySelectorAll('.etool[data-tool="pen"]').forEach(b => b.classList.toggle('pp-on', state.pressurePen));
@@ -4959,27 +4959,33 @@ function wire(){
     clearDraw();
     toast(state.paintTarget === 'color' ? '色を消しました' : '加筆を消しました');
   }));
-  // FILL Wクリック = 透明消し（ANIMATOR準拠）／FILL 長押し = バケツ⇔投げ縄
+  // FILL Wクリック = 投げ縄塗り（ANIMATOR準拠）／FILL 長押し = 投げ縄透明消し
   const syncFillUI = () => {
     document.querySelectorAll('.etool[data-tool="fill"]').forEach(b => {
       b.classList.toggle('lasso-on', state.fillMode === 'lasso');
       b.classList.toggle('fe-on', state.fillErase);
-      b.textContent = state.fillMode === 'lasso' ? 'LASSO' : 'FILL';
-      b.title = '塗りつぶし (G)：' + (state.fillMode === 'lasso' ? '投げ縄' : 'バケツ')
-              + (state.fillErase ? '／透明消し' : '') + ' ／ Wクリックで透明消し・長押しで投げ縄';
+      b.textContent = state.fillMode === 'lasso'
+        ? (state.fillErase ? 'L-DEL' : 'LASSO') : 'FILL';
+      b.title = '塗りつぶし (G)：' + (state.fillMode === 'lasso'
+                  ? (state.fillErase ? '投げ縄透明消し' : '投げ縄') : 'バケツ')
+              + ' ／ Wクリックで投げ縄塗り・長押しで投げ縄透明消し';
     });
   };
   document.querySelectorAll('.etool[data-tool="fill"]').forEach(el => onDoubleActivate(el, () => {
-    state.fillErase = !state.fillErase;
-    setETool('fill');
-    syncFillUI();
-    toast('塗りつぶし: ' + (state.fillErase ? '透明消し ON' : '透明消し OFF'));
-  }));
-  document.querySelectorAll('.etool[data-tool="fill"]').forEach(el => onLongPress(el, () => {
-    state.fillMode = (state.fillMode === 'lasso') ? 'flood' : 'lasso';
+    const lassoFill = (state.fillMode === 'lasso' && !state.fillErase);
+    if(lassoFill){ state.fillMode = 'flood'; }        // もう一度Wクリックでバケツへ
+    else { state.fillMode = 'lasso'; state.fillErase = false; }
     setETool('fill');
     syncFillUI();
     toast('塗りつぶし: ' + (state.fillMode === 'lasso' ? '投げ縄' : 'バケツ'));
+  }));
+  document.querySelectorAll('.etool[data-tool="fill"]').forEach(el => onLongPress(el, () => {
+    const lassoErase = (state.fillMode === 'lasso' && state.fillErase);
+    if(lassoErase){ state.fillMode = 'flood'; state.fillErase = false; }  // 長押しでバケツへ
+    else { state.fillMode = 'lasso'; state.fillErase = true; }
+    setETool('fill');
+    syncFillUI();
+    toast('塗りつぶし: ' + (state.fillErase ? '投げ縄 透明消し' : 'バケツ'));
   }));
   // 右ドラッグでブラシサイズ（描画面すべて）
   [editCv, tlCv].forEach(bindSizeDrag);
