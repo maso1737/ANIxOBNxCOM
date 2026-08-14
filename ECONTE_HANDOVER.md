@@ -213,9 +213,27 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   `idbClearPut('meta',…)` は store を空にするので、**meta を書くところ全部に音のレコードを含める**
   （マイグレーション側の書き戻しを落として一度消しかけた）
 - 波形はルーラー(`#tl-ruler-cv`)の背景。`frameFrac` を通すので拡大しても絵と合う
-- `syncAudio()` が唯一の同期口。play/pause/seek/ループ折り返しから呼ぶ
-- **EXPORT VIDEO には音が入らない**（MediaRecorder経路も WebCodecs経路も映像のみ）。
-  音を載せるなら別途 AudioEncoder かミュート合成が要る＝未実装
+- `syncAudio()` が唯一の同期口。play/pause/seek/ループ折り返しから呼ぶ。
+  **`gExporting` で止めないこと** — 実時間録画は「鳴っている音」をそのまま録るため
+- **配線は `ensureAudioGraph()` の1本**（`el → src ┬→ gain → 出力 ／ └→ recDest → 録画`）。
+  **`el.muted` は使わない**。使うと「作業中は消したい」だけのつもりが書き出しからも音が消える。
+  ミュートは gain（モニター）だけに効かせ、録音は gain より手前の recDest から取る。
+  `createMediaElementSource` は同じ要素に2回作れないので、音を差し替えるときは
+  `clearAudio()` が `gAudioNodes = null` にして**ノードごと作り直す**
+
+■ EXPORT VIDEO の音（2026-08-14）
+- **WebCodecs経路（本命・非実時間）**: `renderAudioForExport(T)` が
+  **タイムラインと同じ長さ・同じ位置の1本**に焼き直す。ずらし／頭切れ／尻の無音は
+  `OfflineAudioContext(ch, T/FPS*sr, sr)` に `start(遅らせ, 内側の頭出し)` するだけで片づく
+  （自前でサンプルをずらすと符号の扱いをどこかで必ず間違える）。
+  そのあと `AudioEncoder('mp4a.40.2')` → `muxer.addAudioChunk`。
+  `fastStart:'in-memory'` なので **映像を全部入れた後にまとめて音を足してよい**
+  - AudioData は `f32-planar`＝**ch0を全部並べてからch1**（インターリーブではない）
+  - AACは最大2ch想定なので `min(2, src.numberOfChannels)` に落とす
+  - `canEncodeAac()` は **映像とは別に**見る。ダメでも映像だけ出す（書き出しごと落とさない）
+- **MediaRecorder経路（実時間フォールバック）**: `recDest.stream` の音声トラックを
+  `tlCv.captureStream()` に `addTrack` するだけ。ずらしは `syncAudio` が面倒を見ている
+- **ミュートしても書き出しには入る**（実測で確認済み）
 
 ■ TIMELINE（P1・composer-timeline-kit準拠）
 - **ミニツールバー**(`#tl-minitools`): プレビュー左上のfloating。PEN/ERASE/FILL/EYE・ブラシ・色パレット。
@@ -442,6 +460,8 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
   BOARD上端の固定モードバー＋`V`/`C`／`cut.lock`（SHEETの🔒）／
   TIMELINE 座標規約＋Alt+ホイール拡大＋高さ可変＋◆キー編集（`camLead`/`camTail`）＋イーズ7種／
   最下部の音バー（読み込み・ずらし・波形・24fps）／`+ IMPORT` 表記／`⧉ REF` の寛容パーサ
+- **V2-F2: 実装済み（2026-08-14）** — **EXPORT VIDEO に音を載せた**（WebCodecs=AAC／
+  MediaRecorder=recDestのトラック追加）。ミュートは gain に移してモニター専用にした
 - **未着手は V2-E3 のみ**（フォトバッシュ・SINGLE限定）。他のフェーズは全部入っている
   - `cut.layers[]`（最大5・原本Blob＋アフィン変形＋投げ縄マスク＋ブレンド）
     ＋ブラシチップ（**.abrパーサは作らない**・内蔵数種＋透過PNG読み込み）

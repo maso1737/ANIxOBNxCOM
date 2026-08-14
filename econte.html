@@ -482,7 +482,7 @@ body{
       <option value="band">INFO帯</option>
     </select>
   </label>
-  <button class="btn ex" id="btn-export" title="MP4で書き出し（WebCodecs対応なら非実時間・未対応なら実時間録画）">EXPORT VIDEO</button>
+  <button class="btn ex" id="btn-export" title="MP4で書き出し（読み込んだ音も入ります。WebCodecs対応なら非実時間・未対応なら実時間録画）">EXPORT VIDEO</button>
   <button class="btn ex" id="btn-export-cs" title="カラースクリプト一覧をPNGで書き出し（枠単位・4列）">&#8681; C.SCRIPT</button>
   <span id="bar-total">0 CUTS</span>
   <span id="save-dot"></span>
@@ -4795,9 +4795,46 @@ let gAudioOffset = 0;       // コマ数
 let gAudioMuted = false;
 let gAudioPeaks = null;     // 1コマ1点の振幅（0..1）
 let gAudioCtx = null;
+let gAudioNodes = null;     // {src, gain, recDest}
 function audioFrames(){ return gAudioPeaks ? gAudioPeaks.length : 0; }
+function ensureAudioCtx(){
+  if(!gAudioCtx) gAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return gAudioCtx;
+}
+/* 音の配線（1回だけ作る）:
+     el → src ┬→ gain → 出力（耳）      ← ミュートはここだけ
+              └→ recDest → 録画ストリーム ← ミュートしても録れる
+   **`el.muted` は使わない**。使うと「作業中は消したい」だけのつもりが
+   書き出しからも音が消える。ミュートは“モニターの都合”に閉じ込める。
+   ※ createMediaElementSource は同じ要素に2回作れないので、音を差し替えるたびに
+     ノードごと捨てて作り直す（clearAudio が gAudioNodes=null にする）。 */
+function ensureAudioGraph(){
+  if(!gAudio) return null;
+  if(gAudioNodes) return gAudioNodes;
+  try{
+    const ctx = ensureAudioCtx();
+    const src = ctx.createMediaElementSource(gAudio.el);
+    const gain = ctx.createGain();
+    const recDest = ctx.createMediaStreamDestination();
+    src.connect(gain); gain.connect(ctx.destination);
+    src.connect(recDest);
+    gain.gain.value = gAudioMuted ? 0 : 1;
+    gAudioNodes = { src, gain, recDest };
+  }catch(e){
+    gAudioNodes = null;    // 配線できない環境では素の <audio> 再生にまかせる
+  }
+  return gAudioNodes;
+}
+function applyAudioMute(){
+  const n = ensureAudioGraph();
+  if(n) n.gain.gain.value = gAudioMuted ? 0 : 1;
+  else if(gAudio) gAudio.el.muted = gAudioMuted;   // 配線できなかったときの保険
+}
 function updateAudioUI(){
   $('#audio-name').textContent = gAudio ? gAudio.name : '—';
+  $('#btn-audio-mute').title = gAudioMuted
+    ? '作業中に鳴らさない（書き出しには入ります）'
+    : '作業中に鳴らす';
   $('#audio-len').textContent = gAudio
     ? (fmtDur(audioFrames()) + ' / ' + gAudio.dur.toFixed(2) + 's')
     : '—';
@@ -4818,8 +4855,7 @@ async function loadAudioBlob(blob, name, quiet){
   el.preload = 'auto';
   gAudio = { name: name || 'audio', blob, url, el, dur: 0 };
   try{
-    if(!gAudioCtx) gAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const buf = await gAudioCtx.decodeAudioData(await blob.arrayBuffer());
+    const buf = await ensureAudioCtx().decodeAudioData(await blob.arrayBuffer());
     gAudio.dur = buf.duration;
     gAudioPeaks = buildPeaks(buf);
   }catch(e){
@@ -4859,6 +4895,7 @@ function clearAudio(quiet){
   }
   gAudio = null;
   gAudioPeaks = null;
+  gAudioNodes = null;     // 要素が変わるので配線も作り直す
   updateAudioUI();
   drawTLRuler(totalFrames());
   if(!quiet){ scheduleSave(); toast('音を外しました'); }
@@ -4874,9 +4911,12 @@ function setAudioOffset(f){
 function syncAudio(hard){
   if(!gAudio) return;
   const el = gAudio.el;
-  el.muted = gAudioMuted;
+  ensureAudioGraph();
+  applyAudioMute();
+  if(gAudioCtx && gAudioCtx.state === 'suspended') gAudioCtx.resume();
   const t = (state.tl.frame - gAudioOffset) / FPS;
-  if(!state.tl.playing || gExporting || t < 0 || (gAudio.dur && t > gAudio.dur)){
+  // gExporting でも止めない: 実時間録画(exportRecord)は鳴っている音をそのまま録る
+  if(!state.tl.playing || t < 0 || (gAudio.dur && t > gAudio.dur)){
     if(!el.paused) el.pause();
     return;
   }
@@ -4919,14 +4959,60 @@ async function canWebCodecs(){
     return !!(s && s.supported);
   }catch(e){ return false; }
 }
+/* --- 書き出し用の音を作る（2026-08-14） ---
+   **タイムラインと同じ長さ・同じ位置の1本**に焼き直してから返す。
+   ずらし(gAudioOffset)・頭切れ・尻の足りないぶんの無音は、
+   OfflineAudioContext に「T/FPS 秒の箱」を作って start(遅らせ, 内側の頭出し) するだけで
+   全部片づく（自前でサンプルをずらすと符号の扱いを必ずどこかで間違える）。
+   `muted` は**見ない** — ミュートはモニターの都合であって、書き出しの内容ではない。 */
+async function renderAudioForExport(T){
+  if(!gAudio || !gAudio.blob || !T) return null;
+  const secs = T / FPS;
+  const src = await ensureAudioCtx().decodeAudioData(await gAudio.blob.arrayBuffer());
+  const ch = Math.min(2, Math.max(1, src.numberOfChannels));   // AACに載せるので最大2ch
+  const sr = src.sampleRate;
+  const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if(!OC) return null;
+  const oc = new OC(ch, Math.max(1, Math.ceil(secs * sr)), sr);
+  const node = oc.createBufferSource();
+  node.buffer = src;
+  node.connect(oc.destination);
+  const shift = gAudioOffset / FPS;
+  if(shift >= 0) node.start(shift);                 // ＋なら遅らせる（頭は無音）
+  else node.start(0, Math.min(-shift, src.duration));  // −なら音の途中から始める
+  return await oc.startRendering();
+}
+/* AACエンコードが使えるか（映像とは別に見る。ダメでも映像だけは出す） */
+async function canEncodeAac(sampleRate, channels){
+  if(!window.AudioEncoder || !window.AudioData) return false;
+  try{
+    const s = await AudioEncoder.isConfigSupported({
+      codec: 'mp4a.40.2', sampleRate, numberOfChannels: channels, bitrate: 192000 });
+    return !!(s && s.supported);
+  }catch(e){ return false; }
+}
 async function exportMP4(){
   const T = totalFrames();
   await loadMuxer();
   const M = window.Mp4Muxer;
   const target = new M.ArrayBufferTarget();
+  // 音を先に作る（失敗しても映像だけで続行する＝書き出しごと落とさない）
+  let ab = null;
+  if(gAudio){
+    $('#btn-export').textContent = 'MP4 音を準備…';
+    try{
+      const r = await renderAudioForExport(T);
+      if(r && await canEncodeAac(r.sampleRate, r.numberOfChannels)) ab = r;
+      else if(r) toast('この環境ではAAC書き出しに未対応でした（映像のみ）');
+    }catch(e){
+      console.error('renderAudioForExport failed', e);
+      toast('音の準備に失敗しました（映像のみ）');
+    }
+  }
   const muxer = new M.Muxer({
     target,
     video: { codec: 'avc', width: CONTE_W, height: CONTE_H, frameRate: FPS },
+    audio: ab ? { codec: 'aac', numberOfChannels: ab.numberOfChannels, sampleRate: ab.sampleRate } : undefined,
     fastStart: 'in-memory'
   });
   const enc = new VideoEncoder({
@@ -4953,6 +5039,38 @@ async function exportMP4(){
   }
   await enc.flush();
   enc.close();
+  // --- 音を流し込む（fastStart:'in-memory' なので映像の後にまとめて足してよい） ---
+  if(ab && !gExportAbort){
+    $('#btn-export').textContent = 'MP4 音 0%';
+    const aenc = new AudioEncoder({
+      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+      error: e => { throw e; }
+    });
+    aenc.configure({ codec: 'mp4a.40.2', sampleRate: ab.sampleRate,
+                     numberOfChannels: ab.numberOfChannels, bitrate: 192000 });
+    const ch = ab.numberOfChannels, sr = ab.sampleRate, total = ab.length;
+    const planes = [];
+    for(let c = 0; c < ch; c++) planes.push(ab.getChannelData(c));
+    const CH_LEN = 4096;                                  // 1回に渡すサンプル数
+    for(let off = 0; off < total; off += CH_LEN){
+      if(gExportAbort) break;
+      const n = Math.min(CH_LEN, total - off);
+      const data = new Float32Array(n * ch);              // f32-planar: ch0を全部→ch1を全部
+      for(let c = 0; c < ch; c++) data.set(planes[c].subarray(off, off + n), c * n);
+      const adata = new AudioData({
+        format: 'f32-planar', sampleRate: sr, numberOfFrames: n, numberOfChannels: ch,
+        timestamp: Math.round(off / sr * 1000000), data
+      });
+      aenc.encode(adata);
+      adata.close();
+      if((off / CH_LEN) % 40 === 0){
+        $('#btn-export').textContent = 'MP4 音 ' + Math.round(off / total * 100) + '%';
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+    await aenc.flush();
+    aenc.close();
+  }
   muxer.finalize();
   if(gExportAbort) return null;
   return new Blob([target.buffer], { type: 'video/mp4' });
@@ -5004,7 +5122,22 @@ function exportRecord(){
   gRecChunks = [];
   gExportAbort = false;
   const stream = tlCv.captureStream(FPS);
-  gRec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+  // 音は recDest（ミュートより手前）から取るので、耳を消していても録れる。
+  // 実時間経路なので「鳴っているものがそのまま入る」＝ずらしも syncAudio 任せでよい
+  let recTrack = null;
+  if(gAudio){
+    const n = ensureAudioGraph();
+    if(n){
+      if(gAudioCtx && gAudioCtx.state === 'suspended') gAudioCtx.resume();
+      recTrack = n.recDest.stream.getAudioTracks()[0];
+      if(recTrack) stream.addTrack(recTrack);
+    }else{
+      toast('この環境では音を録音経路に載せられませんでした（映像のみ）');
+    }
+  }
+  gRec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000,
+                                     audioBitsPerSecond: 192000 });
+  gRec.addEventListener('stop', () => { if(recTrack) stream.removeTrack(recTrack); });
   gRec.ondataavailable = e => { if(e.data && e.data.size) gRecChunks.push(e.data); };
   gRec.onstop = saveExportBlob;
   gExporting = true;
@@ -5467,6 +5600,12 @@ const HELP_GROUPS = [
     ['「全体」をクリック', '拡大をリセット'],
     ['帯の上端をドラッグ', 'TIMELINEの高さ（Wクリックで既定へ）']
   ] },
+  { t: '音（TIMELINE最下部）', rows: [
+    ['⇧ 音を読み込み', 'mp3 / wav / m4a（波形がルーラーに出ます）'],
+    ['ずらし', '音の頭をコマ単位で前後（＋で遅らせる・−で早める）'],
+    ['🔊 / 🔇', '作業中に鳴らすかどうか（書き出しには常に入ります）'],
+    ['EXPORT VIDEO', 'MP4に映像＋音で書き出し']
+  ] },
   { t: '元の絵（BASE）', rows: [
     ['BASEスライダー', '元の絵の濃度（20〜40%がトレース用）'],
     ['元絵 下 / 上', '加筆の下に敷く／上に重ねる（REF扱い）'],
@@ -5894,7 +6033,7 @@ function wire(){
   });
   $('#btn-audio-mute').addEventListener('click', () => {
     gAudioMuted = !gAudioMuted;
-    if(gAudio) gAudio.el.muted = gAudioMuted;
+    applyAudioMute();
     updateAudioUI();
     scheduleSave();
   });
@@ -6064,6 +6203,7 @@ window.__ECONTE__ = {
   layoutTL, renderTL, fitTLCanvas, exportVideo, finishExport, cancelExport, loadKeymap,
   renderOutputFrame, burnMode, burnLabel, exportColorScript, exportRecord, exportMP4,
   canWebCodecs, loadMuxer, colGap,
+  renderAudioForExport, canEncodeAac, ensureAudioGraph, ensureAudioCtx, applyAudioMute,
   // 2026-08-14 追加ぶん（元絵の重ね順 / ロック / 時間軸ズーム / キー編集 / 音）
   baseOverOf, setBaseOver, drawBaseLayer, undoClearBase, buildCellCache,
   setBoardTool, cutLocked, toggleCutLock, updateLockHud,

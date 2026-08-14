@@ -119,7 +119,36 @@ body.panning #void,body.panning canvas#cv{cursor:grabbing}
 .pbtn:hover{color:#fff;border-color:rgba(255,255,255,.25)}
 #cards.mini #cards-body,#cards.mini #cards-resize,
 #qe.mini #qe-body,#qe.mini #qe-resize,
+#mon.mini #mon-body,
 #fx-modal.mini #fx-body,#fx-modal.mini #fx-resize,#fx-modal.mini #fx-head .fx-note{display:none}
+
+/* ---------- MONITOR（結果こうなるよ窓・ice） ----------
+   編集キャンバスは「いまのピント位置での見え方」を出しているので、置いたピントが実際にどう送られるかは
+   プレビューしないと分からない。その答えを常時出しておく小窓。16:9セーフフレームの中だけを映す。 */
+#mon{
+  position:fixed;left:14px;top:var(--bartop,88px);width:clamp(240px,24vw,340px);max-width:94vw;z-index:41;display:none;
+  border:1px solid var(--border-bright);background:rgba(16,7,34,.96);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 24px rgba(90,233,255,.06);
+  font-size:10px;letter-spacing:.1em;
+}
+body.monopen #mon{display:flex;flex-direction:column}
+#mon-head{
+  display:flex;align-items:center;justify-content:space-between;cursor:move;user-select:none;
+  padding:8px 12px;border-bottom:1px solid var(--border);
+  background:linear-gradient(90deg,rgba(90,233,255,.10),transparent);
+  color:var(--ice);letter-spacing:.28em;font-family:var(--bank);
+}
+#mon-close{cursor:pointer;opacity:.5;padding:0 2px;margin-left:6px}
+#mon-close:hover{opacity:1;color:var(--acid)}
+#mon-body{padding:9px 10px 10px}
+#mon-cv{display:block;width:100%;height:auto;background:#07030f;border:1px solid var(--border)}
+#mon .mon-r{display:flex;align-items:center;gap:6px;margin-top:7px}
+#mon .mon-r input[type=range]{flex:1;min-width:40px;accent-color:var(--ice)}
+#mon .mon-r .v{flex:none;color:var(--ice);font-variant-numeric:tabular-nums}
+#mon .mon-info{margin-top:5px;color:var(--amber);font-variant-numeric:tabular-nums;letter-spacing:.06em}
+#mon .mon-note{margin-top:5px;opacity:.45;font-family:var(--jp);letter-spacing:.02em;font-size:9px;line-height:1.6}
+body.cleanview #mon{display:none}
 #crumb{color:var(--gold);letter-spacing:.2em;font-family:var(--bank)}
 #crumb b{font-weight:400;color:var(--ice)}
 #crumb .btn{margin-left:6px}
@@ -427,6 +456,7 @@ body.cleanview{cursor:none}
   <button class="btn" id="b-clear" title="プロジェクトを空にする（元に戻せません）">CLEAR</button>
   <button class="btn mode" id="b-frame" title="フレーム（コマ枠）を追加。画像を重ねて格納できる">+ FRAME</button>
   <button class="btn fx" id="b-fx" title="撮影処理（SATSUEI FX）・DOFピン送り・クリックFXを編集（F）。ONの間はボタンが点灯します">FX [F]</button>
+  <button class="btn mode ice" id="b-mon" title="MONITOR：書き出したときの見え方（カメラ・DEPTH・DOFピント）を16:9の小窓で常時表示（P）">▣ MONITOR</button>
   <span style="width:14px"></span>
   <!-- 入出力（読み込み・書き出し・連携）。矢印はパイプラインの向き -->
   <button class="btn" id="b-ap" title="ANIMATORの連番をPNG書き出しなしで取り込み（同一ブラウザ・EX_DB経由。保存で自動同期）">▶ ANIMATOR</button>
@@ -455,6 +485,20 @@ body.cleanview{cursor:none}
   <div id="qe-head"><span class="ttl">QUICK EDIT</span><span id="qe-name"></span><span class="pbtns"><button class="pbtn" id="qe-mini" title="最小化／展開">▾</button></span><span id="qe-close" title="閉じる（U で開き直せます）">✕</span></div>
   <div id="qe-body"></div>
   <div id="qe-resize" title="ドラッグで高さ調整"></div>
+</div>
+
+<!-- MONITOR: 16:9セーフフレームの中を「書き出したときの見え方」で出す小窓（P で開閉） -->
+<div id="mon">
+  <div id="mon-head"><span>MONITOR — 結果</span><span class="pbtns"><button class="pbtn" id="mon-mini" title="最小化／展開">▾</button></span><span id="mon-close" title="閉じる（P で開き直せます）">✕</span></div>
+  <div id="mon-body">
+    <canvas id="mon-cv"></canvas>
+    <div class="mon-r">
+      <input type="range" id="mon-p" min="0" max="1" step="0.001" value="0" title="スクロール位置（0=先頭 / 1=末尾）。プレビュー中とKF選択時は自動で追従します">
+      <span class="v" id="mon-pv">0%</span>
+    </div>
+    <div class="mon-info" id="mon-info">—</div>
+    <div class="mon-note">カメラ・DEPTH・DOFピントを<b>書き出しと同じ式</b>で反映した16:9の中身。撮影FX（SATSUEI FX）は反映しません（SPACE のプレビューで確認）。</div>
+  </div>
 </div>
 
 <div id="drop">
@@ -890,11 +934,28 @@ let CVOFF=0;
  * ドラッグの移動量も evX/evY 差分で取るので、縮小中でも指の動きと絵の動きが一致する。 */
 const VS_STEPS=[1,0.8,0.66,0.5,0.4,0.33,0.25];
 let VS=1;
+/* ---------- ブランクエリア（キャンバスの置き場所ずらし・VOX/VOY） ----------
+ * 「80%表示にしたときの、セーフフレームより外の余白を中ボタンでズラしたい」への対応。
+ * ＝ 画面の中でキャンバスの箱ごと左（や上下）へ寄せて、空いた右側にUIを置いても絵に被らないようにする。
+ * CVOFF / VS と同じ「見え方だけ動かす」系なので、描画式・構図・書き出し・VRTベースラインは不変。
+ * 中ボタン（ホイール押し込み）ドラッグ＝AEの手のひらツールと同じ「画面を動かす」操作に割り当てる。
+ * ※ 視点そのもの（VC）のパンは従来どおり余白の左ドラッグ／キャンバス空白の左ドラッグ。 */
+let VOX=0,VOY=0;
 function applyCvTransform(){
   const t=[];
-  if(CVOFF)t.push('translateY('+CVOFF+'px)');
+  if(VOX||CVOFF||VOY)t.push('translate('+VOX+'px,'+(CVOFF+VOY)+'px)');
   if(VS!==1)t.push('scale('+VS+')');
   cv.style.transform=t.join(' ');
+}
+/* ズラし量の上限。画面から完全に逃げないよう、必ず1/4は残す */
+function clampViewOffset(){
+  VOX=clamp(VOX,-VW*0.75,VW*0.75);
+  VOY=clamp(VOY,-VH*0.6,VH*0.6);
+}
+function setViewOffset(x,y,quiet){
+  VOX=x;VOY=y;clampViewOffset();applyCvTransform();
+  try{if(!HARNESS_ON)localStorage.setItem('oban-viewoff',VOX.toFixed(0)+','+VOY.toFixed(0));}catch(e){}
+  if(!quiet&&!VOX&&!VOY)toast('画面のズラしをリセット（中央）');
 }
 function updateCvOff(){
   const bar=document.getElementById('bar');
@@ -905,26 +966,28 @@ function updateCvOff(){
   // 縮小するとキャンバス上端が画面中央側へ下がる＝バーに隠れる量が減る。「隠れているぶん」の半分だけズラす
   const top=(VH-VH*VS)/2;
   CVOFF=Math.round(Math.max(0,h-top)/2);
+  clampViewOffset();
   applyCvTransform();
 }
-const evX=e=>VW/2+(e.clientX-VW/2)/VS;          // 画面x → キャンバス内x
-const evY=e=>VH/2+(e.clientY-CVOFF-VH/2)/VS;    // 画面y → キャンバス内y
-const scrX=x=>VW/2+(x-VW/2)*VS;                 // キャンバス内 → 画面（DOMを重ねる用）
-const scrY=y=>VH/2+(y-VH/2)*VS+CVOFF;
-/* 画面の下辺に当たるキャンバス内y（デバイスpx）。CVOFF で下がったぶん、キャンバスの底は
+const evX=e=>VW/2+(e.clientX-VOX-VW/2)/VS;             // 画面x → キャンバス内x
+const evY=e=>VH/2+(e.clientY-CVOFF-VOY-VH/2)/VS;       // 画面y → キャンバス内y
+const scrX=x=>VW/2+(x-VW/2)*VS+VOX;                    // キャンバス内 → 画面（DOMを重ねる用）
+const scrY=y=>VH/2+(y-VH/2)*VS+CVOFF+VOY;
+/* 画面の下辺に当たるキャンバス内y（デバイスpx）。CVOFF / VOY で下がったぶん、キャンバスの底は
    画面外に出る＝そこに描いたUIは見えない。画面に出す目盛りやラベルはこの値を基準にする。 */
-function visBottomPx(){return Math.min(VH,VH/2+(VH/2-CVOFF)/VS)*DPR;}
+function visBottomPx(){return clamp(VH/2+(VH/2-CVOFF-VOY)/VS,0,VH)*DPR;}
 function setViewScale(v,quiet){
   VS=clamp(v,0.25,1);
   updateCvOff();
   try{if(!HARNESS_ON)localStorage.setItem('oban-viewscale',String(VS));}catch(e){}
-  if(!quiet)toast('表示 '+Math.round(VS*100)+'%'+(VS===1?'（原寸）':' — フレーム全体がUIの内側に収まります'));
+  if(!quiet)toast('表示 '+Math.round(VS*100)+'%'+(VS===1?'（原寸）':' — フレーム全体がUIの内側に収まります')
+    +'／中ボタンドラッグで画面ごとズラせます');
 }
 function stepViewScale(dir){    // dir<0 = 縮小（＜） / dir>0 = 拡大（＞）
   let i=VS_STEPS.reduce((b,s,j)=>Math.abs(s-VS)<Math.abs(VS_STEPS[b]-VS)?j:b,0);
   setViewScale(VS_STEPS[clamp(i+(dir<0?1:-1),0,VS_STEPS.length-1)]);
 }
-function onResize(){VW=innerWidth;VH=innerHeight;DPR=Math.min(devicePixelRatio||1,2);cv.width=Math.round(VW*DPR);cv.height=Math.round(VH*DPR);updateCvOff();if(bootedV2C)computeWipeP();}
+function onResize(){VW=innerWidth;VH=innerHeight;DPR=Math.min(devicePixelRatio||1,2);cv.width=Math.round(VW*DPR);cv.height=Math.round(VH*DPR);updateCvOff();if(bootedV2C){computeWipeP();monRender();}}
 /* バーの折り返し段数はフォント読み込みや中身（パンくず）で後から変わる。
    起動直後の1回だけだと CVOFF / --bartop が古いままになるので、確定したところで測り直す */
 try{if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>updateCvOff());}catch(e){}
@@ -939,7 +1002,18 @@ let gFxFailed=false;
 function gFxOK(){
   if(gFxFailed)return false;
   if(!SFX)return false;
-  if(!gFx)gFx=SFX.createSatsueiFX();
+  if(!gFx){
+    // 生成そのものが落ちる環境がある（iPad Safari のWebGLコンテキスト枯渇など）。
+    // 毎フレーム投げ続けないよう、一度こけたら恒久的にOFFにする
+    try{gFx=SFX.createSatsueiFX();}
+    catch(e){gFxFailed=true;console.warn('[OBAN] FX init failed:',e&&e.message);return false;}
+    /* コンテキストロスト（iPadでタブを離れる/メモリ逼迫）でも描画ループを巻き込まない */
+    try{
+      if(gFx&&gFx.canvas)gFx.canvas.addEventListener('webglcontextlost',ev=>{
+        ev.preventDefault();gFxFailed=true;toast('撮影FXを無効化しました（GPUコンテキストが失われました）');
+      },false);
+    }catch(e){}
+  }
   return gFx.available;
 }
 // ビルダー側PREVIEWのFX。汚染canvas等で落ちてもrAFループを止めない（書き出しビューアと同方針）
@@ -961,6 +1035,9 @@ function ensureSc(w,h){
 let PROJECT={version:2,name:'oban',panels:[],frames:[],take:{version:1,name:'take-A',kf:[]}};
 const IMGCACHE={};   // fileName -> {img, ar}
 let pid=1;
+/* ピン送りの既定の「長さ」。1.0＝カメラ移動区間ぴったり。
+   実機のピント送りらしい“わざとらしさ”を出すため、既定は少しゆっくり側に置いてある（FXパネルで調整可） */
+const DOF_PULL_DEF=1.6;
 /* V1→V2マイグレーション: 欠損フィールドを既定値補完 (SPEC_05) */
 function migrate(p){
   p.version=2;
@@ -995,7 +1072,7 @@ function migrate(p){
      ピントは「コマのDEPTH（0=奥 / 1=手前）」で合わせる */
   /* pts=[{kf,f}] … 「このKFではここにピント」を並べたピントのトラック（何点でも打てる）。
      旧 {a,b,kf} の1本送りは pts 2点へ自動変換する（v1プロジェクトの見え方を保つ） */
-  if(!p.dof)p.dof={on:false,pts:[],range:0.30,maxBlur:12,bounce:0.35};
+  if(!p.dof)p.dof={on:false,pts:[],range:0.30,maxBlur:12,bounce:0.35,pull:DOF_PULL_DEF};
   const d=p.dof;
   if(!Array.isArray(d.pts)){
     const a=(typeof d.a==='number'&&isFinite(d.a))?d.a:0.75;
@@ -1012,6 +1089,9 @@ function migrate(p){
   if(typeof d.range!=='number'||!isFinite(d.range))d.range=0.30;
   if(typeof d.maxBlur!=='number'||!isFinite(d.maxBlur))d.maxBlur=12;
   if(typeof d.bounce!=='number'||!isFinite(d.bounce))d.bounce=0.35;
+  // 送りの長さ（1=カメラ移動区間ぴったり／>1=着地後の静止にも食い込んでゆっくり合う）
+  if(typeof d.pull!=='number'||!isFinite(d.pull))d.pull=DOF_PULL_DEF;
+  d.pull=clamp(d.pull,0.3,3);
   d.on=!!d.on;
   if(!p.take)p.take={version:1,name:'take-A',kf:[]};
   if(!p.take.fx)p.take.fx=(typeof window!=='undefined'&&window.SatsueiFX)   // SPEC_06: fxスキーマv1
@@ -1123,6 +1203,12 @@ try{guides=(localStorage.getItem('oban-guides')??'1')==='1';}catch(e){}
 const HARNESS_ON=(()=>{try{return new URLSearchParams(location.search).get('harness')==='1';}catch(e){return false;}})();
 /* 表示ズームの復元（検証窓は常に原寸＝ベースラインと同じ見え方にする） */
 if(!HARNESS_ON){try{const v=parseFloat(localStorage.getItem('oban-viewscale'));if(v>0.2&&v<=1)setViewScale(v,true);}catch(e){}}
+/* 画面ズラし（ブランクエリア）の復元。検証窓は常に中央＝ベースラインと同じ見え方 */
+if(!HARNESS_ON){try{
+  const o=String(localStorage.getItem('oban-viewoff')||'').split(',');
+  const ox=parseFloat(o[0]),oy=parseFloat(o[1]);
+  if(isFinite(ox)&&isFinite(oy))setViewOffset(ox,oy,true);
+}catch(e){}}
 
 /* ---------- persistence (localStorage / 画像はファイル名参照) ---------- */
 function save(){
@@ -1399,14 +1485,29 @@ function apEdit(p){
   if(!w)toast('ポップアップがブロックされました — animator.html を直接開いてください');
 }
 
+/* ---------- マルチプレーンのズーム係数（PLACE / TAKE / PREVIEW / 書き出し すべて共通） ----------
+ * 旧式 `1+(z-1)*lerp(0.55,1.25,eff)` は **z<1（引き）で手前ほど強く縮む**ため、
+ * 同じ大きさで置いた2枚が「配置では同じ・カメラでは手前のほうが小さい」＝前後が逆に見えていた。
+ * （実測 z=0.80 で 奥 zi=0.876 / 手前 zi=0.764。PLACE はどちらも 0.80）
+ *
+ * 新式は「引き(z<=1)＝広いレンズ／寄り(z>1)＝奥へ入り込む」という割り切り:
+ *   spread = 1 + max(0, z-1)*DEPTH_SPREAD
+ *   zi     = z * spread^(2*eff-1)            eff=0.5（中間）は常に z ちょうど
+ * ・z<=1 では spread=1 ＝ 全プレーン同倍率 → **PLACE と TAKE の見え方が完全に一致**
+ * ・z>1 では手前ほど大きい（単調）→ **手前と奥が入れ替わることが無い**
+ * ・パンのパララックス(pf)は従来どおり深度で効くので、引きでも奥行きは出る
+ * ビューア側の rect() にも同式を複製すること。 */
+const DEPTH_SPREAD=0.22;
+function planeZoom(z,eff){
+  const s=1+Math.max(0,z-1)*DEPTH_SPREAD;
+  return (s===1)?z:z*Math.pow(s,2*eff-1);
+}
 /* panel screen rect (multiplane) */
 function prect(p,cam){
   const W=cv.width,H=cv.height;
   const eff=p.depth??0.5;
   const pf=lerp(0.7,1.2,eff);                       // パンのパララックス係数
-  // PLACEモードの編集ビューはズーム均一＝DEPTHでサイズが変わらない（FRAME子と同じ操作感。
-  // 視点z<1で「上げたのに縮んで奥へ見える」混乱を防ぐ）。TAKE編集/PREVIEW/書き出しは従来のマルチプレーンzi
-  const zi=(mode==='place'&&!PV.on)?cam.z:1+(cam.z-1)*lerp(0.55,1.25,eff);   // ズームのマルチプレーン係数
+  const zi=planeZoom(cam.z,eff);                    // ズームのマルチプレーン係数（モードで変えない）
   const th=p.h*H*zi,tw=th*(p.ar||1.414);
   const x=W/2+(p.x-cam.x*pf)*W*zi-tw/2;
   const y=H/2+(p.y-cam.y*pf)*H*zi-th/2;
@@ -1445,42 +1546,73 @@ function visFrac(r){
  *   そのKFへ向かう「移動区間」= 送りの窓 / そのKFで止まる「dwell区間」の頭 = 着地とバウンド。
  * BOUNCE は着地でわずかに行き過ぎて戻る往復（実機のピント送りの気持ちよさ）。すべてPの純関数＝逆走可逆。
  * ビューアにも同式を複製すること。 */
-/* ctx.filter は「プロパティは在るのに無視される」環境があるので、実際に1回ぼかして確かめる。
-   （iOS Safari は 17 未満だと未対応＝ボケない。プロパティ有無だけの判定では見抜けなかった） */
-const CAN_FILTER=(function(){
+/* ctx.filter は「プロパティは在るのに無視される」環境があるので、実際にぼかして確かめる。
+ * 2026-08-14 修正: 旧判定は 9px の極小canvas＋`willReadFrequently:true`＋**色**での判定だった。
+ *   ・willReadFrequently は Safari で CPU ラスタライズ経路に落ちる＝filter が効かない実装がある
+ *   ・9px は blur(3px) の広がりに対して小さすぎて、実装差で判定が揺れる
+ *   実機 iPadOS 26 / Safari 26（ctx.filter 対応済み）で偽陰性が出たため、
+ *   **32px・ヒント無し・アルファ**で見る形に変えた（透明な外側へにじんだかどうか＝素通しなら必ず0）。
+ * それでも誤判定する環境のために、FXパネルから手動で強制ONにできる（oban-dof-force）。 */
+function probeCanvasFilter(){
   try{
-    const c=document.createElement('canvas');c.width=c.height=9;
-    const g=c.getContext('2d',{willReadFrequently:true});
-    if(typeof g.filter!=='string')return false;
-    g.fillStyle='#fff';g.fillRect(0,0,9,9);
-    g.filter='blur(3px)';g.fillStyle='#000';g.fillRect(3,3,3,3);g.filter='none';
-    const d=g.getImageData(1,1,1,1).data;      // 角までにじんでいれば本当に効いている
-    return d[0]<250;
+    const c=document.createElement('canvas');c.width=c.height=32;
+    const g=c.getContext('2d');
+    if(!g||typeof g.filter!=='string')return false;
+    g.clearRect(0,0,32,32);
+    g.filter='blur(4px)';g.fillStyle='#000';g.fillRect(10,10,12,12);g.filter='none';
+    // 矩形の外側(6,16)は素通しなら完全透明。ぼけていればアルファが乗る
+    return g.getImageData(6,16,1,1).data[3]>4;
   }catch(e){return false;}
-})();
+}
+const CAN_FILTER_NATIVE=probeCanvasFilter();
+let DOF_FORCE=false;
+try{DOF_FORCE=localStorage.getItem('oban-dof-force')==='1';}catch(e){}
+let CAN_FILTER=CAN_FILTER_NATIVE||DOF_FORCE;
 let dofPin=0.5;   // 編集ビューで見せているピント位置（HUDのキャレット。保存しない）
 /* ピントのトラック: pts=[{kf,f}] を P の純関数で読む。
  * 点 i へは「i へ向かう travel 区間」で送り、着地後の dwell 頭35%で BOUNCE（行き過ぎて戻る一往復）。
  * 点が1つなら送りは起きず、その値で合いっぱなし＝「各カットで合っている」状態になる。
  * 逆スクロールでも同じ絵になるよう、時間や前フレームの状態は一切持たない。 */
+/* 点 kf へ向かう「送りの窓」。基本はその KF へ向かう travel 区間。
+ * pull>1 のぶんだけ **着地後の静止(dwell)へ食い込ませて**ゆっくり合わせる（＝わざとらしいピン送り）。
+ * pull<1 は travel の頭側で早く合わせ終える。
+ * dwell を食い潰さないよう漸近で頭打ちにする（min() でクランプすると **スライダーの上のほうが
+ * どこまで回しても同じ値＝効かないつまみ** になるため、指数で必ず動き続ける形にした）。 */
+function dofWin(kf,pull){
+  const t=(kf>0)?TT.segs[2*kf-1]:null;              // 先頭KFへの送りは無い＝最初から合っている
+  if(!t)return null;
+  const dSeg=TT.segs[2*kf]||null;
+  const dw=dSeg?(dSeg.p1-dSeg.p0):0;
+  const tw=Math.max(t.p1-t.p0,1e-6);
+  let s1;
+  if(pull<=1)s1=t.p0+tw*Math.max(pull,0.05);
+  else{
+    const room=Math.max(dw*0.85,1e-6);              // dwell のうち送りに使ってよい量
+    s1=t.p1+room*(1-Math.exp(-tw*(pull-1)/room));   // pull→∞ で t.p1+room に漸近（頭打ちでも単調）
+  }
+  return {s0:t.p0,s1,dSeg,dw};
+}
 function focusAt(P){
   const d=PROJECT.dof;
   if(!d||!d.on||!d.pts.length)return null;
   if(P==null)return dofPin;                         // 編集中はHUDのキャレット位置で見せる
   const pts=d.pts.filter(pt=>PROJECT.take.kf[pt.kf]);
   if(!pts.length)return null;
-  let landed=null,before=null;                      // landed=着地済みの最後の点 / before=その1つ前
+  const pull=d.pull??1;
+  let landed=null,before=null,lw=null;              // landed=着地済みの最後の点 / before=その1つ前
   for(const pt of pts){
-    const t=(pt.kf>0)?TT.segs[2*pt.kf-1]:null;      // その点へ向かう travel（先頭KFは無い＝最初から合っている）
-    if(!t||P>=t.p1){before=landed;landed=pt;continue;}
-    if(P>t.p0)return lerp(landed?landed.f:pt.f,pt.f,E.smooth(map(P,t.p0,t.p1)));   // 送りの最中
+    const w=dofWin(pt.kf,pull);
+    if(!w||P>=w.s1){before=landed;landed=pt;lw=w;continue;}
+    if(P>w.s0)return lerp(landed?landed.f:pt.f,pt.f,E.smooth(map(P,w.s0,w.s1)));   // 送りの最中
     break;                                          // まだ送りが始まっていない
   }
   if(!landed)return pts[0].f;                       // 最初の点より手前＝その値で固定
-  const dSeg=TT.segs[2*landed.kf];
-  if(!dSeg||d.bounce<=0.001||!before)return landed.f;
-  const w=Math.max(dSeg.p1-dSeg.p0,1e-6);
-  const u=map(P,dSeg.p0,dSeg.p0+w*0.35);
+  if(!lw||!lw.dSeg||d.bounce<=0.001||!before)return landed.f;
+  // 揺り戻しは「送り終わった位置」から。pull を上げると窓も揺れも一緒にゆっくりになる
+  const rem=Math.max(lw.dSeg.p1-lw.s1,0);
+  const bl=Math.min(lw.dw*0.35*pull,rem*0.95);
+  if(bl<=1e-6)return landed.f;
+  const u=map(P,lw.s1,lw.s1+bl);
   if(u<=0||u>=1)return landed.f;
   return landed.f+(landed.f-before.f)*d.bounce*0.35*Math.sin(u*Math.PI*2)*(1-u);
 }
@@ -1661,15 +1793,18 @@ function drawMaskHandles(f,R){
   });
   cx.restore();
 }
+/* MONITOR（結果こうなるよ窓）へ描いている最中だけ true。
+   選択枠・名前・DOFバッジ・マスクハンドルといった「ビルダーの上乗せ」を全部止めて、書き出しと同じ絵にする。 */
+let MONI=false;
 function renderWorld(cam,tS,P){
   const items=rootItems().sort(bySort);
-  // DOFの「効き」を絵の上に数字で出すのは編集ビューだけ（PREVIEW/クリーン表示/書き出しには出さない）
-  const dofUI=!!(PROJECT.dof&&PROJECT.dof.on)&&!PV.on&&!cleanView&&!ctxFrame;
+  // DOFの「効き」を絵の上に数字で出すのは編集ビューだけ（PREVIEW/クリーン表示/MONITOR/書き出しには出さない）
+  const dofUI=!!(PROJECT.dof&&PROJECT.dof.on)&&!PV.on&&!cleanView&&!ctxFrame&&!MONI;
   for(const o of items){
     let R=prect(o,cam);
     R=applyFxRect(R,o,P,cv.width,cv.height);   // V2-C: IN演出/ドリフト（PREVIEW時のみP非null）
     if(R.x>cv.width+R.w||R.x+R.w<-R.w||R.y>cv.height+R.h||R.y+R.h<-R.h)continue;
-    const dim=!!(ctxFrame&&o!==ctxFrame);   // フレーム内編集中は他を減光
+    const dim=!MONI&&!!(ctxFrame&&o!==ctxFrame);   // フレーム内編集中は他を減光（MONITORは減光しない）
     const bl=dofBlurFor(o.depth,P,cv.height);   // DOF: コマ（フレームは窓ごと）の奥行きでボケる
     if(isFrame(o)){
       cx.save();
@@ -1679,14 +1814,14 @@ function renderWorld(cam,tS,P){
       for(const c of childrenOf(o).sort(bySort)){
         const r=childRect(c,o,R,cam);
         drawImgPanel(c,r,tS,false);
-        if(mode==='place'&&sel===c){cx.save();cx.filter='none';cx.strokeStyle='#FF4FA8';cx.lineWidth=2*DPR;cx.strokeRect(r.x,r.y,r.w,r.h);cx.restore();}
+        if(mode==='place'&&sel===c&&!MONI){cx.save();cx.filter='none';cx.strokeStyle='#FF4FA8';cx.lineWidth=2*DPR;cx.strokeRect(r.x,r.y,r.w,r.h);cx.restore();}
       }
       cx.filter='none';   // 読み文字はボケに巻き込まない（セリフは常に読める）
       for(const t of textsOf(o)){   // V2-D: フレーム内テキスト（フレームに固定・子の最前）
         const fs=(t.size??24)/1000*R.h;
         const sx=R.x+R.w/2+t.x*R.h,sy=R.y+R.h/2+t.y*R.h;
         drawVText(t,sx,sy,fs,vAlpha(t,P));
-        if(mode==='place'&&sel===t){
+        if(mode==='place'&&sel===t&&!MONI){
           const b=textBBox(t,sx,sy,fs);
           cx.save();cx.strokeStyle='#FF4FA8';cx.setLineDash([5,4]);cx.lineWidth=1.5*DPR;cx.strokeRect(b.x,b.y,b.w,b.h);cx.setLineDash([]);cx.restore();
         }
@@ -1700,18 +1835,20 @@ function renderWorld(cam,tS,P){
         quadPath(o,R);cx.stroke();cx.restore();
       }
       /* 選択枠線（ビルダーのみ・書き出さない） */
-      cx.save();cx.globalAlpha=dim?0.25:(sel===o?0.95:0.45);
-      cx.strokeStyle=sel===o?'#FF4FA8':'rgba(242,238,252,.55)';cx.lineWidth=(sel===o?2:1)*DPR;
-      quadPath(o,R);cx.stroke();
-      cx.fillStyle='rgba(242,238,252,.6)';cx.font=`${9*DPR}px monospace`;
-      const badges=[o.fx&&o.fx.in!=='none'?o.fx.in:'',o.fx&&o.fx.drift!=='none'?o.fx.drift:'',o.wipe?'WIPE:'+o.wipe:''].filter(Boolean).join(' ');
-      cx.fillText(o.name+(badges?' ['+badges+']':''),R.x+4*DPR,R.y-6*DPR);
-      cx.restore();
-      if(maskEdit.on&&maskEdit.f===o)drawMaskHandles(o,R);
+      if(!MONI){
+        cx.save();cx.globalAlpha=dim?0.25:(sel===o?0.95:0.45);
+        cx.strokeStyle=sel===o?'#FF4FA8':'rgba(242,238,252,.55)';cx.lineWidth=(sel===o?2:1)*DPR;
+        quadPath(o,R);cx.stroke();
+        cx.fillStyle='rgba(242,238,252,.6)';cx.font=`${9*DPR}px monospace`;
+        const badges=[o.fx&&o.fx.in!=='none'?o.fx.in:'',o.fx&&o.fx.drift!=='none'?o.fx.drift:'',o.wipe?'WIPE:'+o.wipe:''].filter(Boolean).join(' ');
+        cx.fillText(o.name+(badges?' ['+badges+']':''),R.x+4*DPR,R.y-6*DPR);
+        cx.restore();
+        if(maskEdit.on&&maskEdit.f===o)drawMaskHandles(o,R);
+      }
       if(dofUI)drawDofBadge(o,R);
     }else{
       drawImgPanel(o,R,tS,dim,bl);
-      if(mode==='place'&&sel===o){cx.save();cx.strokeStyle='#FF4FA8';cx.lineWidth=2*DPR;cx.strokeRect(R.x,R.y,R.w,R.h);cx.restore();}
+      if(mode==='place'&&sel===o&&!MONI){cx.save();cx.strokeStyle='#FF4FA8';cx.lineWidth=2*DPR;cx.strokeRect(R.x,R.y,R.w,R.h);cx.restore();}
       if(dofUI)drawDofBadge(o,R);
     }
   }
@@ -1719,8 +1856,8 @@ function renderWorld(cam,tS,P){
   for(const t of PROJECT.texts){
     if(t.type!=='v'||t.parent)continue;
     const a=textAnchor(t,cam);
-    drawVText(t,a.sx,a.sy,a.fs,(ctxFrame?0.35:1)*vAlpha(t,P));
-    if(mode==='place'&&sel===t&&!ctxFrame){
+    drawVText(t,a.sx,a.sy,a.fs,((ctxFrame&&!MONI)?0.35:1)*vAlpha(t,P));
+    if(mode==='place'&&sel===t&&!ctxFrame&&!MONI){
       const b=textBBox(t,a.sx,a.sy,a.fs);
       cx.save();cx.strokeStyle='#FF4FA8';cx.setLineDash([5,4]);cx.lineWidth=1.5*DPR;cx.strokeRect(b.x,b.y,b.w,b.h);cx.setLineDash([]);cx.restore();
     }
@@ -1808,8 +1945,10 @@ function drawDofRuler(){
   // キャンバスは CVOFF ぶん下へずれている＝下端が画面外に出る。実際に見えている底から測る
   const w=Math.min(W*0.52,560*DPR),x0=(W-w)/2,y0=visBottomPx()-58*DPR;
   const X=v=>x0+clamp(v,0,1)*w;
-  const f=focusAt(null);                                  // 編集中は A⇔B スライダーの位置
+  const f=focusAt(null);                                  // 編集中はHUDキャレット（＝dofPin）の位置
   cx.save();
+  // プレビュー中も出す（dofPin が再生位置に追従するので、送りが目盛りで見える）。絵の邪魔をしないよう薄く
+  if(PV.on)cx.globalAlpha=0.42;
   cx.font=`${9*DPR}px monospace`;cx.textAlign='left';cx.textBaseline='alphabetic';
   cx.fillStyle='rgba(90,233,255,.16)';                    // 合焦帯（この幅に入っているコマはくっきり）
   cx.fillRect(X(f-d.range),y0-8*DPR,X(f+d.range)-X(f-d.range),16*DPR);
@@ -1841,7 +1980,8 @@ function drawDofRuler(){
   cx.fillText(f.toFixed(2),cxp+9*DPR,y0+22*DPR);
   cx.font=`${9*DPR}px monospace`;cx.textAlign='center';
   cx.fillStyle=dofPick?'#FFC94F':'rgba(242,238,252,.5)';
-  cx.fillText(dofPick?'ピントを合わせたいコマをクリック（Escで取消）'
+  cx.fillText(PV.on?'PREVIEW — ピント送りを再生中'
+    :dofPick?'ピントを合わせたいコマをクリック（Escで取消）'
     :(selKf>=0?'▼ をドラッグ＝ピント調整／KFカードの ◎ で #'+pad(selKf)+' に置く':'▼ をドラッグ＝ピント調整'),
     x0+w/2,y0-34*DPR);
   cx.restore();
@@ -1873,6 +2013,73 @@ function drawDofBadge(o,R){
   cx.fillStyle=now<0.5?'#F8EFFF':'rgba(242,238,252,.6)';cx.fillText(lab,x,y);
   if(hits.length){cx.fillStyle='#5AE9FF';cx.fillText('◎ '+hits.join(' '),x+lab.length*6.2*DPR,y);}
   cx.restore();
+}
+
+/* ---------- MONITOR: 「書き出したらこう見える」小窓（P で開閉） ----------
+ * 編集キャンバスは “いまのピント位置(dofPin)” での見え方なので、置いたピントが実際にどう送られるかは
+ * プレビューを回さないと分からなかった。その答えを常時出しておくための小窓。
+ * ・カメラ(camAt) / DEPTH / DOF(focusAt) を **書き出しと同じ式**で評価する（P を渡す＝編集用の分岐を通らない）
+ * ・オフスクリーンは本キャンバスと同寸で描いてから 16:9 セーフフレームを切り出して縮小転送する
+ *   （prect が cv.width/height 基準なので、寸法を変えると構図がズレる）
+ * ・撮影FX(SATSUEI FX) は WebGL の別パスなので載せない（SPACE のプレビューで見る） */
+const MON={on:false,p:0};
+let monCv=null,monCx=null,monLast=0;
+function monVisible(){return MON.on&&!cleanView;}
+function setMonitor(on){
+  MON.on=(on==null)?!MON.on:!!on;
+  document.body.classList.toggle('monopen',MON.on);
+  if(MON.on){bringToFront($('#mon'),true);monSyncP();monRender();}
+}
+/* いま見るべき位置へ合わせる（プレビュー中=再生位置 / KF選択中=そのKFの静止の真ん中） */
+function monSyncP(){
+  if(PV.on){MON.p=PV.p;return;}
+  if(selKf>=0){const s=TT.segs[2*selKf];if(s){MON.p=s.p0+(s.p1-s.p0)*0.5;return;}}
+  if(!PROJECT.take.kf.length)MON.p=0;
+}
+function monRender(){
+  if(!monVisible())return;
+  const out=$('#mon-cv');if(!out)return;
+  const W=cv.width,H=cv.height;
+  if(!W||!H)return;
+  if(!monCv){monCv=document.createElement('canvas');monCx=monCv.getContext('2d');}
+  if(monCv.width!==W||monCv.height!==H){monCv.width=W;monCv.height=H;}
+  const P=PROJECT.take.kf.length?clamp(MON.p,0,1):null;
+  const cam=(P==null)?VC:camAt(P);
+  const keep=cx;
+  cx=monCx;MONI=true;
+  try{
+    monCx.setTransform(1,0,0,1,0,0);
+    monCx.clearRect(0,0,W,H);
+    monCx.fillStyle='#07030f';monCx.fillRect(0,0,W,H);
+    renderWorld(cam,performance.now()/1000,P);
+  }catch(e){console.warn('[OBAN] monitor render:',e&&e.message);}
+  finally{cx=keep;MONI=false;}
+  // 16:9 セーフフレームだけを切り出す（＝ガイドの枠＝芝居が入る範囲）
+  let aw=W,ah=W*9/16;if(ah>H){ah=H;aw=H*16/9;}
+  const cw=Math.max(80,Math.round((out.clientWidth||240)*DPR)),ch=Math.max(45,Math.round(cw*9/16));
+  if(out.width!==cw||out.height!==ch){out.width=cw;out.height=ch;}
+  const ox=out.getContext('2d');
+  ox.clearRect(0,0,cw,ch);
+  ox.drawImage(monCv,(W-aw)/2,(H-ah)/2,aw,ah,0,0,cw,ch);
+  monInfo(P);
+}
+function monInfo(P){
+  const inf=$('#mon-info'),pv=$('#mon-pv'),sl=$('#mon-p');
+  if(pv)pv.textContent=Math.round((P||0)*100)+'%';
+  if(sl&&document.activeElement!==sl)sl.value=String(P||0);
+  if(!inf)return;
+  if(P==null){inf.textContent='KFがありません — 2.TAKE で C=CAPTURE';return;}
+  const f=focusAt(P),k=kfIndexAtP(P);
+  inf.textContent='KF #'+pad(Math.max(k,0))+'   ピント '+(f==null?'—（DOF OFF）':f.toFixed(2));
+}
+{
+  const sl=$('#mon-p');
+  if(sl)sl.addEventListener('input',()=>{
+    if(PV.on)stopPreview();          // 手で覗きたいので再生は止める
+    MON.p=parseFloat(sl.value)||0;monRender();
+  });
+  const mc=$('#mon-close');if(mc)mc.addEventListener('click',()=>setMonitor(false));
+  const mb=$('#b-mon');if(mb)mb.addEventListener('click',()=>{setMonitor();mb.classList.toggle('on',MON.on);});
 }
 
 /* ---------- cards (TAKE) ---------- */
@@ -1988,6 +2195,7 @@ function selectKf(i,go=true){
   if(go){VC.x=k.x;VC.y=k.y;VC.z=k.z??1;}
   kfFlash=performance.now();   // キャンバス上のKF点をピンクで一瞬光らせる（いまどれかを迷わせない）
   renderCards();
+  monSyncP();monRender();      // MONITOR も選んだKFの見え方へ（開いていなければ何もしない）
   const el=cards.querySelector?cards.querySelector(`.edc[data-i="${selKf}"]`):null;
   if(el&&el.scrollIntoView)el.scrollIntoView({block:'nearest'});
 }
@@ -2460,7 +2668,7 @@ function exitFrame(){ctxFrame=null;maskEdit.on=false;maskEdit.f=null;sel=null;re
 function enterFrame(f){ctxFrame=f;sel=null;maskEdit.on=false;renderChip();renderCrumb();toast(f.name+' の中を編集中 — Escでルートへ');}
 
 cv.addEventListener('pointerdown',e=>{
-  if(e.button===1){startViewPan(e);return;}   // 中ボタン(ホイール押し込み)ドラッグ＝常にパン
+  if(e.button===1){startScreenPan(e);return;}   // 中ボタン(ホイール押し込み)ドラッグ＝画面ごとズラす（AEの手のひら）
   if(touchPinchDown(e))return;                // iPad: 2本指が乗ったらピンチへ移行（単指ドラッグは打ち切る）
   if(PV.on){stopPreview();return;}
   if(textEd){closeTextEditor(true);return;}   // V2-D: 入力中に余白クリック=確定
@@ -2523,6 +2731,10 @@ cv.addEventListener('dblclick',e=>{
 addEventListener('pointermove',e=>{
   if(touchPinchMove(e))return;   // iPad: ピンチ中は単指ドラッグを走らせない
   if(!drag)return;
+  if(drag.type==='screen'){   // 画面ズラし（見え方だけ・構図も書き出しも変わらない）
+    setViewOffset(drag.ox+(e.clientX-drag.sx),drag.oy+(e.clientY-drag.sy),true);
+    return;
+  }
   if(drag.type==='dofpin'){
     const W=cv.width,w=Math.min(W*0.52,560*DPR),x0=(W-w)/2;
     setDofPin(clamp((evX(e)*DPR-x0)/w,0,1),true);
@@ -2569,7 +2781,7 @@ addEventListener('pointerup',e=>{
         }
       }
     }
-    if(drag.type!=='view')commit();
+    if(drag.type!=='view'&&drag.type!=='screen')commit();   // 視点/画面ズラしは履歴に積まない
   }
   drag=null;
 });
@@ -2645,16 +2857,25 @@ function touchPinchUp(e){
 addEventListener('pointerup',touchPinchUp,true);
 addEventListener('pointercancel',touchPinchUp,true);
 
-/* ---------- 余白（#void）と中ボタンでのパン ----------
- * 表示ズームで縮めた外側の余白でも視点を動かせるようにする（中央固定だと寄れない）。
- * ホイールボタン（中ボタン）ドラッグはキャンバス上でも常にパン＝AE/Blender と同じ手癖。 */
+/* ---------- 余白（#void）でのパンと、中ボタンでの「画面ズラし」 ----------
+ * 左ドラッグ（余白／キャンバスの空白）＝ **視点のパン**（VC が動く＝構図側）。
+ * 中ボタン（ホイール押し込み）ドラッグ＝ **画面ズラし**（VOX/VOY が動く＝見え方だけ）。
+ *   AE の手のひらツールと同じ役割で、キャンバスを左へ寄せて右側にUIを置いても絵に被らないようにする。
+ *   構図・書き出しには一切影響しない。0 キーで原寸＋中央に戻る。 */
 function startViewPan(e){
   if(PV.on){stopPreview();return;}
   drag={type:'view',px:evX(e),py:evY(e),x:VC.x,y:VC.y,fine:e.shiftKey?0.2:1};
   document.body.classList.add('panning');
   e.preventDefault();
 }
+function startScreenPan(e){
+  // プレビューは止めない（見ながら画面をズラせる）。見え方だけなので commit もしない
+  drag={type:'screen',sx:e.clientX,sy:e.clientY,ox:VOX,oy:VOY};
+  document.body.classList.add('panning');
+  e.preventDefault();
+}
 $('#void').addEventListener('pointerdown',e=>{
+  if(e.button===1){startScreenPan(e);return;}       // 余白の中ボタン＝画面ズラし
   if(mode==='place'&&sel){sel=null;renderChip();}   // 余白クリック＝選択解除（キャンバスと同じ）
   startViewPan(e);
 });
@@ -2782,6 +3003,7 @@ function stopPreview(){
   PV.on=false;
   if(kfNow!==-1){kfNow=-1;}
   renderCards();
+  monSyncP();monRender();   // 止めた位置の見え方を MONITOR にも残す
 }
 /* いま再生位置がどのKFにいるか（dwell中=そのKF / travel中=行き先のKF） */
 function kfIndexAtP(P){
@@ -2803,7 +3025,7 @@ addEventListener('keydown',e=>{
   else if((e.ctrlKey||e.metaKey)&&(e.key==='d'||e.key==='D')){e.preventDefault();duplicateSel();}   // 素材の複製
   else if(e.key===','||e.key==='<'){e.preventDefault();stepViewScale(-1);}   // 表示を縮小（AEの表示倍率）
   else if(e.key==='.'||e.key==='>'){e.preventDefault();stepViewScale(+1);}   // 表示を拡大
-  else if(e.key==='0'&&!e.ctrlKey&&!e.metaKey)setViewScale(1);               // 原寸に戻す
+  else if(e.key==='0'&&!e.ctrlKey&&!e.metaKey){setViewScale(1);setViewOffset(0,0,true);}   // 原寸＋中央に戻す
   else if(e.key==='1')setMode('place');
   else if(e.key==='2')setMode('take');
   else if((e.key==='c'||e.key==='C')&&mode==='take')capture();
@@ -2817,6 +3039,7 @@ addEventListener('keydown',e=>{
   else if(e.key===']'&&mode==='place'&&sel&&!isText(sel))reorder(sel,+1);   // V2-A: 前面へ
   else if((e.key==='m'||e.key==='M')&&mode==='place')toggleMask();   // V2-B
   else if((e.key==='u'||e.key==='U')&&mode==='place')toggleQuickEdit();   // QUICK EDIT 開閉（COMPOSERのUに合わせる）
+  else if(e.key==='p'||e.key==='P'){setMonitor();const mb=$('#b-mon');if(mb)mb.classList.toggle('on',MON.on);}   // MONITOR（結果こうなるよ窓）
   else if(e.key==='f'||e.key==='F')toggleFxModal();                  // V2-C
   else if(e.key==='g'||e.key==='G')toggleGuides();
   else if(e.key==='h'||e.key==='H')toggleCleanView();               // クリーン表示（ガイド類を全部隠す・OBS等キャプチャ用）
@@ -2954,10 +3177,18 @@ function buildDofUI(root){
     '<label style="color:var(--amber)"><input type="checkbox" id="dof-on"'+(d.on?' checked':'')+'> DOF ピン送り（奥行きでボケる）</label>'
    +rng('dof-range','ピントの幅',0.05,1,0.01,d.range,'この奥行き差でボケが最大になる。小さいほど浅い（前後がすぐボケる）')
    +rng('dof-blur','ボケの強さ',0,40,1,d.maxBlur,'いちばんボケるところのぼかし量（px・画面高1000px基準）',0)
+   +rng('dof-pull','送りの長さ',0.3,3,0.05,d.pull,'ピントが合うまでの長さ。1.0＝カメラ移動区間ぴったり。大きいほど「ゆっくり・わざとらしく」合い、着地後の静止にも食い込みます（揺り戻しも一緒に伸びます）')
    +rng('dof-bounce','BOUNCE',0,1,0.01,d.bounce,'着地でわずかに行き過ぎて戻る量。実機のピント送りらしい一瞬の往復が出ます')
    +'<div class="fx-row" style="opacity:.45;font-family:var(--jp);letter-spacing:.02em;line-height:1.6;display:block">'
-     +'<b>ピントを置く操作は「2. TAKE カメラ」パネル</b>にあります（KFを選ぶ → 画面から取る／KFカードの ◎、画面下の定規の ▼ をドラッグ）。'
-     +(CAN_FILTER?'':'<br><b style="color:var(--acid)">このブラウザはcanvasのぼかしに未対応のため効きません</b>')+'</div>';
+     +'<b>ピントを置く操作は「2. TAKE カメラ」パネル</b>にあります（KFを選ぶ → 画面から取る／KFカードの ◎、画面下の定規の ▼ をドラッグ）。<br>'
+     +'canvas ぼかし判定: <b style="color:'+(CAN_FILTER?'var(--ice)':'var(--acid)')+'">'
+       +(CAN_FILTER_NATIVE?'対応':(DOF_FORCE?'未対応（強制ONで使用中）':'未対応'))+'</b></div>'
+   +(CAN_FILTER_NATIVE?''
+     :'<div class="fx-row" style="font-family:var(--jp);letter-spacing:.02em;line-height:1.6;display:block">'
+       +'<b style="color:var(--acid)">このブラウザは canvas のぼかしに未対応と判定されました</b>'
+       +'<label style="display:block;margin-top:4px;color:var(--amber)"><input type="checkbox" id="dof-force"'+(DOF_FORCE?' checked':'')+'> 判定を無視して強制的に有効にする（再読み込み）</label>'
+       +'<span style="opacity:.55">iPadOS 17 以降なら本来は対応しています。判定が外れているだけならこれで効きます（本当に非対応なら単にボケないだけで、他は壊れません）。'
+       +'書き出したビューアでは URL の末尾に <b>?dof=1</b> を付けると同じ強制ONになります。</span></div>');
   root.appendChild(box);
   const g=id=>box.querySelector('#'+id);
   const bindRange=(id,key,digits)=>{
@@ -2968,7 +3199,14 @@ function buildDofUI(root){
   if(on)on.onchange=e=>{d.on=e.target.checked;syncFxBtn();renderCards();commit();};
   bindRange('dof-range','range');
   bindRange('dof-blur','maxBlur',0);
+  bindRange('dof-pull','pull');
   bindRange('dof-bounce','bounce');
+  const fo=g('dof-force');
+  if(fo)fo.onchange=e=>{
+    DOF_FORCE=e.target.checked;CAN_FILTER=CAN_FILTER_NATIVE||DOF_FORCE;
+    try{localStorage.setItem('oban-dof-force',DOF_FORCE?'1':'0');}catch(err){}
+    toast(DOF_FORCE?'DOFを強制的に有効化しました — ボケなければ本当に非対応です':'DOFの判定を既定に戻しました');
+  };
 }
 /* FXボタンの点灯（撮影FXかDOFのどちらかがONなら光る） */
 function syncFxBtn(){
@@ -3054,9 +3292,10 @@ makePanelDraggable($('#fx-modal'),$('#fx-head'));
 makePanelResizable($('#fx-resize'),$('#fx-body'),'.fx-master,.fx-ent');
 makePanelDraggable($('#qe'),$('#qe-head'));
 makePanelResizable($('#qe-resize'),$('#qe-body'),'.qe-row,.qe-sect');
+makePanelDraggable($('#mon'),$('#mon-head'));
 {const qc=$('#qe-close');if(qc)qc.addEventListener('click',()=>toggleQuickEdit(false));}
 /* ヘッダの ▾ で最小化（COMPOSER の INSPECTOR と同じ）。ヘッダだけ残るので置き場所を見失わない */
-[['#cards','#cards-mini'],['#qe','#qe-mini'],['#fx-modal','#fx-mini']].forEach(([ps,bs])=>{
+[['#cards','#cards-mini'],['#qe','#qe-mini'],['#fx-modal','#fx-mini'],['#mon','#mon-mini']].forEach(([ps,bs])=>{
   const p=$(ps),b=$(bs);if(!p||!b)return;
   b.addEventListener('click',e=>{
     e.stopPropagation();
@@ -3075,7 +3314,7 @@ function bringToFront(p,force){
   if(!force&&z>=zTop)return;              // すでに最前なら触らない（force=明示的に前面へ出す）
   zTop++;p.style.zIndex=zTop;
 }
-['#cards','#qe','#fx-modal'].forEach(s=>{
+['#cards','#qe','#fx-modal','#mon'].forEach(s=>{
   const el=$(s);
   if(el)el.addEventListener('pointerdown',()=>bringToFront(el),true);
 });
@@ -3207,9 +3446,16 @@ const SET_GROUPS=[
     ['0','表示を原寸（100%）に戻す'],
     ['▾（各パネル）','パネルをヘッダだけに最小化／展開'],
     ['パネル下端のバー','高さ調整。<b>項目の切れ目でスナップ</b>する'],
-    ['外側の余白','縮小したときの外側でも<b>ドラッグでパン</b>できる（中央固定にならない）'],
-    ['ホイール押しドラッグ','どこでもパン（中ボタン。AE/Blenderと同じ手癖）'],
-    ['※','表示の縮小は<b>画面上の見え方だけ</b>。構図も書き出し結果も変わりません'],
+    ['外側の余白','縮小したときの外側でも<b>ドラッグでパン</b>できる（＝視点が動く。構図側）'],
+    ['ホイール押しドラッグ','<b>画面ごとズラす</b>（中ボタン＝AEの手のひら）。キャンバスを左へ寄せて、右側のUIと重ねずに作業できる'],
+    ['0','原寸100%＋<b>ズラしも中央に戻す</b>'],
+    ['※','表示の縮小もズラしも<b>画面上の見え方だけ</b>。構図も書き出し結果も変わりません'],
+  ]},
+  {t:'MONITOR（結果こうなるよ窓）',rows:[
+    ['P','MONITOR の開閉（トップバーの ▣ MONITOR でも同じ）'],
+    ['何が映るか','<b>16:9セーフフレームの中を、書き出しと同じ式で</b>（カメラ・DEPTH・DOFピント）。撮影FXは載りません'],
+    ['追従','プレビュー中＝再生位置／KFを選ぶ＝そのKFの静止の真ん中。<b>スライダーで任意の位置</b>も見られる'],
+    ['なぜ要るか','編集キャンバスは「いまのピント位置での見え方」なので、置いたピントが<b>本番でどう送られるか</b>はここで見る'],
   ]},
   {t:'2. TAKE カメラ',rows:[
     ['C','いまの構図を CAPTURE。<b>選択KFがあればその次に挿入</b>される'],
@@ -3227,7 +3473,9 @@ const SET_GROUPS=[
     ['点チップ','クリック＝そのKFへ飛んでその見え方に／<b>✕</b>で点を外す'],
     ['点が1つだけ','ピントは動かない（合いっぱなし）。<b>2点以上で送りが起きる</b>'],
     ['コマのバッジ','いまのボケ量と、<b>◎ そのコマにピントが合うKF番号</b>'],
-    ['詳細…','ピントの幅・ボケの強さ・BOUNCE は FX パネル側（押すと必ず前面に出る）'],
+    ['プレビュー中','<b>ピントのスライダーと定規が再生に追従</b>して動く（送りの様子がそのまま見える）'],
+    ['送りの長さ','FXパネルのスライダー。1.0＝カメラ移動区間ぴったり／<b>大きいほどゆっくり・わざとらしく</b>合う（既定 1.6）'],
+    ['詳細…','ピントの幅・ボケの強さ・送りの長さ・BOUNCE は FX パネル側（押すと必ず前面に出る）'],
   ]},
   {t:'プレビュー / 表示',rows:[
     ['SPACE','プレビュー再生／停止。<b>停止するとその場の構図で止まる</b>'],
@@ -3423,9 +3671,16 @@ function panelImg(p,tS,vis){
   return IM[seqFile(p.seq,i)];
 }
 const bySort=(a,b)=>((a.depth??0.5)-(b.depth??0.5))||((a.ord??0)-(b.ord??0));
+/* マルチプレーン（ビルダーの planeZoom と同式）。
+   引き(z<=1)は全プレーン同倍率／寄り(z>1)で手前ほど大きく＝前後が入れ替わらない */
+const DEPTH_SPREAD=0.22;
+function planeZoom(z,eff){
+  const s=1+Math.max(0,z-1)*DEPTH_SPREAD;
+  return (s===1)?z:z*Math.pow(s,2*eff-1);
+}
 function rect(o,cam,W,H){
-  const eff=o.depth??0.5;
-  const pf=lerp(0.7,1.2,eff),zi=1+(cam.z-1)*lerp(0.55,1.25,eff);
+  const eff=o.depth==null?0.5:o.depth;
+  const pf=lerp(0.7,1.2,eff),zi=planeZoom(cam.z,eff);
   const th=o.h*H*zi,tw=th*(o.ar||1.414);
   return{x:W/2+(o.x-cam.x*pf)*W*zi-tw/2,y:H/2+(o.y-cam.y*pf)*H*zi-th/2,w:tw,h:th};
 }
@@ -3447,32 +3702,50 @@ function drawP(p,r,tS,W,H){
 }
 /* ---- DOF / ピン送り（ビルダーと同式） ---- */
 const DOF=PROJ.dof||null;
-/* ビルダーと同じ実測判定（プロパティが在っても無視される環境があるため実際にぼかして確かめる） */
-const CAN_FILTER=(function(){try{
-  var c=document.createElement('canvas');c.width=c.height=9;
-  var g=c.getContext('2d',{willReadFrequently:true});
-  if(typeof g.filter!=='string')return false;
-  g.fillStyle='#fff';g.fillRect(0,0,9,9);
-  g.filter='blur(3px)';g.fillStyle='#000';g.fillRect(3,3,3,3);g.filter='none';
-  return g.getImageData(1,1,1,1).data[0]<250;
-}catch(e){return false;}})();
+/* ビルダーと同じ実測判定（32px・ヒント無し・アルファで見る。willReadFrequently や極小canvasだと
+   対応済みの Safari でも偽陰性が出た）。?dof=1 で判定を無視して強制ONにもできる */
+const CAN_FILTER=(function(){
+  try{
+    if(new URLSearchParams(location.search).get('dof')==='1')return true;
+  }catch(e){}
+  try{
+    var c=document.createElement('canvas');c.width=c.height=32;
+    var g=c.getContext('2d');
+    if(!g||typeof g.filter!=='string')return false;
+    g.clearRect(0,0,32,32);
+    g.filter='blur(4px)';g.fillStyle='#000';g.fillRect(10,10,12,12);g.filter='none';
+    return g.getImageData(6,16,1,1).data[3]>4;
+  }catch(e){return false;}
+})();
+function dofWin(kf,pull){
+  var t=(kf>0)?TT.segs[2*kf-1]:null;
+  if(!t)return null;
+  var dSeg=TT.segs[2*kf]||null;
+  var dw=dSeg?(dSeg.p1-dSeg.p0):0;
+  var tw=Math.max(t.p1-t.p0,1e-6),s1;
+  if(pull<=1)s1=t.p0+tw*Math.max(pull,0.05);
+  else{var room=Math.max(dw*0.85,1e-6);s1=t.p1+room*(1-Math.exp(-tw*(pull-1)/room));}
+  return {s0:t.p0,s1:s1,dSeg:dSeg,dw:dw};
+}
 function focusAt(P){
   if(!DOF||!DOF.on||!DOF.pts||!DOF.pts.length)return null;
   const pts=DOF.pts.filter(function(pt){return !!PROJ.take.kf[pt.kf];});
   if(!pts.length)return null;
-  var landed=null,before=null;
+  var pull=(typeof DOF.pull==='number'&&isFinite(DOF.pull))?DOF.pull:1;
+  var landed=null,before=null,lw=null;
   for(var i=0;i<pts.length;i++){
     var pt=pts[i];
-    var t=(pt.kf>0)?TT.segs[2*pt.kf-1]:null;
-    if(!t||P>=t.p1){before=landed;landed=pt;continue;}
-    if(P>t.p0)return lerp(landed?landed.f:pt.f,pt.f,E.smooth(map(P,t.p0,t.p1)));
+    var w=dofWin(pt.kf,pull);
+    if(!w||P>=w.s1){before=landed;landed=pt;lw=w;continue;}
+    if(P>w.s0)return lerp(landed?landed.f:pt.f,pt.f,E.smooth(map(P,w.s0,w.s1)));
     break;
   }
   if(!landed)return pts[0].f;
-  var dSeg=TT.segs[2*landed.kf];
-  if(!dSeg||DOF.bounce<=0.001||!before)return landed.f;
-  var w=Math.max(dSeg.p1-dSeg.p0,1e-6);
-  var u=map(P,dSeg.p0,dSeg.p0+w*0.35);
+  if(!lw||!lw.dSeg||DOF.bounce<=0.001||!before)return landed.f;
+  var rem=Math.max(lw.dSeg.p1-lw.s1,0);
+  var bl=Math.min(lw.dw*0.35*pull,rem*0.95);
+  if(bl<=1e-6)return landed.f;
+  var u=map(P,lw.s1,lw.s1+bl);
   if(u<=0||u>=1)return landed.f;
   return landed.f+(landed.f-before.f)*DOF.bounce*0.35*Math.sin(u*Math.PI*2)*(1-u);
 }
@@ -3642,7 +3915,13 @@ function attractUpdate(nowMs,dt){
   scrollTo(0,Math.min(max,scrollY+(max/attract.dur)*(c.segT==='dwell'?0.6:1)*dt));
 }
 let Pd=0;
+/* 例外が出ても rAF を継ぎ足す（1フレーム落ちるだけで、以降も動き続ける）。
+   ビルダー側と同じ方針。iOSでコンテキストが飛んだときに画面が固まったまま戻らないのを防ぐ */
 function frame(nowMs){
+  try{frameBody(nowMs);}catch(e){if(console&&console.warn)console.warn('[OBAN viewer] frame:',e&&e.message);}
+  requestAnimationFrame(frame);
+}
+function frameBody(nowMs){
   const dt=clamp((nowMs-(frame.last??nowMs))/1000,0,0.05);frame.last=nowMs;
   const tS=nowMs/1000;
   mx+=(mxT-mx)*0.08;my+=(myT-my)*0.08;
@@ -3703,7 +3982,6 @@ function frame(nowMs){
     applyWipeVisual(Pd);
     document.getElementById('bar').style.width=(Pd*100).toFixed(2)+'%';
   }
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 ${S}</body></html>`;
@@ -3728,7 +4006,24 @@ $('#b-export').addEventListener('click',async()=>{
 /* ============================================================
    MAIN LOOP
    ============================================================ */
+/* rAFループは何があっても止めない。
+ * 2026-08-14: iPad実機で「PREVIEW後に画面が止まり、PLACEへ戻すと絵が消えて読み込みも効かない」報告。
+ * 原因はループ本体で例外が出ると末尾の requestAnimationFrame まで到達せず**ループごと死ぬ**こと
+ * （さらに cx がオフスクリーン(gScx)のまま残ると、以後の描画が全部画面外へ行く）。
+ * → 本体を try/finally で包み、cx を必ず cx0 に戻し、rAF は finally で必ず継ぎ足す。 */
+let loopErr=0;
 function frame(nowMs){
+  try{ frameBody(nowMs); }
+  catch(e){
+    if(!loopErr){loopErr=1;toast('描画エラーから復帰しました（操作は続けられます）');}
+    console.warn('[OBAN] frame error:',e&&(e.stack||e.message));
+  }
+  finally{
+    cx=cx0;                               // オフスクリーンに刺さったままにしない
+    requestAnimationFrame(frame);
+  }
+}
+function frameBody(nowMs){
   const dt=clamp((nowMs-(frame.last??nowMs))/1000,0,0.05);frame.last=nowMs;
   const tS=nowMs/1000;
   const W=cv.width,H=cv.height;
@@ -3739,6 +4034,12 @@ function frame(nowMs){
     cam=camAt(PV.p);P=PV.p;
     const ni=kfIndexAtP(PV.p);            // 再生位置のKFカードを光らせて自動スクロール
     if(ni!==kfNow){kfNow=ni;markKfNow();}
+    /* DOFのピント位置スライダー／定規を再生に追従させる（「いまどこに合っているか」を数字で見せる）。
+       表示だけの更新なので pts には書き込まない（setDofPin の writeThrough=false） */
+    if(PROJECT.dof&&PROJECT.dof.on){
+      const fv=focusAt(PV.p);
+      if(fv!=null&&Math.abs(fv-dofPin)>0.004)setDofPin(fv,false);
+    }
   }
   /* V2-C: SPEC_06 P2 — 編集中はFXなし（軽量優先）、PREVIEW中のみdraft適用 */
   const fxp=PROJECT.take.fx;
@@ -3757,7 +4058,7 @@ function frame(nowMs){
   if(!cleanView){                           // クリーン表示中はガイド類（カメラ軌道/セーフフレーム/PREVIEW表記）を全部隠す
     drawTakePath(cam);
     drawGuides();
-    if(!PV.on)drawDofRuler();               // DOFの奥行き定規（編集中だけ）
+    drawDofRuler();                         // DOFの奥行き定規（プレビュー中は薄く出して送りを見せる）
     if(VS!==1){                             // 表示ズーム中はキャンバスの縁と倍率を出す（縮んでいると分かるように）
       cx.save();
       cx.strokeStyle='rgba(255,210,122,.45)';cx.lineWidth=1*DPR;
@@ -3772,7 +4073,12 @@ function frame(nowMs){
     }
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)$('#toast').style.display='none';}
-  requestAnimationFrame(frame);
+  /* MONITOR（別キャンバス）は 20fps で十分。プレビュー中は再生位置に追従する */
+  if(monVisible()&&nowMs-monLast>50){
+    monLast=nowMs;
+    if(PV.on)MON.p=PV.p;
+    monRender();
+  }
 }
 PROJECT=migrate(PROJECT);   // V2-C: 初期状態にも take.fx / frame.fx を補完
 load();
@@ -3798,8 +4104,10 @@ requestAnimationFrame(frame);
      960×540/DPR=1 に固定してから撮る。ウィンドウ幅で絵が変わるツールなので、
      ここを固定しないとVRTが成立しない。
    ・撮影対象は #cv のCSS表示ではなく、そのピクセルを等倍でコピーした #harness-shot。
-   ・PREVIEW相当の見た目で撮る（mode='take' + PV.on）。PLACE編集ビューは
-     prect() が zi=cam.z の均一ズームに分岐する＝出力と別物なので使わない。
+   ・PREVIEW相当の見た目で撮る（mode='take' + PV.on）。
+     ※ 2026-08-14 以降、prect() は PLACE / TAKE で**同じ式**（planeZoom）になったので
+       「PLACEだと均一ズームに分岐する」という理由は消えた。それでも mode/PV を立てるのは
+       IN演出・ドリフト・ワイプ・字幕が P 非nullでしか動かないから（＝出力と同じ経路を通すため）。
    ============================================================ */
 const OB_FIX={W:960,H:540,cycleMs:4000};   // 撮影サイズ／P(0..1)へ写す1周の長さ
 let obShotCv=null,obShotCtx=null,obReadyPromise=null;
