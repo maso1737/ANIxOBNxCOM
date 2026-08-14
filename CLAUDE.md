@@ -8,7 +8,7 @@
 - `animator.html` — メインの作画エディタ（実体。最重要）
 - `oban-builder.html` — OBAN BUILDER。モーションコミック製造機（画像→PLACE→TAKE→単一HTMLビューア書き出し）。パイプライン上は animator と composer の間
 - `composer.html` — マルチトラック合成（カメラ/キーフレーム/書き出し）
-- `manga-plate.html` — **MANGA PLATE v2。漫画ページ＆コマ割り**（ジャンプ規定B4 600dpi・多角形コマの縦/横/斜め分割・コマ内マスク・境界効果・ページ一覧・グレー→網点。SPEC_09 §v2）
+- `manga-plate.html` — **MANGA PLATE v2。漫画ページ＆コマ割り**（ジャンプ規定B4 600dpi・多角形コマの縦/横/斜め分割・コマ内マスク・境界効果・ページ一覧・**左右見開き作業**・グレー→網点。SPEC_09 §v2 / §v2-6b）
 - `econte.html` — ECONTE。プリプロ（紙ネーム写真→BOARD切り出し→SHEET絵コンテ→加筆。SPEC_10。パイプライン上は animator の前）
 - `index.html` — ランディングページ（**OBAN 追加予定**）
 - `inbetween_lab.html` / `inbetween_warp_lab.html` — 中割り実験ラボ

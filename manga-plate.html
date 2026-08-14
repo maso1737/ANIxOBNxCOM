@@ -101,8 +101,15 @@ details.sp>summary:hover{background:rgba(255,79,168,.07)}
 .tr .lb{color:var(--lavender);letter-spacing:.12em;text-transform:uppercase;font-size:9px;white-space:nowrap}
 .tr .vv{color:var(--gold);min-width:40px;text-align:right;font-size:10px}
 .note{font-family:var(--jp);font-size:9px;line-height:1.6;color:rgba(181,142,255,.75);margin:6px 0 2px}
-input[type=range]{flex:1;min-width:40px;-webkit-appearance:none;appearance:none;height:2px;background:rgba(255,210,122,.25);outline:0}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;
+/* スライダー: 当たり判定は背高・見た目は細い線（指でつかめる）。
+   touch-action:none = 横スクラブが #side の縦スクロールに取られない（iPadの「突っかかり」対策） */
+input[type=range]{flex:1;min-width:40px;-webkit-appearance:none;appearance:none;height:24px;
+  background:transparent;outline:0;touch-action:none;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:rgba(255,210,122,.25);border:0}
+input[type=range]::-moz-range-track{height:2px;background:rgba(255,210,122,.25);border:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+  margin-top:-5.5px;background:linear-gradient(135deg,#FFD27A,#FF4FA8);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;border:0;
   background:linear-gradient(135deg,#FFD27A,#FF4FA8);cursor:pointer}
 input[type=range]:disabled{opacity:.3}
 input[type=number],select,input[type=text]{background:var(--cell);border:1px solid rgba(255,210,122,.3);color:var(--white);
@@ -199,6 +206,24 @@ select{width:100%}
 .pcard .cap{width:100%;text-align:center;font-size:10px;letter-spacing:.16em;color:#cfcfcf;background:#2a2a2a;padding:3px 0}
 .pcard.cur .cap{background:var(--rouge);color:#fff}
 .pcard.sel .cap{background:#2f4a7a;color:#fff}
+
+/* ---- タッチ最適化（animator と同じ pointer:coarse 分岐）
+   後勝ちで効かせたいので、必ずスタイルシートの最後に置くこと ---- */
+@media (pointer:coarse){
+  input[type=range]{height:34px}
+  input[type=range]::-webkit-slider-thumb{width:20px;height:20px;margin-top:-9px}
+  input[type=range]::-moz-range-thumb{width:20px;height:20px}
+  input[type=number],select,input[type=text]{padding:7px 6px;font-size:11px}
+  .tr{margin:9px 0}
+  .btn{padding:8px 10px}
+  #topbar .btn{padding:6px 8px}
+  .sub{height:28px}
+  .el-row{padding:8px 6px}
+  .el-row .el-ud,.el-row .el-x,.el-row .el-vis{padding:0 4px;font-size:11px}
+  .fp{padding:6px 9px}
+  .pal .sw{width:26px;height:26px}
+  #modal-list .mrow{padding:10px 9px}
+}
 </style>
 </head>
 <body>
@@ -217,7 +242,7 @@ select{width:100%}
     <input type="file" id="io-file" accept="application/json,.json" style="display:none">
     <span class="t-gap"></span>
     <button class="btn gold" id="pg-prev" title="前のページへ（[）">◀</button>
-    <button class="btn gold" id="btn-pages" title="ページ一覧（Wクリックでそのページへ）">PAGES</button>
+    <button class="btn gold" id="btn-pages" title="ページ一覧（Wクリックで左右見開き作業 ON／W）">PAGES</button>
     <button class="btn gold" id="pg-next" title="次のページへ（]）">▶</button>
     <span class="t-gap"></span>
     <button class="btn gold" id="btn-settings" title="操作一覧・設定（?）">⚙</button>
@@ -466,6 +491,7 @@ function migrate(b){
       if(it.visible===undefined)it.visible=true;
       if(it.panelId===undefined)it.panelId=null;
       if(!it.name)it.name=it.type.toUpperCase();
+      if(it.type==='focus'&&it.core===undefined)it.core=0;   // 既存の集中線は真円のまま（新規だけ既定で崩す）
       const def=defaultsFor(it.type,PAPER.bas);
       for(const k in def)if(it[k]===undefined)it[k]=def[k];
       if(it.type==='img'){
@@ -491,7 +517,7 @@ function defaultsFor(type,box){
                              dot:Math.round(16*S),gap:Math.round(22*S),angle:45,shape:'dot',color:'#000000'};
   if(type==='focus') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,r0:Math.round(Math.min(box.w,box.h)*0.22),
                              r1:Math.round(Math.hypot(box.w,box.h)*0.62),count:110,lw:Math.round(7*S),
-                             taper:0.9,jitter:0.35,seed:1,color:'#000000'};
+                             taper:0.9,jitter:0.35,core:0.25,seed:1,color:'#000000'};
   if(type==='stream')return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,w:Math.round(box.w),h:Math.round(box.h),
                              count:34,lw:Math.round(6*S),taper:0.85,jitter:0.3,seed:1,color:'#000000'};
   return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,w:Math.round(box.w),h:Math.round(box.h),lw:Math.round(14*S),color:'#000000'};
@@ -499,13 +525,14 @@ function defaultsFor(type,box){
 const DEFS={
   img:   [['scale',0.05,4,0.01,'SCALE'],['rot',-180,180,1,'ROT'],['opacity',0.05,1,0.05,'不透明度']],
   tone:  [['w',50,9000,1,'W'],['h',50,9000,1,'H'],['dot',2,120,1,'ドット径'],['gap',4,240,1,'間隔'],['angle',0,90,1,'角度'],['rot',-90,90,1,'ROT']],
-  focus: [['r0',0,4000,1,'R0 白場'],['r1',100,9000,1,'R1 長さ'],['count',10,400,1,'本数'],['lw',1,60,1,'太さ'],['taper',0,1,0.05,'先細り'],['jitter',0,1,0.05,'ゆらぎ'],['seed',1,99,1,'SEED'],['rot',-180,180,1,'ROT']],
+  focus: [['r0',0,4000,1,'R0 白場'],['core',0,1,0.05,'芯くずし'],['r1',100,9000,1,'R1 長さ'],['count',10,400,1,'本数'],['lw',1,60,1,'太さ'],['taper',0,1,0.05,'先細り'],['jitter',0,1,0.05,'ゆらぎ'],['seed',1,99,1,'SEED'],['rot',-180,180,1,'ROT']],
   stream:[['w',50,9000,1,'W'],['h',50,9000,1,'H'],['count',2,200,1,'本数'],['lw',1,60,1,'太さ'],['taper',0,1,0.05,'先細り'],['jitter',0,1,0.05,'ゆらぎ'],['seed',1,99,1,'SEED'],['rot',-180,180,1,'ROT']],
   frame: [['w',50,9000,1,'W'],['h',50,9000,1,'H'],['lw',2,120,1,'太さ'],['rot',-90,90,1,'ROT']],
   white: [['rot',-180,180,1,'ROT'],['opacity',0.05,1,0.05,'不透明度']],
 };
 const TONE_PRESETS=[['10%',0.42],['20%',0.55],['40%',0.74],['60%',0.90]];   // dot = gap × 比
-const FOCUS_PRESETS=[['標準',{count:110,taper:0.9,jitter:0.35}],['密',{count:220,taper:0.95,jitter:0.25}]];
+const FOCUS_PRESETS=[['標準',{count:110,taper:0.9,jitter:0.35}],['密',{count:220,taper:0.95,jitter:0.25}],
+                     ['芯くずし',{core:0.55,jitter:0.45}],['真円',{core:0}]];
 const STREAM_PRESETS=[['標準',{count:34,taper:0.85}],['太',{count:16,taper:0.6}]];
 const MANGA_PAL=['#000000','#FFFFFF','#EBEBEB','#D4D4D4','#ABABAB','#808080','#555555','#2B2B2B','#F5F1E8','#FF3355'];
 
@@ -693,16 +720,23 @@ function drawTone(g,it){
 }
 function drawFocus(g,it){
   const rnd=mulberry32(it.seed|0);
+  /* 芯くずし（core）: 白場が真円すぎるのを崩す。
+     低周波のうねり（2〜5山＋倍音）で全体を歪ませ、そこへ1本ごとのばらつきを足す。
+     乱数列は本体（rnd）と別に持つので、core=0 のときの絵は今までと1pxも変わらない。 */
+  const core=clamp(it.core||0,0,1);
+  const cr=mulberry32((it.seed|0)*7919+13);
+  const lobes=2+Math.floor(cr()*4), ph=cr()*TAU, lobes2=lobes*2+1, ph2=cr()*TAU;
   for(let i=0;i<it.count;i++){
     const a=(i/it.count)*TAU+(rnd()-0.5)*(TAU/it.count)*it.jitter*2;
-    const len=Math.max(it.r0+4,it.r1*(1-rnd()*it.jitter*0.4));
+    const r0=core?Math.max(0,it.r0*(1+(Math.sin(a*lobes+ph)*0.30+Math.sin(a*lobes2+ph2)*0.14+(cr()-0.5)*0.46)*core)):it.r0;
+    const len=Math.max(r0+4,it.r1*(1-rnd()*it.jitter*0.4));
     const w0=(it.lw*(0.6+rnd()*0.8))/2, w1=w0*(1-it.taper);
     const ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca;
     g.beginPath();
-    g.moveTo(ca*it.r0+px*w0, sa*it.r0+py*w0);
+    g.moveTo(ca*r0+px*w0, sa*r0+py*w0);
     g.lineTo(ca*len+px*w1, sa*len+py*w1);
     g.lineTo(ca*len-px*w1, sa*len-py*w1);
-    g.lineTo(ca*it.r0-px*w0, sa*it.r0-py*w0);
+    g.lineTo(ca*r0-px*w0, sa*r0-py*w0);
     g.closePath();g.fill();
   }
 }
@@ -788,63 +822,138 @@ function setupCanvas(){
   render();
 }
 function kz(){return view.z*DPR;}
-function s2p(sx,sy){return{x:(sx-cvs.width/2)/kz()+PAPER.w/2-view.x, y:(sy-cvs.height/2)/kz()+PAPER.h/2-view.y};}
-function evPt(ev){const r=cvs.getBoundingClientRect();return s2p((ev.clientX-r.left)*DPR,(ev.clientY-r.top)*DPR);}
+
+/* ============================================================
+   見開き（左右2ページを並べて作業）
+   1ページ目は単独（表紙）、以降は2pずつ＝PAGES の並びとまったく同じ。
+   モデルは1ページ単位のまま触らない。「置く位置＝オフセット」だけで見開きにする。
+   世界座標 = ページ座標 + そのページのオフセット。
+   ============================================================ */
+let spreadOn=false;
+function spreadRowOf(i){
+  if(i<=0)return[0];
+  const a=(i%2)?i:i-1;                      // 1,2 / 3,4 / 5,6 …
+  return a+1<BOOK.pages.length?[a,a+1]:[a];
+}
+/* 画面に並べる順（左→右）。null=向かいの白紙（表紙の裏など） */
+function spreadSlots(){
+  if(!spreadOn)return[curPageIdx];
+  const row=spreadRowOf(curPageIdx);
+  if(row.length===2)return BOOK.bindRight?[row[1],row[0]]:[row[0],row[1]];
+  return BOOK.bindRight?[null,row[0]]:[row[0],null];
+}
+function worldW(){return spreadOn?PAPER.w*2:PAPER.w;}
+function curOx(){const i=spreadSlots().indexOf(curPageIdx);return i>0?PAPER.w*i:0;}
+/* 世界座標のXが、どのページの上か */
+function pageAtWorldX(wx){
+  if(!spreadOn)return curPageIdx;
+  const s=spreadSlots(), i=clamp(Math.floor(wx/PAPER.w),0,s.length-1);
+  return (s[i]===null||s[i]===undefined)?curPageIdx:s[i];
+}
+function s2w(sx,sy){return{x:(sx-cvs.width/2)/kz()+worldW()/2-view.x, y:(sy-cvs.height/2)/kz()+PAPER.h/2-view.y};}
+function evPtW(ev){const r=cvs.getBoundingClientRect();return s2w((ev.clientX-r.left)*DPR,(ev.clientY-r.top)*DPR);}
+/* 以降のツール処理はすべて「作業中ページのページ座標」で動く（見開きでも今までのまま） */
+function evPt(ev){const w=evPtW(ev);const o=curOx();return{x:w.x-o,y:w.y};}
 function fitView(){
-  view.z=clamp(Math.min(cvs.width/DPR/PAPER.w,cvs.height/DPR/PAPER.h)*0.88,0.005,4);
+  view.z=clamp(Math.min(cvs.width/DPR/worldW(),cvs.height/DPR/PAPER.h)*0.88,0.005,4);
   view.x=0;view.y=0;render();
 }
 let gToneOn=false;      // 網点プレビューは書き出し時のみON
 let divPreview=null;    // {x0,y0,x1,y1}
+/* 描画はフレームに1回に間引く（スライダー連打・指のドラッグでも詰まらない＝iPad対策） */
+let rafQ=0;
+function renderQ(){if(rafQ)return;rafQ=requestAnimationFrame(()=>{rafQ=0;render();});}
 
-function render(){
-  if(!BOOK)return;
-  const W=cvs.width,H=cvs.height,pg=curPage();
-  cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,W,H);
-  cx.translate(W/2,H/2);cx.scale(kz(),kz());cx.translate(-PAPER.w/2+view.x,-PAPER.h/2+view.y);
-  /* 用紙面 */
+/* ---- 用紙まわりの部品（見開きでは 1枚ぶんずつ translate してから呼ぶ） ---- */
+function drawSheetGround(){
   if(BOOK.bg==='transparent'){
     cx.fillStyle='#e8e4ee';cx.fillRect(0,0,PAPER.w,PAPER.h);
     cx.fillStyle='#cfc9dc';const cs=Math.max(PAPER.w/60,Math.round(48/view.z/2)*2);
     for(let yy=0;yy<PAPER.h;yy+=cs)for(let xx=(Math.round(yy/cs))%2?cs:0;xx<PAPER.w;xx+=cs*2)
       cx.fillRect(xx,yy,Math.min(cs,PAPER.w-xx),Math.min(cs,PAPER.h-yy));
   }else{cx.fillStyle='#fff';cx.fillRect(0,0,PAPER.w,PAPER.h);}
-  cx.save();cx.beginPath();cx.rect(0,0,PAPER.w,PAPER.h);cx.clip();
-  renderPage(cx,pg,{});
-  cx.restore();
-  /* 選択以外を青くする（クリスタのコマ作業表示） */
-  if(showShade&&selPanel){
-    cx.save();
-    cx.beginPath();cx.rect(0,0,PAPER.w,PAPER.h);cx.clip();
-    cx.beginPath();cx.rect(0,0,PAPER.w,PAPER.h);
-    const dp=dispPoly(selPanel);
-    cx.moveTo(dp[0].x,dp[0].y);for(let i=dp.length-1;i>=1;i--)cx.lineTo(dp[i].x,dp[i].y);cx.closePath();
-    cx.fillStyle='rgba(120,136,255,.45)';cx.fill('evenodd');
-    cx.restore();
-  }
-  /* ガイド（トンボ・仕上がり・内枠）— 表示のみ。書き出しに入らない */
-  if(showGuide){
-    const u=1/view.z;
-    cx.save();cx.lineWidth=Math.max(1.2*u,PAPER.w*0.0006);
-    cx.strokeStyle='rgba(90,140,255,.85)';strokeRectO(cx,PAPER.fin);
-    cx.strokeStyle='rgba(90,140,255,.55)';strokeRectO(cx,PAPER.bas);
-    cx.strokeStyle='rgba(90,140,255,.9)';
-    const m=PAPER.w*0.03;
-    [[PAPER.fin.x,PAPER.fin.y],[PAPER.fin.x+PAPER.fin.w,PAPER.fin.y],
-     [PAPER.fin.x,PAPER.fin.y+PAPER.fin.h],[PAPER.fin.x+PAPER.fin.w,PAPER.fin.y+PAPER.fin.h]].forEach(c=>{
-      cx.beginPath();cx.moveTo(c[0]-m,c[1]);cx.lineTo(c[0]+m,c[1]);
-      cx.moveTo(c[0],c[1]-m);cx.lineTo(c[0],c[1]+m);cx.stroke();
-    });
-    cx.restore();
-  }
-  /* コマ番号 */
+}
+/* 向かいが無いページ（表紙など）。見開きの位置関係が分かるように枠だけ出す */
+function drawBlankSheet(){
   cx.save();
-  cx.fillStyle='rgba(255,79,168,.85)';
+  cx.fillStyle='rgba(248,239,255,.04)';cx.fillRect(0,0,PAPER.w,PAPER.h);
+  cx.strokeStyle='rgba(181,142,255,.3)';cx.lineWidth=Math.max(1.5/view.z,PAPER.w*0.0009);
+  cx.setLineDash([26/view.z,20/view.z]);cx.strokeRect(0,0,PAPER.w,PAPER.h);cx.setLineDash([]);
+  cx.restore();
+}
+/* 選択以外を青くする（クリスタのコマ作業表示） */
+function drawShade(){
+  cx.save();
+  cx.beginPath();cx.rect(0,0,PAPER.w,PAPER.h);cx.clip();
+  cx.beginPath();cx.rect(0,0,PAPER.w,PAPER.h);
+  const dp=dispPoly(selPanel);
+  cx.moveTo(dp[0].x,dp[0].y);for(let i=dp.length-1;i>=1;i--)cx.lineTo(dp[i].x,dp[i].y);cx.closePath();
+  cx.fillStyle='rgba(120,136,255,.45)';cx.fill('evenodd');
+  cx.restore();
+}
+/* ガイド（トンボ・仕上がり・内枠）— 表示のみ。書き出しに入らない */
+function drawGuides(){
+  const u=1/view.z;
+  cx.save();cx.lineWidth=Math.max(1.2*u,PAPER.w*0.0006);
+  cx.strokeStyle='rgba(90,140,255,.85)';strokeRectO(cx,PAPER.fin);
+  cx.strokeStyle='rgba(90,140,255,.55)';strokeRectO(cx,PAPER.bas);
+  cx.strokeStyle='rgba(90,140,255,.9)';
+  const m=PAPER.w*0.03;
+  [[PAPER.fin.x,PAPER.fin.y],[PAPER.fin.x+PAPER.fin.w,PAPER.fin.y],
+   [PAPER.fin.x,PAPER.fin.y+PAPER.fin.h],[PAPER.fin.x+PAPER.fin.w,PAPER.fin.y+PAPER.fin.h]].forEach(c=>{
+    cx.beginPath();cx.moveTo(c[0]-m,c[1]);cx.lineTo(c[0]+m,c[1]);
+    cx.moveTo(c[0],c[1]-m);cx.lineTo(c[0],c[1]+m);cx.stroke();
+  });
+  cx.restore();
+}
+function drawPanelNums(pg,act){
+  cx.save();
+  cx.fillStyle=act?'rgba(255,79,168,.85)':'rgba(255,79,168,.32)';
   const fs=Math.max(PAPER.w*0.022,16/view.z);
   cx.font='700 '+fs+'px '+'IBM Plex Mono, monospace';cx.textBaseline='top';
   pg.panels.forEach((k,i)=>{const b=polyBounds(dispPoly(k));
     cx.fillText(String(i+1),b.x+b.w-fs*0.9,b.y+fs*0.2);});
   cx.restore();
+}
+/* 見開きのとき、どちらが作業中のページか一目で分かるように */
+function drawPageTag(idx,act){
+  const fs=Math.max(PAPER.w*0.024,18/view.z);
+  cx.save();
+  cx.font='700 '+fs+'px IBM Plex Mono, monospace';cx.textAlign='center';cx.textBaseline='bottom';
+  cx.fillStyle=act?'#FF4FA8':'rgba(181,142,255,.6)';
+  cx.fillText('P'+(idx+1)+(act?' ●':''),PAPER.w/2,-fs*0.45);
+  if(act){
+    cx.strokeStyle='rgba(255,79,168,.5)';cx.lineWidth=Math.max(2/view.z,PAPER.w*0.0014);
+    cx.strokeRect(0,0,PAPER.w,PAPER.h);
+  }
+  cx.restore();
+}
+
+function render(){
+  if(!BOOK)return;
+  const W=cvs.width,H=cvs.height;
+  cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,W,H);
+  cx.translate(W/2,H/2);cx.scale(kz(),kz());cx.translate(-worldW()/2+view.x,-PAPER.h/2+view.y);
+  /* 用紙（見開きなら2枚。中身は今までどおり1ページ座標で描き、置く位置だけずらす） */
+  spreadSlots().forEach((idx,si)=>{
+    cx.save();cx.translate(PAPER.w*si,0);
+    if(idx===null)drawBlankSheet();
+    else{
+      const pg=BOOK.pages[idx], act=(idx===curPageIdx);
+      drawSheetGround();
+      cx.save();cx.beginPath();cx.rect(0,0,PAPER.w,PAPER.h);cx.clip();
+      renderPage(cx,pg,{});
+      cx.restore();
+      if(act&&showShade&&selPanel)drawShade();
+      if(showGuide)drawGuides();
+      drawPanelNums(pg,act);
+      if(spreadOn)drawPageTag(idx,act);
+    }
+    cx.restore();
+  });
+  /* ここから下は「作業中のページ」の座標で描く（選択・ハンドル・プレビュー） */
+  cx.save();cx.translate(curOx(),0);
+  const pg=curPage();
   /* 選択コマ */
   if(selPanel){
     cx.save();pathPoly(cx,dispPoly(selPanel));
@@ -897,6 +1006,7 @@ function render(){
     cx.lineTo(divPreview.x0+dx*L,divPreview.y0+dy*L);
     cx.stroke();cx.setLineDash([]);cx.restore();
   }
+  cx.restore();
   updateStatus();
 }
 function strokeRectO(g,r){g.strokeRect(r.x,r.y,r.w,r.h);}
@@ -911,7 +1021,10 @@ function itemBounds(it){
 }
 function updateStatus(){
   const pg=curPage(), n=BOOK.pages.length;
-  $('#pg-indic').textContent='P '+(curPageIdx+1)+' / '+n;
+  $('#pg-indic').innerHTML=spreadOn
+    ? '見開き '+spreadSlots().map(i=>i===null?'<span style="opacity:.4">—</span>'
+        :(i===curPageIdx?'<b style="color:var(--rouge)">P'+(i+1)+'</b>':'P'+(i+1))).join('｜')+' / '+n
+    : 'P '+(curPageIdx+1)+' / '+n;
   $('#pg-prev').disabled=curPageIdx<=0;
   $('#pg-next').disabled=curPageIdx>=n-1;
   $('#bb-info').textContent=PAPER.w+'×'+PAPER.h+'  '+PAPER.dpi+'dpi  Z'+(view.z*100).toFixed(0)+'%  コマ'+pg.panels.length;
@@ -920,8 +1033,10 @@ function updateStatus(){
       ?'クリック=コマ選択（SELをWクリックで素材選択に切替）'
       :'クリック=素材を選ぶ／ドラッグで移動（SELをWクリックでコマ選択に戻る）')
       +' ／ 空白ドラッグ=パン・ホイール=ズーム',
-    div:'ドラッグで分割線（'+(divMode==='v'?'縦':divMode==='h'?'横':'斜め・Shiftで15°')
-      +'）。用紙の外から引くと定規のように縦横が決まる。コマ選択中はそのコマだけ、未選択なら横切る全コマ',
+    div:'ドラッグで分割線（'+(divMode==='v'?'縦':divMode==='h'?'横':'斜め・Shiftで15°')+'）。'
+      +(divMode==='f'?'斜のあいだは向きが勝手に切り替わりません'
+                     :'用紙の外から引くと定規のように縦横が決まる')
+      +'。コマ選択中はそのコマだけ、未選択なら横切る全コマ',
     edit:(editMode==='line'
       ?'分割線の●=回転／■=平行移動（Shiftで15°）。破綻する動きは自動で戻ります'
       :'ドラッグで投げ縄→離すと白でかぶさります（EDITをWクリックで線編集に戻る）')};
@@ -985,7 +1100,7 @@ const hist=[];let hi=-1,dT=null;
 function snapshot(){return JSON.stringify(BOOK);}
 function pushHist(){hist.splice(hi+1);hist.push(snapshot());if(hist.length>50)hist.shift();hi=hist.length-1;}
 function commit(){pushHist();save();thumbCache={};render();}
-function commitD(){save();thumbCache={};render();clearTimeout(dT);dT=setTimeout(pushHist,300);}
+function commitD(){save();thumbCache={};renderQ();clearTimeout(dT);dT=setTimeout(pushHist,300);}
 function applyHist(s){
   BOOK=JSON.parse(s);PAPER=paperOf(BOOK.paper);
   curPageIdx=clamp(curPageIdx,0,BOOK.pages.length-1);
@@ -1077,15 +1192,64 @@ function cutAt(pg,x,y){
   return best;
 }
 let drag=null, lasso=null;
+/* ---- iPad: 指が2本以上のあいだは「ジェスチャ」。1本目の操作は打ち切る ---- */
+const tPts=new Map();          // pointerId → {x,y}（画面座標）
+let gestureLock=false, pinch=null;
+function cancelGestures(){drag=null;lasso=null;divPreview=null;}
+function pinchStart(){
+  const a=[...tPts.values()];if(a.length<2)return;
+  const r=cvs.getBoundingClientRect();
+  pinch={d0:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1,
+         mx:(a[0].x+a[1].x)/2-r.left,my:(a[0].y+a[1].y)/2-r.top,
+         z0:view.z,vx:view.x,vy:view.y,on:false};
+}
+/* 2本指ピンチ＝ズーム＋パン（指の中点を画面に貼り付けたまま拡縮） */
+function pinchMove(){
+  const a=[...tPts.values()];if(!pinch||a.length<2)return;
+  const r=cvs.getBoundingClientRect();
+  const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+  const mx=(a[0].x+a[1].x)/2-r.left, my=(a[0].y+a[1].y)/2-r.top;
+  /* 少し動くまでは何もしない＝2本指タップ（UNDO）に譲る */
+  if(!pinch.on&&Math.abs(d-pinch.d0)<12&&Math.hypot(mx-pinch.mx,my-pinch.my)<12)return;
+  pinch.on=true;
+  const z=clamp(pinch.z0*(d/pinch.d0),0.005,4);
+  const Cx=cvs.width/(2*DPR), Cy=cvs.height/(2*DPR);
+  view.z=z;
+  view.x=(mx-Cx)/z-(pinch.mx-Cx)/pinch.z0+pinch.vx;
+  view.y=(my-Cy)/z-(pinch.my-Cy)/pinch.z0+pinch.vy;
+  renderQ();
+}
+/* 見開き: 触った側のページを作業対象にする（PAGES を開かずに左右を行き来できる） */
+function focusPageAt(ev){
+  if(!spreadOn)return false;
+  const idx=pageAtWorldX(evPtW(ev).x);
+  if(idx===curPageIdx)return false;
+  curPageIdx=idx;selPanel=null;selItem=null;selCut=null;
+  renderItemList();renderItemParams();renderPanelSec();
+  return true;
+}
 cvs.addEventListener('pointerdown',ev=>{
+  if(ev.pointerType==='touch'){
+    tPts.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+    if(tPts.size>1){
+      gestureLock=true;cancelGestures();
+      if(tPts.size===2)pinchStart();else pinch=null;
+      renderQ();return;
+    }
+  }
+  if(gestureLock)return;
   cvs.setPointerCapture(ev.pointerId);
+  focusPageAt(ev);
   const p=evPt(ev), pg=curPage();
 
   if(tool==='div'){
-    /* クリスタの定規のように、用紙の外から引き始めると縦横が自動で決まる */
-    const outSide=(p.x<0||p.x>PAPER.w), outTop=(p.y<0||p.y>PAPER.h);
-    if(outTop&&!outSide)setDivMode('h');        // 上下の外から引く＝横線
-    else if(outSide&&!outTop)setDivMode('v');   // 左右の外から引く＝縦線
+    /* クリスタの定規のように、用紙の外から引き始めると縦横が自動で決まる。
+       ただし「斜」を選んでいるあいだは切り替えない（斜のまま引きたいのに戻ってしまうため） */
+    if(divMode!=='f'){
+      const outSide=(p.x<0||p.x>PAPER.w), outTop=(p.y<0||p.y>PAPER.h);
+      if(outTop&&!outSide)setDivMode('h');        // 上下の外から引く＝横線
+      else if(outSide&&!outTop)setDivMode('v');   // 左右の外から引く＝縦線
+    }
     drag={t:'div',x0:p.x,y0:p.y,x1:p.x,y1:p.y,shift:ev.shiftKey};
     divPreview=divLine(drag);render();return;
   }
@@ -1129,17 +1293,21 @@ function divLine(d){
   return{x0:d.x0,y0:d.y0,x1:d.x0+dx,y1:d.y0+dy};
 }
 cvs.addEventListener('pointermove',ev=>{
-  if(!drag)return;
+  if(ev.pointerType==='touch'&&tPts.has(ev.pointerId)){
+    tPts.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+    if(pinch){pinchMove();return;}
+  }
+  if(gestureLock||!drag)return;
   if(drag.t==='pan'){const r=cvs.getBoundingClientRect();
-    view.x=drag.ox+((ev.clientX-r.left)-drag.sx)/view.z;view.y=drag.oy+((ev.clientY-r.top)-drag.sy)/view.z;render();return;}
+    view.x=drag.ox+((ev.clientX-r.left)-drag.sx)/view.z;view.y=drag.oy+((ev.clientY-r.top)-drag.sy)/view.z;renderQ();return;}
   const p=evPt(ev);
   if(drag.t==='div'){drag.x1=p.x;drag.y1=p.y;drag.shift=ev.shiftKey;
     if(divMode==='v'||divMode==='h'){drag.x0=p.x;drag.y0=p.y;}
-    divPreview=divLine(drag);render();return;}
+    divPreview=divLine(drag);renderQ();return;}
   if(drag.t==='lasso'&&lasso){
     const q=lasso.pts[lasso.pts.length-1], mn=Math.max(6/view.z,PAPER.w*0.002);
     if(Math.hypot(p.x-q.x,p.y-q.y)>mn)lasso.pts.push({x:p.x,y:p.y});
-    render();return;}
+    renderQ();return;}
   if(drag.t==='cut'){
     const pg=curPage(), cu=cutsOfPage(pg).find(c=>c.id===drag.cid);
     if(!cu)return;
@@ -1160,7 +1328,17 @@ cvs.addEventListener('pointermove',ev=>{
   if(drag.t==='item'&&selItem){
     selItem.x=Math.round(drag.ox+p.x-drag.px);selItem.y=Math.round(drag.oy+p.y-drag.py);commitD();return;}
 });
-cvs.addEventListener('pointerup',()=>{
+/* 戻り値 true = この指はジェスチャの一部だった（通常のツール処理はしない） */
+function touchEnd(ev){
+  if(ev.pointerType!=='touch')return false;
+  tPts.delete(ev.pointerId);
+  if(tPts.size<2)pinch=null;
+  if(tPts.size)return true;                 // まだ指が残っている
+  const was=gestureLock;gestureLock=false;
+  return was;
+}
+cvs.addEventListener('pointerup',ev=>{
+  if(touchEnd(ev)){cancelGestures();renderQ();return;}
   if(drag&&drag.t==='div'&&divPreview){
     const pg=curPage(), L=divPreview;
     const targets=selPanel?[selPanel]:pg.panels.slice();
@@ -1189,11 +1367,43 @@ cvs.addEventListener('pointerup',()=>{
   }
   divPreview=null;drag=null;
 });
-cvs.addEventListener('pointercancel',()=>{divPreview=null;drag=null;lasso=null;render();});
+cvs.addEventListener('pointercancel',ev=>{touchEnd(ev);cancelGestures();render();});
 cvs.addEventListener('wheel',ev=>{
   ev.preventDefault();
   view.z=clamp(view.z*(ev.deltaY<0?1.12:0.89),0.005,4);render();
 },{passive:false});
+
+/* ============================================================
+   iPad: 2本指タップ=UNDO / 3本指タップ=REDO（econte と同じ作法・同じ数値）
+   window の capture 段で拾うので、各ハンドラの preventDefault に邪魔されない
+   ============================================================ */
+const gTap={pts:new Map(),t0:0,max:0,moved:false};
+function tapDown(e){
+  if(e.pointerType!=='touch')return;
+  if(!gTap.pts.size){gTap.t0=performance.now();gTap.max=0;gTap.moved=false;}
+  gTap.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(gTap.pts.size>gTap.max)gTap.max=gTap.pts.size;
+}
+function tapMove(e){
+  if(e.pointerType!=='touch')return;
+  const p=gTap.pts.get(e.pointerId);
+  if(p&&Math.hypot(e.clientX-p.x,e.clientY-p.y)>12)gTap.moved=true;
+}
+function tapUp(e){
+  if(e.pointerType!=='touch'||!gTap.pts.has(e.pointerId))return;
+  gTap.pts.delete(e.pointerId);
+  if(gTap.pts.size)return;                        // まだ指が残っている
+  const n=gTap.max, dt=performance.now()-gTap.t0;
+  gTap.max=0;
+  if(gTap.moved||dt>250||n<2||n>3)return;
+  cancelGestures();                               // 直前のピンチ/ドラッグを打ち切る（誤爆防止）
+  if(n===2){undo();toast('UNDO（2本指）');}
+  else{redo();toast('REDO（3本指）');}
+}
+window.addEventListener('pointerdown',tapDown,true);
+window.addEventListener('pointermove',tapMove,true);
+window.addEventListener('pointerup',tapUp,true);
+window.addEventListener('pointercancel',tapUp,true);
 
 /* ============================================================
    サイドパネル: Panel セクション
@@ -1701,7 +1911,25 @@ function gotoPage(i){
 }
 function openPages(){pagesSel=curPageIdx;$('#pages-ov').style.display='flex';renderPages();}
 function closePages(){$('#pages-ov').style.display='none';}
-$('#btn-pages').addEventListener('click',openPages);
+/* PAGES: クリック=一覧 ／ Wクリック=見開き作業 ON/OFF（レールのツールと同じ手ぐせ）。
+   Wクリックの1回目で一覧が開いてしまわないよう、開くのを少しだけ待つ */
+let pagesClickT=null;
+$('#btn-pages').addEventListener('click',()=>{
+  if(pagesClickT){clearTimeout(pagesClickT);pagesClickT=null;return;}   // 2回目＝dblclick側に任せる
+  pagesClickT=setTimeout(()=>{pagesClickT=null;openPages();},210);
+});
+$('#btn-pages').addEventListener('dblclick',ev=>{
+  ev.preventDefault();clearTimeout(pagesClickT);pagesClickT=null;
+  setSpread(!spreadOn);
+});
+function setSpread(on){
+  spreadOn=!!on;
+  $('#btn-pages').classList.toggle('on',spreadOn);
+  $('#btn-pages').title=spreadOn?'ページ一覧（Wクリックで見開きを解除）':'ページ一覧（Wクリックで左右見開き作業 ON）';
+  try{localStorage.setItem('mp_spread',spreadOn?'1':'0');}catch(e){}
+  selCut=null;fitView();
+  toast(spreadOn?'見開き ON — 反対のページはタップ／クリックで作業対象になります':'見開き OFF');
+}
 /* 一覧を開かずにページを行き来する */
 $('#pg-prev').addEventListener('click',()=>gotoPage(curPageIdx-1));
 $('#pg-next').addEventListener('click',()=>gotoPage(curPageIdx+1));
@@ -1993,7 +2221,7 @@ const HELP_GROUPS=[
   ]],
   ['コマを割る（DIV）',[
     ['ドラッグ','線を引いた位置で分割。コマ間隔は線の向きで 左右／上下 が自動で選ばれる'],
-    ['用紙の外から','クリスタの定規と同じ。<b>上下の外から引くと横線・左右の外から引くと縦線</b>になり、向きボタンも自動で切替わる'],
+    ['用紙の外から','クリスタの定規と同じ。<b>上下の外から引くと横線・左右の外から引くと縦線</b>になり、向きボタンも自動で切替わる。<b>斜のあいだは切り替わらない</b>（斜のまま引ける）'],
     ['Shift','斜めのとき15°ずつスナップ'],
     ['コマ選択中','そのコマだけを分割。未選択なら線が横切る全コマ'],
   ]],
@@ -2013,11 +2241,21 @@ const HELP_GROUPS=[
     ['配置','「コマNの中」＝マスクされて枠の下 ／「上に乗せる」＝枠の上（擬音）'],
     ['境界効果','擬音などのアルファに白フチ。フチONのときだけ太さが効く'],
     ['網点化','グレーで塗った中間調だけをトーンに。線画と白はそのまま残る'],
+    ['芯くずし','集中線の白場（真円）を崩す。0=真円 / 1=ぐしゃぐしゃ。SEEDを変えると崩れ方が変わる'],
   ]],
-  ['ページ',[
-    ['PAGES','一覧を開く。Wクリックでそのページへ'],
+  ['ページ・見開き',[
+    ['PAGES','クリック=一覧（一覧の中はWクリックでそのページへ）'],
+    ['PAGES Wクリック','<b>左右見開き作業 ON/OFF</b>（キーは <b>W</b>）'],
+    ['見開き中','<b>反対のページをタップすると、そちらが作業対象になる</b>（P◯ ● が作業中の側）'],
     ['[ / ]','前のページ / 次のページ'],
     ['—','1ページ目は単独（表紙）、以降は見開き。右綴じなら右が若い番号'],
+  ]],
+  ['iPad（他ツールと同じ）',[
+    ['1本指','ドラッグ＝コマ選択・分割・投げ縄／余白ドラッグ＝パン'],
+    ['2本指','ピンチ＝ズーム＋パン'],
+    ['2本指タップ','UNDO（元に戻す）'],
+    ['3本指タップ','REDO（やり直し）'],
+    ['—','スライダーは指の当たり判定を広げてあります（見た目より上下に余裕あり）'],
   ]],
   ['連携',[
     ['▶ ANIMATOR REF','選択コマを送る。ANIMATOR側は <b>REF ▸ ＋FROM SAVED</b>。1コマなので全ティックで出しっぱなしになる'],
@@ -2028,6 +2266,7 @@ const HELP_GROUPS=[
   ['表示・その他',[
     ['S','選択コマ以外を青くする ON/OFF'],
     ['G','トンボ・内枠ガイド ON/OFF'],
+    ['W','左右見開き作業 ON/OFF'],
     ['F','用紙を画面に合わせる'],
     ['Ctrl+Z / Ctrl+Y','元に戻す / やり直し'],
     ['ESC','選択解除・オーバーレイを閉じる'],
@@ -2131,6 +2370,7 @@ $('#main').addEventListener('drop',async ev=>{
   ev.preventDefault();
   const fs=[...(ev.dataTransfer.files||[])].filter(f=>/^image\//.test(f.type));
   if(!fs.length)return;
+  focusPageAt(ev);                       // 見開きなら落とした側のページへ
   const p=evPt(ev), pg=curPage();
   const k=panelAt(pg,p.x,p.y);
   selPanel=k;
@@ -2176,6 +2416,7 @@ window.addEventListener('keydown',ev=>{
   else if(k==='1')setDivMode('v');
   else if(k==='2')setDivMode('h');
   else if(k==='3')setDivMode('f');
+  else if(k==='w')setSpread(!spreadOn);
   else if(k==='s'){showShade=!showShade;$('#t-shade').classList.toggle('on',showShade);render();}
   else if(k==='g'){showGuide=!showGuide;$('#t-guide').classList.toggle('on',showGuide);render();}
   else if(k==='f')fitView();
@@ -2201,6 +2442,8 @@ window.addEventListener('resize',setupCanvas);
   gLpi=50;$('#ex-lpi').value=gLpi;$('#ex-lpi-v').textContent=gLpi;syncLpiEnable();
   try{swapUI=localStorage.getItem('mp_swap')==='1';}catch(e){}
   document.body.classList.toggle('swap',swapUI);
+  try{spreadOn=localStorage.getItem('mp_spread')==='1';}catch(e){}
+  $('#btn-pages').classList.toggle('on',spreadOn);
   syncUI();
   setDivMode('f');setTool('sel');
   setupCanvas();fitView();

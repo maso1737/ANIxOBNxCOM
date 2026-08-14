@@ -40,8 +40,16 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 
 ■ カメラ枠列 cam[]（V2-D1・SPEC_13 §5a/§5b）
 - `cut.cam[i] = {k,x,y,w,h,dur,ease,key,keyUser}`。**dur = 次の枠までのコマ数**（最終枠には無い）
-- `cut.durF` は枠列カットでは **Σcam[].dur の導出値**。`recalcDur(cut)` 経由でしか変わらない。
-  **`durF` に直接代入しないこと**（`setCutDur()` は枠列カットを弾いてトーストを出す）
+- **`cut.camLead` / `cut.camTail`（2026-08-14 追加）** = 頭で A枠に止まるコマ数 ／ 尻で最終枠に
+  止まるコマ数。**カット内の時間 = lead + Σdur + tail**。これで「PAN/T.U. の動き出しと
+  止まりの位置」をTIMELINEの◆で動かせる（旧モデルは A が常に0f固定だった）
+  - `camAt()` / `colorMixAt()` / `burnLabel()` は **必ず `f - camLead(cut)` を時間軸にする**。
+    片方だけ直すと色だけ先に動く
+  - `camStartFrame(cut,k)` は lead 込みの位置を返す（＝◆の表示位置とセル描画のフレーム）
+- `cut.durF` は枠列カットでは **lead + Σcam[].dur + tail の導出値**。`recalcDur(cut)` 経由でしか
+  変わらない。**`durF` に直接代入しないこと** — 尺を変えるなら `setCutSpan(i,total)`
+  （枠列カットは **tail が差を吸う**。足りなければ最後の区間を詰める）。
+  `setCutDur()` も `clipDragMove()` もここを通る＝枠列カットでも尺入力とクリップ右端ドラッグが効く
 - `bakeRect = fit16_9(union(cam[]) × bakeExpand)`。枠を動かすたび `rebakeFromCam()` が
   再計算→再ベイクする。**定義上すべての枠が bakeRect の内側**（PAN先に画が無い事故が構造的に起きない）
 - **bakeRect が動いたら `remapDraw()` が加筆(drawC)を新しいベイク空間へ載せ替える**。
@@ -70,6 +78,15 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   **`cut.baseC/drawC` を直接読まない** → `getBase()/getDraw()`（非常駐なら null を返し、
   裏で `requestResident()` が走って完了時に再描画する）
   - 保護対象（追い出さない）: EDIT中のカット / 選択中の枠のカット / プレイヘッド±1
+  - **`cut.cellCache`（2026-08-14）**: `evictLru()` が追い出す**直前**に GRIDセル用の 320×180 を
+    焼いておく配列（枠ごと）。`ensureResident()` で常駐に戻った瞬間に捨てる＝
+    **作るのが追い出す瞬間だけなので「無効化の管理」が要らない**（常に最新）。
+    - これが無いと、GRIDは1画面に数十セル出るのに LRU_MAX=8 しかないため
+      「白く抜ける→読み込む→別のが追い出される」で延々ちらつく（iPadで「絵が消えてまた戻る」）
+    - **色は焼き込まない**（カラー層はLRU対象外＝常に手元にある）。焼き込むと非常駐カットに
+      色を塗った瞬間セルが古い絵で止まる。`drawCell()` が控え→色の順に重ねる
+    - `requestResident()` の完了時は **`inGrid()` なら `refreshGridCells()`**。
+      `renderEditCanvas()` だけだとGRIDが描き直されずセルが白いまま残る
   - `touchLru()` からも `scheduleEvict()` を呼ぶ。**ensureResident 経由だけだと
     新規作成やアクセスだけで溜まったぶんが掃かれない**（2026-08-02 に踏んだ）
   - 焼き付けは `encodeCut()`: drawC=PNG／baseC は `cut.baseOpaque` が真なら JPEG q0.85、
@@ -84,6 +101,14 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 ■ BOARD（考える場）
 - `bDown/bMove/bUp` がMOVE/CUTツール共用のポインタハンドラ。V2-Bで判定順が
   **①選択枠の角ハンドル → ②枠線/C#ラベル（写真より優先）→ ③写真 → ④パン** になった
+- **モード切替の入口は `setBoardTool()` 一本**（2026-08-14）。BOARD上端に横一杯で固定した
+  `#board-topbar`（高さ34px・`has-clip` のとき top:26px）のボタンと、`V`/`C` ショートカットが
+  ここを通る。`#board-tools`（浮きパネル）は選択中オブジェクトの設定だけを持つ形に整理した
+- **`cut.lock`（2026-08-14）**: SHEET行の 🔒 で切替。`hitCutFrame()`/`hitCutHandle()` が
+  **当たり判定ごと外す**（選択はできるが動かせない、では結局動くため）。
+  BOARDでは破線＋🔒、TLクリップも破線、バー右端に「🔒 n」
+- **ショートカットの単押し判定**: `onKey` の `SHORTCUT_ACTIONS` ディスパッチは
+  **修飾キー付きを素通しする**。入れないと Ctrl+V（写真ペースト）が V=MOVE に食われる
 - CUTツール: 矩形ドラッグ（16:9固定）→`createCutFromRect()`→`bakeCut(src)`で1280×720にベイクし新規カット追加
 - `rebakeCut(i)`: 保持している`src`矩形から現在のBOARD内容を再ベイク（SHEETの⟳ボタン）
 - **写真の描画は `drawPhoto(ctx,p)` 一本**（V2-B）。renderBoard と bakeCut の両方がこれを通るので、
@@ -100,7 +125,13 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 - `v!==1` / `ts` が24時間以上前 は無視。起動時に古いものは localStorage ごと捨てる
 - 写真が増えたら**先頭1枚だけ**に ref を付け、`clip-used` を送り返す（ref-board 側が棚を消す実装済み）
 - **同一オリジンでないと繋がらない**（ルートで `python -m http.server 8000`）。
-  file:// 用に トップバー ⧉ CLIP からの JSON 手動貼り付けを用意してある
+  file:// 用に トップバー **⧉ REF**（旧 ⧉ CLIP）からの手動貼り付けを用意してある
+- **貼れる形は4つ**（2026-08-14・`refItemsFromText()`）。ref-board 側の出口が1つではないので
+  全部受ける: ①クリップJSON `{v:1,item}`（クリップ帯の ⧉）②ボード全体JSON `{v:1,items:[…]}`
+  （📋 JSONをコピー / ⬇ JSON書き出し）③Markdown `- [title](url) #tag — memo`
+  （📝 表示中を Markdown コピー）④生URL。
+  **複数件なら `modalPick()` で1件選ばせる** — REFは「次に貼る写真1枚」に付くものなので
+  配列で持たない（持つと「どれが付いたか」が分からなくなる）
 
 ■ 統合Undoログ（V2-B・animator と同じ一元ログ）
 - `gLog = [{type, undo(), redo()}]` / `gLogRedo`。STUDIO の Ctrl+Z/Y はこれ、EDIT内は従来の
@@ -127,9 +158,17 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 - 判定は「全部の指が250ms以内に上がる & 移動<12px」。成立したら `cancelGestures()` で
   直前のピンチ/パンを打ち切る。undo先は `undoActive()`（EDIT=カット別スタック / STUDIO=統合ログ）
 
-■ トレース透かし（V2-C）
-- `cut.baseAlpha`（0..1）。`compositeTo()` の **baseC を描くときだけ** globalAlpha を落とす
-  → EDIT/プレビュー/サムネ/書き出しの全部に効く。スライダーは EDITサイドとミニツールの両方
+■ トレース透かし＋元の絵の重ね順（V2-C / 2026-08-14）
+- `cut.baseAlpha`（0..1）。**元の絵を描くのは `drawBaseLayer()` 一本だけ**。
+  `compositeTo()` と `drawCamFrame()` の両方がこれを通る → EDIT/プレビュー/サムネ/書き出しの
+  全部に効く。スライダーは EDITサイドとミニツールの両方
+- **`cut.baseOver`** = 元の絵を加筆の上に重ねる（ANIMATORのREFと同じ扱い＝透かして参考にする）。
+  既定 false＝従来どおり下敷き。合成順は
+  `bg → base → 色 → draw`（下）／`bg → 色 → draw → base`（上）。**元の絵は1枚なので上下どちらか一方**
+- ペイントは `drawC`/`colorC` にしか書かないので、**元の絵は描いても消しても壊れない**。
+  唯一の破壊口は `CLEAR BASE` で、そこは `gBaseUndo`（1手・現在カット限定）で戻せる。
+  **統合ログ(gLog)には積まない** — EDITのCtrl+Zが統合ログへ抜けると cut-add/photo-add まで
+  遡ってしまい、2026-08-02 の事故と同じ経路になる
 - 対象カットは `activeCutIndex()`（EDIT中=curCut / STUDIO=gFocusCut）。
   フォーカスが変わったら `syncBaseAlphaUI()` が両方のスライダーを更新する
 
@@ -142,6 +181,41 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   カットをまたいだままundoすると壊れる。新規に描画系の関数を足すときはこの前提を崩さないこと）
 - 再描画は`renderPaintViews()`経由（`state.view`を見てEDIT側かTIMELINE側かを自動判定）。
   ペイント処理を追加/変更するときは`renderEditCanvas()`直呼びでなくこちらを使う
+
+■ TIMELINE 座標規約（2026-08-14・composer-timeline-kit §0 準拠）
+- **帯に何かを描く/掴ませるなら `frameFrac(f)` と `pxToFrame(px,幅)` を必ず通す。**
+  ルーラー / クリップ / プレイヘッド / ◆キー / 区間バー / スクラブ / 尺ドラッグ / 波形 が全部これを見る。
+  片方だけ `f/T` のままにすると、拡大したとき「掴んだ場所と違うコマが動く」
+- `state.tlView = {start, span}`。**span=0 が「全体表示」**で、そのとき2関数は拡大前と
+  同じ値を返す＝ズームを使わない移植先でも同じコードが動く
+- Alt+ホイール=拡大縮小（`tlZoomAt`・カーソル下のコマを固定）／ホイール単独=拡大中の横スクロール／
+  「全体」ラベル or 帯のダブルクリックでリセット。再生中は `tlFollowPlayhead()` が追いかける
+- 帯の高さは `gUi.tlH`（localStorage）＋上端の `#tl-resize`。キー行は CSS変数 `--keyh`＝高さの40%
+  （26〜72px）。**画面の55%で頭打ち**にしてある（低い画面で帯が全部食い潰さないよう）
+
+■ TIMELINE のカメラキー行 `#tl-keys`（2026-08-14）
+- ◆＝`camStartFrame(cut,k)` の位置 ／ 区間バー＝`cam[k].ease`（クリックで `openEaseMenu()`）
+- **`layoutCamKeys()` は先頭で `innerHTML=''` する**。ドラッグ中に毎回呼ぶので、
+  消さないとノードが積み上がる（実際に一度踏んだ）
+- ◆ドラッグ（`camKeyDown/Move/Up`）は **durF を変えない**＝後ろのカットがずれない。
+  隣だけを付け替える: 先頭◆→`lead`と`cam[0].dur`（B の位置は動かない＝AEと同じ感覚）／
+  最終◆→`cam[n-2].dur`と`tail`／中間◆→前後の `dur` を等量トレード。
+  ドラッグ開始時のスナップショット(`before`)から**毎回引き直す**（差分を積むと誤差が溜まる）
+- ロック中のカットの◆は掴めない（`cut.lock`）
+- イーズは `EASES` ＋ `EASE_INFO`（短縮名と色）。**カーブエディタは作らない**方針で、
+  現場語のプリセットを並べる: LINEAR / EASE / IN(送り出し) / OUT(引き) /
+  Q.PAN(クイックパン) / FAIRING(フェアリング) / HOLD(タメ)。
+  足すときは `easeT()` の switch と `EASES` と `EASE_INFO` の3点セット
+
+■ 音（TIMELINE最下部バー・2026-08-14）
+- `gAudio {name,blob,url,el,dur}` / `gAudioOffset`(コマ) / `gAudioMuted` / `gAudioPeaks`(1コマ1点)
+- **Blobが正**。IndexedDB の `meta` ストアに `{k:'audio'}` として同居する。
+  `idbClearPut('meta',…)` は store を空にするので、**meta を書くところ全部に音のレコードを含める**
+  （マイグレーション側の書き戻しを落として一度消しかけた）
+- 波形はルーラー(`#tl-ruler-cv`)の背景。`frameFrac` を通すので拡大しても絵と合う
+- `syncAudio()` が唯一の同期口。play/pause/seek/ループ折り返しから呼ぶ
+- **EXPORT VIDEO には音が入らない**（MediaRecorder経路も WebCodecs経路も映像のみ）。
+  音を載せるなら別途 AudioEncoder かミュート合成が要る＝未実装
 
 ■ TIMELINE（P1・composer-timeline-kit準拠）
 - **ミニツールバー**(`#tl-minitools`): プレビュー左上のfloating。PEN/ERASE/FILL/EYE・ブラシ・色パレット。
@@ -210,6 +284,9 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
 - **セルの複数選択**は `gSelCells`（"i:k" の配列）。キャプションクリックで選択、Ctrl=追加/解除、
   Shift=範囲。`eachSelSlot()` が「選択中（無ければ現在セル）」へ一括適用する入口で、
   濃・描画モードはここを通す。`moveSelCuts(d)` が選択カットのまとめ移動
+- **コマまたぎ塗りの直後は、またいだセルを全部選択状態にする**（2026-08-14・`gridStrokeUp` 末尾）。
+  濃/描画モードは `eachSelSlot` 経由の一括適用なので、これが無いと
+  「5コマまたいで塗ったのに濃を動かすと1コマしか変わらない」になる
 - **ブラシ幅は出力1280px基準**。`gStrokeK = strokeScaleFor(cut, targetW, frame)` を
   ストローク開始時（コマまたぎ塗りは**セルごと**）に決め、`strokeSegOn` が
   `state.brush * gStrokeK` を lineWidth にする。
@@ -360,6 +437,11 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
     **非実時間経路はタブが非表示でも焼ける**（rAFを使わないため）
   - 一覧PNGは `exportColorScript()`。GRIDの部品（`colorCells/cellFrames/cellSub/extractPalette`）を
     そのまま大きく描くだけ。**プリント体裁は作らない**（1枚の長いPNG）
+- **V2-F: 実装済み（2026-08-14・ブラッシュアップ依頼）** — 元の絵のレイヤー扱い（`baseOver`＋
+  CLEAR BASE の戻し）／GRIDのまたぎ塗り一括＋非常駐セルの控え（白抜け解消）／
+  BOARD上端の固定モードバー＋`V`/`C`／`cut.lock`（SHEETの🔒）／
+  TIMELINE 座標規約＋Alt+ホイール拡大＋高さ可変＋◆キー編集（`camLead`/`camTail`）＋イーズ7種／
+  最下部の音バー（読み込み・ずらし・波形・24fps）／`+ IMPORT` 表記／`⧉ REF` の寛容パーサ
 - **未着手は V2-E3 のみ**（フォトバッシュ・SINGLE限定）。他のフェーズは全部入っている
   - `cut.layers[]`（最大5・原本Blob＋アフィン変形＋投げ縄マスク＋ブレンド）
     ＋ブラシチップ（**.abrパーサは作らない**・内蔵数種＋透過PNG読み込み）
