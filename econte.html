@@ -80,6 +80,18 @@ body{
   background:rgba(21,9,39,.94);border-bottom:1px solid var(--border);backdrop-filter:blur(3px);
 }
 #board-topbar .btn{padding:5px 12px}
+/* MOVE / CUT は BOARD 専用の「置く道具」なので、上部メニューの STUDIO/EDIT（ピンク）と
+   混ざらないよう **紫系**にする。2つは濃さで区別（MOVE=濃い / CUT=明るい） */
+#btn-tool-move,#btn-tool-cut{border-color:rgba(184,80,255,.5);color:#C88BFF}
+#btn-tool-move:hover,#btn-tool-cut:hover{border-color:rgba(184,80,255,.9);color:#E3C2FF}
+#btn-tool-move.on{
+  background:linear-gradient(135deg,#8B3FE0,#5B2A9E);border-color:transparent;color:#F4E8FF;
+  box-shadow:0 0 14px rgba(139,63,224,.5);
+}
+#btn-tool-cut.on{
+  background:linear-gradient(135deg,#D79BFF,#A75BF0);border-color:transparent;color:#1B0733;
+  box-shadow:0 0 14px rgba(215,155,255,.5);
+}
 .tb-div{width:1px;height:16px;background:var(--border);margin:0 3px}
 #board-lock-tx{color:var(--gold);font-size:9px;letter-spacing:.08em}
 #studio-board.has-clip #board-topbar{top:26px}
@@ -133,19 +145,18 @@ body{
   -webkit-user-select:text;user-select:text;
 }
 .tc input:focus{outline:none}
-#cur-dur,#cur-durf{
+#cur-dur{
   width:60px;background:var(--black);border:1px solid var(--border);color:var(--gold);
   font-family:var(--mono);font-size:11px;text-align:center;padding:4px 3px;
   -webkit-user-select:text;user-select:text;
 }
-#cur-durf{width:48px;color:var(--ice)}
 #cur-note{
   height:var(--curh,58px);background:var(--black);border:1px solid var(--border);color:var(--white);
   font-family:var(--jp);font-size:12px;line-height:1.6;padding:6px;resize:none;
   -webkit-user-select:text;user-select:text;
 }
-#cur-dur:focus,#cur-durf:focus,#cur-note:focus{outline:none;border-color:var(--border-bright)}
-#cur-dur:disabled,#cur-durf:disabled,#cur-note:disabled{opacity:.35}
+#cur-dur:focus,#cur-note:focus{outline:none;border-color:var(--border-bright)}
+#cur-dur:disabled,#cur-note:disabled{opacity:.35}
 /* 横スプリッタ（内容・セリフ欄の高さ）。TIMELINE帯の #tl-resize と同じ手触りにする */
 .hsplit{
   flex:none;height:7px;cursor:row-resize;touch-action:none;position:relative;
@@ -210,7 +221,11 @@ body{
 #edit-top{
   display:flex;align-items:center;gap:8px;padding:7px 12px;
   background:var(--panel);border-bottom:1px solid var(--border);flex:none;
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;   /* #bar と同じ＝狭い画面では横に流す */
 }
+#edit-top::-webkit-scrollbar{height:0}
+#edit-top > *{flex:none}
+#view-ctl-grid label{white-space:nowrap}
 #edit-cut-label{font-family:var(--bank);font-size:14px;letter-spacing:.14em;color:var(--ice)}
 #edit-dur{
   width:60px;background:var(--black);border:1px solid var(--border);color:var(--gold);
@@ -311,15 +326,14 @@ body{
 /* ✎ は画の上に重ねず、キャプション行（C1 2+00 の横）に置く */
 .gc-edit{flex:none;padding:0 4px;font-size:8px;line-height:1.3;opacity:.55}
 .gc:hover .gc-edit{opacity:1}
-#grid-hud{
-  position:absolute;right:14px;bottom:10px;z-index:4;display:flex;align-items:center;gap:8px;
-  background:rgba(7,3,15,.72);border:1px solid var(--border);padding:4px 8px;
-  font-family:var(--mono);font-size:9px;color:var(--gold);
-}
-#grid-hud .btn{padding:2px 6px;font-size:8px}
-#grid-hud{display:none}
-#edit-main.grid #grid-hud{display:flex}
-#grid-pal-label,#grid-gap-label,#grid-col-label{display:flex;align-items:center;gap:3px;font-family:var(--jp);color:var(--grey);cursor:pointer}
+/* 表示まわりのコントロールは EDIT 上部バーに集約（画の上には何も浮かせない）。
+   SINGLE と GRID で中身を差し替える */
+#view-ctl-single,#view-ctl-grid{display:none;align-items:center;gap:7px}
+#view-edit:not(.grid) #view-ctl-single{display:flex}
+#view-edit.grid #view-ctl-grid{display:flex}
+#view-ctl-grid .btn{padding:4px 8px}
+#grid-zoom{color:var(--gold);font-size:10px;letter-spacing:.08em;min-width:40px;text-align:center}
+#grid-pal-label,#grid-gap-label,#grid-col-label{display:flex;align-items:center;gap:3px;font-family:var(--jp);font-size:10px;color:var(--grey);cursor:pointer}
 #grid-pal-label input,#grid-gap-label input,#grid-col-label input{accent-color:var(--acid)}
 #grid-empty{color:var(--grey);font-family:var(--jp);font-size:12px;padding:20px;text-align:center}
 #edit-zoom{color:var(--gold);font-size:10px;letter-spacing:.08em;min-width:42px}
@@ -389,14 +403,25 @@ body{
 .ta-mk{cursor:pointer;border:1px solid var(--border);padding:5px 10px;color:var(--amber)}
 .ta-mk:hover{border-color:var(--border-bright)}
 #marker-tx{color:var(--dim);font-size:9px;font-family:var(--mono)}
-/* マーカー（ルーラー上の▼）。COMPOSER と同じ「聴きながら M で打つ」もの */
+/* マーカー（COMPOSER の `.tl-gmarker` 準拠：縦線＋ラベル。
+   ドラッグで移動 / Ctrl+クリックで削除 / Wクリックでメモ） */
 #tl-marks{position:absolute;left:0;right:0;top:0;height:18px;pointer-events:none;z-index:4}
 .tl-mark{
-  position:absolute;top:0;width:0;height:0;margin-left:-6px;pointer-events:auto;cursor:pointer;
-  border-left:6px solid transparent;border-right:6px solid transparent;
-  border-top:9px solid var(--amber);filter:drop-shadow(0 0 4px rgba(255,201,79,.7));
+  position:absolute;top:0;bottom:0;width:14px;transform:translateX(-50%);
+  pointer-events:auto;cursor:grab;background:transparent;touch-action:none;
 }
-.tl-mark::before{content:'';position:absolute;left:-9px;right:-9px;top:-9px;height:26px}
+.tl-mark:active{cursor:grabbing}
+.tl-mark::before{
+  content:'';position:absolute;left:50%;top:0;bottom:-4px;width:1px;transform:translateX(-50%);
+  background:var(--amber);box-shadow:0 0 4px rgba(255,201,79,.75);
+}
+.tl-mark::after{
+  content:attr(data-label);position:absolute;top:1px;left:9px;white-space:nowrap;
+  font-family:var(--mono);font-size:9px;font-weight:700;color:var(--amber);line-height:1;
+  letter-spacing:.04em;text-shadow:0 0 3px #000,0 0 2px #000;
+}
+.tl-mark:hover::before{background:#fff;box-shadow:0 0 8px var(--amber)}
+.tl-mark.on::before{background:var(--acid);box-shadow:0 0 8px rgba(255,79,168,.9)}
 #audio-name{color:var(--ice);font-size:10px;font-family:var(--jp);max-width:220px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #audio-len,#audio-offset-tx{color:var(--dim);font-size:9px;font-family:var(--mono)}
 #audio-offset{
@@ -420,16 +445,22 @@ body{
   font-family:var(--bank);font-size:9px;color:rgba(255,255,255,.85);letter-spacing:.06em;
 }
 .tl-seg:hover{border-color:var(--acid)}
+/* ◆は「回転していない当たり箱＋回転した中身」の2層。
+   回転した要素に当たり判定を持たせると、45°の外接矩形がとても大きくなって
+   **隣の◆（tail=0 の B と 次カットの頭）を食い合う**ため。
+   箱は横に広く縦に薄い＝段違いに並べても取り合いにならない。 */
 .tl-key{
-  position:absolute;width:11px;height:11px;margin-left:-5.5px;
-  background:var(--gold);border:1px solid rgba(7,3,15,.85);cursor:ew-resize;
-  transform:rotate(45deg);z-index:3;
+  position:absolute;width:24px;height:15px;margin-left:-12px;
+  background:transparent;cursor:ew-resize;z-index:3;
 }
-/* ◆は見た目11px。ペン/指で掴めるよう当たり判定だけ広げる（回転済みなので inset でよい） */
-.tl-key::before{content:'';position:absolute;inset:-9px}
-.tl-key.edge{background:var(--ice)}
-.tl-key.on{background:var(--acid);box-shadow:0 0 8px rgba(255,79,168,.9)}
-.tl-key.fix{cursor:default;opacity:.35}
+.tl-key::after{
+  content:'';position:absolute;left:50%;top:50%;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;
+  background:var(--gold);border:1px solid rgba(7,3,15,.85);transform:rotate(45deg);
+}
+.tl-key.edge::after{background:var(--ice)}
+.tl-key.on::after{background:var(--acid);box-shadow:0 0 8px rgba(255,79,168,.9)}
+.tl-key.fix{cursor:default}
+.tl-key.fix::after{opacity:.35}
 .tl-clip{
   position:absolute;top:4px;bottom:4px;overflow:hidden;display:flex;align-items:center;gap:6px;padding:0 8px;
   background:linear-gradient(180deg,rgba(255,79,168,.30),rgba(184,80,255,.16));
@@ -560,7 +591,8 @@ body.ui-big #board-tools{top:58px}
 body.ui-big .splitter{width:9px}
 body.ui-big .hsplit,body.ui-big #tl-resize{height:11px}
 body.ui-big .tl-clip-h{width:30px}
-body.ui-big .tl-key{width:15px;height:15px;margin-left:-7.5px}
+body.ui-big .tl-key{width:32px;height:19px;margin-left:-16px}
+body.ui-big .tl-key::after{width:15px;height:15px;margin:-7.5px 0 0 -7.5px}
 body.ui-big .tl-mark{border-left-width:8px;border-right-width:8px;border-top-width:12px;margin-left:-8px}
 body.ui-big .sp-btns .btn{padding:5px 8px;font-size:12px}
 body.ui-big .sp-dur{width:62px;font-size:12px;padding:5px}
@@ -584,8 +616,8 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
 
 <div id="bar">
   <span class="title">E<b>CONTE</b></span>
-  <button class="btn mode on" id="btn-view-studio">STUDIO</button>
-  <button class="btn mode" id="btn-view-edit" title="現在カットを加筆EDITで開く">EDIT</button>
+  <button class="btn mode on" id="btn-view-studio" title="STUDIO (1) ／ X で GRID と行き来">STUDIO</button>
+  <button class="btn mode" id="btn-view-edit" title="加筆EDIT＝GRIDで開く (2) ／ X で STUDIO と行き来">EDIT</button>
   <button class="btn ex" id="btn-import">+ IMPORT</button>
   <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none;">
   <button class="btn" id="btn-clip-paste" title="REF BOARD の内容を貼り付けて次の写真に紐づける（クリップJSON / ボード全体JSON / Markdown / URL のどれでも可）">&#9187; REF</button>
@@ -597,14 +629,15 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
       <option value="band">INFO帯</option>
     </select>
   </label>
-  <button class="btn ex" id="btn-export" title="MP4で書き出し（読み込んだ音も入ります。WebCodecs対応なら非実時間・未対応なら実時間録画）">EXPORT VIDEO</button>
-  <button class="btn ex" id="btn-export-cs" title="カラースクリプト一覧をPNGで書き出し（枠単位・4列）">&#8681; C.SCRIPT</button>
   <span id="bar-total">0 CUTS</span>
   <span id="save-dot"></span>
-  <!-- プロジェクト入出力は設定の隣。この並びは manga-plate / OBAN と揃えている
+  <!-- **出すもの** は ⇩ PROJ → EXPORT VIDEO → ⇩ C.SCRIPT の順で固めて ⚙ の左隣に置く。
+       プロジェクト入出力が ⚙ の近くにある並びは manga-plate / OBAN と揃えたまま
        （ツールを渡り歩いても同じ場所にある）。ZIPなので表記は PROJ のまま -->
-  <button class="btn" id="btn-proj-export" title="プロジェクトをZIPで書き出し（写真＋枠列＋加筆。ベイクは含めない）">&#8681; PROJ</button>
   <button class="btn" id="btn-proj-import" title="プロジェクトZIPを読み込み（現在の内容は置き換わります）">&#8679; PROJ</button>
+  <button class="btn" id="btn-proj-export" title="プロジェクトをZIPで書き出し（写真＋枠列＋加筆＋色＋音＋マーカー。ベイクは含めない）">&#8681; PROJ</button>
+  <button class="btn ex" id="btn-export" title="MP4で書き出し（読み込んだ音も入ります。WebCodecs対応なら非実時間・未対応なら実時間録画）">EXPORT VIDEO</button>
+  <button class="btn ex" id="btn-export-cs" title="カラースクリプト一覧をPNGで書き出し（枠単位・4列）">&#8681; C.SCRIPT</button>
   <button class="btn" id="btn-help" title="ショートカット一覧 (?)">&#9881;</button>
   <button class="btn" id="btn-fs" title="フルスクリーン切替">⛶</button>
   <button class="btn" id="btn-home" title="ランディングページに戻る">HOME</button>
@@ -702,16 +735,14 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
       <div id="cur-box">
         <div id="cur-row">
           <span id="cur-cut-label">—</span>
+          <!-- ここは **このカット単体の尺**。秒+コマ / コマ数 / 時間 の3表記が全部つながっていて、
+               どれを打ち換えても setCutDur() に入る（TIMELINE側の FRAME/TIME は全体の通し位置） -->
           <span class="cr-k">尺</span>
           <input id="cur-dur" value="" title="秒+コマ（24fps）例: 3+12">
-          <!-- コマ数でも打てる（AE等から持ってきた数値をそのまま入れる用） -->
-          <input id="cur-durf" value="" title="コマ数で直接入力（例: 48）">
-          <span class="cr-k">f</span>
-          <span class="tb-div"></span>
           <span class="cr-k">FRAME</span>
-          <span class="tc" id="cur-frame" title="通しコマ。クリックで直接入力してその位置へ飛ぶ">—— / ——</span>
+          <span class="tc" id="cur-frame" title="このカットの尺（コマ数）。クリックで直接入力">——</span>
           <span class="cr-k">TIME</span>
-          <span class="tc" id="cur-tc" title="タイムコード H:MM:SS:FF（COMPOSERと同じ表記）。クリックで直接入力">0:00:00:00</span>
+          <span class="tc" id="cur-tc" title="このカットの尺（時間 H:MM:SS:FF）。クリックで直接入力">0:00:00:00</span>
           <span id="cur-info"></span>
           <span style="flex:1"></span>
           <button class="btn" id="btn-cur-edit" title="このカットを加筆EDITで開く">&#9998; EDIT</button>
@@ -743,7 +774,11 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
       <button class="btn" id="btn-tl-nextcut" title="次のカット頭 (K)">&#10072;&#9654;</button>
       <button class="btn" id="btn-tl-last" title="末尾 (End)">&#9197;</button>
       <span id="tl-cutlabel">—</span>
-      <span id="tl-time">0+00 / 0+00</span>
+      <!-- ここは **全体の通し位置**（中央の FRAME/TIME はカット単体の尺）。並びは同じにしてある -->
+      <span class="cr-k">FRAME</span>
+      <span class="tc" id="tl-frame" title="いまのコマ / 全体のコマ数。クリックで直接入力してインジケータを移動">—— / ——</span>
+      <span class="cr-k">TIME</span>
+      <span class="tc" id="tl-time" title="タイムコード H:MM:SS:FF。クリックで直接入力してインジケータを移動">0:00:00:00</span>
       <button class="btn mode on" id="btn-loop" title="ループ切替 (L)">LOOP</button>
       <span style="flex:1"></span>
       <span id="tl-zoom-tx" title="Alt+ホイールで時間軸を拡大縮小 ／ ダブルクリックで全体へ">全体</span>
@@ -786,17 +821,31 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
 <div class="view" id="view-edit">
   <div id="edit-top">
     <!-- ◀STUDIO は最上部メニューの STUDIO と重複するので置かない -->
-    <button class="btn mode on" id="btn-mode-single" title="1カットを全面で加筆">SINGLE</button>
-    <button class="btn mode" id="btn-mode-grid" title="一覧でカラースクリプトを描く">GRID</button>
+    <button class="btn mode on" id="btn-mode-single" title="1カットを全面で加筆 (3)">SINGLE</button>
+    <button class="btn mode" id="btn-mode-grid" title="一覧でカラースクリプトを描く (4) ／ X で STUDIO と行き来">GRID</button>
     <button class="btn" id="btn-cut-prev">&#9664;</button>
     <span id="edit-cut-label">C1</span>
     <button class="btn" id="btn-cut-next">&#9654;</button>
     <span style="color:var(--grey);margin-left:10px;">尺</span>
     <input id="edit-dur" value="2+0" title="秒+コマ（24fps）例: 3+12">
     <span id="edit-dur-f">48f</span>
-    <span style="color:var(--grey);margin-left:10px;">表示</span>
-    <button class="btn" id="btn-edit-fit" title="ズーム/パンをリセット (F)">FIT</button>
-    <span id="edit-zoom">100%</span>
+    <span class="cr-k" style="margin-left:10px;">表示</span>
+    <!-- SINGLE のときだけ出る（1カットのズーム/パン） -->
+    <span id="view-ctl-single">
+      <button class="btn" id="btn-edit-fit" title="ズーム/パンをリセット (F)">FIT</button>
+      <span id="edit-zoom">100%</span>
+    </span>
+    <!-- GRID のときだけ出る（旧・画面右下の #grid-hud をここへ引き上げた。画の上に何も浮かせない） -->
+    <span id="view-ctl-grid">
+      <button class="btn" id="btn-grid-out" title="縮小">−</button>
+      <span id="grid-zoom">100%</span>
+      <button class="btn" id="btn-grid-in" title="拡大">＋</button>
+      <button class="btn" id="btn-grid-fit" title="既定の大きさへ (F)">FIT</button>
+      <label id="grid-pal-label"><input type="checkbox" id="chk-grid-pal" checked> 色帯</label>
+      <label id="grid-gap-label"><input type="checkbox" id="chk-grid-gap" checked> 行間</label>
+      <label id="grid-col-label"><input type="checkbox" id="chk-grid-col" checked> 列間</label>
+      <span id="grid-sel"></span>
+    </span>
     <span style="flex:1"></span>
     <button class="btn" id="btn-clear-draw" title="加筆レイヤーを消去（Undo可）">CLEAR DRAW</button>
     <button class="btn" id="btn-clear-base" title="元の絵（切り出しベース）を破棄（直後の Ctrl+Z で戻せる）">CLEAR BASE</button>
@@ -812,14 +861,18 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
         </div>
       </div>
       <div>
+        <!-- 線画と色は別レイヤー（色だけ乗算/濃を持ち、CLEAR も別々にできる）ので入口は2つのまま。
+             SINGLE でも GRID でも同じように使える -->
         <div class="pnl-t">描く先</div>
         <div class="etools">
-          <div class="etool on" data-target="draw" title="線画レイヤー（加筆）">線画</div>
-          <div class="etool" data-target="color" title="カラースクリプト層（一覧と同じレイヤー）">色</div>
+          <div class="etool on" data-target="draw" title="線画レイヤー（加筆）／CLEAR DRAW で消える">線画</div>
+          <div class="etool" data-target="color" title="カラースクリプト層（一覧と同じレイヤー）／CLEAR COLOR で消える">色</div>
         </div>
       </div>
       <div>
-        <div class="pnl-t">COLOR LAYER（カラースクリプト）</div>
+        <div class="pnl-t" id="color-pnl-t">COLOR LAYER（カラースクリプト）</div>
+        <!-- 色は枠ごとに1枚。枠が2つ以上あるカットではどの枠を塗るかをここで選ぶ -->
+        <div class="etools" id="color-frame-pick"></div>
         <div class="sld-row">
           <select id="color-blend" title="描画モード"></select>
         </div>
@@ -882,16 +935,6 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
     </div>
     <div id="edit-stage"><canvas id="edit-cv" width="1280" height="720"></canvas></div>
     <div id="edit-grid"><div id="grid-wrap"></div><div id="grid-empty">カットがありません</div></div>
-    <div id="grid-hud">
-      <button class="btn" id="btn-grid-out" title="縮小">−</button>
-      <span id="grid-zoom">100%</span>
-      <button class="btn" id="btn-grid-in" title="拡大">＋</button>
-      <button class="btn" id="btn-grid-fit" title="既定の大きさへ">FIT</button>
-      <label id="grid-pal-label"><input type="checkbox" id="chk-grid-pal" checked> 色帯</label>
-      <label id="grid-gap-label"><input type="checkbox" id="chk-grid-gap" checked> 行間</label>
-      <label id="grid-col-label"><input type="checkbox" id="chk-grid-col" checked> 列間</label>
-      <span id="grid-sel"></span>
-    </div>
   </div>
 </div>
 
@@ -1144,7 +1187,8 @@ async function saveAll(){
     await idbClearPut('meta', [
       { k: 'main', board: { x: state.board.x, y: state.board.y, z: state.board.z } },
       { k: 'audio', blob: gAudio ? gAudio.blob : null, name: gAudio ? gAudio.name : '',
-        offset: gAudioOffset, muted: gAudioMuted, markers: gMarkers.slice() }
+        offset: gAudioOffset, muted: gAudioMuted,
+        markers: gMarkers.map(m => ({ f: m.f | 0, label: m.label || '' })) }
     ]);
     $('#save-dot').textContent = 'SAVED';
   }catch(e){
@@ -1424,6 +1468,29 @@ function layoutStudio(){
   resizeBoard(); renderBoard();
   fitTLCanvas(); layoutTL(); renderTL();
 }
+/* STUDIO → EDIT の唯一の入口（トップバーのEDITボタンとショートカットが通る）。
+   mode を渡すとその表示モードで開く。既定は GRID＝主戦場（SPEC_13 §9） */
+function enterEdit(mode){
+  if(!cuts.length){ toast('カットがありません'); return false; }
+  if(state.view !== 'edit'){
+    state.curCut = clamp(gFocusCut >= 0 ? gFocusCut : 0, 0, cuts.length - 1);
+    undoStack = []; redoStack = [];
+    ensureResident(cuts[state.curCut]);
+  }
+  setEditMode(mode || 'grid', true);
+  setView('edit');
+  return true;
+}
+/* SINGLE / GRID へ。STUDIOに居るときはそのモードで EDIT を開く */
+function gotoEditMode(m){
+  if(state.view !== 'edit'){ enterEdit(m); return; }
+  setEditMode(m);
+}
+/* いちばん使う2画面（STUDIO ⇄ GRID）をひと押しで行き来する */
+function swapStudioGrid(){
+  if(state.view === 'edit') setView('studio');
+  else enterEdit('grid');
+}
 
 /* --- STUDIO フォーカス同期（V2-A の核・SPEC_13 §1） ---
    「現在カット」= cutIndexAt(tl.frame).i の1つの導出値に、右パネル行 / 中央下の編集欄 /
@@ -1442,11 +1509,10 @@ function renderStudioSync(force){
     syncBaseAlphaUI();    // ミニツールの BASE スライダーも現在カットへ
   }
   const cut = cuts[i];
-  const lab = $('#cur-cut-label'), durEl = $('#cur-dur'), durfEl = $('#cur-durf'), note = $('#cur-note');
+  const lab = $('#cur-cut-label'), durEl = $('#cur-dur'), note = $('#cur-note');
   const has = !!cut;
   const cam = has && isCamCut(cut);
   durEl.disabled = !has;
-  durfEl.disabled = !has;
   durEl.title = cam ? '秒+コマ（24fps）。枠列カットは尻の止まり（tail）が伸び縮みします'
                     : '秒+コマ（24fps）例: 3+12';
   note.disabled = !has;
@@ -1463,13 +1529,16 @@ function renderStudioSync(force){
   // 再生中にフォーカス中の入力欄を書き換えない（入力が飛ぶため）
   const dv = has ? fmtDur(cut.durF) : '';
   if(document.activeElement !== durEl && durEl.value !== dv) durEl.value = dv;
-  const fv = has ? String(cut.durF) : '';
-  if(document.activeElement !== durfEl && durfEl.value !== fv) durfEl.value = fv;
   const nv = has ? cut.note : '';
   if(document.activeElement !== note && note.value !== nv) note.value = nv;
   updateTimecodeHud();
 }
-/* --- コマ番号 ⇄ タイムコード（COMPOSER の frameToTimecode と同じ規約：先頭コマ=01） --- */
+/* --- コマ番号 ⇄ タイムコード ---
+   **2種類あるので混同しないこと**:
+   ① 位置（インジケータ）  = `frameToTimecode` / `parseTimecodeToFrame`
+      COMPOSER と同じ規約で **先頭コマ=01**（f+1 して割る）。TIMELINE の FRAME/TIME 用
+   ② 尺（長さ）            = `durToTimecode` / `parseDurTimecode`
+      こちらは +1 しない（48コマ = 0:00:02:00）。中央の FRAME/TIME 用 */
 function frameToTimecode(frameIdx){
   const f = Math.max(0, frameIdx | 0) + 1;
   const p2 = n => String(n).padStart(2, '0');
@@ -1483,18 +1552,33 @@ function parseTimecodeToFrame(v){
     return ((p[3] || 0) * 3600 + (p[2] || 0) * 60 + (p[1] || 0)) * FPS + (p[0] || 0) - 1;
   }
   const n = parseFloat(s);
-  return isFinite(n) ? Math.round(n * FPS) : null;
+  return isFinite(n) ? Math.round(n * FPS) : null;   // コロン無し＝秒。その秒の頭コマへ
 }
-/* 中央の FRAME / TIME（COMPOSER のトランスポート右端と同じ表記） */
+function durToTimecode(f){
+  const n = Math.max(0, f | 0);
+  const p2 = x => String(x).padStart(2, '0');
+  const ff = n % FPS, total = Math.floor(n / FPS);
+  return Math.floor(total / 3600) + ':' + p2(Math.floor(total / 60) % 60) + ':' + p2(total % 60) + ':' + p2(ff);
+}
+function parseDurTimecode(v){
+  const s = String(v).trim();
+  if(s.indexOf(':') >= 0){
+    const p = s.split(':').map(x => parseInt(x, 10) || 0).reverse();   // [FF,SS,MM,HH]
+    return ((p[3] || 0) * 3600 + (p[2] || 0) * 60 + (p[1] || 0)) * FPS + (p[0] || 0);
+  }
+  const n = parseFloat(s);
+  return isFinite(n) ? Math.round(n * FPS) : null;   // コロン無し＝秒
+}
+/* 中央（内容・セリフの上）の FRAME / TIME = **このカット単体の尺**。
+   尺(秒+コマ) と同じものを別表記で出しているだけで、どれを打ち換えても setCutDur() に入る。 */
 function updateTimecodeHud(){
-  const T = totalFrames();
-  const cur = T ? clamp(state.tl.frame, 0, T - 1) : 0;
+  const cut = cuts[gFocusCut];
   const fe = $('#cur-frame'), te = $('#cur-tc');
   if(!fe || !te) return;
   if(fe.querySelector('input') || te.querySelector('input')) return;   // 入力中は上書きしない
-  if(!T){ fe.textContent = '—— / ——'; te.textContent = '0:00:00:00'; return; }
-  fe.textContent = String(cur + 1).padStart(4, '0') + ' / ' + String(T).padStart(4, '0');
-  te.textContent = frameToTimecode(cur);
+  if(!cut){ fe.textContent = '——'; te.textContent = '0:00:00:00'; return; }
+  fe.textContent = String(cut.durF).padStart(4, '0');
+  te.textContent = durToTimecode(cut.durF);
 }
 
 /* ---------------- BOARD ---------------- */
@@ -1738,7 +1822,7 @@ function hitPhoto(bx, by){
   return null;
 }
 function bDown(e){
-  boardCv.setPointerCapture(e.pointerId);
+  try{ boardCv.setPointerCapture(e.pointerId); }catch(err){}
   bPtrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if(bPtrs.size === 2){
     const pts = [...bPtrs.values()];
@@ -3699,6 +3783,7 @@ function setEditMode(m, quiet){
   // （持ち越すと 濃/モードが見えていないコマにも効いてしまう）
   if(m === 'single' && gSelCells.length) setSelCells([]);
   $('#edit-main').classList.toggle('grid', m === 'grid');
+  $('#view-edit').classList.toggle('grid', m === 'grid');   // 上部バーの表示コントロール切替
   $('#btn-mode-single').classList.toggle('on', m === 'single');
   $('#btn-mode-grid').classList.toggle('on', m === 'grid');
   // GRIDは色を、SINGLEは線画を既定の描き先にする（手で切り替えも可）
@@ -3726,20 +3811,24 @@ function syncEditPanels(){
       sel.appendChild(o);
     });
   }
-  // **SINGLE でも 濃/描画モードは触れる**（2026-08-15）。以前は GRID 限定で灰色になっていて
-  // 「バグか仕様か」が分からなかった。対象は state.curFrame の枠（FIXカットは1枠なので迷わない）
+  // **SINGLE でも色は描けるし 濃/モードも触れる**（2026-08-15）。
+  // 以前は GRID 限定で灰色になっていて「バグか仕様か」が分からなかった。
+  // 線画と色を別ボタンにしてあるのは、色だけ 乗算/濃 を持ち CLEAR も別だから（統合はしない）
   if(cut) state.curFrame = clamp(state.curFrame | 0, 0, Math.max(0, camCount(cut) - 1));
   const canColor = !!cut;
   sel.disabled = !canColor;
   $('#color-alpha').disabled = !canColor;
-  const tgtLabel = (cut && isCamCut(cut)) ? ('（対象: ' + cut.cam[state.curFrame].k + ' 枠）') : '';
-  const pnl = sel.closest('div').previousElementSibling;
-  if(pnl && pnl.classList.contains('pnl-t')) pnl.textContent = 'COLOR LAYER（カラースクリプト）' + tgtLabel;
-  const colorBtn = document.querySelector('.etool[data-target="color"]');
-  if(colorBtn){                       // 色を「描く」のは枠ごとの空間なので GRID だけ（座標が別空間のため）
-    colorBtn.classList.toggle('off', !inGrid());
-    colorBtn.title = inGrid() ? 'カラースクリプト層（枠ごと）' : '色を描くのはGRIDです（濃・モードはここでも変えられます）';
+  const pnl = $('#color-pnl-t');
+  if(pnl){
+    const tgtLabel = (cut && isCamCut(cut)) ? ('（' + cut.cam[state.curFrame].k + ' 枠）') : '';
+    pnl.textContent = 'COLOR LAYER（カラースクリプト）' + tgtLabel;
   }
+  const colorBtn = document.querySelector('.etool[data-target="color"]');
+  if(colorBtn){
+    colorBtn.classList.remove('off');   // SINGLE でも塗れるようになったのでグレーアウトしない
+    colorBtn.title = 'カラースクリプト層（枠ごと）／CLEAR COLOR で消える';
+  }
+  renderColorFramePick(cut);
   if(cut){
     sel.value = colorBlendOf(cut, state.curFrame);
     const a = Math.round(colorAlphaOf(cut, state.curFrame) * 100);
@@ -3747,6 +3836,35 @@ function syncEditPanels(){
     $('#color-alpha-val').textContent = a + '%';
   }
   syncBaseAlphaUI();
+}
+/* SINGLE で「どの枠の色を塗るか」を選ぶチップ（GRIDはセルを触れば決まるので出さない） */
+function renderColorFramePick(cut){
+  const box = $('#color-frame-pick');
+  if(!box) return;
+  const show = !!cut && isCamCut(cut) && !inGrid();
+  box.style.display = show ? 'flex' : 'none';
+  // **dataset.keys も一緒に捨てる**。中身だけ消して鍵を残すと、次に出すとき
+  // 「同じ枠構成だから作り直し不要」と判断して空のまま出る
+  if(!show){ box.innerHTML = ''; box.dataset.keys = ''; return; }
+  const keys = cut.cam.map(c => c.k).join(',');
+  if(box.dataset.keys !== keys){
+    box.innerHTML = '';
+    cut.cam.forEach((c, k) => {
+      const el = document.createElement('div');
+      el.className = 'etool';
+      el.textContent = c.k;
+      el.title = c.k + ' 枠の色を塗る（色は枠ごとに1枚）';
+      el.addEventListener('click', () => {
+        state.curFrame = k;
+        undoStack = []; redoStack = [];   // 枠をまたいだ undo の破損防止（カット切替と同じ扱い）
+        syncEditPanels();
+        renderPaintViews();
+      });
+      box.appendChild(el);
+    });
+    box.dataset.keys = keys;
+  }
+  [...box.children].forEach((el, k) => el.classList.toggle('on', k === state.curFrame));
 }
 /* 選択中のセル全部に適用（選択が無ければ現在セル） */
 function setColorBlend(v){
@@ -3919,8 +4037,24 @@ function toBakeCoord(clientX, clientY, cv){
   }
   return p;   // editCv はベイク空間そのもの
 }
+/* ベイク空間 → いま塗っている枠(k)の色レイヤー座標（512×288）。
+   色は「出力枠の空間」で持っているので、ベイク面（EDITのSINGLE）から塗るときだけ
+   **カメラ枠で切り戻す**必要がある（`sampleCompositeColor` と同じ換算の書き下し）。 */
+function bakeToColorCoord(cut, k, bx, by){
+  const s = bakeSize(cut), r = camRect(cut, k), br = cut.bakeRect;
+  if(!r || !br) return { x: bx / s.w * COLOR_W, y: by / s.h * COLOR_H };
+  const u = (bx / s.w * br.w + br.x - r.x) / r.w;
+  const v = (by / s.h * br.h + br.y - r.y) / r.h;
+  return { x: u * COLOR_W, y: v * COLOR_H };
+}
 function paintCoord(clientX, clientY, cv){
   if(state.paintTarget === 'color'){
+    const cut = cuts[state.curCut];
+    // EDIT の SINGLE はベイク面なので、枠で切り戻してから色の縮尺へ（GRID/プレビューは出力枠のまま）
+    if(cut && cv === editCv){
+      const p = toCanvasCoord(clientX, clientY, cv);
+      return bakeToColorCoord(cut, state.curFrame, p.x, p.y);
+    }
     // 色は出力枠の空間。GRIDのセルは出力枠の縮小表示なので、素直に比率で入れるだけ
     const r = cv.getBoundingClientRect();
     return { x: (clientX - r.left) / r.width * COLOR_W, y: (clientY - r.top) / r.height * COLOR_H };
@@ -4432,13 +4566,16 @@ function paintDown(e, cv){
   // SPEC_13 §4-3: 指は描かない（パン/ピンチ経路へ）。描くのはペンとマウスだけ
   if(e.pointerType === 'touch') return;
   e.preventDefault();
-  cv.setPointerCapture(e.pointerId);
+  try{ cv.setPointerCapture(e.pointerId); }catch(err){}   // 合成イベントでは投げるので握りつぶす
   paintCv = cv;
   {   // ブラシ幅の基準を決める（tlCvは今のカメラ位置、EDITはA枠）
     const cut = cuts[state.curCut];
     const tgt = cut ? paintCanvas(cut) : null;
     const ca = (cv === tlCv) ? cutIndexAt(state.tl.frame) : null;
-    gStrokeK = (cut && tgt) ? strokeScaleFor(cut, tgt.width, ca ? ca.local : 0) : 1;
+    // 色は**常に出力枠基準**（枠の寄りに依らない）。gridStrokeTo と同じ扱いにしないと
+    // T.U.した枠を SINGLE から塗ったときだけ線が細くなる
+    gStrokeK = (state.paintTarget === 'color') ? (COLOR_W / CONTE_W)
+             : ((cut && tgt) ? strokeScaleFor(cut, tgt.width, ca ? ca.local : 0) : 1);
   }
   const p = paintCoord(e.clientX, e.clientY, cv);
   if(e.altKey){                       // EYEツールは廃止。Alt+クリックでスポイト（ANIMATOR準拠）
@@ -4657,9 +4794,16 @@ function renderOutputFrame(ctx, ca){
   }
   ctx.restore();
 }
+/* TIMELINE の FRAME / TIME = **全体の通し位置**（中央のはカット単体の尺）。
+   どちらもクリックで打ち込めて、こちらはインジケータが飛ぶ。 */
 function updateTLHud(){
   const T = totalFrames();
-  $('#tl-time').textContent = fmtDur(T ? Math.min(state.tl.frame, T - 1) : 0) + ' / ' + fmtDur(T);
+  const cur = T ? clamp(state.tl.frame, 0, T - 1) : 0;
+  const fe = $('#tl-frame'), te = $('#tl-time');
+  if(fe && te && !fe.querySelector('input') && !te.querySelector('input')){
+    fe.textContent = T ? (String(cur + 1).padStart(4, '0') + ' / ' + String(T).padStart(4, '0')) : '—— / ——';
+    te.textContent = T ? frameToTimecode(cur) : '0:00:00:00';
+  }
   const ca = cutIndexAt(state.tl.frame);
   $('#tl-cutlabel').textContent = ca ? 'C' + (ca.i + 1) : '—';
   updatePlayhead();
@@ -4801,6 +4945,22 @@ function layoutCamKeys(){
   const T = totalFrames();
   if(!T) return;
   const X = f => frameFrac(f) * aw;
+  /* --- ◆の置き方（2026-08-15） -----------------------------------------
+     tail=0 の A→B では **B（カット尻）と次のカットの A（カット頭）が同じコマ**に来るため、
+     ◆が完全に重なって後ろに積んだ方しか掴めなかった（「Bキーがめっちゃ選択しづらい」）。
+     - 近すぎる◆は **段違い**にする（xは正しい位置のまま。見ても2つあると分かる）
+     - 帯の両端に来た◆は数px内側に寄せる（半分見切れて掴めないのを防ぐ）
+     どちらも表示だけの調整。camKeyMove は掴んだ位置からの相対差分で計算するので影響しない。 */
+  const big = !!gUi.uiBig;
+  const KEY_GAP = big ? 22 : 16, KEY_TOP = big ? 0 : 1, KEY_ROW_H = big ? 17 : 13;
+  let lastX = -1e9, lastRow = 1;
+  const placeKey = (d, x) => {
+    const px = clamp(x, 7, Math.max(7, aw - 7));
+    const row = (px - lastX < KEY_GAP) ? (1 - lastRow) : 0;
+    lastX = px; lastRow = row;
+    d.style.left = px + 'px';
+    d.style.top = (KEY_TOP + row * KEY_ROW_H) + 'px';
+  };
   cuts.forEach((c, i) => {
     const start = cutStartFrame(i);
     const n = camCount(c);
@@ -4808,9 +4968,8 @@ function layoutCamKeys(){
       // FIXカットは動かす所が無いので、頭に薄い◆だけ出す（行が空だと何の行か分からなくなる）
       const d = document.createElement('div');
       d.className = 'tl-key fix';
-      d.style.left = X(start) + 'px';
-      d.style.top = '7px';
       d.title = 'C' + (i + 1) + ': 枠が1つ（＋枠 で T.U./PAN になります）';
+      placeKey(d, X(start));
       box.appendChild(d);
       return;
     }
@@ -4834,12 +4993,12 @@ function layoutCamKeys(){
       const edge = (k === 0 || k === n - 1);
       d.className = 'tl-key' + (edge ? ' edge' : '') +
                     (state.selCut && state.selCut.i === i && state.selCut.k === k ? ' on' : '');
-      d.style.left = X(f) + 'px';
-      d.style.top = '7px';
+      d.dataset.k = c.cam[k].k;
       d.title = 'C' + (i + 1) + '-' + c.cam[k].k + '：' + (f - start) + 'f' +
                 (k === 0 ? '（右へドラッグ＝動き出しを遅らせる）'
                          : (k === n - 1 ? '（左へドラッグ＝早く止める）' : '（ドラッグで前後の配分）'));
       d.addEventListener('pointerdown', ev => camKeyDown(ev, i, k, d));
+      placeKey(d, X(f));
       box.appendChild(d);
     }
   });
@@ -5234,14 +5393,27 @@ function offsetScrubUp(e){
   scheduleSave();
 }
 
-/* ---------------- マーカー（COMPOSER 準拠・聴きながら M で打つ） ----------------
-   通しコマ番号の配列。ルーラーの上に▼で出る。音と同じ meta レコードに保存する。 */
+/* ---------------- マーカー（composer-timeline-kit §4 準拠） ----------------
+   `gMarkers = [{f, label}]`。**COMPOSER と同じ手触りに揃える**:
+     M           … いまの位置に打つ／同じ位置でもう一度＝消す
+     ドラッグ     … 位置を動かす（スクラブに取られない）
+     Ctrl+クリック … 消す
+     Wクリック     … メモ（COMPOSERは native prompt だが、ECONTEは modalPrompt に揃える）
+   音と同じ meta レコードに同居させるので、meta を書く所は全部セットで書くこと。 */
 let gMarkers = [];
+function markerTol(){ return Math.max(1, Math.round(8 / Math.max(0.1, pxPerFrame()))); }
 function markerNear(f){
-  const tol = Math.max(1, Math.round(8 / Math.max(0.1, pxPerFrame())));   // 画面上8px ぶんを「同じ位置」とみなす
+  const tol = markerTol();                 // 画面上8px ぶんを「同じ位置」とみなす
   let bi = -1, bd = Infinity;
-  gMarkers.forEach((m, i) => { const d = Math.abs(m - f); if(d <= tol && d < bd){ bd = d; bi = i; } });
+  gMarkers.forEach((m, i) => { const d = Math.abs(m.f - f); if(d <= tol && d < bd){ bd = d; bi = i; } });
   return bi;
+}
+function sortMarkers(){ gMarkers.sort((a, b) => a.f - b.f); }
+function afterMarkerChange(){
+  sortMarkers();
+  layoutMarkers();
+  updateAudioUI();
+  scheduleSave();
 }
 function toggleMarkerHere(){
   const T = totalFrames();
@@ -5249,45 +5421,77 @@ function toggleMarkerHere(){
   const f = clamp(state.tl.frame, 0, T - 1);
   const i = markerNear(f);
   if(i >= 0){ gMarkers.splice(i, 1); toast('マーカーを消しました'); }
-  else { gMarkers.push(f); gMarkers.sort((a, b) => a - b); toast('マーカー ' + fmtDur(f)); }
-  layoutMarkers();
-  updateAudioUI();
-  scheduleSave();
+  else { gMarkers.push({ f, label: '' }); toast('マーカー ' + fmtDur(f)); }
+  afterMarkerChange();
 }
-function delMarkerAt(f){
-  const i = gMarkers.indexOf(f);
+function delMarker(m){
+  const i = gMarkers.indexOf(m);
   if(i < 0) return;
   gMarkers.splice(i, 1);
-  layoutMarkers();
-  updateAudioUI();
-  scheduleSave();
+  afterMarkerChange();
   toast('マーカーを消しました');
 }
 function seekMarker(d){
   if(!gMarkers.length) return;
   const f = state.tl.frame;
-  const list = d < 0 ? gMarkers.filter(m => m < f).slice(-1) : gMarkers.filter(m => m > f).slice(0, 1);
+  const list = d < 0 ? gMarkers.filter(m => m.f < f).slice(-1) : gMarkers.filter(m => m.f > f).slice(0, 1);
   if(!list.length) return;
   pause();
-  seek(list[0]);
+  seek(list[0].f);
 }
+async function editMarkerLabel(m){
+  const v = await modalPrompt('マーカーのメモ（' + fmtDur(m.f) + '）');
+  if(v === null) return;
+  m.label = v;
+  afterMarkerChange();
+}
+function markerLabelOf(m, i){ return m.label || ('M' + (i + 1)); }
 function layoutMarkers(){
   const box = $('#tl-marks');
   if(!box) return;
   box.innerHTML = '';
   const aw = tlWidthPx();
-  if(!totalFrames() || !aw) return;
-  gMarkers.forEach(f => {
-    const x = frameFrac(f) * aw;
-    if(x < -14 || x > aw + 14) return;      // 拡大中に画面外のものは出さない
+  const T = totalFrames();
+  if(!T || !aw) return;
+  gMarkers.forEach((m, i) => {
+    const x = frameFrac(m.f) * aw;
+    if(x < -20 || x > aw + 20) return;      // 拡大中に画面外のものは出さない
     const d = document.createElement('div');
     d.className = 'tl-mark';
     d.style.left = x + 'px';
-    d.title = 'マーカー ' + fmtDur(f) + '（クリック=そこへ移動 / Wクリック=削除）';
-    d.addEventListener('pointerdown', ev => ev.stopPropagation());   // スクラブに取られない
-    d.addEventListener('click', ev => { ev.stopPropagation(); pause(); seek(f); });
-    d.addEventListener('dblclick', ev => { ev.stopPropagation(); delMarkerAt(f); });
-    bindDoubleTap(d, () => delMarkerAt(f));
+    d.dataset.label = markerLabelOf(m, i);
+    d.title = 'マーカー ' + fmtDur(m.f) + (m.label ? ' — ' + m.label : '') +
+              '（ドラッグ=移動 / クリック=そこへ / Ctrl+クリック=削除 / Wクリック=メモ）';
+    let drag = false, moved = false, ctrl = false, id = -1;
+    d.addEventListener('pointerdown', ev => {
+      ev.stopPropagation();          // 帯のスクラブに取られない
+      ev.preventDefault();
+      drag = true; moved = false; ctrl = ev.ctrlKey || ev.metaKey; id = ev.pointerId;
+      try{ d.setPointerCapture(ev.pointerId); }catch(e){}
+      d.classList.add('on');
+    });
+    d.addEventListener('pointermove', ev => {
+      if(!drag || ctrl || ev.pointerId !== id) return;
+      const r = $('#tl-clips').getBoundingClientRect();
+      if(!r.width) return;
+      const nf = clamp(Math.round(pxToFrame(ev.clientX - r.left, r.width)), 0, T - 1);
+      if(nf === m.f) return;
+      moved = true;
+      m.f = nf;
+      d.style.left = (frameFrac(nf) * tlWidthPx()) + 'px';
+    });
+    const end = ev => {
+      if(!drag || (ev && ev.pointerId !== id)) return;
+      drag = false;
+      d.classList.remove('on');
+      if(ctrl){ delMarker(m); return; }
+      if(moved) afterMarkerChange();
+      else { pause(); seek(m.f); }
+    };
+    d.addEventListener('pointerup', end);
+    d.addEventListener('pointercancel', end);
+    d.addEventListener('dblclick', ev => { ev.stopPropagation(); editMarkerLabel(m); });
+    bindDoubleTap(d, () => editMarkerLabel(m));
     box.appendChild(d);
   });
 }
@@ -5632,7 +5836,14 @@ function tlPaintDown(e){
 }
 /* --- ショートカット（composer-timeline-kit 準拠・TIMELINEビューで有効） --- */
 const KEYMAP_LS = 'econte_keymap_v1';
+/* `global:true` は **STUDIO / EDIT のどちらでも効く**（画面切替そのものなので）。
+   印の無いものは従来どおり STUDIO でだけ効く。 */
 const SHORTCUT_ACTIONS = [
+  { id: 'viewStudio', label: 'STUDIO へ',           def: '1', global: true, run: () => setView('studio') },
+  { id: 'viewEdit',   label: 'EDIT へ（GRID）',     def: '2', global: true, run: () => enterEdit('grid') },
+  { id: 'modeSingle', label: 'EDIT: SINGLE',        def: '3', global: true, run: () => gotoEditMode('single') },
+  { id: 'modeGrid',   label: 'EDIT: GRID',          def: '4', global: true, run: () => gotoEditMode('grid') },
+  { id: 'swapView',   label: 'STUDIO ⇄ GRID 入替',  def: 'X', global: true, run: () => swapStudioGrid() },
   { id: 'play',      label: '再生 / 停止',          def: 'Space',      prevent: true, run: () => togglePlay() },
   { id: 'prevFrame', label: '1コマ戻る (Shift=10)', def: 'ArrowLeft',  prevent: true, run: e => { pause(); seek(state.tl.frame - (e && e.shiftKey ? 10 : 1)); } },
   { id: 'nextFrame', label: '1コマ進む (Shift=10)', def: 'ArrowRight', prevent: true, run: e => { pause(); seek(state.tl.frame + (e && e.shiftKey ? 10 : 1)); } },
@@ -5913,8 +6124,9 @@ async function wipeAll(){
   $('#save-dot').textContent = 'SAVED';
   toast('全部消しました');
 }
-/* FRAME / TIME のクリック入力（COMPOSER と同じ：Enterで確定・Escで取消） */
-function bindTcEdit(sel, cur, parse){
+/* FRAME / TIME のクリック入力（COMPOSER と同じ：Enterで確定・Escで取消）。
+   `apply(f)` が「打ち込んだ数の行き先」＝インジケータ移動 or 尺変更。 */
+function bindTcEdit(sel, cur, parse, apply){
   const span = $(sel);
   if(!span) return;
   span.addEventListener('click', () => {
@@ -5934,9 +6146,9 @@ function bindTcEdit(sel, cur, parse){
       span.textContent = old;
       if(commit && v){
         const f = parse(v);
-        if(f != null && isFinite(f)){ pause(); seek(clamp(Math.round(f), 0, totalFrames() - 1)); }
+        if(f != null && isFinite(f)) apply(Math.round(f));
       }
-      updateTimecodeHud();
+      updateTLHud();
     };
     inp.addEventListener('blur', () => fin(true));
     inp.addEventListener('keydown', ev => {
@@ -5978,7 +6190,7 @@ function toggleFullscreen(){
 const ePtrs = new Map();
 let eGest = null;
 function editTouchDown(e){
-  editCv.setPointerCapture(e.pointerId);
+  try{ editCv.setPointerCapture(e.pointerId); }catch(err){}
   ePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   const v = state.editView;
   if(ePtrs.size === 2){
@@ -6169,26 +6381,36 @@ const HELP_GROUPS = [
     ['ずらし ⇄', '左右にドラッグで音をずらす（数値入力も可）'],
     ['M', 'いまの位置にマーカー（同じ所でもう一度＝消す）'],
     [', / .', '前／次のマーカーへ'],
-    ['▼ をクリック', 'そこへ移動 ／ Wクリックで削除'],
+    ['マーカーをドラッグ', '位置を動かす（クリックだけ＝そこへ移動）'],
+    ['Ctrl+クリック', 'マーカーを消す'], ['Wクリック', 'マーカーにメモを書く'],
     ['🔊 / 🔇', '作業中に鳴らすかどうか（書き出しには常に入ります）'],
     ['EXPORT VIDEO', 'MP4に映像＋音で書き出し（焼込に TIME も出ます）']
   ] },
   { t: '画面（AE風）', rows: [
+    ['1 / 2', 'STUDIO ／ EDIT（GRID）へ'],
+    ['3 / 4', 'EDIT の SINGLE ／ GRID'],
+    ['X', 'STUDIO ⇄ GRID をひと押しで入替'],
     ['@', 'カーソル下のペインを最大化 ／ もう一度で戻す'],
     ['ペインの境界', 'ドラッグで幅・高さ（Wクリックで既定へ）'],
     ['S', 'SHEETパネルの開閉'],
     ['✎ TOOLS / HIDE', 'プレビュー上のミニツール（既定は隠し）'],
     ['大きいUI', 'ボタン・スライダーを大きく（この画面の上で切替）']
   ] },
-  { t: '元の絵（BASE）', rows: [
-    ['BASEスライダー', '元の絵の濃度（20〜40%がトレース用）'],
-    ['元絵 下 / 上', '加筆の下に敷く／上に重ねる（REF扱い）'],
-    ['CLEAR BASE', '元の絵を破棄（直後の Ctrl+Z で戻せる）'],
-    ['SHEETの ⟳', 'BOARDの写真から焼き直す']
+  { t: 'レイヤーと消去（元の絵は壊れません）', rows: [
+    ['線画 / 色', '描く先は2枚。色だけ 乗算・濃 を持つので入口を分けてある'],
+    ['CLEAR DRAW', '線画レイヤーだけ消す（元の絵はそのまま）'],
+    ['CLEAR COLOR', 'カラー層だけ消す（元の絵はそのまま）'],
+    ['元絵 下 / 上', '重ね順を変えるだけ。上でも下でも元の絵は非破壊'],
+    ['BASE スライダー', '元の絵の濃度（20〜40%がトレース用）'],
+    ['CLEAR BASE', '元の絵を捨てる唯一の操作（直後の Ctrl+Z で戻せる）'],
+    ['SHEETの ⟳', 'BOARDの写真から元の絵を焼き直す']
   ] },
   { t: 'EDIT', rows: [
+    ['SINGLE', '1カットを大きく詰める（線画も色も描ける）'],
+    ['GRID', '一覧でカラースクリプト（コマをまたいで塗れる）'],
+    ['A / B チップ', 'SINGLEでどの枠の色を塗るか（色は枠ごとに1枚）'],
     ['ホイール', 'カーソル中心ズーム'], ['1本指ドラッグ', 'パン'], ['2本指', 'ピンチ拡縮＋パン'],
-    ['FIT', 'ズーム/パンをリセット']
+    ['F', 'ズーム/パンをリセット（GRIDは既定の大きさへ）']
   ] },
   { t: 'iPad（指＝操作 / ペン＝描画）', rows: [
     ['指でなぞる', 'スクロール・パン（指では描きません）'],
@@ -6291,6 +6513,19 @@ function onKey(e){
     moveSelCuts(e.key === 'ArrowUp' ? -1 : 1);
     return;
   }
+  // 画面切替（1/2/3/4/X）は **STUDIO / EDIT の両方**で効かせるので studio ブロックの外で先に見る
+  {
+    const nk = normKey(e);
+    const bare = !(e.ctrlKey || e.metaKey || e.altKey);
+    for(const a of (bare ? SHORTCUT_ACTIONS : [])){
+      if(!a.global) continue;
+      if(gKeymap[a.id] && gKeymap[a.id] === nk){
+        if(a.prevent) e.preventDefault();
+        a.run(e);
+        return;
+      }
+    }
+  }
   if(state.view === 'studio'){
     // Ctrl+↑/↓ = 現在カットを並べ替え（SHEET行ドラッグと同じ操作）
     if((e.ctrlKey || e.metaKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown')){
@@ -6346,15 +6581,8 @@ function onKey(e){
 /* ---------------- wiring / init ---------------- */
 function wire(){
   $('#btn-view-studio').addEventListener('click', () => setView('studio'));
-  $('#btn-view-edit').addEventListener('click', () => {
-    if(!cuts.length){ toast('カットがありません'); return; }
-    // 編集画面はGRIDが主戦場。1カットを詰めるときだけ ✎ / ダブルクリックで SINGLE へ
-    state.curCut = clamp(gFocusCut >= 0 ? gFocusCut : 0, 0, cuts.length - 1);
-    undoStack = []; redoStack = [];
-    ensureResident(cuts[state.curCut]);
-    setEditMode('grid', true);
-    setView('edit');
-  });
+  // 編集画面はGRIDが主戦場。1カットを詰めるときだけ ✎ / ダブルクリックで SINGLE へ
+  $('#btn-view-edit').addEventListener('click', () => enterEdit('grid'));
   $('#btn-fs').addEventListener('click', toggleFullscreen);
   $('#btn-help').addEventListener('click', () => toggleHelp());
   $('#btn-help-close').addEventListener('click', () => toggleHelp(false));
@@ -6451,19 +6679,18 @@ function wire(){
     if(f === null || f <= 0){ $('#cur-dur').value = fmtDur(cut.durF); return; }
     setCutDur(gFocusCut, f);
   });
-  // 尺はコマ数でも打てる（AE等で測った数値をそのまま入れる用）
-  $('#cur-durf').addEventListener('change', () => {
-    const cut = cuts[gFocusCut];
-    if(!cut) return;
-    const n = parseInt($('#cur-durf').value, 10);
-    if(!(n > 0)){ $('#cur-durf').value = String(cut.durF); return; }
-    setCutDur(gFocusCut, n);
-  });
-  // FRAME / TIME はクリックで直接入力 → その位置へ飛ぶ（COMPOSER と同じ操作）
-  bindTcEdit('#cur-frame', () => String(clamp(state.tl.frame, 0, Math.max(0, totalFrames() - 1)) + 1),
-             v => { const n = parseInt(v, 10); return isFinite(n) ? n - 1 : null; });
-  bindTcEdit('#cur-tc', () => frameToTimecode(clamp(state.tl.frame, 0, Math.max(0, totalFrames() - 1))),
-             parseTimecodeToFrame);
+  // 中央の FRAME / TIME = このカット単体の尺（打ち換えると尺が変わる＝秒+コマ欄と連動）
+  const setDurHere = f => { if(gFocusCut >= 0 && f > 0) setCutDur(gFocusCut, f); };
+  bindTcEdit('#cur-frame', () => String(cuts[gFocusCut] ? cuts[gFocusCut].durF : 0),
+             v => { const n = parseInt(v, 10); return isFinite(n) ? n : null; }, setDurHere);
+  bindTcEdit('#cur-tc', () => durToTimecode(cuts[gFocusCut] ? cuts[gFocusCut].durF : 0),
+             parseDurTimecode, setDurHere);
+  // TIMELINE の FRAME / TIME = 全体の通し位置（打ち込むとインジケータが飛ぶ）
+  const seekTo = f => { pause(); seek(clamp(f, 0, Math.max(0, totalFrames() - 1))); };
+  bindTcEdit('#tl-frame', () => String(clamp(state.tl.frame, 0, Math.max(0, totalFrames() - 1)) + 1),
+             v => { const n = parseInt(v, 10); return isFinite(n) ? n - 1 : null; }, seekTo);
+  bindTcEdit('#tl-time', () => frameToTimecode(clamp(state.tl.frame, 0, Math.max(0, totalFrames() - 1))),
+             parseTimecodeToFrame, seekTo);
   $('#cur-note').addEventListener('input', () => {
     const cut = cuts[gFocusCut];
     if(!cut) return;
@@ -6857,8 +7084,10 @@ window.__ECONTE__ = {
                                  offset: gAudioOffset, muted: gAudioMuted, playing: !gAudio.el.paused } : null; },
   loadAudioBlob, clearAudio, setAudioOffset, syncAudio, buildPeaks, audioFrames, updateAudioUI,
   // 2026-08-15 追加ぶん（iPad操作・UI整理・マーカー・TC）
-  get markers(){ return gMarkers.slice(); },
-  toggleMarkerHere, delMarkerAt, seekMarker, layoutMarkers, markerNear,
+  get markers(){ return gMarkers.map(m => ({ f: m.f, label: m.label })); },
+  toggleMarkerHere, delMarker, seekMarker, layoutMarkers, markerNear, editMarkerLabel, markerLabelOf,
+  durToTimecode, parseDurTimecode, enterEdit, gotoEditMode, swapStudioGrid,
+  bakeToColorCoord, renderColorFramePick,
   offsetScrubDown, offsetScrubMove, offsetScrubUp,
   frameToTimecode, parseTimecodeToFrame, updateTimecodeHud, bindTcEdit,
   clipEdgeAt, togglePaneMax, clearPaneMax, paneAtPointer, get paneMax(){ return gPaneMax; },

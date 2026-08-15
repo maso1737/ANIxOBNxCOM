@@ -407,25 +407,64 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   **色を"描く"のは従来どおり GRID だけ**（座標空間が別なので）。
   SINGLEへ移るとき `gSelCells` は捨てる（見えていないコマに濃が効かないように）
 
-■ 中央の尺欄・タイムコード（2026-08-15）
-- `#cur-dur`（秒+コマ）の隣に **`#cur-durf`（コマ数）** を追加。どちらも `setCutDur()` へ入る
-- **`#cur-frame` / `#cur-tc` は COMPOSER のトランスポート右端と同じ表記**
-  （`frameToTimecode()` は COMPOSER の同名関数と同じ規約＝**先頭コマ=01** の `H:MM:SS:FF`）。
-  クリックで直接入力（`bindTcEdit`・Enter確定/Esc取消）
+■ FRAME / TIME は2か所ある（2026-08-15・**意味が違うので混ぜないこと**）
+- **中央（内容・セリフの上）= そのカット単体の尺**。`尺(秒+コマ)` / `FRAME(コマ数)` /
+  `TIME(H:MM:SS:FF)` は同じものの別表記で、**どれを打ち換えても `setCutDur()` に入る**
+- **TIMELINE のトランスポート = 全体の通し位置**。打ち込むとインジケータが飛ぶ（`seek`）。
+  並びは中央と同じ `FRAME … / TIME …` にしてある（ぱっと見で対応が取れるように）
+- 変換関数も **2種類あるので取り違えないこと**:
+  - 位置 → `frameToTimecode` / `parseTimecodeToFrame`（COMPOSER と同じ規約で **先頭コマ=01**）
+  - 尺   → `durToTimecode` / `parseDurTimecode`（**+1 しない**。48コマ = 0:00:02:00）
+- 入力は `bindTcEdit(sel, cur, parse, apply)`。**`apply` が行き先**（seek か setCutDur）。
+  Enter確定 / Esc取消 / blurで確定 は COMPOSER と同じ
 - **焼き込みにも TIME を出す**（`burnLabel()` の末尾）。入る文字が伸びたので
   「画面内」モードの黒帯は `measureText` で実測して敷く
 
-■ マーカー（2026-08-15・composer-timeline-kit 準拠）
-- `gMarkers`＝通しコマ番号の配列。**音と同じ meta レコード**（`{k:'audio'}`）に同居させるので、
-  meta を書くところは全部セットで書く（音のときと同じ落とし穴）
-- `M`＝打つ/消す（`markerNear()` が画面上8px ぶんを「同じ位置」とみなす）／`,` `.`＝前後へ
-- DOMは `#tl-marks`（ルーラーの上・`pointer-events:none`＋▼だけ auto）。
-  **▼の pointerdown は stopPropagation**（帯のスクラブに取られないため）。`layoutTL()` から張り直す
+■ マーカー（2026-08-15・composer-timeline-kit §4 準拠）
+- **`gMarkers = [{f, label}]`**（COMPOSER の `state.markers=[{frame,label}]` と同じ形）。
+  **音と同じ meta レコード**（`{k:'audio'}`）に同居させるので、meta を書くところは全部セットで書く
+- 手触りも COMPOSER に揃える: `M`＝打つ/消す（`markerNear()` が画面上8px ぶんを「同じ位置」とみなす）／
+  `,` `.`＝前後へ／**ドラッグ＝移動**／**Ctrl+クリック＝削除**／**Wクリック＝メモ**
+  （COMPOSER は native prompt だが、ECONTE は `modalPrompt` に揃える）
+- 見た目も `.tl-gmarker` 準拠の **縦線＋ラベル**（`data-label` を `::after` で出す。既定は `M1`,`M2`…）
+- DOMは `#tl-marks`（ルーラーの上・`pointer-events:none`＋マーカーだけ auto）。
+  **pointerdown は stopPropagation**（帯のスクラブに取られないため）。`layoutTL()` から張り直す
 
 ■ 音の「ずらし」スクラブ（2026-08-15）
 - `#audio-offset-scrub` を左右ドラッグ。**1コマ＝`pxPerFrame()`** にしてあるので
   波形を見ながら合わせられる（数値入力は AE の測定値を打つ用に残す）
 - ドラッグ中は `setAudioOffset(f, true)` で保存を抑え、離した時に1回だけ `scheduleSave()`
+
+■ V2-G2（2026-08-15・追いブラッシュアップ）
+- **画面の行き来はキーで**（`SHORTCUT_ACTIONS` に `global:true` を追加した）。
+  `global` 印のものは **STUDIO / EDIT の両方**で効く＝`onKey` の studio 限定ブロックの
+  **手前**に専用のディスパッチを1つ置いてある。印の無いものは従来どおり STUDIO だけ
+  - `1`=STUDIO ／ `2`=EDIT(GRID) ／ `3`=SINGLE ／ `4`=GRID ／ **`X`=STUDIO ⇄ GRID 入替**
+  - 入口は `enterEdit(mode)` / `gotoEditMode(m)` / `swapStudioGrid()` の3本。
+    トップバーの EDIT ボタンも `enterEdit('grid')` を通る（分岐を二重に書かない）
+- **◆が掴めない問題を直した**。`tail=0` の A→B では **B（カット尻）と次のカットの頭が同じコマ**に来る。
+  さらに `.tl-key` は 45°回転していたので、回転要素に当たり判定を持たせると
+  **外接矩形が巨大化して隣の◆を食う**（11px の◆が実質41px四方を占めていた）。
+  - `.tl-key` を **回転しない当たり箱（24×15）＋ `::after` の回転した◆** の2層に作り直した
+  - `layoutCamKeys()` の `placeKey()` が、近すぎる◆を **段違い**に置く（xは正しい位置のまま）。
+    帯の両端に来た◆は数px内側へ寄せる（半分見切れて掴めないのを防ぐ）。
+    **どちらも表示だけの調整**。`camKeyMove` は掴んだ位置からの相対差分なので影響しない
+- **SINGLE でも色が塗れる**ようにした（`.etool[data-target="color"]` のグレーアウト廃止）。
+  色は「出力枠の空間」なので、ベイク面である editCv から塗るときだけ
+  **`bakeToColorCoord()` で枠に切り戻す**（`sampleCompositeColor` と同じ換算の書き下し）。
+  ブラシ幅は `gridStrokeTo` と同じく **常に `COLOR_W/CONTE_W`**（枠の寄りに依らない）
+  - どの枠を塗るかは `#color-frame-pick` の A/B チップ（`renderColorFramePick`）。GRIDでは出さない
+  - **線画/色のボタンは2つのまま**。色だけ 乗算・濃 を持ち CLEAR も別なので統合しない
+  - `renderColorFramePick` は `dataset.keys` でDOM再構築を省くが、**隠すときに鍵も捨てる**こと
+    （中身だけ消して鍵を残すと、次に出したとき空のまま出る。実際に踏んだ）
+- GRID の表示コントロール（`− % ＋ FIT 色帯 行間 列間`）は **EDIT上部バーへ引き上げた**
+  （旧 `#grid-hud` は撤去。画の上に何も浮かせない）。`#view-edit.grid` の有無で
+  `#view-ctl-single` / `#view-ctl-grid` を差し替える。`#edit-top` も `#bar` と同じく横スクロール
+- BOARD の MOVE / CUT は **紫**（上部メニューの STUDIO/EDIT＝ピンクと役割が違うため）。
+  2つは濃さで区別する（MOVE=濃い / CUT=明るい）
+- トップバーの並び: `… ⇧PROJ ⇩PROJ EXPORT VIDEO ⇩C.SCRIPT ⚙ ⛶ HOME`（出すものを固めた）
+- **`setPointerCapture` は全部 try/catch で包んだ**。合成 PointerEvent では必ず投げるので、
+  包まないと自動検証でハンドラが途中で死ぬ（ECONTEの検証で毎回踏んでいた）
 
 ■ 画面まわり（2026-08-15）
 - **`@` でカーソル下のペインを最大化**（AEの `~`）。`gPointer` に最後のカーソル位置を持ち、
@@ -455,8 +494,9 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   別カットのスナップショットを誤って適用してしまう
 - `renderStudioSync()` の中から `renderTL()` を呼んではいけない（`renderTL` の末尾から呼ばれているので無限再帰）
 - 絵を変える処理で `cut.thumb = null` を忘れると、右パネルのサムネだけ古いまま静かにズレる
-- **検証時の注意**: 合成 `PointerEvent` では `setPointerCapture` が NotFoundError を投げるため、
-  `bDown`/クリップ尺ハンドル/スプリッタが途中で止まる。自動検証では一時的に no-op に差し替えること（実機は無関係）
+- ~~検証時の注意: 合成 `PointerEvent` では `setPointerCapture` が NotFoundError を投げる~~
+  → **2026-08-15 に全箇所 try/catch で包んだので、そのまま合成イベントで検証できる**。
+  新しく `setPointerCapture` を書くときも必ず包むこと（包み忘れると自動検証だけ静かに壊れる）
 - **`node tools/check.js` を編集のたびに回す**。2026-08-02 に `addPhotoFromImage(img,name,blob,at)` の
   引数 `at` と同名の `let at` を関数内に足して SyntaxError（＝スクリプト全体が実行されず画面は
   HTMLだけ表示・コンソールも静か）を出した。check.js は `new Function` で必ず捕まえる
@@ -549,6 +589,15 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
   ★はSHEETへ、余はSETTINGSへ）／尺のコマ数入力＋FRAME/TIME＋焼き込みTIME／
   マーカー（M）／ずらしスクラブ／`@`でペイン最大化／内容欄の高さスプリッタ／
   SETTINGS1画面化＋全消去／PROJ ZIP に音とマーカーを同梱
+- **V2-G2: 実装済み（2026-08-15・追いブラッシュアップ）** — 画面切替のショートカット
+  （`1`/`2`/`3`/`4` と **`X`＝STUDIO ⇄ GRID 入替**・`global` 印で EDIT でも効く）／
+  ◆の当たり判定作り直し（回転を外した当たり箱＋段違い配置。tail=0 の B が掴めなかった）／
+  SINGLEでも色を塗れるように（`bakeToColorCoord` ＋ A/B チップ）／
+  GRIDの表示コントロールを上部バーへ（`#grid-hud` 撤去）／MOVE・CUT を紫に／
+  トップバーの並び（⇩PROJ → EXPORT VIDEO → ⇩C.SCRIPT）／
+  中央=カット尺・TIMELINE=通し位置 の FRAME/TIME 2系統／
+  マーカーを `{f,label}` にして ドラッグ移動・Ctrl+クリック削除・Wクリックでメモ／
+  `setPointerCapture` を全部 try/catch
 - **未着手は V2-E3 のみ**（フォトバッシュ・SINGLE限定）。他のフェーズは全部入っている
   - `cut.layers[]`（最大5・原本Blob＋アフィン変形＋投げ縄マスク＋ブレンド）
     ＋ブラシチップ（**.abrパーサは作らない**・内蔵数種＋透過PNG読み込み）
