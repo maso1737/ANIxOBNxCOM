@@ -385,6 +385,40 @@ body.cvtopen #cvt-modal{display:block}
 #cvt-body #cvt-copy{display:block;width:100%;margin-top:4px;border-color:rgba(90,233,255,.45);color:var(--ice)}
 #cvt-body #cvt-copy:hover{background:rgba(90,233,255,.14);border-color:var(--ice)}
 
+/* ---------- EXPORT モーダル（HTML / 動画 の選択。COPY FOR COMPOSER と同じ作法） ---------- */
+#exp-modal{
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:290;display:none;width:340px;
+  border:1px solid rgba(90,233,255,.5);background:rgba(16,7,34,.98);
+  box-shadow:0 8px 40px rgba(0,0,0,.7),0 0 24px rgba(90,233,255,.1);
+  font-size:10px;letter-spacing:.12em;font-family:var(--mono);
+}
+body.expopen #exp-modal{display:block}
+#exp-head{padding:10px 12px;border-bottom:1px solid rgba(90,233,255,.35);color:var(--ice);font-family:var(--bank);letter-spacing:.2em}
+#exp-head .btn{float:right;border-color:rgba(90,233,255,.45);color:var(--ice);padding:3px 8px}
+#exp-body{padding:10px 12px}
+/* 種類のタブ（HTML / 動画）。選ばれているほうだけ下の設定が出る */
+#exp-kind{display:flex;gap:6px;margin-bottom:9px}
+#exp-kind .btn{flex:1;padding:7px 4px;border-color:rgba(90,233,255,.35);color:var(--ice)}
+#exp-kind .btn.on{background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#04121a;box-shadow:0 0 12px rgba(90,233,255,.4)}
+#exp-body .row{display:flex;align-items:center;gap:8px;margin:6px 0}
+#exp-body .row .k{width:6.4em;flex:none;opacity:.65}
+#exp-body select,#exp-body input[type=number]{
+  flex:1;background:rgba(90,233,255,.06);border:1px solid rgba(90,233,255,.3);color:var(--ice);
+  font-family:var(--mono);font-size:11px;padding:4px 6px;outline:none;
+}
+#exp-body select option{background:#100722;color:var(--ice)}
+#exp-note{font-family:var(--jp);letter-spacing:.03em;opacity:.5;margin:8px 0 4px;line-height:1.6}
+#exp-go{display:block;width:100%;margin-top:6px;padding:8px;border-color:rgba(90,233,255,.5);color:var(--ice);letter-spacing:.18em}
+#exp-go:hover{background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#04121a}
+#exp-go:disabled{opacity:.45;cursor:default}
+/* 進捗バー（書き出し中は入力を伏せる） */
+#exp-prog{display:none;margin-top:8px}
+body.exprun #exp-prog{display:block}
+body.exprun #exp-kind,body.exprun #exp-opts,body.exprun #exp-go{display:none}
+#exp-bar{height:4px;background:rgba(90,233,255,.15);margin-top:6px}
+#exp-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ice),var(--acid))}
+#exp-cancel{display:block;width:100%;margin-top:8px;border-color:rgba(255,79,168,.45);color:var(--acid)}
+
 /* ---------- FROM ANIMATOR modal (SPEC_07 — ap連携=rouge) ---------- */
 #b-ap{border-color:rgba(255,79,168,.4);color:var(--acid)}
 #b-ap:hover{background:rgba(255,79,168,.14);border-color:var(--acid);color:var(--acid)}
@@ -463,15 +497,14 @@ body.cleanview{cursor:none}
 <div id="ticks"></div>
 
 <div id="bar">
-  <span class="title">OBAN <b>BUILDER</b></span>
+  <span class="title"><b>OBAN</b></span>
   <!-- 手順1〜3（PLACE→TAKE→EXPORT） -->
   <button class="btn mode on" id="m-place" title="配置モード：画像をコマとして並べる。ドラッグ=移動 / [ ]=前後 / フレームに重ねて格納 / Wクリック=フレーム内へ / M=マスク編集">1. PLACE 配置</button>
   <button class="btn mode ice" id="m-take" title="カメラモード：スクロールに沿ったカメラワークをキーフレームで打つ。C=CAPTURE / ↑↓=KF移動 / SPACE=PREVIEW">2. TAKE カメラ</button>
-  <button class="btn ex" id="b-export" title="スクロール駆動のモーションコミックを単一HTMLビューアで書き出し（依存ゼロ・画像同梱）">3. EXPORT ▸ HTML</button>
-  <!-- 作成中に使う道具（EXPORTのとなり）。GUIDEはボタン廃止＝Gキー/SETTINGS参照 -->
-  <button class="btn mode" id="b-img" title="画像を選んで追加（複数選択できます。連番4枚以上は自動でパラパラに。iPadはD&Dの代わりにこちら）">＋ 画像</button>
+  <button class="btn ex" id="b-export" title="書き出し（単一HTMLビューア ／ 動画 MP4）を選んで書き出します">3. EXPORT</button>
+  <!-- 作成中に使う道具（EXPORTのとなり）。GUIDE/CLEAR はボタン廃止＝Gキー/SETTINGSへ集約 -->
+  <button class="btn mode" id="b-img" title="画像を選んで追加（複数選択できます。連番4枚以上は自動でパラパラに。iPadはD&Dの代わりにこちら）">▶ pic</button>
   <input type="file" id="oban-img-input" accept="image/*" multiple style="display:none;">
-  <button class="btn" id="b-clear" title="プロジェクトを空にする（元に戻せません）">CLEAR</button>
   <button class="btn mode" id="b-frame" title="フレーム（コマ枠）を追加。画像を重ねて格納できる">+ FRAME</button>
   <button class="btn fx" id="b-fx" title="撮影処理（SATSUEI FX）・DOFピン送り・クリックFXを編集（F）。ONの間はボタンが点灯します">FX [F]</button>
   <button class="btn mode ice" id="b-mon" title="MONITOR：書き出したときの見え方（カメラ・DEPTH・DOFピント）を16:9の小窓で常時表示（P）">▣ MONITOR</button>
@@ -548,9 +581,38 @@ body.cleanview{cursor:none}
 <!-- ============= SETTINGS / SHORTCUTS（中央オーバーレイ・グリッド一覧。中身はJSのSET_GROUPSから生成） ============= -->
 <div id="set-ovl">
   <div id="set-box">
-    <div id="set-head"><span class="t">SETTINGS ／ SHORTCUTS</span><button class="btn" id="set-close" title="閉じる (Esc)">✕</button></div>
+    <!-- CLEAR は econte の「全消去」と同じ位置（SETTINGSの閉じるの隣）。
+         普段のバーには置かない＝押し間違いの入口を作らない -->
+    <div id="set-head"><span class="t">SETTINGS ／ SHORTCUTS</span>
+      <button class="btn" id="b-clear" title="プロジェクトを空にする（元に戻せません。先に EXPORT JSON で保存を）">CLEAR</button>
+      <button class="btn" id="set-close" title="閉じる (Esc)">✕</button></div>
     <div id="set-body"></div>
     <div id="set-note">ショートカットは固定です。書き出したビューアでは <b>S</b> = 字幕 ON/OFF、<b>?fx=0</b> で撮影処理OFF、<b>?sub=0</b> で字幕を初期非表示にできます。</div>
+  </div>
+</div>
+
+<!-- ==================== EXPORT MODAL（HTMLビューア / 動画MP4） ==================== -->
+<div id="exp-modal">
+  <div id="exp-head"><span>3. EXPORT</span><button class="btn" id="exp-close" title="閉じる (Esc)">✕</button></div>
+  <div id="exp-body">
+    <div id="exp-kind">
+      <button class="btn on" data-kind="html" title="スクロールで動く単一HTMLビューア（依存ゼロ・画像は同じフォルダに置く）">HTML ビューア</button>
+      <button class="btn" data-kind="mp4" title="TAKEを頭から最後まで1本の動画に（WebCodecs対応なら非実時間で書き出し）">動画 MP4</button>
+    </div>
+    <div id="exp-opts">
+      <div class="row" data-for="mp4"><span class="k">サイズ</span><select id="exp-size"></select></div>
+      <div class="row" data-for="mp4"><span class="k">FPS</span><select id="exp-fps">
+        <option value="24">24</option><option value="30">30</option><option value="60" selected>60</option>
+      </select></div>
+      <div class="row" data-for="mp4"><span class="k">尺（秒）</span><input type="number" id="exp-sec" min="1" max="600" step="0.5" value="8"></div>
+      <div id="exp-note"></div>
+    </div>
+    <button class="btn" id="exp-go">書き出す</button>
+    <div id="exp-prog">
+      <div id="exp-msg">準備中…</div>
+      <div id="exp-bar"><i></i></div>
+      <button class="btn" id="exp-cancel">中断（Esc）</button>
+    </div>
   </div>
 </div>
 
@@ -1713,12 +1775,16 @@ function kfWinAlpha(ki,P){
   return ain*(1-map(P,seg.p1-w*0.2,seg.p1));
 }
 function vAlpha(t,P){return(t.kf==null||P==null)?1:kfWinAlpha(t.kf,P);}
-function drawSubs(g,P,W,H){   // 画面下部中央 mono 11px（ビューアと同表示・PREVIEW中のみ）
+/* 画面下部中央 mono 11px（ビューアと同表示・PREVIEW中のみ）。
+   scale は既定 DPR。動画書き出しだけは「画面で見えていたのと同じ相対サイズ」になるよう
+   書き出し高さ/画面高さ を掛けて渡す（4Kに 11px の字幕を焼いても読めないため）。 */
+function drawSubs(g,P,W,H,scale){
   if(P==null)return;
+  const DPRs=scale||DPR;
   for(const t of PROJECT.texts){
     if(t.type!=='sub'||t.kf==null||!t.str)continue;
     const a=kfWinAlpha(t.kf,P);if(a<=0.01)continue;
-    g.save();g.globalAlpha=a;g.font=(11*DPR)+'px monospace';g.textAlign='center';
+    g.save();g.globalAlpha=a;g.font=(11*DPRs)+'px monospace';g.textAlign='center';
     g.fillStyle='rgba(0,0,0,.8)';g.fillText(t.str,W/2+1,H-H*0.055+1);
     g.fillStyle='#f2eefc';g.fillText(t.str,W/2,H-H*0.055);
     g.restore();
@@ -1781,7 +1847,9 @@ function fireClickFx(){
   if(gClick&&performance.now()-gClick<180)return;   // 連打はキュー1つ
   gClick=performance.now();
 }
-function applyWipeVisual(P){
+/* ワイプの状態（Pの純関数）。画面表示は CSS フィルタで掛けるが、
+   動画書き出しはピクセルに焼く必要があるので、判定だけ切り出して共有する。 */
+function wipeStateAt(P){
   let inv=false,wa=0;
   if(P!=null)for(const f of PROJECT.frames){
     if(!f.wipe||f._wipeP==null)continue;
@@ -1791,6 +1859,10 @@ function applyWipeVisual(P){
       wa=Math.max(wa,a);
     }
   }
+  return{inv,wa};
+}
+function applyWipeVisual(P){
+  let {inv,wa}=wipeStateAt(P);
   if(gClick){   // V2-D: 0.18秒。invertはワイプ反転とXOR=重なっても破綻しない
     const el=performance.now()-gClick;
     if(el>=180)gClick=0;
@@ -3107,7 +3179,9 @@ addEventListener('keydown',e=>{
   else if(e.key==='h'||e.key==='H')toggleCleanView();               // クリーン表示（ガイド類を全部隠す・OBS等キャプチャ用）
   else if((e.key==='Delete'||e.key==='Backspace')&&mode==='place'&&sel)deleteSel();
   else if(e.key==='Escape'){   // カスケード テキスト待機→APモーダル→コンバータ→FXモーダル→マスク→フレーム内→選択解除→プレビュー
+    if(gVidExporting){gVidAbort=true;return;}   // 書き出し中は中断が最優先
     if(textEd)closeTextEditor(false);   // V2-D（入力フォーカス中はエディタ自身のEscが先に効く）
+    else if(document.body.classList.contains('expopen'))toggleExpModal(false);
     else if(dofPick){dofPick=null;document.body.classList.remove('dofpick');renderCards();}   // ピント取りの取消
     else if(cleanView)toggleCleanView();   // クリーン表示中はEscでも戻せる
     else if(document.body.classList.contains('apopen'))toggleApModal(false);
@@ -3498,9 +3572,18 @@ $('#b-home').addEventListener('click',()=>{ location.href='index.html'; });
 /* ---------- 設定・ショートカット一覧（econte式：中央オーバーレイにグリッドで全部出す） ---------- */
 const SET_GROUPS=[
   {t:'はじめに',rows:[
-    ['画像を D&D','ウィンドウに落とすとコマになる。連番4枚以上は自動でパラパラ（シーケンス）'],
+    ['画像を D&D','コマになる。連番4枚以上は自動でパラパラ'],
+    ['▶ pic','画像を選んで追加（複数可。iPadはこちら）'],
     ['1 / 2','1=PLACE 配置 ／ 2=TAKE カメラ の切替'],
-    ['3. EXPORT','スクロールで動く単一HTMLを書き出し（画像も同梱）'],
+    ['3. EXPORT','<b>HTMLビューア／動画MP4</b>を選んで書き出し'],
+    ['CLEAR','この一覧の ✕ の隣（誤爆しない場所へ移した）'],
+  ]},
+  {t:'動画 MP4 書き出し',rows:[
+    ['中身','TAKE の先頭から末尾まで1本に。撮影FX・DOF・字幕・ワイプも焼き込む'],
+    ['サイズ','画面と同じ／FHD／QHD／4K。<b>16:9なら画面全体＝セーフフレーム</b>'],
+    ['FPS / 尺','24・30・60 ／ 既定は PREVIEW と同じ長さ'],
+    ['速さ','WebCodecs対応なら<b>非実時間</b>。非対応は実時間録画（前面のまま待つ）'],
+    ['中断','Esc または「中断」ボタン（ファイルは保存されません）'],
   ]},
   {t:'1. PLACE 配置',rows:[
     ['ドラッグ','コマを移動（空白＝視点のパン）'],
@@ -3556,7 +3639,7 @@ const SET_GROUPS=[
   ]},
   {t:'共通',rows:[
     ['Ctrl+Z / Ctrl+Shift+Z','元に戻す／やり直し'],
-    ['Esc','キャンセル（クリーン表示→モーダル→選択→プレビューの順に解除）'],
+    ['Esc','キャンセル（書き出し中断→モーダル→選択→プレビューの順）'],
     ['⚙ / ⛶ / HOME','この一覧／全画面／ランディングページ'],
   ]},
   {t:'iPad（キーボードなし）',rows:[
@@ -3604,12 +3687,16 @@ $('#set-ovl').addEventListener('pointerdown',e=>{if(e.target&&e.target.id==='set
   document.addEventListener('fullscreenchange',sync);
   document.addEventListener('webkitfullscreenchange',sync);
 })();
+/* CLEAR は SETTINGS の ✕ の隣（econte の「全消去」と同じ場所）。
+   戻せないので econte と同じく2段確認にしてある */
 $('#b-clear').addEventListener('click',async()=>{
-  if(!await modalConfirm('プロジェクトを空にします。よろしいですか？'))return;
+  if(!await modalConfirm('プロジェクトを空にします。先に EXPORT JSON で保存しましたか？\nこの操作は元に戻せません。'))return;
+  if(!await modalConfirm('本当に全部消します。よろしいですか？'))return;
   PROJECT=migrate({version:2,name:'oban',panels:[],frames:[],take:{version:1,name:'take-A',kf:[]}});
   ctxFrame=null;maskEdit.on=false;maskEdit.f=null;selKf=-1;
   sel=null;renderChip();renderCrumb();rebuild();$('#drop').classList.remove('hide');
   try{localStorage.removeItem('oban-project')}catch(e){}
+  toggleSetModal(false);
 });
 
 /* ============================================================
@@ -4061,9 +4148,7 @@ function frameBody(nowMs){
 requestAnimationFrame(frame);
 ${S}</body></html>`;
 }
-$('#b-export').addEventListener('click',async()=>{
-  if(!PROJECT.panels.length){toast('パネルがありません — まず画像をドロップ');return;}
-  if(!PROJECT.take.kf.length){toast('TAKEが空です — 2.TAKE で C=CAPTURE してから書き出し');return;}
+async function exportViewerHTML(){
   const apb=apBakeData();   // SPEC_07 B2: ap-seqをビューアへ同梱
   const mb=apb.bytes/1048576;
   if(mb>50&&!await modalConfirm('ANIMATORベイクが約'+mb.toFixed(0)+'MBになります。書き出しを続けますか？'))return;
@@ -4076,6 +4161,218 @@ $('#b-export').addEventListener('click',async()=>{
   toast('oban-viewer.html を書き出しました'
     +(apb.miss?('（未同期のANIMATORパネル'+apb.miss+'件はプレースホルダ）'):
       mb>0.05?('（ANIMATORベイク '+mb.toFixed(1)+'MB同梱）'):' — 画像と同じフォルダへ'));
+}
+
+/* ============================================================
+   EXPORT — 動画（MP4）
+   TAKE の P=0→1 を1本の動画に焼く。フレームは **P の純関数**（PREVIEW と同じ式）なので
+   実時間で回す必要が無く、WebCodecs があれば非実時間で一気に書ける。
+   econte の実装（SPEC_13 §5g）と同じ優先順:
+     WebCodecs(H.264)+mp4-muxer → MediaRecorder(mp4) → MediaRecorder(webm)
+   ・キャンバスは **書き出しサイズに一時的に張り替える**（prect が cv.width/height 基準なので、
+     ここを変えずに別解像度で描くと構図がズレる）。終わったら onResize() で戻す。
+   ・16:9 を選ぶと **画面全体＝セーフフレーム**になる（drawGuides の 16:9 枠がキャンバスと一致するため）
+   ・ワイプの反転/白飛びは画面ではCSSフィルタだが、動画では**ピクセルに焼く**（wipeStateAt を共有）
+   ============================================================ */
+const MUXER_CDN='https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.5/build/mp4-muxer.min.js';
+let gMuxLoad=null,gVidExporting=false,gVidAbort=false;
+function loadMuxer(){
+  if(window.Mp4Muxer)return Promise.resolve();
+  if(gMuxLoad)return gMuxLoad;
+  gMuxLoad=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src=MUXER_CDN;
+    s.onload=()=>res();
+    s.onerror=()=>{gMuxLoad=null;rej(new Error('mp4-muxer を読み込めませんでした（オフラインの可能性）'));};
+    document.head.appendChild(s);
+  });
+  return gMuxLoad;
+}
+async function canWebCodecs(W,H,fps){
+  if(!window.VideoEncoder||!window.VideoFrame)return false;
+  try{
+    const s=await VideoEncoder.isConfigSupported({codec:'avc1.4d0034',width:W,height:H,bitrate:vidBitrate(W,H,fps),framerate:fps});
+    if(s&&s.supported)return 'avc1.4d0034';
+    const s2=await VideoEncoder.isConfigSupported({codec:'avc1.42001f',width:W,height:H,bitrate:vidBitrate(W,H,fps),framerate:fps});
+    return (s2&&s2.supported)?'avc1.42001f':false;
+  }catch(e){return false;}
+}
+function vidBitrate(W,H,fps){ // だいたい 0.1bit/px/frame。4K60で約50Mbps
+  return Math.round(clamp(W*H*fps*0.1,4e6,6e7));
+}
+function expProgress(msg,ratio){
+  const m=$('#exp-msg'),b=$('#exp-bar');
+  if(m)m.textContent=msg;
+  if(b&&b.firstElementChild)b.firstElementChild.style.width=Math.round(clamp(ratio||0,0,1)*100)+'%';
+}
+/* 1フレーム描く。P の純関数（PREVIEW/書き出しビューアと同じ経路）。
+   返すのは合成済みの expCv（撮影FX・字幕・ワイプまで乗せた最終画）。 */
+function vidRenderFrame(P,tS,W,H,expCx,expCv,subScale){
+  const fxp=PROJECT.take.fx;
+  const useFx=!!(fxp&&fxp.enabled&&gFxOK());
+  const cam=camAt(P);
+  const keep=cx;
+  MONI=true;                       // ビルダーの上乗せ（選択枠・バッジ）を止める＝書き出しと同じ絵
+  try{
+    if(useFx){ensureSc(W,H);cx=gScx;}
+    else cx=expCx;
+    cx.setTransform(1,0,0,1,0,0);
+    cx.globalAlpha=1;cx.filter='none';cx.globalCompositeOperation='source-over';
+    cx.clearRect(0,0,W,H);
+    cx.fillStyle='#07030f';cx.fillRect(0,0,W,H);   // 動画は透明を持てないので下地を敷く
+    renderWorld(cam,tS,P);
+    if(useFx){
+      const out=gFxApplySafe(gSc,fxp,{t:tS});
+      expCx.setTransform(1,0,0,1,0,0);
+      expCx.globalAlpha=1;expCx.filter='none';
+      expCx.clearRect(0,0,W,H);expCx.drawImage(out,0,0,W,H);
+    }
+  }finally{cx=keep;MONI=false;}
+  /* 字幕とワイプ（ビューアと同じ順: 字幕 → ワイプ白／反転） */
+  drawSubs(expCx,P,W,H,subScale);
+  const {inv,wa}=wipeStateAt(P);
+  if(inv){   // 画面ではCSSの invert。動画はピクセルに焼く
+    expCx.save();expCx.filter='invert(1) hue-rotate(180deg)';
+    expCx.drawImage(expCv,0,0);expCx.restore();
+  }
+  if(wa>0.01){expCx.save();expCx.globalAlpha=wa;expCx.fillStyle='#fff';expCx.fillRect(0,0,W,H);expCx.restore();}
+  return expCv;
+}
+function saveVideoBlob(blob,ext){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  a.href=url;a.download='oban_'+ts+'.'+ext;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+  toast(ext.toUpperCase()+' を書き出しました（'+Math.round(blob.size/1048576*10)/10+'MB）');
+}
+async function exportVideo(W,H,fps,sec){
+  if(gVidExporting)return;
+  const N=Math.max(2,Math.round(sec*fps));
+  // 画面のキャンバスを書き出しサイズへ張り替える（メインループは止めておく）
+  const save={w:cv.width,h:cv.height,mode,pv:PV.on,pvp:PV.p,clean:cleanView};
+  gVidExporting=true;gVidAbort=false;
+  document.body.classList.add('exprun');
+  PV.on=false;
+  const expCv=document.createElement('canvas');expCv.width=W;expCv.height=H;
+  const expCx=expCv.getContext('2d');
+  const subScale=DPR*(H/Math.max(save.h,1));   // 字幕は「画面で見えていたのと同じ相対サイズ」に
+  cv.width=W;cv.height=H;
+  let blob=null,ext='mp4';
+  try{
+    const codec=await canWebCodecs(W,H,fps);
+    if(codec){
+      expProgress('mp4-muxer を読み込み中…',0);
+      await loadMuxer();
+      const M=window.Mp4Muxer;
+      const target=new M.ArrayBufferTarget();
+      const muxer=new M.Muxer({target,video:{codec:'avc',width:W,height:H,frameRate:fps},fastStart:'in-memory'});
+      let encErr=null;
+      const enc=new VideoEncoder({output:(c,m)=>muxer.addVideoChunk(c,m),error:e=>{encErr=e;}});
+      enc.configure({codec,width:W,height:H,bitrate:vidBitrate(W,H,fps),framerate:fps});
+      const us=Math.round(1e6/fps);
+      for(let f=0;f<N;f++){
+        if(gVidAbort||encErr)break;
+        const P=f/(N-1);
+        vidRenderFrame(P,f/fps,W,H,expCx,expCv,subScale);
+        const vf=new VideoFrame(expCv,{timestamp:f*us,duration:us});
+        enc.encode(vf,{keyFrame:f%(fps*2)===0});
+        vf.close();
+        if(f%6===0){
+          expProgress('MP4 '+Math.round(f/N*100)+'%（'+W+'×'+H+' / '+fps+'fps）',f/N);
+          await new Promise(r=>setTimeout(r,0));   // UIを固めない
+        }
+      }
+      await enc.flush();enc.close();
+      if(encErr)throw encErr;
+      muxer.finalize();
+      if(!gVidAbort)blob=new Blob([target.buffer],{type:'video/mp4'});
+    }else{
+      /* フォールバック: 実時間録画。オフスクリーンを captureStream して自分でコマを送る
+         （タブを前面に置いたまま尺ぶん待つ必要がある） */
+      const mime=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm']
+        .find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));
+      if(!mime)throw new Error('この環境では動画書き出しに未対応です');
+      ext=mime.indexOf('mp4')>=0?'mp4':'webm';
+      toast('WebCodecs 非対応のため実時間録画に切替（このタブを前面のままにしてください）');
+      const stream=expCv.captureStream(fps);
+      const chunks=[];
+      const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:vidBitrate(W,H,fps)});
+      rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+      const done=new Promise(r=>{rec.onstop=r;});
+      rec.start(250);
+      const t0=performance.now();
+      for(let f=0;f<N;f++){
+        if(gVidAbort)break;
+        vidRenderFrame(f/(N-1),f/fps,W,H,expCx,expCv,subScale);
+        if(f%6===0)expProgress('REC '+Math.round(f/N*100)+'%（実時間・'+ext.toUpperCase()+'）',f/N);
+        const due=t0+(f+1)*1000/fps;
+        await new Promise(r=>setTimeout(r,Math.max(0,due-performance.now())));
+      }
+      rec.stop();await done;
+      if(!gVidAbort&&chunks.length)blob=new Blob(chunks,{type:mime});
+    }
+  }catch(e){
+    console.error('[OBAN] exportVideo',e);
+    toast('動画書き出しに失敗: '+(e.message||e));
+  }finally{
+    cv.width=save.w;cv.height=save.h;
+    mode=save.mode;PV.on=save.pv;PV.p=save.pvp;cleanView=save.clean;
+    gVidExporting=false;
+    document.body.classList.remove('exprun');
+    onResize();                       // CVOFF/--bartop とワイプ発火点を取り直す
+    resetCanvasState();
+  }
+  if(blob)saveVideoBlob(blob,ext);
+  else if(gVidAbort)toast('動画書き出しを中断しました');
+}
+
+/* ---------- EXPORT モーダル ---------- */
+let expKind='html';
+function expSizeOptions(){
+  const s=$('#exp-size');if(!s)return;
+  const W=cv.width,H=cv.height;
+  const list=[[W,H,'画面と同じ'],[1920,1080,'FHD 16:9'],[2560,1440,'QHD 16:9'],[3840,2160,'4K 16:9']];
+  s.innerHTML=list.map((o,i)=>`<option value="${o[0]}x${o[1]}"${i===0?' selected':''}>${o[2]} — ${o[0]}×${o[1]}</option>`).join('');
+}
+function expSyncUI(){
+  $('#exp-kind').querySelectorAll('.btn').forEach(b=>b.classList.toggle('on',b.dataset.kind===expKind));
+  $('#exp-opts').querySelectorAll('[data-for]').forEach(r=>{r.style.display=(r.dataset.for===expKind)?'':'none';});
+  const n=$('#exp-note');
+  n.innerHTML=(expKind==='html')
+    ? 'スクロールで動く<b>単一HTML</b>。画像は同梱しないので、書き出したHTMLを<b>画像と同じフォルダ</b>に置いてください（ANIMATOR連番だけは同梱されます）。'
+    : 'TAKE の先頭から末尾までを1本の動画に。<b>16:9 を選ぶと画面全体＝セーフフレーム</b>になります。'
+      +'「画面と同じ」はいまのウィンドウの見え方そのまま。撮影FX・DOF・字幕・ワイプも焼き込まれます。'
+      +'<br>WebCodecs 対応なら<b>非実時間</b>（待つだけ）、非対応なら実時間録画に切り替わります。';
+}
+function toggleExpModal(force){
+  const open=(typeof force==='boolean')?force:!document.body.classList.contains('expopen');
+  if(open){
+    if(!PROJECT.panels.length){toast('パネルがありません — まず画像をドロップ');return;}
+    if(!PROJECT.take.kf.length){toast('TAKEが空です — 2.TAKE で C=CAPTURE してから書き出し');return;}
+    expSizeOptions();
+    const sec=$('#exp-sec');if(sec)sec.value=Math.max(1,Math.round((TT.total||1)*1.15*10)/10);   // PREVIEWと同じ尺
+    expSyncUI();
+  }
+  document.body.classList.toggle('expopen',open);
+  if(!open)document.body.classList.remove('exprun');
+}
+$('#b-export').addEventListener('click',()=>toggleExpModal());
+$('#exp-close').addEventListener('click',()=>toggleExpModal(false));
+$('#exp-kind').addEventListener('click',e=>{
+  const b=e.target.closest&&e.target.closest('.btn');
+  if(!b||!b.dataset.kind)return;
+  expKind=b.dataset.kind;expSyncUI();
+});
+$('#exp-cancel').addEventListener('click',()=>{gVidAbort=true;});
+$('#exp-go').addEventListener('click',async()=>{
+  if(expKind==='html'){toggleExpModal(false);await exportViewerHTML();return;}
+  const [W,H]=String($('#exp-size').value).split('x').map(Number);
+  const fps=+$('#exp-fps').value||30;
+  const sec=Math.max(1,parseFloat($('#exp-sec').value)||8);
+  expProgress('準備中…',0);
+  await exportVideo(W,H,fps,sec);
+  toggleExpModal(false);
 });
 
 /* ============================================================
@@ -4110,6 +4407,9 @@ function frame(nowMs){
 }
 function frameBody(nowMs){
   const dt=clamp((nowMs-(frame.last??nowMs))/1000,0,0.05);frame.last=nowMs;
+  /* 動画書き出し中はキャンバスを書き出しサイズに張り替えて自前でコマを描いているので、
+     編集用の描画は止める（同じキャンバスを取り合うと1コマおきに編集画が混ざる） */
+  if(gVidExporting)return;
   const tS=nowMs/1000;
   const W=cv.width,H=cv.height;
   // 毎フレームの衛生管理（save/restore の取りこぼしを次のフレームへ持ち越さない）

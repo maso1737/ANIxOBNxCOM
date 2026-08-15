@@ -620,3 +620,50 @@ MONITOR は KF ごとに別の絵（平均色で FAR=青 / NEAR=桃）を出す�
 ビューア実生成→iframe で `planeZoom`/`dofWin`/`frameBody` 生存・例外注入でも rAF 継続・filter 復帰を実測。
 COMPOSER は実クリックで「モーダル開＝非点灯／ENABLED ON＝点灯／FX PREVIEW＝primary／
 ＋FINAL PREVIEW＝final」を確認。
+
+## メニューバー整理と EXPORT ダイアログ（HTML / 動画 MP4）（2026-08-15 第2弾）
+
+### バーの整理
+
+- タイトルを **`OBAN`** に（`BUILDER` を落とした）／`＋ 画像` → **`▶ pic`**／`3. EXPORT ▸ HTML` → **`3. EXPORT`**
+- **`CLEAR` はバーから撤去し、SETTINGS の ✕ の隣へ**（econte の「全消去」と同じ位置・同じ考え方）。
+  戻せない操作なので **2段 modalConfirm** にし、実行後は SETTINGS を閉じる
+- 結果、1400×900 で**バーが1段に収まる**（＝`--bartop` も CVOFF も小さくなる）
+
+### EXPORT ダイアログ（`#exp-modal`）
+
+`3. EXPORT` は書き出しの**種類を選ぶダイアログ**を出す。`HTML ビューア` / `動画 MP4` のタブで、
+動画のときだけ サイズ / FPS / 尺 の行が出る（`data-for` で出し分け）。Esc・✕ で閉じる。
+
+### 動画（MP4）書き出し
+
+**なぜ非実時間でいけるか**: OBAN のフレームは **P の純関数**（`camAt(P)` / `focusAt(P)` / `applyFxRect(…,P)`）。
+再生を待つ必要がないので、WebCodecs があれば一気に回せる。econte（SPEC_13 §5g）と同じ優先順:
+
+```
+WebCodecs(H.264)+mp4-muxer → MediaRecorder(mp4) → MediaRecorder(webm)
+```
+
+- **キャンバスを書き出しサイズへ一時的に張り替える**。`prect()` は `cv.width/height` 基準なので、
+  ここを変えずに別解像度で描くと構図がズレる。終わったら `onResize()` で戻す
+- 同じキャンバスを取り合わないよう、**`gVidExporting` の間は `frameBody` を早期 return** で止める
+- **16:9 を選ぶと画面全体＝セーフフレーム**になる（`drawGuides` の16:9枠がキャンバスと一致するため）。
+  「画面と同じ」はいまのウィンドウの見え方そのまま
+- 焼き込む順は **ビューアと同じ**: renderWorld（DOF込み）→ 撮影FX → 字幕 → ワイプ。
+  ワイプの反転は画面ではCSSフィルタなので、**動画ではピクセルに焼く**（判定を `wipeStateAt(P)` に切り出して共有）
+- 動画は透明を持てないので下地 `#07030f` を敷く
+- **字幕だけは `drawSubs(g,P,W,H,scale)` の第5引数で拡大**する（既定は従来どおり `DPR`）。
+  4K に 11px の字幕を焼いても読めないので、`DPR*(書き出し高/画面高)` を渡して
+  「画面で見えていたのと同じ相対サイズ」にする
+- ビットレートは `W*H*fps*0.1` を 4〜60Mbps でクランプ（4K60 ≒ 50Mbps）
+- 中断は **Esc または「中断」ボタン**（`gVidAbort`）。Esc のカスケードでは**書き出し中断が最優先**
+- 実測（Chrome / 1400×900）:
+  640×360@30 = 30コマ 0.6秒 ／ **3840×2160@60 = 107ms/コマ**（7.2秒の尺で約46秒）／
+  撮影FX(diffusion)込みでも成功。生成物は `video/mp4` で `<video>` から
+  尺1.00s・640×360・**先頭/中/末で絵が変わる**（FAR→引き→NEAR）ことまで確認
+
+### 検証（2026-08-15 第2弾）
+
+`node tools/check.js` ALL PASS ／ `npm run verify:oban` **6/6 = 0.000%**（ベースライン不変）。
+MP4 は実生成→`<video>` でデコードして尺・解像度・内容の変化を実測。
+FX込み・中断・4K60・HTML経路・CLEARの2段確認・設定UIが1画面に収まること（571/571px・5列・10グループ）を確認。
