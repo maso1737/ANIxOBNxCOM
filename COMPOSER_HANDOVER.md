@@ -349,3 +349,21 @@ cd verify && npm run verify:composer
 - **撮影は `drawFrame()` をコンポ解像度1:1で叩いた `#harness-shot`。** `drawCurrentFrame()` は
   通さないので **FXチェーン（SATSUEI）とドラフト再生は現状カバー外**。FXも検証したくなったら
   別ラベルの config を足す（WebGL経路なので baseline の環境依存が強くなる点に注意）。
+
+## トップバー FXボタンの点灯規則（2026-08-15）
+
+3ツールで意味を揃えた。**点灯＝効いている／ホバー＝枠だけ（押せる合図）**。
+「モーダルが開いているか」は点灯の意味にしない（開いていることは見れば分かるため）。
+
+| ボタン | 状態 | 見た目 |
+|---|---|---|
+| `#btn-fx` | `state.fx.enabled`（SATSUEI FX ENABLED） | `.primary`（枠＋薄い地） |
+| `#btn-fx-preview` | `gFxPreview` | `.primary` |
+| `#btn-fx-preview` | `gFxPreview && gFxFinalPrev`（FINAL PREVIEW） | `.primary.final`（フル点灯） |
+| すべて | ホバー | 枠が明るくなるだけ（`#topbar button:hover`） |
+
+- 集約先は **`syncFxBtns()`**。呼ぶのは master チェック／FINAL PREVIEW チェック／`toggleFxPreview()`／
+  `finishImport()`（プロジェクト読み込み）／起動時の5か所
+- `closeSfxModal()` / `toggleSfxModal()` は **`.primary` に触らない**（開閉と点灯を切り離した）
+- CSS は `#topbar button.primary.final` を追加。OBAN の `.btn.fx.on` と同じ考え方
+- 検証: `npm run verify:composer` 6/6 = 0.000%（見た目の回帰なし）＋実クリックで4状態を確認

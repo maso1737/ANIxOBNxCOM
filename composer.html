@@ -454,6 +454,17 @@ input[type=number]{-moz-appearance:textfield;}
   border-color:transparent;color:#0a0612;
   box-shadow:0 0 14px rgba(255,79,168,0.45);
 }
+/* ── final = 最終品質で見えている状態（FINAL PREVIEW ON）＝ボタン自体を点灯 ──
+   ホバー＝枠 / primary＝効いている / final＝いちばん強い状態、の3段。OBAN の FX ボタンと同じ作法 */
+#topbar button.primary.final{
+  background:linear-gradient(135deg,var(--acid),var(--magenta));
+  border-color:transparent;color:#0a0612;
+  box-shadow:0 0 14px rgba(255,79,168,0.45);
+}
+#topbar button.primary.final:hover{
+  background:linear-gradient(135deg,#ff8fc4,var(--acid));
+  box-shadow:0 0 18px rgba(255,79,168,0.6);
+}
 
 /* ── データ値＝ice ── */
 .corner .lbl{color:rgba(255,210,122,0.75);}
@@ -2115,6 +2126,7 @@ function finishImport(){
   updateInspector(); updateKfUI(); drawCurrentFrame(); updateTransport();
   $('#empty-state').style.display='none';
   updateExportButtons();
+  syncFxBtns();   // 読み込んだプロジェクトの fx.enabled をトップバーの点灯へ反映
   recordHistory();
   saveAutosaveCells(); // SPEC_11 P1: 絵はimport完了時に保存（metaはrecordHistory経由）
   announceLive();
@@ -4427,12 +4439,12 @@ function buildSfxUI(){
   const fx=state.fx||(state.fx=SatsueiFX.makeDefaultFx());
   const master=document.createElement('label'); master.className='sfx-master';
   master.innerHTML='<input type="checkbox"'+(fx.enabled?' checked':'')+'><span>SATSUEI FX ENABLED</span>';
-  master.querySelector('input').addEventListener('change',e=>{fx.enabled=e.target.checked;sfxChanged();});
+  master.querySelector('input').addEventListener('change',e=>{fx.enabled=e.target.checked;syncFxBtns();sfxChanged();});
   root.appendChild(master);
   const fin=document.createElement('label'); fin.className='sfx-master sfx-final';
   fin.title='停止中の現在フレームをfinal品質（MBサブフレーム蓄積＋DOF）で表示。再生中は自動でdraftに戻ります';
   fin.innerHTML='<input type="checkbox"'+(gFxFinalPrev?' checked':'')+'><span>FINAL PREVIEW（MB+DOF・停止中のみ）</span>';
-  fin.querySelector('input').addEventListener('change',e=>{gFxFinalPrev=e.target.checked;sfxChanged();});
+  fin.querySelector('input').addEventListener('change',e=>{gFxFinalPrev=e.target.checked;syncFxBtns();sfxChanged();});
   root.appendChild(fin);
   for(const ent of fx.chain){
     const def=SatsueiFX.FX_DEFS[ent.t]; if(!def) continue; // 未知tはUIにも出さない
@@ -4463,12 +4475,21 @@ function buildSfxUI(){
   }
 }
 function sfxChanged(){ if(gFxPreview) drawCurrentFrame(); } // undo対象外（SPEC_06 v1）
-function closeSfxModal(){ $('#sfx-modal').classList.remove('show'); $('#btn-fx').classList.remove('primary'); }
-// FXボタンは開く/閉じるのトグル（✕とEscでも閉じる。ボタンは開いている間 primary で光る）
+/* トップバーのFX系ボタンの点灯を状態に合わせる。
+   ・FX          … SATSUEI FX ENABLED が ON（＝撮影処理がかかっている）
+   ・FX PREVIEW  … プレビューに適用中（primary）／FINAL PREVIEW も ON なら final でフル点灯
+   モーダルの開閉ではなく **効いているかどうか** を点灯の意味にする（ホバーは枠だけ＝押せる合図）。 */
+function syncFxBtns(){
+  const bf=$('#btn-fx'); if(bf) bf.classList.toggle('primary', !!(state.fx&&state.fx.enabled));
+  const bp=$('#btn-fx-preview');
+  if(bp){ bp.classList.toggle('primary',gFxPreview); bp.classList.toggle('final',gFxPreview&&gFxFinalPrev); }
+}
+function closeSfxModal(){ $('#sfx-modal').classList.remove('show'); }
+// FXボタンは開く/閉じるのトグル（✕とEscでも閉じる）。点灯は「開いているか」ではなく「効いているか」
 function toggleSfxModal(){
   const m=$('#sfx-modal');
   if(m.classList.contains('show')){ closeSfxModal(); return; }
-  buildSfxUI(); m.classList.add('show'); $('#btn-fx').classList.add('primary');
+  buildSfxUI(); m.classList.add('show');
   bringToFront('#sfx-modal',true); // 下敷きのまま開いて「押しても出ない」に見えるのを防ぐ
 }
 $('#btn-fx').addEventListener('click',toggleSfxModal);
@@ -4476,11 +4497,12 @@ $('#sfx-close').addEventListener('click',closeSfxModal);
 makeFloatDrag($('#sfx-modal'), $('#sfx-head'), t=>t.id==='sfx-close'); // フローティング（INSPECTOR/QUICK TRANSFORMと同じ）
 function toggleFxPreview(){
   gFxPreview=!gFxPreview;
-  $('#btn-fx-preview').classList.toggle('primary',gFxPreview);
+  syncFxBtns();
   drawCurrentFrame();
   flashLive(gFxPreview?'撮 FX PREVIEW ON（draft品質）':'撮 FX PREVIEW OFF');
 }
 $('#btn-fx-preview').addEventListener('click',toggleFxPreview);
+syncFxBtns();   // 起動時の状態を反映（プロジェクト復元でFXがONのまま戻ることがある）
 
 // ── EXPORT WEB（モーションコミック HTML ビューア）── 仕様: EXPORT_WEB_SPEC.md
 function webRange(){
