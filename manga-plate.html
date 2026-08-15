@@ -559,13 +559,27 @@ function clipHalf(poly,nx,ny,d){
   return out;
 }
 function pathPoly(g,p){g.beginPath();g.moveTo(p[0].x,p[0].y);for(let i=1;i<p.length;i++)g.lineTo(p[i].x,p[i].y);g.closePath();}
-/* 断ち切り: 内枠に接した辺を用紙の端まで伸ばす */
-function dispPoly(k){
-  if(!k.bleed)return k.poly;
+/* 内枠に接した頂点を用紙の端へ出す（矩形の角にだけ使う。斜めの辺には使わない） */
+function outToPaper(p){
   const b=PAPER.bas, E=Math.max(4,PAPER.w*0.006);
-  return k.poly.map(q=>({
+  return p.map(q=>({
     x:Math.abs(q.x-b.x)<E?0:(Math.abs(q.x-(b.x+b.w))<E?PAPER.w:q.x),
     y:Math.abs(q.y-b.y)<E?0:(Math.abs(q.y-(b.y+b.h))<E?PAPER.h:q.y)}));
+}
+/* 断ち切り: 内枠に接した辺を用紙の端まで伸ばす。
+   頂点をそのまま外へ動かすと、斜めの辺は「まっすぐ上/横」へ引っぱられて角度が変わってしまう。
+   そこで base（内枠）だけを用紙いっぱいに広げ、分割線は動かさずに切り直す
+   ＝ 斜めの辺は自分の角度のまま用紙の端まで伸びる。 */
+function dispPoly(k){
+  if(!k.bleed)return k.poly;
+  if(!k.cuts||!k.cuts.length)return outToPaper(k.poly);   // 分割由来でないコマ（=内枠いっぱいの矩形）
+  let poly=outToPaper(k.base);
+  for(const c of k.cuts){
+    poly=c.side>0?clipHalf(poly,c.nx,c.ny,cutD(c)-c.gap/2)
+                 :clipHalf(poly,-c.nx,-c.ny,-(cutD(c)+c.gap/2));
+    if(poly.length<3)return k.poly;                       // 破綻したら伸ばさない
+  }
+  return poly;
 }
 /* 読み順（右綴じ=右上から）で並べ替え。コマ番号表示用 */
 function sortPanels(pg){
@@ -1196,12 +1210,13 @@ let drag=null, lasso=null;
 const tPts=new Map();          // pointerId → {x,y}（画面座標）
 let gestureLock=false, pinch=null;
 function cancelGestures(){drag=null;lasso=null;divPreview=null;}
+const PINCH_SETTLE=80, PINCH_SLOP=16;   // 指が落ち着くまでの猶予ms / 効き始める移動量px
 function pinchStart(){
   const a=[...tPts.values()];if(a.length<2)return;
   const r=cvs.getBoundingClientRect();
   pinch={d0:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1,
          mx:(a[0].x+a[1].x)/2-r.left,my:(a[0].y+a[1].y)/2-r.top,
-         z0:view.z,vx:view.x,vy:view.y,on:false};
+         z0:view.z,vx:view.x,vy:view.y,on:false,t0:performance.now()};
 }
 /* 2本指ピンチ＝ズーム＋パン（指の中点を画面に貼り付けたまま拡縮） */
 function pinchMove(){
@@ -1209,8 +1224,15 @@ function pinchMove(){
   const r=cvs.getBoundingClientRect();
   const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
   const mx=(a[0].x+a[1].x)/2-r.left, my=(a[0].y+a[1].y)/2-r.top;
-  /* 少し動くまでは何もしない＝2本指タップ（UNDO）に譲る */
-  if(!pinch.on&&Math.abs(d-pinch.d0)<12&&Math.hypot(mx-pinch.mx,my-pinch.my)<12)return;
+  if(!pinch.on){
+    /* 置いた直後は基準を指に追従させるだけ＝3本目が着くまでの数十msで拡縮が始まらない
+       （2本指タップ/3本指タップの着地は必ずこの窓に入る） */
+    if(performance.now()-pinch.t0<PINCH_SETTLE){
+      pinch.d0=d||1;pinch.mx=mx;pinch.my=my;pinch.z0=view.z;pinch.vx=view.x;pinch.vy=view.y;return;
+    }
+    /* 少し動くまでは何もしない＝2本指タップ（UNDO）に譲る */
+    if(Math.abs(d-pinch.d0)<PINCH_SLOP&&Math.hypot(mx-pinch.mx,my-pinch.my)<PINCH_SLOP)return;
+  }
   pinch.on=true;
   const z=clamp(pinch.z0*(d/pinch.d0),0.005,4);
   const Cx=cvs.width/(2*DPR), Cy=cvs.height/(2*DPR);
@@ -1333,6 +1355,7 @@ function touchEnd(ev){
   if(ev.pointerType!=='touch')return false;
   tPts.delete(ev.pointerId);
   if(tPts.size<2)pinch=null;
+  else if(tPts.size===2)pinchStart();       // 3本→2本に戻ったら、今の指で取り直してピンチ再開
   if(tPts.size)return true;                 // まだ指が残っている
   const was=gestureLock;gestureLock=false;
   return was;
@@ -1469,7 +1492,12 @@ $('#paper-preset').addEventListener('change',ev=>{
     const ox=old.w/2, oy=old.h/2, nx=np.w/2, ny=np.h/2;
     const T=(x,y)=>({x:(x-ox)*r+nx, y:(y-oy)*r+ny});
     BOOK.pages.forEach(pg=>{
-      pg.panels.forEach(k=>{k.poly=k.poly.map(q=>T(q.x,q.y));});
+      /* poly だけでなく base と分割線も一緒に運ぶ（片方だけだと断ち切り表示と線編集が壊れる） */
+      pg.panels.forEach(k=>{
+        k.poly=k.poly.map(q=>T(q.x,q.y));
+        if(Array.isArray(k.base))k.base=k.base.map(q=>T(q.x,q.y));
+        (k.cuts||[]).forEach(c=>{const t=T(c.ax,c.ay);c.ax=t.x;c.ay=t.y;c.gap=c.gap*r;});   // 法線は等倍なので不変
+      });
       pg.items.forEach(it=>{const t=T(it.x,it.y);it.x=t.x;it.y=t.y;
         ['w','h','r0','r1','dot','gap','lw'].forEach(f=>{if(typeof it[f]==='number')it[f]=Math.max(1,Math.round(it[f]*r));});
         if(it.type==='img')it.scale=it.scale*r;

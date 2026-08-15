@@ -18,6 +18,7 @@
   --bank:'Bank Gothic','Barlow Condensed','Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
   --mono:'IBM Plex Mono','Menlo','Consolas',monospace;
   --jp:-apple-system,'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
+  --bartop:42px;   /* トップバーの高さ。ビューの top と1か所で揃える（大きいUIで伸びる） */
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden}
@@ -32,10 +33,13 @@ body{
 }
 /* ---------- top bar ---------- */
 #bar{
-  position:fixed;left:0;right:0;top:0;height:42px;z-index:50;display:flex;align-items:center;gap:7px;
+  position:fixed;left:0;right:0;top:0;height:var(--bartop);z-index:50;display:flex;align-items:center;gap:7px;
   padding:0 14px;background:var(--panel);border-bottom:1px solid var(--border);
   font-size:9px;letter-spacing:.14em;
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;   /* 狭い画面ではバーごと横に流せる */
 }
+#bar::-webkit-scrollbar{height:0}
+#bar > *{flex:none}
 #bar .title{font-family:var(--bank);letter-spacing:.32em;margin-right:10px;text-shadow:0 0 10px rgba(255,79,168,.25)}
 #bar .title b{color:var(--acid);font-weight:400}
 .btn{
@@ -52,16 +56,18 @@ body{
 #bar-total{margin-left:auto;color:var(--gold);letter-spacing:.12em}
 #save-dot{color:var(--grey);min-width:52px;text-align:right}
 /* ---------- views（V2-A: STUDIO / EDIT の2つ） ---------- */
-.view{position:fixed;left:0;right:0;top:42px;bottom:0;display:none}
+.view{position:fixed;left:0;right:0;top:var(--bartop);bottom:0;display:none}
 .view.on{display:block}
 #view-studio{display:none;flex-direction:column}
 #view-studio.on{display:flex}
 #studio-main{flex:1;display:flex;min-height:0}
 /* ペイン境界のスプリッタ（ドラッグで幅変更・ダブルクリックで既定へ） */
 .splitter{
-  flex:none;width:5px;cursor:col-resize;touch-action:none;
+  flex:none;width:5px;cursor:col-resize;touch-action:none;position:relative;
   background:rgba(255,210,122,.10);transition:background .12s;
 }
+/* 見た目は細いまま、当たり判定だけ左右へ広げる（ペン/指で掴めるように） */
+.splitter::before{content:'';position:absolute;top:0;bottom:0;left:-6px;right:-6px}
 .splitter:hover{background:rgba(255,79,168,.55)}
 .splitter.on{background:var(--acid)}
 /* ---------- STUDIO 左: BOARD ---------- */
@@ -77,14 +83,17 @@ body{
 .tb-div{width:1px;height:16px;background:var(--border);margin:0 3px}
 #board-lock-tx{color:var(--gold);font-size:9px;letter-spacing:.08em}
 #studio-board.has-clip #board-topbar{top:26px}
+/* 選択中CUT枠の表示（枠を選んだときだけ出す） */
+#cutsel-box{display:none;align-items:center;gap:6px}
+#cutsel-box.on{display:flex}
 #board-tools{
-  position:absolute;left:12px;top:46px;display:flex;flex-direction:column;gap:6px;
+  position:absolute;left:12px;top:46px;display:none;flex-direction:column;gap:6px;
   background:rgba(21,9,39,.86);border:1px solid var(--border);padding:9px;z-index:10;
   backdrop-filter:blur(3px);max-height:calc(100% - 58px);overflow-y:auto;
 }
+#board-tools.on{display:flex}
 #studio-board.has-clip #board-tools{top:72px}
 #board-tools .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-#board-hint{color:var(--grey);font-size:9px;letter-spacing:.06em;max-width:212px;line-height:1.6;font-family:var(--jp)}
 #zoom-label{color:var(--gold);font-size:9px;letter-spacing:.1em}
 /* REF BOARD クリップ帯（SPEC_13 §2-1a） */
 #clip-bar{
@@ -95,55 +104,56 @@ body{
 #clip-tx{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #clip-bar .btn{padding:3px 7px;font-size:8px}
 /* 選択中オブジェクトのパネル */
-#photo-panel,#cutframe-panel{display:none;flex-direction:column;gap:5px;border-top:1px solid var(--border);padding-top:7px}
-#photo-panel.on,#cutframe-panel.on{display:flex}
+#photo-panel{display:none;flex-direction:column;gap:5px}
+#photo-panel.on{display:flex}
 #board-tools .sld-row{gap:5px}
 #board-tools .sld-row input[type=range]{width:96px}
 .sld-k{color:var(--grey);font-size:9px;min-width:14px}
-.mini-note{color:var(--dim);font-size:9px;font-family:var(--jp);line-height:1.5;max-width:212px}
 #photo-ref-tx{color:var(--ice);font-size:9px;font-family:var(--jp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:120px}
-#cutframe-label{font-family:var(--bank);font-size:13px;letter-spacing:.1em;color:var(--acid)}
-/* 枠列（cam[]）の行 */
-#cam-list{display:flex;flex-direction:column;gap:3px}
-.cam-row{display:flex;align-items:center;gap:3px;padding:2px;border:1px solid transparent;cursor:pointer}
-.cam-row.on{border-color:var(--acid);background:rgba(255,79,168,.10)}
-.cam-k{font-family:var(--bank);font-size:11px;color:var(--ice);min-width:14px}
-.cam-at{color:var(--dim);font-size:8px;min-width:30px}
-.cam-dur{
-  width:40px;background:var(--black);border:1px solid var(--border);color:var(--gold);
-  font-family:var(--mono);font-size:10px;text-align:center;padding:2px;
-  -webkit-user-select:text;user-select:text;
-}
-.cam-dur:focus{outline:none;border-color:var(--border-bright)}
-.cam-dur:disabled{opacity:.25}
-.cam-ease{
-  background:var(--black);border:1px solid var(--border);color:rgba(255,255,255,.8);
-  font-family:var(--mono);font-size:9px;padding:2px 1px;max-width:74px;
-}
-.cam-ease:disabled{opacity:.25}
-.cam-row .btn{padding:2px 4px;font-size:9px;line-height:1.2}
-.cam-key.on{border-color:var(--gold);color:var(--gold)}
+#cutframe-label{font-family:var(--bank);font-size:12px;letter-spacing:.1em;color:var(--acid)}
 /* ---------- STUDIO 中央: プレビュー＋現在カット編集 ---------- */
 #studio-center{flex:1;display:flex;flex-direction:column;min-width:0}
 #cur-box{
   flex:none;background:var(--panel);border-top:1px solid var(--border);
   padding:7px 10px;display:flex;flex-direction:column;gap:6px;
 }
-#cur-row{display:flex;align-items:center;gap:8px}
+#cur-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 #cur-cut-label{font-family:var(--bank);font-size:14px;letter-spacing:.14em;color:var(--ice);min-width:34px}
-#cur-dur{
+.cr-k{color:var(--grey);font-size:9px;letter-spacing:.1em}
+#cur-info{color:var(--dim);font-size:9px;font-family:var(--mono);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:260px}
+/* FRAME / TIME は COMPOSER のトランスポート右端と同じ見え方に揃える */
+.tc{
+  font-family:var(--mono);font-size:11px;color:var(--gold);letter-spacing:.06em;
+  border:1px solid transparent;padding:2px 5px;cursor:text;
+}
+.tc:hover{border-color:var(--border)}
+.tc input{
+  width:110px;background:var(--black);border:1px solid var(--border-bright);color:var(--gold);
+  font-family:var(--mono);font-size:11px;padding:1px 4px;
+  -webkit-user-select:text;user-select:text;
+}
+.tc input:focus{outline:none}
+#cur-dur,#cur-durf{
   width:60px;background:var(--black);border:1px solid var(--border);color:var(--gold);
   font-family:var(--mono);font-size:11px;text-align:center;padding:4px 3px;
   -webkit-user-select:text;user-select:text;
 }
-#cur-dur-f{color:var(--grey);font-size:9px}
+#cur-durf{width:48px;color:var(--ice)}
 #cur-note{
-  height:58px;background:var(--black);border:1px solid var(--border);color:var(--white);
+  height:var(--curh,58px);background:var(--black);border:1px solid var(--border);color:var(--white);
   font-family:var(--jp);font-size:12px;line-height:1.6;padding:6px;resize:none;
   -webkit-user-select:text;user-select:text;
 }
-#cur-dur:focus,#cur-note:focus{outline:none;border-color:var(--border-bright)}
-#cur-dur:disabled,#cur-note:disabled{opacity:.35}
+#cur-dur:focus,#cur-durf:focus,#cur-note:focus{outline:none;border-color:var(--border-bright)}
+#cur-dur:disabled,#cur-durf:disabled,#cur-note:disabled{opacity:.35}
+/* 横スプリッタ（内容・セリフ欄の高さ）。TIMELINE帯の #tl-resize と同じ手触りにする */
+.hsplit{
+  flex:none;height:7px;cursor:row-resize;touch-action:none;position:relative;
+  background:rgba(255,210,122,.10);transition:background .12s;
+}
+.hsplit::before{content:'';position:absolute;left:0;right:0;top:-5px;bottom:-5px}
+.hsplit:hover{background:rgba(255,79,168,.55)}
+.hsplit.on{background:var(--acid)}
 /* ---------- STUDIO 右: SHEETパネル ---------- */
 #studio-sheet{
   width:22%;min-width:160px;flex:none;background:var(--panel2);
@@ -153,7 +163,7 @@ body{
 #sheet-head{flex:none;display:flex;align-items:center;gap:8px;padding:8px 8px 6px;border-bottom:1px solid var(--border)}
 #sheet-head .btn{padding:5px 8px}
 #sheet-total{color:var(--gold);letter-spacing:.08em;font-size:9px}
-#sheet-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px}
+#sheet-list{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:6px}
 .sp-row{
   border:1px solid var(--border);background:rgba(7,3,15,.35);
   padding:5px;margin-bottom:5px;cursor:pointer;transition:border-color .12s;
@@ -166,7 +176,7 @@ body{
   position:absolute;left:6px;right:6px;height:2px;background:var(--acid);
   box-shadow:0 0 8px rgba(255,79,168,.9);display:none;pointer-events:none;z-index:5;
 }
-.sp-head{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.sp-head{display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap}
 .sp-no{font-family:var(--bank);font-size:12px;letter-spacing:.08em;color:var(--acid)}
 .sp-dur{
   width:48px;background:var(--black);border:1px solid var(--border);color:var(--gold);
@@ -174,6 +184,14 @@ body{
   -webkit-user-select:text;user-select:text;
 }
 .sp-dur:focus{outline:none;border-color:var(--border-bright)}
+/* 枠ごとの★（カラースクリプト一覧に出す枠）。旧「CUT 枠列」パネルからここへ移した */
+.cam-stars{display:flex;gap:2px;flex-wrap:wrap}
+.cam-star{
+  cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--dim);
+  font-family:var(--mono);font-size:9px;line-height:1.2;padding:2px 4px;transition:all .12s;
+}
+.cam-star:hover{border-color:var(--border-bright)}
+.cam-star.on{border-color:var(--gold);color:var(--gold);background:rgba(255,210,122,.14)}
 .sp-btns{display:flex;gap:2px;margin-left:auto}
 .sp-btns .btn{padding:2px 4px;font-size:9px;line-height:1.2}
 .sp-btns .btn.lk-on{border-color:var(--gold);background:rgba(255,210,122,.14)}
@@ -315,28 +333,31 @@ body{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   color:var(--grey);font-family:var(--jp);font-size:12px;pointer-events:none;
 }
+/* 横1行のミニツール（絵の上を最小限しか隠さない）。HSB/パレット/⇄ は置かない */
 #tl-minitools{
-  position:absolute;left:10px;top:10px;z-index:6;width:150px;
-  background:rgba(16,7,34,0.82);border:1px solid var(--border);padding:8px;
-  display:flex;flex-direction:column;gap:7px;backdrop-filter:blur(3px);
+  position:absolute;left:10px;top:10px;z-index:6;max-width:calc(100% - 20px);
+  background:rgba(16,7,34,0.86);border:1px solid var(--border);padding:5px 8px;
+  display:flex;flex-direction:row;align-items:center;gap:8px;flex-wrap:wrap;
+  backdrop-filter:blur(3px);
 }
-#tl-minitools.hidden{display:none}
 #tl-minitools.right{left:auto;right:10px}
-#tl-minitools .etool{padding:5px 7px;font-size:8px}
-#tl-minitools .palette{grid-template-columns:repeat(8,1fr);gap:2px}
-#tl-minitools .pal-cell{border-width:1px}
-#tl-mini-swatch{width:100%;height:16px;border:1px solid var(--border)}
-#tl-mini-btns{display:flex;gap:4px}
-#tl-mini-btns .btn{padding:3px 6px;font-size:8px;flex:1}
+#tl-minitools.hidden{display:none}
+#tl-minitools .etool{padding:5px 8px;font-size:8px}
+#tl-minitools .sld-row{gap:5px}
+#tl-minitools .sld-row input[type=range]{width:74px;flex:none}
+#tl-minitools .sld-val{min-width:26px;font-size:9px}
+#tl-minitools .btn{padding:4px 9px;font-size:8px}
+#tl-mini-swatch{width:26px;height:18px;border:1px solid var(--border);flex:none}
 #btn-tl-tools{position:absolute;left:10px;top:10px;z-index:6}
 #btn-tl-tools.right{left:auto;right:10px}
 #tl-bottom{flex:none;background:var(--panel);border-top:1px solid var(--border);padding:0 12px 0;display:flex;flex-direction:column}
 /* 上端の横スプリッタ（AE風にペイン境界を上下へ）。#tl-bottom の padding を 0 にして
    ここが帯の一番上に来るようにしてある */
 #tl-resize{
-  flex:none;height:7px;margin:0 -12px 4px;cursor:row-resize;touch-action:none;
+  flex:none;height:7px;margin:0 -12px 4px;cursor:row-resize;touch-action:none;position:relative;
   background:rgba(255,210,122,.10);transition:background .12s;
 }
+#tl-resize::before{content:'';position:absolute;left:0;right:0;top:-5px;bottom:-5px}
 #tl-resize:hover{background:rgba(255,79,168,.55)}
 #tl-resize.on{background:var(--acid)}
 #tl-transport{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding-bottom:7px}
@@ -352,6 +373,30 @@ body{
 .ta-t{color:var(--grey);font-size:9px;letter-spacing:.1em}
 .ta-div{width:1px;height:14px;background:var(--border)}
 .ta-fps{color:var(--gold);font-size:9px;letter-spacing:.1em}
+/* 見出し AUDIO 自体が読み込みボタン */
+.ta-load{
+  background:transparent;border:1px solid rgba(90,233,255,.45);color:var(--ice);
+  font-family:var(--bank);letter-spacing:.18em;padding:5px 12px;cursor:pointer;transition:all .12s;
+}
+.ta-load:hover{background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#04121a}
+/* ずらしのスクラブ帯（左右ドラッグでコマ単位に動かす） */
+.ta-scrub{
+  cursor:ew-resize;touch-action:none;border:1px solid var(--border);padding:5px 10px;
+  color:var(--gold);user-select:none;
+}
+.ta-scrub:hover{border-color:var(--border-bright)}
+.ta-scrub.on{background:rgba(255,79,168,.18);border-color:var(--acid)}
+.ta-mk{cursor:pointer;border:1px solid var(--border);padding:5px 10px;color:var(--amber)}
+.ta-mk:hover{border-color:var(--border-bright)}
+#marker-tx{color:var(--dim);font-size:9px;font-family:var(--mono)}
+/* マーカー（ルーラー上の▼）。COMPOSER と同じ「聴きながら M で打つ」もの */
+#tl-marks{position:absolute;left:0;right:0;top:0;height:18px;pointer-events:none;z-index:4}
+.tl-mark{
+  position:absolute;top:0;width:0;height:0;margin-left:-6px;pointer-events:auto;cursor:pointer;
+  border-left:6px solid transparent;border-right:6px solid transparent;
+  border-top:9px solid var(--amber);filter:drop-shadow(0 0 4px rgba(255,201,79,.7));
+}
+.tl-mark::before{content:'';position:absolute;left:-9px;right:-9px;top:-9px;height:26px}
 #audio-name{color:var(--ice);font-size:10px;font-family:var(--jp);max-width:220px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #audio-len,#audio-offset-tx{color:var(--dim);font-size:9px;font-family:var(--mono)}
 #audio-offset{
@@ -380,6 +425,8 @@ body{
   background:var(--gold);border:1px solid rgba(7,3,15,.85);cursor:ew-resize;
   transform:rotate(45deg);z-index:3;
 }
+/* ◆は見た目11px。ペン/指で掴めるよう当たり判定だけ広げる（回転済みなので inset でよい） */
+.tl-key::before{content:'';position:absolute;inset:-9px}
 .tl-key.edge{background:var(--ice)}
 .tl-key.on{background:var(--acid);box-shadow:0 0 8px rgba(255,79,168,.9)}
 .tl-key.fix{cursor:default;opacity:.35}
@@ -403,7 +450,16 @@ body{
 .em-row i{font-family:var(--jp);font-size:9px;font-style:normal;color:var(--dim)}
 .tl-clip-no{font-family:var(--bank);font-size:11px;color:var(--white);letter-spacing:.08em}
 .tl-clip-dur{font-size:9px;color:var(--gold)}
-.tl-clip-h{position:absolute;right:0;top:0;bottom:0;width:12px;cursor:ew-resize;background:linear-gradient(90deg,transparent,rgba(255,210,122,.55))}
+/* カット境目（尺ハンドル）。ここを掴もうとしてスクラブに取られるのを避けるため広めに取る。
+   strip 側でも「境目の近くはハンドル優先」に振り分けている（EDGE_GRAB） */
+.tl-clip-h{
+  position:absolute;right:0;top:0;bottom:0;width:20px;cursor:ew-resize;z-index:2;
+  background:linear-gradient(90deg,transparent,rgba(255,210,122,.55));
+}
+.tl-clip-h::after{
+  content:'';position:absolute;right:5px;top:30%;bottom:30%;width:2px;
+  background:rgba(255,210,122,.85);
+}
 #tl-playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--ice);pointer-events:none;box-shadow:0 0 8px rgba(90,233,255,.8)}
 #tl-hint{
   color:var(--grey);font-size:9px;font-family:var(--jp);letter-spacing:.04em;
@@ -425,7 +481,7 @@ body{
   background:var(--panel);border:1px solid var(--border-bright);padding:22px 26px;max-width:400px;
   box-shadow:0 0 40px rgba(255,79,168,.2);
 }
-#modal-msg{font-family:var(--jp);font-size:13px;line-height:1.7;margin-bottom:16px}
+#modal-msg{font-family:var(--jp);font-size:13px;line-height:1.7;margin-bottom:16px;white-space:pre-line}
 #modal-input{
   display:none;width:100%;height:96px;margin-bottom:14px;resize:none;
   background:var(--black);border:1px solid var(--border);color:var(--white);
@@ -440,29 +496,88 @@ body{
 }
 #modal-select:focus{outline:none;border-color:var(--border-bright)}
 #modal-btns{display:flex;gap:8px;justify-content:flex-end}
-/* ---------- SETTINGS（ショートカット一覧・表示のみ） ---------- */
+/* ---------- SETTINGS（**スクロールなしで1画面に収める**・manga-plate 準拠）
+   段組（CSS columns）に流し込み、収まらないぶんは --hs で全体を縮める（fitHelpBody）。 ---------- */
 #help-ovl{
-  position:fixed;inset:0;z-index:280;background:rgba(7,3,15,.78);display:none;
-  align-items:center;justify-content:center;padding:24px;
+  position:fixed;inset:0;z-index:280;background:rgba(7,3,15,.82);display:none;
+  flex-direction:column;padding:12px;
 }
 #help-ovl.on{display:flex}
 #help-box{
-  background:var(--panel);border:1px solid var(--border-bright);padding:18px 22px;
-  max-width:760px;width:100%;max-height:100%;overflow-y:auto;
+  background:var(--panel);border:1px solid var(--border-bright);padding:12px 16px;
+  width:100%;flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;
   box-shadow:0 0 40px rgba(255,79,168,.2);
 }
-#help-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+#help-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex:none;flex-wrap:wrap}
 #help-head .t{font-family:var(--bank);font-size:13px;letter-spacing:.24em;color:var(--acid)}
-#help-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
-.help-grp{border:1px solid var(--border);padding:9px 11px}
-.help-grp h4{font-family:var(--bank);font-size:9px;letter-spacing:.2em;color:var(--gold);margin-bottom:6px;font-weight:400}
-.help-grp .r{display:flex;gap:8px;align-items:baseline;padding:2px 0;font-family:var(--jp);font-size:11px}
-.help-grp .k{
-  font-family:var(--mono);font-size:10px;color:var(--ice);white-space:nowrap;
-  border:1px solid var(--border);padding:1px 5px;min-width:74px;text-align:center;flex:none;
+#ui-big-label,#cam-expand-label{
+  display:flex;align-items:center;gap:5px;font-family:var(--jp);font-size:10px;color:var(--grey);cursor:pointer;
 }
-.help-grp .d{color:rgba(248,239,255,.78);line-height:1.5}
-#help-note{color:var(--dim);font-size:10px;font-family:var(--jp);margin-top:12px;line-height:1.6}
+#ui-big-label input{accent-color:var(--acid)}
+#cam-expand-label input[type=range]{width:74px;accent-color:var(--acid)}
+#cam-expand-label.off{opacity:.35;pointer-events:none}
+#btn-wipe-all{border-color:rgba(255,79,168,.5);color:var(--acid)}
+#help-body{
+  --hs:1;
+  flex:1;min-height:0;overflow:hidden;
+  columns:calc(228px * var(--hs)) auto;column-gap:calc(11px * var(--hs));column-fill:auto;
+}
+.help-grp{
+  border:1px solid var(--border);padding:calc(7px * var(--hs)) calc(9px * var(--hs));
+  margin:0 0 calc(8px * var(--hs));break-inside:avoid;-webkit-column-break-inside:avoid;
+}
+.help-grp h4{
+  font-family:var(--bank);font-size:calc(9px * var(--hs));letter-spacing:.2em;color:var(--gold);
+  margin-bottom:calc(5px * var(--hs));font-weight:400;
+}
+.help-grp .r{
+  display:flex;gap:calc(7px * var(--hs));align-items:baseline;
+  padding:calc(1px * var(--hs)) 0;font-family:var(--jp);font-size:calc(10.5px * var(--hs));
+}
+.help-grp .k{
+  font-family:var(--mono);font-size:calc(9.5px * var(--hs));color:var(--ice);white-space:nowrap;
+  border:1px solid var(--border);padding:0 calc(4px * var(--hs));
+  min-width:calc(70px * var(--hs));text-align:center;flex:none;
+}
+.help-grp .d{color:rgba(248,239,255,.78);line-height:1.45}
+.help-grp .note{color:var(--dim);font-family:var(--jp);font-size:calc(10px * var(--hs));line-height:1.55}
+/* ---------- @ でカーソル下のペインを最大化（AEの ~ と同じ手触り） ---------- */
+.pane-hide{display:none !important}
+.pane-max{flex:1 1 auto !important;width:auto !important;min-width:0 !important}
+#tl-bottom.pane-max #tl-strip{flex:1;height:auto !important}
+#tl-bottom.pane-max{min-height:0}
+/* ---------- 大きいUI（iPadで指が当たりやすいサイズ・SETTINGSで切替） ---------- */
+body.ui-big{--bartop:52px}
+body.ui-big .btn{padding:9px 15px;font-size:10.5px}
+body.ui-big .etool{padding:10px 14px;font-size:10.5px}
+body.ui-big .sld-val{font-size:11px;min-width:34px}
+body.ui-big .sld-k{font-size:11px;min-width:18px}
+body.ui-big input[type=range]{height:24px}
+body.ui-big #board-topbar{height:46px}
+body.ui-big #board-topbar .btn{padding:9px 14px}
+body.ui-big #studio-board.has-clip #board-tools{top:84px}
+body.ui-big #board-tools{top:58px}
+body.ui-big .splitter{width:9px}
+body.ui-big .hsplit,body.ui-big #tl-resize{height:11px}
+body.ui-big .tl-clip-h{width:30px}
+body.ui-big .tl-key{width:15px;height:15px;margin-left:-7.5px}
+body.ui-big .tl-mark{border-left-width:8px;border-right-width:8px;border-top-width:12px;margin-left:-8px}
+body.ui-big .sp-btns .btn{padding:5px 8px;font-size:12px}
+body.ui-big .sp-dur{width:62px;font-size:12px;padding:5px}
+body.ui-big .sp-no{font-size:14px}
+body.ui-big #cur-dur,body.ui-big #cur-durf,body.ui-big #audio-offset{font-size:13px;padding:7px 4px}
+body.ui-big .gc-cap{height:19px;font-size:10px}
+body.ui-big .gc-edit{font-size:12px;padding:0 9px}
+body.ui-big #grid-hud .btn{padding:6px 10px;font-size:10px}
+body.ui-big .cam-star{padding:4px 7px;font-size:12px}
+/* ミニツールは id 付きセレクタで細かく指定してあるので、大きいUI 側も id で上書きする */
+body.ui-big #tl-minitools .etool{padding:9px 12px;font-size:10px}
+body.ui-big #tl-minitools .btn{padding:8px 12px;font-size:10px}
+body.ui-big #tl-minitools .sld-row input[type=range]{width:92px}
+body.ui-big #tl-mini-swatch{width:34px;height:24px}
+body.ui-big #board-topbar .btn{padding:9px 14px}
+body.ui-big #tl-audio .btn{padding:7px 11px}
+body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;font-size:10px}
 </style>
 </head>
 <body>
@@ -511,9 +626,14 @@ body{
       <div id="board-topbar">
         <button class="btn mode on" id="btn-tool-move" title="写真とCUT枠を動かす (V)">MOVE</button>
         <button class="btn mode" id="btn-tool-cut" title="矩形ドラッグでコマを切り出す (C)">CUT 16:9</button>
+        <!-- 選択中CUT枠の表示と ＋枠 はここ（旧「CUT 枠列（カメラ）」パネルは撤去した。
+             ✎編集は中央の ✎EDIT／✕削除は SHEET行と Delete にあるので、ここには置かない） -->
+        <span id="cutsel-box">
+          <span id="cutframe-label">C1</span>
+          <button class="btn" id="btn-cam-add" title="枠を追加（B枠＝T.U./PANの行き先）">＋枠</button>
+        </span>
         <span class="tb-div"></span>
-        <button class="btn" id="btn-board-fit" title="全体が入るように表示">FIT</button>
-        <span id="zoom-label">50%</span>
+        <span id="zoom-label" title="全体が入る表示は F キー">50%</span>
         <span style="flex:1"></span>
         <span id="board-lock-tx" title="ロック中のカットはBOARDで選べません（SHEETの 🔒 で解除）"></span>
       </div>
@@ -539,24 +659,6 @@ body{
           </div>
           <div id="photo-ref-tx"></div>
         </div>
-        <!-- 選択中のCUT枠列 -->
-        <div id="cutframe-panel">
-          <div class="pnl-t">CUT 枠列（カメラ）</div>
-          <div class="row">
-            <span id="cutframe-label">C1</span>
-            <button class="btn" id="btn-cam-add" title="枠を追加（B枠＝T.U./PANの行き先）">＋枠</button>
-            <button class="btn" id="btn-cutframe-edit" title="加筆EDITで開く">&#9998;</button>
-            <button class="btn" id="btn-cutframe-del" title="このカットを削除 (Delete)">&#10005;</button>
-          </div>
-          <div id="cam-list"></div>
-          <div class="sld-row" id="cam-expand-row">
-            <span class="sld-k">余</span>
-            <input type="range" id="cam-expand" min="100" max="150" value="102" title="ベイク範囲の余白（枠ぎりぎりが不安なとき）">
-            <span class="sld-val" id="cam-expand-val">1.02</span>
-          </div>
-          <div class="mini-note">枠内ドラッグ=移動 ／ 角=リサイズ(16:9) ／ 離すと自動で再ベイク。<b>尺は枠ごと</b>（次の枠までのコマ数）。</div>
-        </div>
-        <div id="board-hint">写真をD&amp;D / IMPORT / Ctrl+Vで読み込み。<b>MOVE(V)</b>=写真移動（空白ドラッグ=パン・Alt/中ボタン=常にパン・ホイール/ピンチ=ズーム）。CUT枠は枠線かC#ラベルをクリックで選択。<b>CUT(C)</b>=矩形ドラッグで絵コンテのコマ化（16:9）。うっかり動かしたくないカットはSHEETの 🔒 でロック。</div>
       </div>
     </div>
 
@@ -567,16 +669,21 @@ body{
       <div id="tl-stage">
         <canvas id="tl-cv" width="1280" height="720"></canvas>
         <div id="tl-empty">カットがありません（BOARDで矩形ドラッグ、または右パネルで空コマ追加）</div>
-        <div id="tl-minitools">
+        <!-- 横並び1行のミニツール。HSB/パレットは置かない（Alt＝スポイト・指は長押しでスポイト）。
+             左右入替は Tab。既定は隠し（gUi.tools）＝絵を隠さない -->
+        <div id="tl-minitools" class="hidden">
           <div class="etools">
             <div class="etool on" data-tool="pen" title="ペン (B) ／ Wクリックで筆圧">PEN</div>
             <div class="etool" data-tool="eraser" title="消しゴム (E) ／ WクリックでCLEAR">ERASE</div>
             <div class="etool" data-tool="fill" title="塗りつぶし (G) ／ Wクリックで投げ縄塗り・長押しで投げ縄透明消し">FILL</div>
           </div>
+          <span class="tb-div"></span>
           <div class="sld-row">
-            <input type="range" id="tl-brush" min="1" max="64" value="6" title="ブラシサイズ">
+            <span class="sld-k">太</span>
+            <input type="range" id="tl-brush" min="1" max="64" value="6" title="ブラシサイズ（[ / ] ・右ドラッグでも）">
             <span class="sld-val" id="tl-brush-val">6</span>
           </div>
+          <span class="tb-div"></span>
           <div class="sld-row">
             <span class="sld-k">B</span>
             <input type="range" id="tl-base-alpha" min="0" max="100" value="100" title="元の絵の濃度（トレース）">
@@ -586,28 +693,26 @@ body{
             <div class="etool on" data-baseover="0" title="元の絵を加筆の下に敷く">元絵 下</div>
             <div class="etool" data-baseover="1" title="元の絵を加筆の上に重ねる（REF扱い）">元絵 上</div>
           </div>
-          <div id="tl-mini-swatch" title="現在色（スポイトで選択スロットに上書き）"></div>
-          <div id="tl-hsv-box"></div>
-          <div class="palette" id="tl-palette"></div>
-          <div class="pal-btns">
-            <button class="btn" id="btn-tl-pal-add" title="色スロットを追加">＋</button>
-            <button class="btn" id="btn-tl-pal-del" title="選択中の色スロットを削除">−</button>
-            <button class="btn" id="btn-tl-pal-save" title="パレットをJSONで書き出し">⇩</button>
-            <button class="btn" id="btn-tl-pal-load" title="パレットJSONを読み込み">⇧</button>
-          </div>
-          <div id="tl-mini-btns">
-            <button class="btn" id="btn-tl-tools-hide" title="ツールバーを隠す">HIDE ▲</button>
-            <button class="btn" id="btn-ui-side-mini" title="TOOLパネルを左右入替">⇄</button>
-          </div>
+          <div id="tl-mini-swatch" title="現在色（Alt+クリック／指の長押しでスポイト）"></div>
+          <button class="btn" id="btn-tl-tools-hide" title="ツールバーを隠す（✎ TOOLS で戻る）">HIDE</button>
         </div>
         <button class="btn" id="btn-tl-tools" title="ペイントツールを表示" style="display:none;padding:4px 8px;font-size:8px">✎ TOOLS</button>
       </div>
+      <div class="hsplit" id="split-cur" title="ドラッグで内容・セリフ欄の高さを変える ／ ダブルクリックで既定へ"></div>
       <div id="cur-box">
         <div id="cur-row">
           <span id="cur-cut-label">—</span>
-          <span style="color:var(--grey)">尺</span>
+          <span class="cr-k">尺</span>
           <input id="cur-dur" value="" title="秒+コマ（24fps）例: 3+12">
-          <span id="cur-dur-f"></span>
+          <!-- コマ数でも打てる（AE等から持ってきた数値をそのまま入れる用） -->
+          <input id="cur-durf" value="" title="コマ数で直接入力（例: 48）">
+          <span class="cr-k">f</span>
+          <span class="tb-div"></span>
+          <span class="cr-k">FRAME</span>
+          <span class="tc" id="cur-frame" title="通しコマ。クリックで直接入力してその位置へ飛ぶ">—— / ——</span>
+          <span class="cr-k">TIME</span>
+          <span class="tc" id="cur-tc" title="タイムコード H:MM:SS:FF（COMPOSERと同じ表記）。クリックで直接入力">0:00:00:00</span>
+          <span id="cur-info"></span>
           <span style="flex:1"></span>
           <button class="btn" id="btn-cur-edit" title="このカットを加筆EDITで開く">&#9998; EDIT</button>
         </div>
@@ -646,22 +751,29 @@ body{
     </div>
     <div id="tl-strip">
       <canvas id="tl-ruler-cv"></canvas>
+      <div id="tl-marks"></div>
       <div id="tl-clips"></div>
       <div id="tl-keys"></div>
       <div id="tl-playhead"></div>
     </div>
     <!-- 最下部: 音と尺のバー（SPEC_13 §5j） -->
     <div id="tl-audio">
-      <span class="ta-t">AUDIO</span>
-      <button class="btn" id="btn-audio-load" title="mp3 / wav / m4a を読み込む">⇧ 音を読み込み</button>
-      <input type="file" id="audio-file-input" accept="audio/*" style="display:none;">
+      <!-- 見出しの AUDIO 自体が読み込みボタン（別ボタンは置かない）。
+           iPad の Files で mp3 が灰色になるのを避けるため accept は MIME＋拡張子の両方を並べる -->
+      <button class="ta-t ta-load" id="btn-audio-load" title="音を読み込む（mp3 / wav / m4a / aac）">AUDIO</button>
+      <input type="file" id="audio-file-input"
+             accept="audio/*,audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/x-wav,audio/aiff,.mp3,.m4a,.wav,.aac,.aif,.aiff,.caf,.mp4"
+             style="display:none;">
       <span id="audio-name">—</span>
       <button class="btn" id="btn-audio-mute" title="再生時に鳴らす / 鳴らさない">🔊</button>
       <button class="btn" id="btn-audio-clear" title="音を外す">✕</button>
       <span class="ta-div"></span>
-      <span class="ta-t">ずらし</span>
+      <span class="ta-t ta-scrub" id="audio-offset-scrub" title="左右にドラッグで音をずらす（タイムラインと同じ縮尺＝見ながら合わせられる）">ずらし &#8646;</span>
       <input id="audio-offset" value="0" title="音の頭をずらすコマ数（＋で遅らせる・−で早める。24fps）">
       <span id="audio-offset-tx">0f / 0+00</span>
+      <span class="ta-div"></span>
+      <span class="ta-t ta-mk" id="btn-marker-add" title="いまの位置にマーカー（M）。ルーラーの▼をクリック=そこへ移動 / Wクリック=削除">&#9660; MARK</span>
+      <span id="marker-tx">—</span>
       <span class="ta-div"></span>
       <span id="audio-len">—</span>
       <span style="flex:1"></span>
@@ -673,7 +785,7 @@ body{
 <!-- ================= EDIT ================= -->
 <div class="view" id="view-edit">
   <div id="edit-top">
-    <button class="btn" id="btn-edit-back">&#9666; STUDIO</button>
+    <!-- ◀STUDIO は最上部メニューの STUDIO と重複するので置かない -->
     <button class="btn mode on" id="btn-mode-single" title="1カットを全面で加筆">SINGLE</button>
     <button class="btn mode" id="btn-mode-grid" title="一覧でカラースクリプトを描く">GRID</button>
     <button class="btn" id="btn-cut-prev">&#9664;</button>
@@ -683,10 +795,9 @@ body{
     <input id="edit-dur" value="2+0" title="秒+コマ（24fps）例: 3+12">
     <span id="edit-dur-f">48f</span>
     <span style="color:var(--grey);margin-left:10px;">表示</span>
-    <button class="btn" id="btn-edit-fit" title="ズーム/パンをリセット">FIT</button>
+    <button class="btn" id="btn-edit-fit" title="ズーム/パンをリセット (F)">FIT</button>
     <span id="edit-zoom">100%</span>
     <span style="flex:1"></span>
-    <button class="btn" id="btn-ui-side" title="TOOLパネルを左右入替">&#8646; TOOL</button>
     <button class="btn" id="btn-clear-draw" title="加筆レイヤーを消去（Undo可）">CLEAR DRAW</button>
     <button class="btn" id="btn-clear-base" title="元の絵（切り出しベース）を破棄（直後の Ctrl+Z で戻せる）">CLEAR BASE</button>
   </div>
@@ -788,14 +899,19 @@ body{
   <div id="help-box">
     <div id="help-head">
       <span class="t">SETTINGS ／ SHORTCUTS</span>
+      <label id="ui-big-label" title="ボタン・スライダーを大きくする（iPadで指が当たりやすい）">
+        <input type="checkbox" id="chk-ui-big"> 大きいUI
+      </label>
+      <label id="cam-expand-label" title="ベイク範囲の余白。枠ぎりぎりが不安なとき（選択中のCUT枠に効きます）">
+        <span class="sld-k">余</span>
+        <input type="range" id="cam-expand" min="100" max="150" value="102">
+        <span class="sld-val" id="cam-expand-val">1.02</span>
+      </label>
       <span style="flex:1"></span>
+      <button class="btn" id="btn-wipe-all" title="写真・カット・音をすべて消す（先に ⇩ PROJ で保存してください）">全消去</button>
       <button class="btn" id="btn-help-close">CLOSE</button>
     </div>
     <div id="help-body"></div>
-    <div id="help-note">
-      再生系のキー（Space / ←→ / Home / End / J / K / L）は localStorage <code>econte_keymap_v1</code> で
-      差し替えできます（アプリ内の再割当UIはありません）。
-    </div>
   </div>
 </div>
 
@@ -867,7 +983,9 @@ let photos = [];   // {id,name,img,blob,x,y,w,h,rot,filter,ref} — BOARD座標
 let cuts = [];     // SPEC_10 cutモデル
 let db = null;
 let gFocusCut = -1;                          // 現在カット = cutIndexAt(tl.frame).i の導出値
-let gUi = { side: 'left', sheet: true, boardW: 40, sheetW: 22, tlH: 66 };   // TOOLパネル左右 / 右パネル開閉 / ペイン幅(%)
+// TOOLパネル左右 / 右パネル開閉 / ペイン幅(%) / TIMELINE高さ / ミニツール表示 / 内容欄の高さ / 大きいUI
+let gUi = { side: 'left', sheet: true, boardW: 40, sheetW: 22, tlH: 66,
+            tools: false, curH: 58, uiBig: null };
 
 function uid(){ return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function clamp(v, a, b){ return Math.min(b, Math.max(a, v)); }
@@ -1026,7 +1144,7 @@ async function saveAll(){
     await idbClearPut('meta', [
       { k: 'main', board: { x: state.board.x, y: state.board.y, z: state.board.z } },
       { k: 'audio', blob: gAudio ? gAudio.blob : null, name: gAudio ? gAudio.name : '',
-        offset: gAudioOffset, muted: gAudioMuted }
+        offset: gAudioOffset, muted: gAudioMuted, markers: gMarkers.slice() }
     ]);
     $('#save-dot').textContent = 'SAVED';
   }catch(e){
@@ -1097,6 +1215,7 @@ async function loadAll(){
     if(am){
       gAudioOffset = am.offset | 0;
       gAudioMuted = !!am.muted;
+      gMarkers = Array.isArray(am.markers) ? am.markers.map(n => n | 0) : [];
       if(am.blob) await loadAudioBlob(am.blob, am.name, true);
       updateAudioUI();
     }
@@ -1323,10 +1442,11 @@ function renderStudioSync(force){
     syncBaseAlphaUI();    // ミニツールの BASE スライダーも現在カットへ
   }
   const cut = cuts[i];
-  const lab = $('#cur-cut-label'), durEl = $('#cur-dur'), durF = $('#cur-dur-f'), note = $('#cur-note');
+  const lab = $('#cur-cut-label'), durEl = $('#cur-dur'), durfEl = $('#cur-durf'), note = $('#cur-note');
   const has = !!cut;
   const cam = has && isCamCut(cut);
   durEl.disabled = !has;
+  durfEl.disabled = !has;
   durEl.title = cam ? '秒+コマ（24fps）。枠列カットは尻の止まり（tail）が伸び縮みします'
                     : '秒+コマ（24fps）例: 3+12';
   note.disabled = !has;
@@ -1334,17 +1454,47 @@ function renderStudioSync(force){
   lab.textContent = has ? 'C' + (i + 1) : '—';
   let tail = '';
   if(has){
-    if(cam) tail += ' ／ ' + cut.cam.map(c => c.k).join('→');
-    if(cut.bakeW) tail += ' ／ ' + cut.bakeW + '×' + cut.bakeH;
+    if(cam) tail += cut.cam.map(c => c.k).join('→');
+    if(cut.bakeW) tail += (tail ? ' ／ ' : '') + cut.bakeW + '×' + cut.bakeH;
     if(cut.bakeClamp && cut.bakeClamp < 0.995) tail += '（最寄り枠 ' + cut.bakeClamp.toFixed(2) + 'x）';
     if(cut.uncov > 0) tail += ' ⚠素材不足';
   }
-  durF.textContent = has ? (cut.durF + 'f' + tail) : '';
+  $('#cur-info').textContent = tail;
   // 再生中にフォーカス中の入力欄を書き換えない（入力が飛ぶため）
   const dv = has ? fmtDur(cut.durF) : '';
   if(document.activeElement !== durEl && durEl.value !== dv) durEl.value = dv;
+  const fv = has ? String(cut.durF) : '';
+  if(document.activeElement !== durfEl && durfEl.value !== fv) durfEl.value = fv;
   const nv = has ? cut.note : '';
   if(document.activeElement !== note && note.value !== nv) note.value = nv;
+  updateTimecodeHud();
+}
+/* --- コマ番号 ⇄ タイムコード（COMPOSER の frameToTimecode と同じ規約：先頭コマ=01） --- */
+function frameToTimecode(frameIdx){
+  const f = Math.max(0, frameIdx | 0) + 1;
+  const p2 = n => String(n).padStart(2, '0');
+  const ff = f % FPS, total = Math.floor(f / FPS);
+  return Math.floor(total / 3600) + ':' + p2(Math.floor(total / 60) % 60) + ':' + p2(total % 60) + ':' + p2(ff);
+}
+function parseTimecodeToFrame(v){
+  const s = String(v).trim();
+  if(s.indexOf(':') >= 0){
+    const p = s.split(':').map(x => parseInt(x, 10) || 0).reverse();   // [FF,SS,MM,HH]
+    return ((p[3] || 0) * 3600 + (p[2] || 0) * 60 + (p[1] || 0)) * FPS + (p[0] || 0) - 1;
+  }
+  const n = parseFloat(s);
+  return isFinite(n) ? Math.round(n * FPS) : null;
+}
+/* 中央の FRAME / TIME（COMPOSER のトランスポート右端と同じ表記） */
+function updateTimecodeHud(){
+  const T = totalFrames();
+  const cur = T ? clamp(state.tl.frame, 0, T - 1) : 0;
+  const fe = $('#cur-frame'), te = $('#cur-tc');
+  if(!fe || !te) return;
+  if(fe.querySelector('input') || te.querySelector('input')) return;   // 入力中は上書きしない
+  if(!T){ fe.textContent = '—— / ——'; te.textContent = '0:00:00:00'; return; }
+  fe.textContent = String(cur + 1).padStart(4, '0') + ' / ' + String(T).padStart(4, '0');
+  te.textContent = frameToTimecode(cur);
 }
 
 /* ---------------- BOARD ---------------- */
@@ -1389,20 +1539,68 @@ function filterStr(f){
   if(f.contrast !== 1) parts.push('contrast(' + f.contrast + ')');
   return parts.join(' ');
 }
-function drawPhoto(ctx, p){
+/* iPad Safari 16 以前は `ctx.filter` が無い＝GRAY/明/コが**黙って効かない**。
+   使えるかどうかを1回だけ調べ、無い環境ではピクセル処理で同じ絵を作る。 */
+const CTX_FILTER_OK = (() => {
+  try{
+    const c = document.createElement('canvas').getContext('2d');
+    c.filter = 'grayscale(1)';
+    return c.filter === 'grayscale(1)';
+  }catch(e){ return false; }
+})();
+/* フィルタ済みの画をキャンバスへ焼いてキャッシュする（ctx.filter が無い環境の代役）。
+   キーはフィルタの中身。スライダーを動かす間は上限を下げて焼き、離した時に高精細で焼き直す
+   （全画素を毎フレーム回すと12MPの写真で確実に固まるため）。
+   CSS と同じ順序: grayscale → brightness → contrast。式は y = x*b*c + 127.5*(1-c) */
+const FILTER_CAP_LOW = 1400, FILTER_CAP_HI = 4096;
+function filteredSource(p, hiRes){
+  const f = normFilter(p.filter);
+  if(!f.gray && f.bright === 1 && f.contrast === 1) return p.img;
+  const cap = hiRes ? FILTER_CAP_HI : FILTER_CAP_LOW;
+  const key = (f.gray ? 1 : 0) + ':' + f.bright + ':' + f.contrast + ':' + cap;
+  if(p._fkey === key && p._fcv) return p._fcv;
+  const iw = p.img.naturalWidth || p.img.width, ih = p.img.naturalHeight || p.img.height;
+  if(!iw || !ih) return p.img;
+  const s = Math.min(1, cap / Math.max(iw, ih));
+  const w = Math.max(1, Math.round(iw * s)), h = Math.max(1, Math.round(ih * s));
+  const cv = blankCanvas(w, h);
+  const cx = ctx2d(cv);
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = 'high';
+  cx.drawImage(p.img, 0, 0, w, h);
+  try{
+    const d = cx.getImageData(0, 0, w, h), a = d.data;
+    const b = f.bright, ct = f.contrast, off = 127.5 * (1 - ct);
+    for(let i = 0; i < a.length; i += 4){
+      let r = a[i], g = a[i + 1], bl = a[i + 2];
+      if(f.gray){ const y = 0.2126 * r + 0.7152 * g + 0.0722 * bl; r = y; g = y; bl = y; }
+      r = r * b * ct + off; g = g * b * ct + off; bl = bl * b * ct + off;
+      a[i]     = r < 0 ? 0 : (r > 255 ? 255 : r);
+      a[i + 1] = g < 0 ? 0 : (g > 255 ? 255 : g);
+      a[i + 2] = bl < 0 ? 0 : (bl > 255 ? 255 : bl);
+    }
+    cx.putImageData(d, 0, 0);
+  }catch(e){ return p.img; }     // 汚染キャンバス等で読めなければ素の画で妥協する
+  p._fcv = cv; p._fkey = key;
+  return cv;
+}
+/* hiRes=true はベイク（焼き上がり）用。**見た目＝焼き上がりを保つため入口はここ一本** */
+function drawPhoto(ctx, p, hiRes){
   const fs = filterStr(p.filter);
   const rot = p.rot || 0;
-  if(!fs && !rot){ ctx.drawImage(p.img, p.x, p.y, p.w, p.h); return; }
+  const useNative = CTX_FILTER_OK && !!fs;
+  const img = useNative ? p.img : filteredSource(p, hiRes);
+  if(!fs && !rot){ ctx.drawImage(img, p.x, p.y, p.w, p.h); return; }
   ctx.save();
-  if(fs) ctx.filter = fs;          // ※iPad Safari 16 以前は ctx.filter 未対応（無視されるだけ）
+  if(useNative) ctx.filter = fs;
   if(rot){
     const swap = (rot === 90 || rot === 270);
     const dw = swap ? p.h : p.w, dh = swap ? p.w : p.h;
     ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
     ctx.rotate(rot * Math.PI / 180);
-    ctx.drawImage(p.img, -dw / 2, -dh / 2, dw, dh);
+    ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
   }else{
-    ctx.drawImage(p.img, p.x, p.y, p.w, p.h);
+    ctx.drawImage(img, p.x, p.y, p.w, p.h);
   }
   ctx.restore();
 }
@@ -1461,15 +1659,24 @@ function renderBoard(){
       const foc = (i === gFocusCut);   // 現在カット（プレイヘッド位置）だけ色を変える
       const sel = state.selCut && state.selCut.i === i && state.selCut.k === k;
       const lk = !!c.lock;
+      const col = sel ? 'rgba(255,79,168,0.95)' : (foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.9)');
       boardCtx.save();
       if(lk) boardCtx.setLineDash([7 / b.z, 4 / b.z]);   // ロック中は破線＝掴めないことが見て分かる
-      boardCtx.strokeStyle = sel ? 'rgba(255,79,168,0.95)' : (foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.75)');
+      // 下の紙が白いと黄色/水色の線が飛ぶので、**同じ形の暗い線を1段太く先に敷く**（枠自体は黒くしない）
+      boardCtx.strokeStyle = 'rgba(7,3,15,0.55)';
+      boardCtx.lineWidth = (sel || foc ? 5 : 3.5) / b.z;
+      boardCtx.strokeRect(r.x, r.y, r.w, r.h);
+      boardCtx.strokeStyle = lk ? 'rgba(255,210,122,0.55)' : col;
       boardCtx.lineWidth = (sel || foc ? 2.5 : 1.5) / b.z;
-      if(lk) boardCtx.strokeStyle = 'rgba(255,210,122,0.45)';
       boardCtx.strokeRect(r.x, r.y, r.w, r.h);
       boardCtx.restore();
-      boardCtx.fillStyle = sel ? 'rgba(255,79,168,0.95)' : (foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.9)');
-      boardCtx.fillText(camLabel(i, k) + (lk ? ' 🔒' : ''), r.x + 4 / b.z, r.y + 15 / b.z);
+      // C# は黒い台紙の上に置く（白い紙の上でも必ず読める）
+      const tx = camLabel(i, k) + (lk ? ' 🔒' : '');
+      const pad = 4 / b.z, bh = 19 / b.z;
+      boardCtx.fillStyle = 'rgba(7,3,15,0.82)';
+      boardCtx.fillRect(r.x, r.y, boardCtx.measureText(tx).width + pad * 2, bh);
+      boardCtx.fillStyle = col;
+      boardCtx.fillText(tx, r.x + pad, r.y + 14 / b.z);
       if(sel){
         const h = CAM_HANDLE / b.z;
         camCorners(r).forEach(c2 => boardCtx.fillRect(c2.x - h / 2, c2.y - h / 2, h, h));
@@ -1819,88 +2026,29 @@ function syncBoardPanels(){
     $('#photo-ref-tx').textContent = p.ref ? ('REF: ' + (p.ref.title || p.ref.url)) : '';
     $('#btn-photo-ref').classList.toggle('mode', !!p.ref);
   }
-  const sc = state.selCut;
-  $('#cutframe-panel').classList.toggle('on', !!sc);
-  if(sc){
-    $('#cutframe-label').textContent = camLabel(sc.i, sc.k);
-    renderCamList();
-  }
+  // BOARDの浮きパネルは「選択中の写真」だけを持つ。中身が無いときは箱ごと出さない
+  $('#board-tools').classList.toggle('on', !!p);
+  renderCamList();
 }
 
-/* ---------------- 枠列の編集UI（SPEC_13 §5a） ---------------- */
+/* ---------------- 枠列の表示（旧「CUT 枠列（カメラ）」パネルは撤去した） ----------------
+   ・C# と ＋枠 → BOARD上端のモードバー（#cutsel-box）
+   ・★（一覧に出す枠） → SHEET行（makeSheetRow の .cam-stars）
+   ・コマ数／イーズ → TIMELINE（◆ドラッグ・区間バークリック）
+   ・余（bakeExpand） → SETTINGS
+   関数名は据え置き（呼び出し元と __ECONTE__ export がそのまま生きる） */
 function renderCamList(){
   const sc = state.selCut;
-  const list = $('#cam-list');
-  list.innerHTML = '';
-  if(!sc) return;
-  const cut = cuts[sc.i];
-  if(!cut) return;
-  const cam = cut.cam || [];
-  const last = cam.length - 1;
-  cam.forEach((c, k) => {
-    const row = document.createElement('div');
-    row.className = 'cam-row' + (k === sc.k ? ' on' : '');
-    row.title = 'クリックでこの枠を選択（BOARD上でも選ばれます）';
-    row.addEventListener('click', () => selectCutFrame({ i: sc.i, k }));
-
-    const lb = document.createElement('span');
-    lb.className = 'cam-k';
-    lb.textContent = c.k;
-
-    const at = document.createElement('span');
-    at.className = 'cam-at';
-    at.textContent = camStartFrame(cut, k) + 'f';   // 通しフレームは表示のみ
-
-    const dur = document.createElement('input');
-    dur.className = 'cam-dur';
-    dur.value = (k === last) ? '' : Math.max(1, c.dur | 0);
-    dur.disabled = (k === last);                    // 最終枠に dur は無い
-    dur.title = (k === last) ? '最終枠に尺はありません' : '次の枠までのコマ数';
-    dur.addEventListener('click', ev => ev.stopPropagation());
-    dur.addEventListener('change', () => {
-      const n = parseInt(dur.value, 10);
-      if(!(n > 0)){ dur.value = Math.max(1, c.dur | 0); return; }
-      setCamDur(sc.i, k, n);
-    });
-
-    const ea = document.createElement('select');
-    ea.className = 'cam-ease';
-    ea.disabled = (k === last);
-    ea.title = 'LINEAR=等速 / EASE=前後をなめらか / HOLD=この枠で止まる（タメ）';
-    EASES.forEach(v => {
-      const o = document.createElement('option');
-      o.value = v; o.textContent = v;
-      if((c.ease || 'LINEAR') === v) o.selected = true;
-      ea.appendChild(o);
-    });
-    ea.addEventListener('click', ev => ev.stopPropagation());
-    ea.addEventListener('change', () => { c.ease = ea.value; renderPaintViews(); scheduleSave(); });
-
-    const key = document.createElement('button');
-    key.className = 'btn cam-key' + (c.key ? ' on' : '');
-    key.textContent = '★';
-    key.title = 'カラースクリプト一覧に出す枠（既定は始点と終点）';
-    key.addEventListener('click', ev => {
-      ev.stopPropagation();
-      c.key = !c.key; c.keyUser = true;
-      renderCamList();
-      scheduleSave();
-    });
-
-    const del = document.createElement('button');
-    del.className = 'btn';
-    del.textContent = '✕';
-    del.title = 'この枠を削除';
-    del.disabled = cam.length <= 1;
-    del.addEventListener('click', ev => { ev.stopPropagation(); delCamFrame(sc.i, k); });
-
-    row.appendChild(lb); row.appendChild(at); row.appendChild(dur);
-    row.appendChild(ea); row.appendChild(key); row.appendChild(del);
-    list.appendChild(row);
-  });
-  const ex = Math.round((cut.bakeExpand || 1.02) * 100);
-  $('#cam-expand').value = ex;
-  $('#cam-expand-val').textContent = (ex / 100).toFixed(2);
+  const cut = sc ? cuts[sc.i] : null;
+  $('#cutsel-box').classList.toggle('on', !!cut);
+  if(cut) $('#cutframe-label').textContent = camLabel(sc.i, sc.k);
+  const lab = $('#cam-expand-label');
+  if(lab){
+    lab.classList.toggle('off', !cut);
+    const ex = Math.round(((cut && cut.bakeExpand) || 1.02) * 100);
+    $('#cam-expand').value = ex;
+    $('#cam-expand-val').textContent = (ex / 100).toFixed(2);
+  }
 }
 /* 枠を追加: 選択枠を少しずらして後ろへ挿入。FIXカットの尺は cam[0].dur に引き継ぐ */
 function addCamFrame(){
@@ -2148,6 +2296,13 @@ async function exportProject(){
                        bakeExpand: c.bakeExpand || 1.02, camLead: camLead(c), camTail: camTail(c),
                        drawFile: c.drawBlob ? file : null });
     }
+    // 音とマーカーも入れる（全消去の前の保存先がこのZIPなので、抜けがあると戻せない）
+    if(gAudio && gAudio.blob){
+      const af = 'audio/' + (gAudio.name || 'audio').replace(/[\\/:*?"<>|]/g, '_');
+      zip.file(af, gAudio.blob);
+      meta.audio = { file: af, name: gAudio.name, offset: gAudioOffset, muted: gAudioMuted };
+    }
+    meta.markers = gMarkers.slice();
     zip.file('project.json', JSON.stringify(meta, null, 1));
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
     const url = URL.createObjectURL(blob);
@@ -2226,10 +2381,19 @@ async function importProject(file){
       rebakeFromCam(cut);   // ベイクは持ち歩かずここで焼き直す
     }
     if(meta.board){ state.board.x = meta.board.x; state.board.y = meta.board.y; state.board.z = meta.board.z; }
+    // 音とマーカー
+    clearAudio(true);
+    gMarkers = Array.isArray(meta.markers) ? meta.markers.map(n => n | 0) : [];
+    if(meta.audio && meta.audio.file && zip.file(meta.audio.file)){
+      gAudioOffset = meta.audio.offset | 0;
+      gAudioMuted = !!meta.audio.muted;
+      try{ await loadAudioBlob(await zip.file(meta.audio.file).async('blob'), meta.audio.name, true); }catch(e){}
+    }
     invalidateCoverage();
     refreshStudio();
     syncBoardPanels();
     layoutStudio();
+    updateAudioUI();
     scheduleSave();
     toast('読み込みました（写真 ' + photos.length + ' 枚 / ' + cuts.length + ' カット）');
   }catch(e){
@@ -2607,7 +2771,7 @@ function bakeCut(src, w, h){
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.setTransform(s, 0, 0, s, -src.x * s, -src.y * s);
-  for(const p of photos) drawPhoto(ctx, p);   // 回転・モノクロ/輝度も焼き込まれる
+  for(const p of photos) drawPhoto(ctx, p, true);   // 回転・モノクロ/輝度も焼き込まれる（true=高精細）
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   return c;
 }
@@ -2868,6 +3032,25 @@ function makeSheetRow(cut, i){
     if(f === null || f <= 0){ dur.value = fmtDur(cut.durF); return; }
     setCutDur(i, f);
   });
+  // 枠ごとの★（カラースクリプト一覧に出す枠）。枠が2つ以上あるカットにだけ出す
+  const stars = document.createElement('div');
+  stars.className = 'cam-stars';
+  if(isCamCut(cut)){
+    cut.cam.forEach((c, k) => {
+      const st = document.createElement('button');
+      st.className = 'cam-star' + (c.key ? ' on' : '');
+      st.textContent = '★' + c.k;
+      st.title = 'カラースクリプト一覧（GRID / ⇩ C.SCRIPT）に ' + c.k + ' 枠を出す（既定は始点と終点）';
+      st.addEventListener('click', ev => {
+        ev.stopPropagation();
+        c.key = !c.key; c.keyUser = true;   // 一度触ったら relabelCam の既定計算から守られる
+        st.classList.toggle('on', !!c.key);
+        if(inGrid()) renderGrid();
+        scheduleSave();
+      });
+      stars.appendChild(st);
+    });
+  }
   const btns = document.createElement('div');
   btns.className = 'sp-btns';
   const mk = (label, title, fn) => {
@@ -2885,7 +3068,7 @@ function makeSheetRow(cut, i){
   lockBt.classList.toggle('lk-on', !!cut.lock);
   mk('⟳', 'BOARDの切り出し元から再ベイク', () => rebakeCut(i));
   mk('✕', '削除', () => deleteCut(i));
-  head.appendChild(no); head.appendChild(dur); head.appendChild(btns);
+  head.appendChild(no); head.appendChild(dur); head.appendChild(stars); head.appendChild(btns);
 
   const body = document.createElement('div');
   body.className = 'sp-body';
@@ -2910,15 +3093,36 @@ function makeSheetRow(cut, i){
 }
 
 /* --- 行の上下ドラッグ並べ替え（SPEC_13 §9f。▲▼は撤去した） --- */
-let gRowDrag = null, gRowDragged = false;
+/* 指は **長押ししてから** 掴む（それまでは一覧を普通にスクロールできる）。
+   ペン/マウスは従来どおり 6px 動かした時点でドラッグ開始。 */
+const ROW_HOLD_MS = 350;
+let gRowDrag = null, gRowDragged = false, gRowHoldT = 0;
 function rowDragDown(e, i, row){
   const t = e.target;
-  if((t.closest && t.closest('.sp-btns')) || t.tagName === 'INPUT') return;   // ボタン/尺入力は対象外
-  gRowDrag = { i, row, y0: e.clientY, active: false, to: i };
+  // ボタン/★/尺入力は対象外
+  if((t.closest && (t.closest('.sp-btns') || t.closest('.cam-stars'))) || t.tagName === 'INPUT') return;
+  const touch = (e.pointerType === 'touch');
+  gRowDrag = { i, row, y0: e.clientY, active: false, to: i, touch, armed: !touch };
   gRowDragged = false;
+  clearTimeout(gRowHoldT);
+  if(touch){
+    gRowHoldT = setTimeout(() => {
+      if(!gRowDrag || gRowDrag.row !== row) return;
+      gRowDrag.armed = true;
+      gRowDrag.active = true;
+      row.classList.add('dragging');
+      $('#sp-drop').style.display = 'block';
+      toast('上下ドラッグで並べ替え');
+    }, ROW_HOLD_MS);
+  }
 }
 function rowDragMove(e){
   if(!gRowDrag) return;
+  if(!gRowDrag.armed){
+    // 長押しが決まる前に指が動いた＝スクロールしたいので、掴むのをやめる
+    if(Math.abs(e.clientY - gRowDrag.y0) > 10){ clearTimeout(gRowHoldT); gRowDrag = null; }
+    return;
+  }
   if(!gRowDrag.active){
     if(Math.abs(e.clientY - gRowDrag.y0) < 6) return;   // しきい値（クリックと区別）
     gRowDrag.active = true;
@@ -2939,12 +3143,13 @@ function rowDragMove(e){
   $('#sp-drop').style.top = (y - 1) + 'px';
 }
 function rowDragUp(){
+  clearTimeout(gRowHoldT);
   if(!gRowDrag) return;
   const g = gRowDrag;
   gRowDrag = null;
   $('#sp-drop').style.display = 'none';
   g.row.classList.remove('dragging');
-  if(!g.active) return;
+  if(!g.active || g.to === g.i) return;
   gRowDragged = true;
   setTimeout(() => { gRowDragged = false; }, 0);   // 直後の click を1回だけ抑止
   let to = g.to;
@@ -3018,6 +3223,21 @@ function refreshRow(i){
     lk.classList.toggle('lk-on', !!cut.lock);
   }
   row.classList.toggle('locked', !!cut.lock);
+  // ★（枠ごと）。枠の数が変わったときだけ行を作り直す（毎回作り直すとスクラブが重い）
+  const stars = row.querySelector('.cam-stars');
+  if(stars){
+    const cam = cut.cam || [];
+    const want = isCamCut(cut) ? cam.length : 0;
+    const btns = stars.querySelectorAll('.cam-star');
+    if(btns.length !== want){
+      const fresh = makeSheetRow(cut, i);
+      fresh.classList.toggle('focus', i === gFocusCut);
+      fresh.classList.toggle('locked', !!cut.lock);
+      row.replaceWith(fresh);
+      return;
+    }
+    btns.forEach((b, k) => b.classList.toggle('on', !!(cam[k] && cam[k].key)));
+  }
 }
 
 /* ---------------- EDIT ---------------- */
@@ -3124,6 +3344,7 @@ function renderGrid(){
       cv.addEventListener('pointermove', paintMove);
       cv.addEventListener('pointerup', paintUp);
       cv.addEventListener('pointercancel', paintUp);
+      bindTouchEyedrop(cv);                     // 指の長押し＝スポイト
       bindDoubleTap(cv, e => { if(e.pointerType === 'touch'){ state.curCut = ce.i; openEdit(ce.i); } });
       const cap = document.createElement('div');
       cap.className = 'gc-cap';
@@ -3352,6 +3573,15 @@ function gridTouchUp(e){
 }
 function gridPaintDown(e, cv){
   const i = +cv.dataset.ci, k = +cv.dataset.ck || 0;
+  // **指は選択専用**（ANIMATOR と同じ＝描くのはペン/マウスだけ）。
+  // これが無いと、セルを選ぼうと触っただけで色が画に乗る（gridStrokeStart が pointerType を見ていなかった）
+  if(e.pointerType === 'touch'){
+    state.curCut = i; state.curFrame = k;
+    undoStack = []; redoStack = [];
+    setSelCells([i + ':' + k]);
+    syncEditPanels();
+    return;
+  }
   if(state.curCut !== i || state.curFrame !== k){
     state.curCut = i;
     state.curFrame = k;                    // 色は枠ごとなのでどの枠かも覚える
@@ -3465,6 +3695,9 @@ function renderGridTouched(entries){
 function setEditMode(m, quiet){
   gEditMode = m;
   undoStack = []; redoStack = [];   // カット別スタックは SINGLE 専用なのでモード切替で捨てる
+  // SINGLE は1カットしか見えないので、GRIDで選んだ複数セルは持ち越さない
+  // （持ち越すと 濃/モードが見えていないコマにも効いてしまう）
+  if(m === 'single' && gSelCells.length) setSelCells([]);
   $('#edit-main').classList.toggle('grid', m === 'grid');
   $('#btn-mode-single').classList.toggle('on', m === 'single');
   $('#btn-mode-grid').classList.toggle('on', m === 'grid');
@@ -3493,13 +3726,19 @@ function syncEditPanels(){
       sel.appendChild(o);
     });
   }
-  const canColor = !!cut && inGrid();
+  // **SINGLE でも 濃/描画モードは触れる**（2026-08-15）。以前は GRID 限定で灰色になっていて
+  // 「バグか仕様か」が分からなかった。対象は state.curFrame の枠（FIXカットは1枠なので迷わない）
+  if(cut) state.curFrame = clamp(state.curFrame | 0, 0, Math.max(0, camCount(cut) - 1));
+  const canColor = !!cut;
   sel.disabled = !canColor;
   $('#color-alpha').disabled = !canColor;
+  const tgtLabel = (cut && isCamCut(cut)) ? ('（対象: ' + cut.cam[state.curFrame].k + ' 枠）') : '';
+  const pnl = sel.closest('div').previousElementSibling;
+  if(pnl && pnl.classList.contains('pnl-t')) pnl.textContent = 'COLOR LAYER（カラースクリプト）' + tgtLabel;
   const colorBtn = document.querySelector('.etool[data-target="color"]');
-  if(colorBtn){                       // 色は枠ごとなので GRID でだけ編集する
+  if(colorBtn){                       // 色を「描く」のは枠ごとの空間なので GRID だけ（座標が別空間のため）
     colorBtn.classList.toggle('off', !inGrid());
-    colorBtn.title = inGrid() ? 'カラースクリプト層（枠ごと）' : '色はGRIDで編集します';
+    colorBtn.title = inGrid() ? 'カラースクリプト層（枠ごと）' : '色を描くのはGRIDです（濃・モードはここでも変えられます）';
   }
   if(cut){
     sel.value = colorBlendOf(cut, state.curFrame);
@@ -4130,10 +4369,8 @@ function sampleCompositeColor(cx, cy){
   }
   return rgbToHex(cut.bg, cut.bg, cut.bg);
 }
-function eyedropAt(clientX, clientY, cv){
-  const { x, y } = toBakeCoord(clientX, clientY, cv);
-  const hex = sampleCompositeColor(x, y);
-  if(!hex) return;
+function takeColor(hex){
+  if(!hex) return false;
   state.fillColor = hex;
   updateSwatch();
   if(gPalSlot >= 0 && gPalSlot < gPalette.length){
@@ -4141,6 +4378,46 @@ function eyedropAt(clientX, clientY, cv){
     savePalette();
     renderPalette();
   }
+  return true;
+}
+function eyedropAt(clientX, clientY, cv){
+  const { x, y } = toBakeCoord(clientX, clientY, cv);
+  // レイヤーから拾えないとき（非常駐カット等）は、見えている画から拾う
+  if(!takeColor(sampleCompositeColor(x, y))) eyedropView(clientX, clientY, cv);
+}
+/* **表示されている画そのもの**から色を拾う（見たまま＝WYSIWYG）。
+   非常駐カットでも効くので、指の長押しスポイトはこちらを使う */
+function eyedropView(clientX, clientY, cv){
+  const p = toCanvasCoord(clientX, clientY, cv);
+  try{
+    const d = ctx2d(cv).getImageData(clamp(Math.floor(p.x), 0, cv.width - 1),
+                                     clamp(Math.floor(p.y), 0, cv.height - 1), 1, 1).data;
+    if(d[3] < 8) return false;
+    return takeColor(rgbToHex(d[0], d[1], d[2]));
+  }catch(e){ return false; }
+}
+/* iPad: 指で 500ms 押さえたらスポイト（ペンは Alt が無いので、指だけの逃げ道） */
+const EYE_HOLD_MS = 500;
+function bindTouchEyedrop(cv){
+  let t = 0, sx = 0, sy = 0, id = -1;
+  const clear = () => { if(t){ clearTimeout(t); t = 0; } id = -1; };
+  cv.addEventListener('pointerdown', e => {
+    if(e.pointerType !== 'touch'){ clear(); return; }
+    if(id >= 0){ clear(); return; }        // 2本目が乗ったらピンチ扱い＝スポイトはやめる
+    id = e.pointerId; sx = e.clientX; sy = e.clientY;
+    t = setTimeout(() => {
+      t = 0;
+      if(eyedropView(sx, sy, cv)){
+        cancelGestures();                  // 直前のパン/ピンチを打ち切る
+        toast('スポイト ' + state.fillColor);
+      }
+    }, EYE_HOLD_MS);
+  });
+  cv.addEventListener('pointermove', e => {
+    if(e.pointerId !== id) return;
+    if(t && Math.hypot(e.clientX - sx, e.clientY - sy) > 12) clear();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => cv.addEventListener(ev, clear));
 }
 
 /* --- paint pointers（EDITキャンバスとTIMELINEプレビューで共用） --- */
@@ -4332,7 +4609,8 @@ function burnLabel(ca){
     }
     s += (seg < cam.length - 1) ? ('-' + cam[seg].k + '→' + cam[seg + 1].k) : ('-' + cam[cam.length - 1].k);
   }
-  return s + '  ' + fmtDur(cut.durF);
+  // 尺のあとに **通しタイムコード**（TIME）も出す。中央の TIME 表示と同じ規約
+  return s + '  ' + fmtDur(cut.durF) + '  ' + frameToTimecode(cutStartFrame(ca.i) + ca.local);
 }
 let gBandTmp = null;
 function renderOutputFrame(ctx, ca){
@@ -4342,11 +4620,12 @@ function renderOutputFrame(ctx, ca){
     drawCamFrame(ctx, cut, ca.local);
     if(mode === 'in'){
       ctx.save();
+      ctx.font = 'bold 30px monospace';
+      const tx = burnLabel(ca);
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(20, 20, 372, 62);
+      ctx.fillRect(20, 20, ctx.measureText(tx).width + 28, 56);   // TIME が入って伸びるので実測で敷く
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 34px monospace';
-      ctx.fillText(burnLabel(ca), 34, 64);
+      ctx.fillText(tx, 34, 58);
       ctx.restore();
     }
     return;
@@ -4363,15 +4642,18 @@ function renderOutputFrame(ctx, ca){
   ctx.drawImage(gBandTmp, ox, oy, w, h);
   ctx.save();
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 30px monospace';
+  ctx.font = 'bold 26px monospace';
   ctx.textBaseline = 'middle';
-  ctx.fillText(burnLabel(ca), ox, CONTE_H - oy / 2);
+  const lab = burnLabel(ca);
+  ctx.fillText(lab, ox, CONTE_H - oy / 2);
   const note = (cut.note || '').split('\n')[0];
   if(note){
+    // TIME が入って見出しが伸びたぶん、内容は残り幅に収める
+    const left = ox + ctx.measureText(lab).width + 24;
     ctx.font = '22px ' + "'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif";
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
     ctx.textAlign = 'right';
-    ctx.fillText(note, CONTE_W - ox, CONTE_H - oy / 2);
+    ctx.fillText(note, CONTE_W - ox, CONTE_H - oy / 2, Math.max(80, CONTE_W - ox - left));
   }
   ctx.restore();
 }
@@ -4381,6 +4663,7 @@ function updateTLHud(){
   const ca = cutIndexAt(state.tl.frame);
   $('#tl-cutlabel').textContent = ca ? 'C' + (ca.i + 1) : '—';
   updatePlayhead();
+  updateTimecodeHud();
 }
 function updatePlayhead(){
   const T = totalFrames();
@@ -4497,16 +4780,15 @@ function layoutTL(){
     bindDoubleTap(el, () => openEdit(i));   // iPad: ネイティブdblclickが来ないことがある
     h.addEventListener('pointerdown', ev => {
       ev.stopPropagation(); ev.preventDefault();
-      h.setPointerCapture(ev.pointerId);
+      try{ h.setPointerCapture(ev.pointerId); }catch(err){}
       gClipDrag = { i, startX: ev.clientX, origDur: c.durF };
     });
-    h.addEventListener('pointermove', clipDragMove);
-    h.addEventListener('pointerup', clipDragEnd);
-    h.addEventListener('pointercancel', clipDragEnd);
+    // move/up は window 側で拾う（帯から始めた尺ドラッグと経路を1本にするため）
     cont.appendChild(el);
     acc += c.durF;
   });
   layoutCamKeys();
+  layoutMarkers();
   updateTLHud();
 }
 /* --- カメラキー行（◆＝枠がその位置に居るコマ / 区間バー＝イーズ） ---
@@ -4723,6 +5005,24 @@ function stripSeek(ev){
   pause();
   seek(clamp(Math.round(pxToFrame(ev.clientX - r.left, r.width)), 0, T - 1));
 }
+/* カット境目（クリップ右端）に近いか。ペン/指だと 20px のハンドルでも外しやすく、
+   そのたびにインジケータが飛んでいたので、境目の近くはハンドル扱いに寄せる。 */
+function clipEdgeAt(clientX){
+  const T = totalFrames();
+  if(!T) return -1;
+  const r = $('#tl-clips').getBoundingClientRect();
+  if(!r.width) return -1;
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const tol = (coarse || gUi.uiBig) ? 26 : 15;
+  let acc = 0, best = -1, bd = Infinity;
+  for(let i = 0; i < cuts.length; i++){
+    acc += cuts[i].durF;
+    const x = r.left + frameFrac(acc) * r.width;
+    const d = Math.abs(clientX - x);
+    if(d <= tol && d < bd){ bd = d; best = i; }
+  }
+  return best;
+}
 function seek(f){
   const T = totalFrames();
   if(!T){ state.tl.frame = 0; renderTL(); return; }
@@ -4846,6 +5146,10 @@ function updateAudioUI(){
   $('#btn-audio-mute').disabled = !gAudio;
   $('#btn-audio-clear').disabled = !gAudio;
   $('#audio-offset').disabled = !gAudio;
+  const sc = $('#audio-offset-scrub');
+  if(sc) sc.style.opacity = gAudio ? '1' : '.35';
+  const mk = $('#marker-tx');
+  if(mk) mk.textContent = gMarkers.length ? (gMarkers.length + '個') : '—';
 }
 async function loadAudioBlob(blob, name, quiet){
   clearAudio(true);
@@ -4900,12 +5204,92 @@ function clearAudio(quiet){
   drawTLRuler(totalFrames());
   if(!quiet){ scheduleSave(); toast('音を外しました'); }
 }
-function setAudioOffset(f){
+function setAudioOffset(f, quiet){
   gAudioOffset = clamp(Math.round(f) || 0, -FPS * 600, FPS * 600);
   updateAudioUI();
   drawTLRuler(totalFrames());
   if(state.tl.playing) syncAudio(true);
+  if(!quiet) scheduleSave();
+}
+/* 「ずらし」を数値入力ではなくスクラブで合わせる（AEでコマ数を測って打つ運用も残す）。
+   1コマ＝タイムラインの1コマぶんの幅にしてあるので、波形を見ながら合わせられる */
+let gOffDrag = null;
+function offsetScrubDown(e){
+  if(!gAudio) return;
+  e.preventDefault();
+  const el = $('#audio-offset-scrub');
+  try{ el.setPointerCapture(e.pointerId); }catch(err){}
+  el.classList.add('on');
+  gOffDrag = { id: e.pointerId, x0: e.clientX, base: gAudioOffset };
+}
+function offsetScrubMove(e){
+  if(!gOffDrag || e.pointerId !== gOffDrag.id) return;
+  const per = Math.max(0.5, pxPerFrame());   // 帯が狭い/全体表示でも操作できるよう下限を置く
+  setAudioOffset(gOffDrag.base + Math.round((e.clientX - gOffDrag.x0) / per), true);
+}
+function offsetScrubUp(e){
+  if(!gOffDrag || (e && e.pointerId !== gOffDrag.id)) return;
+  gOffDrag = null;
+  $('#audio-offset-scrub').classList.remove('on');
   scheduleSave();
+}
+
+/* ---------------- マーカー（COMPOSER 準拠・聴きながら M で打つ） ----------------
+   通しコマ番号の配列。ルーラーの上に▼で出る。音と同じ meta レコードに保存する。 */
+let gMarkers = [];
+function markerNear(f){
+  const tol = Math.max(1, Math.round(8 / Math.max(0.1, pxPerFrame())));   // 画面上8px ぶんを「同じ位置」とみなす
+  let bi = -1, bd = Infinity;
+  gMarkers.forEach((m, i) => { const d = Math.abs(m - f); if(d <= tol && d < bd){ bd = d; bi = i; } });
+  return bi;
+}
+function toggleMarkerHere(){
+  const T = totalFrames();
+  if(!T){ toast('カットがありません'); return; }
+  const f = clamp(state.tl.frame, 0, T - 1);
+  const i = markerNear(f);
+  if(i >= 0){ gMarkers.splice(i, 1); toast('マーカーを消しました'); }
+  else { gMarkers.push(f); gMarkers.sort((a, b) => a - b); toast('マーカー ' + fmtDur(f)); }
+  layoutMarkers();
+  updateAudioUI();
+  scheduleSave();
+}
+function delMarkerAt(f){
+  const i = gMarkers.indexOf(f);
+  if(i < 0) return;
+  gMarkers.splice(i, 1);
+  layoutMarkers();
+  updateAudioUI();
+  scheduleSave();
+  toast('マーカーを消しました');
+}
+function seekMarker(d){
+  if(!gMarkers.length) return;
+  const f = state.tl.frame;
+  const list = d < 0 ? gMarkers.filter(m => m < f).slice(-1) : gMarkers.filter(m => m > f).slice(0, 1);
+  if(!list.length) return;
+  pause();
+  seek(list[0]);
+}
+function layoutMarkers(){
+  const box = $('#tl-marks');
+  if(!box) return;
+  box.innerHTML = '';
+  const aw = tlWidthPx();
+  if(!totalFrames() || !aw) return;
+  gMarkers.forEach(f => {
+    const x = frameFrac(f) * aw;
+    if(x < -14 || x > aw + 14) return;      // 拡大中に画面外のものは出さない
+    const d = document.createElement('div');
+    d.className = 'tl-mark';
+    d.style.left = x + 'px';
+    d.title = 'マーカー ' + fmtDur(f) + '（クリック=そこへ移動 / Wクリック=削除）';
+    d.addEventListener('pointerdown', ev => ev.stopPropagation());   // スクラブに取られない
+    d.addEventListener('click', ev => { ev.stopPropagation(); pause(); seek(f); });
+    d.addEventListener('dblclick', ev => { ev.stopPropagation(); delMarkerAt(f); });
+    bindDoubleTap(d, () => delMarkerAt(f));
+    box.appendChild(d);
+  });
 }
 /* タイムラインのコマ位置 → 音の再生位置。範囲外なら止める */
 function syncAudio(hard){
@@ -5236,6 +5620,8 @@ function tlPaintDown(e){
   if(e.pointerType === 'touch') return;   // §4-3: 指では描かない（STUDIOプレビューにパンは無い）
   const T = totalFrames();
   if(!T) return;
+  // スポイトは常駐を待たない（見えている画から拾えるので、Altクリックはいつでも効く）
+  if(e.altKey){ eyedropView(e.clientX, e.clientY, tlCv); return; }
   pause();
   const ca = cutIndexAt(state.tl.frame);
   if(!ca) return;
@@ -5257,7 +5643,12 @@ const SHORTCUT_ACTIONS = [
   { id: 'loop',      label: 'ループ切替',           def: 'L',          run: () => toggleLoop() },
   { id: 'sheet',     label: 'SHEETパネル 開閉',     def: 'S',          run: () => toggleSheetPanel() },
   { id: 'toolMove',  label: 'BOARD: MOVE',          def: 'V',          run: () => setBoardTool('move') },
-  { id: 'toolCut',   label: 'BOARD: CUT 16:9',      def: 'C',          run: () => setBoardTool('cut') }
+  { id: 'toolCut',   label: 'BOARD: CUT 16:9',      def: 'C',          run: () => setBoardTool('cut') },
+  { id: 'fit',       label: 'BOARD 全体表示（EDITでは表示リセット）', def: 'F', run: () => boardFit() },
+  { id: 'marker',    label: 'マーカーを打つ / 消す', def: 'M',          run: () => toggleMarkerHere() },
+  { id: 'prevMark',  label: '前のマーカーへ',       def: ',',          run: () => seekMarker(-1) },
+  { id: 'nextMark',  label: '次のマーカーへ',       def: '.',          run: () => seekMarker(1) },
+  { id: 'maxPane',   label: 'カーソル下のペインを最大化 / 解除', def: '@', prevent: true, run: () => togglePaneMax() }
 ];
 let gKeymap = {};
 function defaultKeymap(){ const m = {}; SHORTCUT_ACTIONS.forEach(a => m[a.id] = a.def); return m; }
@@ -5287,7 +5678,14 @@ function loadUi(){
     if(typeof o.boardW === 'number') gUi.boardW = clamp(o.boardW, 12, 72);
     if(typeof o.sheetW === 'number') gUi.sheetW = clamp(o.sheetW, 10, 48);
     if(typeof o.tlH === 'number') gUi.tlH = clamp(o.tlH, TL_H_MIN, TL_H_MAX);
+    if(typeof o.tools === 'boolean') gUi.tools = o.tools;
+    if(typeof o.curH === 'number') gUi.curH = clamp(o.curH, CUR_H_MIN, CUR_H_MAX);
+    if(typeof o.uiBig === 'boolean') gUi.uiBig = o.uiBig;
   }catch(e){}
+  // 初回だけ環境で決める（指で触る端末は最初から大きいUI）
+  if(gUi.uiBig === null){
+    gUi.uiBig = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  }
 }
 function saveUi(){
   try{ localStorage.setItem(UI_LS, JSON.stringify(gUi)); }catch(e){}
@@ -5295,12 +5693,18 @@ function saveUi(){
 function applyUi(){
   const right = gUi.side === 'right';
   $('#edit-main').classList.toggle('side-right', right);
-  $('#tl-minitools').classList.toggle('right', right);
   $('#btn-tl-tools').classList.toggle('right', right);
   $('#studio-sheet').classList.toggle('hidden', !gUi.sheet);
   $('#split-sheet').style.display = gUi.sheet ? 'block' : 'none';
   $('#studio-board').style.width = gUi.boardW + '%';
   $('#studio-sheet').style.width = gUi.sheetW + '%';
+  // ミニツールは既定で隠す（絵を隠さない）。開閉は覚える
+  $('#tl-minitools').classList.toggle('hidden', !gUi.tools);
+  $('#btn-tl-tools').style.display = gUi.tools ? 'none' : 'inline-block';
+  document.body.classList.toggle('ui-big', !!gUi.uiBig);
+  const chk = $('#chk-ui-big');
+  if(chk) chk.checked = !!gUi.uiBig;
+  applyCurHeight();
   applyTlHeight();
 }
 /* スプリッタ（AEのようにペイン境界をドラッグ）。TIMELINE帯は全幅なので影響を受けない＝
@@ -5388,6 +5792,158 @@ function bindTlResize(){
   el.addEventListener('dblclick', () => {
     gUi.tlH = TL_H_DEF;
     applyTlHeight(); saveUi(); fitTLCanvas(); layoutTL(); renderTL(); layoutStudio();
+  });
+}
+/* 中央下「内容・セリフ」欄の高さ（AE風に境界を上下へ） */
+const CUR_H_MIN = 24, CUR_H_MAX = 420, CUR_H_DEF = 58;
+function applyCurHeight(){
+  const room = Math.max(CUR_H_MIN, Math.round(window.innerHeight * 0.5));
+  const h = clamp(gUi.curH || CUR_H_DEF, CUR_H_MIN, Math.min(CUR_H_MAX, room));
+  const box = $('#cur-box');
+  if(box) box.style.setProperty('--curh', h + 'px');
+}
+function bindCurResize(){
+  const el = $('#split-cur');
+  if(!el) return;
+  let drag = null;
+  const move = e => {
+    if(!drag || drag.id !== e.pointerId) return;
+    gUi.curH = clamp(drag.h0 - (e.clientY - drag.y0), CUR_H_MIN, CUR_H_MAX);
+    applyCurHeight();
+    fitTLCanvas(); renderTL();
+  };
+  const end = () => {
+    if(!drag) return;
+    drag = null;
+    el.classList.remove('on');
+    saveUi();
+    if(state.view === 'studio') layoutStudio();
+  };
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    drag = { id: e.pointerId, y0: e.clientY, h0: $('#cur-note').getBoundingClientRect().height };
+    el.classList.add('on');
+  });
+  el.addEventListener('pointermove', move);
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  el.addEventListener('dblclick', () => {
+    gUi.curH = CUR_H_DEF;
+    applyCurHeight(); saveUi(); fitTLCanvas(); renderTL(); layoutStudio();
+  });
+}
+/* ---------------- @ でカーソル下のペインを最大化（AE の ~ と同じ手触り） ----------------
+   もう一度 @ で戻す。ペインは BOARD / プレビュー / SHEET / TIMELINE帯 の4つ。 */
+const gPointer = { x: 0, y: 0 };
+let gPaneMax = null;
+function studioPanes(){
+  return [$('#studio-board'), $('#studio-center'), $('#studio-sheet'), $('#tl-bottom')].filter(Boolean);
+}
+function paneAtPointer(){
+  for(const el of studioPanes()){
+    if(el.offsetParent === null) continue;                 // 閉じている SHEET などは対象外
+    const r = el.getBoundingClientRect();
+    if(gPointer.x >= r.left && gPointer.x <= r.right && gPointer.y >= r.top && gPointer.y <= r.bottom) return el;
+  }
+  return null;
+}
+function clearPaneMax(){
+  ['#studio-main', '#studio-board', '#studio-center', '#studio-sheet', '#tl-bottom',
+   '#split-board', '#split-sheet'].forEach(id => {
+    const el = $(id);
+    if(el) el.classList.remove('pane-hide', 'pane-max');
+  });
+  gPaneMax = null;
+  applyUi();
+  layoutStudio();
+}
+function togglePaneMax(){
+  if(state.view !== 'studio') return;
+  if(gPaneMax){ clearPaneMax(); toast('ペインの最大化を解除'); return; }
+  const el = paneAtPointer();
+  if(!el){ toast('@ ：最大化したいペインの上にカーソルを置いてから押してください'); return; }
+  const tl = $('#tl-bottom');
+  if(el === tl){
+    $('#studio-main').classList.add('pane-hide');
+  }else{
+    tl.classList.add('pane-hide');
+    ['#studio-board', '#studio-center', '#studio-sheet'].forEach(id => {
+      const p = $(id);
+      if(p && p !== el) p.classList.add('pane-hide');
+    });
+    ['#split-board', '#split-sheet'].forEach(id => { const s = $(id); if(s) s.classList.add('pane-hide'); });
+  }
+  el.classList.add('pane-max');
+  gPaneMax = el;
+  layoutStudio();
+  toast('最大化（@ でもとに戻す）');
+}
+/* 全消去（SETTINGSのCLOSE隣）。ZIPが唯一の保険なので、2段確認にしてある */
+async function wipeAll(){
+  const ok = await modalConfirm('写真・カット・音・マーカーをすべて消します。\n先に ⇩ PROJ でZIP保存しましたか？（音とマーカーもZIPに入ります）\nこの操作は元に戻せません。');
+  if(!ok) return;
+  const ok2 = await modalConfirm('本当に全部消します。よろしいですか？');
+  if(!ok2) return;
+  pause();
+  clearAudio(true);
+  gMarkers = [];
+  gAudioOffset = 0;
+  photos.splice(0, photos.length);
+  cuts.splice(0, cuts.length);
+  gLru.length = 0;
+  gLog.length = 0; gLogRedo.length = 0;
+  gColorLog.length = 0; gColorRedo.length = 0;
+  undoStack = []; redoStack = [];
+  setSelCells([]);
+  state.selPhoto = null; state.selCut = null;
+  state.curCut = -1; state.curFrame = 0; state.tl.frame = 0;
+  state.tlView = { start: 0, span: 0 };
+  gFocusCut = -1;
+  try{
+    await idbClearPut('photos', []);
+    await idbClearPut('cuts', []);
+    await idbClearPut('meta', []);
+  }catch(e){ console.error('wipeAll failed', e); }
+  toggleHelp(false);
+  refreshStudio();
+  syncBoardPanels();
+  updateAudioUI();
+  layoutStudio();
+  $('#save-dot').textContent = 'SAVED';
+  toast('全部消しました');
+}
+/* FRAME / TIME のクリック入力（COMPOSER と同じ：Enterで確定・Escで取消） */
+function bindTcEdit(sel, cur, parse){
+  const span = $(sel);
+  if(!span) return;
+  span.addEventListener('click', () => {
+    if(!totalFrames() || span.querySelector('input')) return;
+    const old = span.textContent;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.value = cur();
+    span.textContent = '';
+    span.appendChild(inp);
+    inp.focus(); inp.select();
+    let done = false;
+    const fin = commit => {
+      if(done) return;
+      done = true;
+      const v = inp.value.trim();
+      span.textContent = old;
+      if(commit && v){
+        const f = parse(v);
+        if(f != null && isFinite(f)){ pause(); seek(clamp(Math.round(f), 0, totalFrames() - 1)); }
+      }
+      updateTimecodeHud();
+    };
+    inp.addEventListener('blur', () => fin(true));
+    inp.addEventListener('keydown', ev => {
+      ev.stopPropagation();
+      if(ev.key === 'Enter') fin(true);
+      else if(ev.key === 'Escape') fin(false);
+    });
   });
 }
 function toggleUiSide(){
@@ -5584,27 +6140,45 @@ const HELP_GROUPS = [
     ['↑ / ↓', '前/次のカットを選ぶ'], ['上下ドラッグ', 'カットの並べ替え'],
     ['Ctrl+↑ / ↓', '現在カットを上へ／下へ移動']
   ] },
-  { t: 'BOARD', rows: [
+  { t: 'BOARD（考える場）', rows: [
     ['V / C', 'MOVE ／ CUT 16:9（上のバーと同じ）'],
-    ['ドラッグ', '写真を移動（空白＝パン）'], ['Alt / 中ボタン ドラッグ', '常にパン'],
-    ['ホイール / ピンチ', 'ズーム'], ['枠線・C#をクリック', 'CUT枠を選択'],
+    ['写真の読み込み', 'D&D ／ + IMPORT ／ Ctrl+V'],
+    ['MOVE でドラッグ', '写真を移動（空白をドラッグ＝パン）'],
+    ['Alt / 中ボタン ドラッグ', 'いつでもパン'],
+    ['ホイール / ピンチ', 'ズーム'], ['F', '全体が入る表示'],
+    ['枠線・C# をクリック', 'CUT枠を選択'],
+    ['枠内ドラッグ / 角', '枠の移動 ／ リサイズ（16:9）— 離すと自動で再ベイク'],
+    ['CUT でドラッグ', '矩形で絵コンテのコマ化（16:9）'],
+    ['＋枠', 'B枠を足す＝T.U./PAN になる（尺は枠ごと＝次の枠までのコマ数）'],
     ['SHEETの 🔒', 'そのカットをBOARDで掴めなくする'],
-    ['Delete', '選択中の枠（カット）／写真を削除'], ['Ctrl+V', '画像を貼り付け']
+    ['Delete', '選択中の枠（カット）／写真を削除']
   ] },
   { t: 'TIMELINE', rows: [
-    ['帯クリック / ドラッグ', 'seek'], ['クリップ右端ドラッグ', '尺を変更'],
+    ['帯クリック / ドラッグ', 'seek'],
+    ['カット境目をドラッグ', '尺を変更（境目の近くはスクラブより優先）'],
     ['クリップをWクリック', '加筆EDITへ'],
     ['◆ をドラッグ', '動き出し／止まりの位置（PAN・T.U.）'],
     ['区間バーをクリック', 'イーズを選ぶ（Q.PAN・フェアリング等）'],
     ['Alt+ホイール', '時間軸を拡大縮小'], ['ホイール', '拡大中の横スクロール'],
     ['「全体」をクリック', '拡大をリセット'],
-    ['帯の上端をドラッグ', 'TIMELINEの高さ（Wクリックで既定へ）']
+    ['帯の上端をドラッグ', 'TIMELINEの高さ（Wクリックで既定へ）'],
+    ['FRAME / TIME', 'クリックで直接入力してその位置へ']
   ] },
-  { t: '音（TIMELINE最下部）', rows: [
-    ['⇧ 音を読み込み', 'mp3 / wav / m4a（波形がルーラーに出ます）'],
-    ['ずらし', '音の頭をコマ単位で前後（＋で遅らせる・−で早める）'],
+  { t: '音・マーカー（TIMELINE最下部）', rows: [
+    ['AUDIO', 'その文字が読み込みボタン（mp3 / wav / m4a / aac）'],
+    ['ずらし ⇄', '左右にドラッグで音をずらす（数値入力も可）'],
+    ['M', 'いまの位置にマーカー（同じ所でもう一度＝消す）'],
+    [', / .', '前／次のマーカーへ'],
+    ['▼ をクリック', 'そこへ移動 ／ Wクリックで削除'],
     ['🔊 / 🔇', '作業中に鳴らすかどうか（書き出しには常に入ります）'],
-    ['EXPORT VIDEO', 'MP4に映像＋音で書き出し']
+    ['EXPORT VIDEO', 'MP4に映像＋音で書き出し（焼込に TIME も出ます）']
+  ] },
+  { t: '画面（AE風）', rows: [
+    ['@', 'カーソル下のペインを最大化 ／ もう一度で戻す'],
+    ['ペインの境界', 'ドラッグで幅・高さ（Wクリックで既定へ）'],
+    ['S', 'SHEETパネルの開閉'],
+    ['✎ TOOLS / HIDE', 'プレビュー上のミニツール（既定は隠し）'],
+    ['大きいUI', 'ボタン・スライダーを大きく（この画面の上で切替）']
   ] },
   { t: '元の絵（BASE）', rows: [
     ['BASEスライダー', '元の絵の濃度（20〜40%がトレース用）'],
@@ -5616,9 +6190,20 @@ const HELP_GROUPS = [
     ['ホイール', 'カーソル中心ズーム'], ['1本指ドラッグ', 'パン'], ['2本指', 'ピンチ拡縮＋パン'],
     ['FIT', 'ズーム/パンをリセット']
   ] },
-  { t: 'iPad', rows: [
-    ['ダブルタップ', '加筆EDITへ（行・クリップ）'], ['2本指タップ', 'UNDO'], ['3本指タップ', 'REDO'],
-    ['指 / ペン', '指＝操作・ペン＝描画']
+  { t: 'iPad（指＝操作 / ペン＝描画）', rows: [
+    ['指でなぞる', 'スクロール・パン（指では描きません）'],
+    ['指でセルを触る', 'GRIDはそのコマを選ぶだけ（色は乗りません）'],
+    ['指の長押し', 'スポイト（見えている色をそのまま拾う）'],
+    ['SHEET行を長押し', 'そのまま上下ドラッグで並べ替え'],
+    ['ダブルタップ', '加筆EDITへ（行・クリップ・セル）'],
+    ['2本指タップ', 'UNDO'], ['3本指タップ', 'REDO'],
+    ['ペン', '枠置き・ペイント（画面が指で隠れない）']
+  ] },
+  { t: 'メモ', rows: [
+    ['⇩ PROJ', '写真・枠・加筆・色・音・マーカーを1つのZIPに（全消去の前にこれ）'],
+    ['キーの再割当', 'localStorage econte_keymap_v1 を直接編集（アプリ内UIはありません）'],
+    ['余（このバー）', 'ベイク範囲の余白。BOARDで枠を選ぶと触れます'],
+    ['⚠ 素材不足', '枠の中に写真が無い所がある印。BOARDで赤ハッチが出ます']
   ] }
 ];
 function renderHelp(){
@@ -5643,12 +6228,28 @@ function renderHelp(){
     });
     body.appendChild(box);
   });
+  fitHelpBody();
+}
+/* **スクロールを出さない**（manga-plate と同じ「1枚で見渡せる」形）。
+   段組に流し込んだあと、横にはみ出したぶんだけ --hs で全体を縮める。
+   面積で効くので √ で寄せる＝2〜3回で収束する。 */
+function fitHelpBody(){
+  const body = $('#help-body');
+  if(!body) return;
+  let s = 1;
+  body.style.setProperty('--hs', '1');
+  for(let n = 0; n < 6; n++){
+    const over = body.scrollWidth / Math.max(1, body.clientWidth);
+    if(over <= 1.002) break;
+    s = clamp(s / Math.sqrt(over), 0.55, 1);
+    body.style.setProperty('--hs', s.toFixed(3));
+  }
 }
 function toggleHelp(force){
   const ov = $('#help-ovl');
   const on = (typeof force === 'boolean') ? force : !ov.classList.contains('on');
+  ov.classList.toggle('on', on);      // **先に出す**（隠れたままだと fitHelpBody が測れない）
   if(on) renderHelp();
-  ov.classList.toggle('on', on);
 }
 
 /* ---------------- keyboard ---------------- */
@@ -5728,6 +6329,12 @@ function onKey(e){
     }
   }
   if(e.key === 'Tab'){ e.preventDefault(); toggleUiSide(); return; }   // ANIMATOR準拠: 左右入替
+  // F は文脈で行き先が変わる（STUDIO=BOARD全体表示 / EDIT=ズーム・パンをリセット）
+  if(state.view === 'edit' && e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey){
+    e.preventDefault();
+    if(gEditMode === 'grid') gridFit(); else editFit();
+    return;
+  }
   const k = e.key.toLowerCase();   // ペイント系は STUDIO / EDIT 両方で有効
   if(k === 'b') setETool('pen');
   else if(k === 'e') setETool('eraser');
@@ -5752,10 +6359,16 @@ function wire(){
   $('#btn-help').addEventListener('click', () => toggleHelp());
   $('#btn-help-close').addEventListener('click', () => toggleHelp(false));
   $('#help-ovl').addEventListener('click', e => { if(e.target === $('#help-ovl')) toggleHelp(false); });
-  $('#btn-ui-side').addEventListener('click', toggleUiSide);
-  $('#btn-ui-side-mini').addEventListener('click', toggleUiSide);
+  $('#btn-wipe-all').addEventListener('click', wipeAll);
+  $('#chk-ui-big').addEventListener('change', e => {
+    gUi.uiBig = !!e.target.checked;
+    applyUi(); saveUi();
+    if(state.view === 'studio') layoutStudio(); else if(inGrid()) renderGrid();
+    fitHelpBody();
+  });
   bindSplit($('#split-board'), 'board');
   bindSplit($('#split-sheet'), 'sheet');
+  bindCurResize();
   $('#btn-home').addEventListener('click', () => { location.href = 'index.html'; });
   $('#btn-import').addEventListener('click', () => $('#file-input').click());
   $('#file-input').addEventListener('change', e => {
@@ -5765,7 +6378,6 @@ function wire(){
   // BOARD
   $('#btn-tool-move').addEventListener('click', () => setBoardTool('move'));
   $('#btn-tool-cut').addEventListener('click', () => setBoardTool('cut'));
-  $('#btn-board-fit').addEventListener('click', boardFit);
   $('#btn-photo-del').addEventListener('click', deleteSelPhoto);
   $('#btn-photo-rot').addEventListener('click', () => rotatePhoto(-90));   // ボタンの字形(↺)に合わせて反時計回り
   $('#btn-photo-ref').addEventListener('click', photoRefAction);
@@ -5778,8 +6390,6 @@ function wire(){
   $('#photo-bright').addEventListener('change', e => setPhotoFilter('bright', +e.target.value / 100, true));
   $('#photo-contrast').addEventListener('input', e => setPhotoFilter('contrast', +e.target.value / 100, false));
   $('#photo-contrast').addEventListener('change', e => setPhotoFilter('contrast', +e.target.value / 100, true));
-  $('#btn-cutframe-edit').addEventListener('click', () => { if(state.selCut) openEdit(state.selCut.i); });
-  $('#btn-cutframe-del').addEventListener('click', () => { if(state.selCut) deleteCut(state.selCut.i); });
   $('#btn-cam-add').addEventListener('click', addCamFrame);
   $('#cam-expand').addEventListener('input', e => {
     $('#cam-expand-val').textContent = (+e.target.value / 100).toFixed(2);
@@ -5841,6 +6451,19 @@ function wire(){
     if(f === null || f <= 0){ $('#cur-dur').value = fmtDur(cut.durF); return; }
     setCutDur(gFocusCut, f);
   });
+  // 尺はコマ数でも打てる（AE等で測った数値をそのまま入れる用）
+  $('#cur-durf').addEventListener('change', () => {
+    const cut = cuts[gFocusCut];
+    if(!cut) return;
+    const n = parseInt($('#cur-durf').value, 10);
+    if(!(n > 0)){ $('#cur-durf').value = String(cut.durF); return; }
+    setCutDur(gFocusCut, n);
+  });
+  // FRAME / TIME はクリックで直接入力 → その位置へ飛ぶ（COMPOSER と同じ操作）
+  bindTcEdit('#cur-frame', () => String(clamp(state.tl.frame, 0, Math.max(0, totalFrames() - 1)) + 1),
+             v => { const n = parseInt(v, 10); return isFinite(n) ? n - 1 : null; });
+  bindTcEdit('#cur-tc', () => frameToTimecode(clamp(state.tl.frame, 0, Math.max(0, totalFrames() - 1))),
+             parseTimecodeToFrame);
   $('#cur-note').addEventListener('input', () => {
     const cut = cuts[gFocusCut];
     if(!cut) return;
@@ -5849,7 +6472,6 @@ function wire(){
     scheduleSave();
   });
   // EDIT
-  $('#btn-edit-back').addEventListener('click', () => setView('studio'));
   $('#btn-mode-single').addEventListener('click', () => setEditMode('single'));
   $('#btn-mode-grid').addEventListener('click', () => setEditMode('grid'));
   document.querySelectorAll('.etool[data-target]').forEach(el => {
@@ -5988,11 +6610,23 @@ function wire(){
     if(gClipDrag || gKeyDrag) return;
     if(e.target.classList.contains('tl-clip-h')) return;  // 尺ハンドルはスクラブしない
     if(e.target.closest && e.target.closest('#tl-keys')) return;   // ◆と区間バーもスクラブしない
+    // **カット境目の近くはスクラブより尺ドラッグを優先**（ペン/指でハンドルを外しても
+    //   インジケータが飛ばない）
+    const ei = clipEdgeAt(e.clientX);
+    if(ei >= 0 && !cutLocked(ei)){
+      e.preventDefault();
+      gClipDrag = { i: ei, startX: e.clientX, origDur: cuts[ei].durF };
+      return;
+    }
     gScrub = true;
     stripSeek(e);
   });
   window.addEventListener('pointermove', e => { if(gScrub && !gClipDrag && !gKeyDrag) stripSeek(e); });
   window.addEventListener('pointerup', () => { gScrub = false; });
+  // 尺ドラッグは帯からも始まる（ハンドル側の setPointerCapture でも window までは届く）
+  window.addEventListener('pointermove', clipDragMove);
+  window.addEventListener('pointerup', clipDragEnd);
+  window.addEventListener('pointercancel', clipDragEnd);
   // ◆キーのドラッグは window で拾う（セル外へ出ても続く）
   window.addEventListener('pointermove', camKeyMove);
   window.addEventListener('pointerup', camKeyUp);
@@ -6042,21 +6676,25 @@ function wire(){
     const n = parseInt(e.target.value, 10);
     setAudioOffset(isNaN(n) ? 0 : n);
   });
+  // ずらしをスクラブで（数値入力はそのまま残す）
+  $('#audio-offset-scrub').addEventListener('pointerdown', offsetScrubDown);
+  window.addEventListener('pointermove', offsetScrubMove);
+  window.addEventListener('pointerup', offsetScrubUp);
+  window.addEventListener('pointercancel', offsetScrubUp);
+  $('#btn-marker-add').addEventListener('click', toggleMarkerHere);
   updateAudioUI();
   // SHEET行の上下ドラッグ（setPointerCapture は使わない＝dblclick/ダブルタップを殺さないため）
   window.addEventListener('pointermove', rowDragMove);
   window.addEventListener('pointerup', rowDragUp);
   window.addEventListener('pointercancel', rowDragUp);
-  // TIMELINE ミニツールバー
+  // 指の長押しで掴んだあとは、一覧のスクロールを止める（touchmove は非passiveで拾う）
+  $('#sheet-list').addEventListener('touchmove', e => {
+    if(gRowDrag && gRowDrag.touch && gRowDrag.armed) e.preventDefault();
+  }, { passive: false });
+  // TIMELINE ミニツールバー（既定は隠し。開閉は gUi.tools に覚える）
   $('#tl-brush').addEventListener('input', e => setBrush(+e.target.value));
-  $('#btn-tl-tools-hide').addEventListener('click', () => {
-    $('#tl-minitools').classList.add('hidden');
-    $('#btn-tl-tools').style.display = 'inline-block';
-  });
-  $('#btn-tl-tools').addEventListener('click', () => {
-    $('#tl-minitools').classList.remove('hidden');
-    $('#btn-tl-tools').style.display = 'none';
-  });
+  $('#btn-tl-tools-hide').addEventListener('click', () => { gUi.tools = false; applyUi(); saveUi(); });
+  $('#btn-tl-tools').addEventListener('click', () => { gUi.tools = true; applyUi(); saveUi(); });
   tlCv.addEventListener('pointerdown', tlPaintDown);
   tlCv.addEventListener('pointermove', paintMove);
   tlCv.addEventListener('pointerup', paintUp);
@@ -6089,14 +6727,11 @@ function wire(){
     URL.revokeObjectURL(url);
   };
   const palLoad = () => $('#pal-file-input').click();
+  // パレットは EDIT サイドだけ（STUDIOのミニツールからは撤去した＝Altスポイト/指の長押しで拾う）
   $('#btn-pal-add').addEventListener('click', palAdd);
   $('#btn-pal-del').addEventListener('click', palDel);
   $('#btn-pal-save').addEventListener('click', palSave);
   $('#btn-pal-load').addEventListener('click', palLoad);
-  $('#btn-tl-pal-add').addEventListener('click', palAdd);
-  $('#btn-tl-pal-del').addEventListener('click', palDel);
-  $('#btn-tl-pal-save').addEventListener('click', palSave);
-  $('#btn-tl-pal-load').addEventListener('click', palLoad);
   $('#pal-file-input').addEventListener('change', async e => {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
@@ -6123,8 +6758,15 @@ function wire(){
   window.addEventListener('pointercancel', tapUp, true);
   // keyboard
   window.addEventListener('keydown', onKey);
+  // カーソル位置を覚えておく（@ でどのペインを最大化するかの判定に使う）
+  window.addEventListener('pointermove', e => { gPointer.x = e.clientX; gPointer.y = e.clientY; }, true);
+  // 指の長押しスポイト（EDIT / STUDIOプレビュー。GRIDセルは renderGrid 側で張る）
+  bindTouchEyedrop(editCv);
+  bindTouchEyedrop(tlCv);
   const relayout = () => {
     applyTlHeight();   // 画面が低くなったら帯の上限も下がる
+    applyCurHeight();
+    if($('#help-ovl').classList.contains('on')) fitHelpBody();
     if(state.view === 'studio') layoutStudio();
     else if(gEditMode === 'grid') renderGrid();
     else fitEditCanvas();
@@ -6213,7 +6855,15 @@ window.__ECONTE__ = {
   camLead, camTail, camMoveFrames, setCutSpan, layoutCamKeys, openEaseMenu, closeEaseMenu,
   get audio(){ return gAudio ? { name: gAudio.name, dur: gAudio.dur, frames: audioFrames(),
                                  offset: gAudioOffset, muted: gAudioMuted, playing: !gAudio.el.paused } : null; },
-  loadAudioBlob, clearAudio, setAudioOffset, syncAudio, buildPeaks, audioFrames, updateAudioUI
+  loadAudioBlob, clearAudio, setAudioOffset, syncAudio, buildPeaks, audioFrames, updateAudioUI,
+  // 2026-08-15 追加ぶん（iPad操作・UI整理・マーカー・TC）
+  get markers(){ return gMarkers.slice(); },
+  toggleMarkerHere, delMarkerAt, seekMarker, layoutMarkers, markerNear,
+  offsetScrubDown, offsetScrubMove, offsetScrubUp,
+  frameToTimecode, parseTimecodeToFrame, updateTimecodeHud, bindTcEdit,
+  clipEdgeAt, togglePaneMax, clearPaneMax, paneAtPointer, get paneMax(){ return gPaneMax; },
+  wipeAll, fitHelpBody, applyCurHeight, bindCurResize,
+  CTX_FILTER_OK, filteredSource, takeColor, eyedropView, bindTouchEyedrop
 };
 </script>
 </body>

@@ -362,6 +362,86 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   `＋`（スロット追加）も同様。スキルの canon と差分が出る点なのでコード側にもコメントを残してある
 - ミニツール側にも同じ4ボタン（＋ − ⇩ ⇧）がある。ハンドラは `wire()` 内の `palAdd/palDel/palSave/palLoad` を共有
 
+■ V2-G「iPad指運用＋UI整理」（2026-08-15）
+- **役割の分担を固定した**: iPad は **指＝選択と操作／ペン＝枠置きとペイント**。
+  指で描ける場所は無い（`paintDown` の touch return に加え、**`gridPaintDown` も touch を
+  選択だけで返す**）。GRIDで「セルを選ぼうとしただけで色が乗る」のは
+  `gridStrokeStart` が pointerType を見ていなかったため
+- **指の長押し＝スポイト**（`bindTouchEyedrop` 500ms/12px）。拾い元は
+  **`eyedropView()`＝表示されているキャンバスの画素**なので、非常駐カットでも効く。
+  `eyedropAt()` もレイヤーから拾えないときはここへ落ちる（Altクリックが空振りしない）
+- **SHEET行は長押ししてから掴む**（`ROW_HOLD_MS=350`）。それ以前に指が動いたら
+  `gRowDrag` を捨てて一覧のスクロールに譲る。掴んだ後は `#sheet-list` の
+  **非passive `touchmove` で preventDefault**（`touch-action` は途中で変えても効かないため）
+- **当たり判定を広げた**: `.tl-key::before{inset:-9px}` ／ `.tl-clip-h` 12→20px ／
+  `.splitter::before`・`#tl-resize::before` で外側±5〜6px。
+  さらに **`clipEdgeAt()`** で「カット境目の近くはスクラブより尺ドラッグを優先」
+  （＝境目を掴もうとしてインジケータが飛ぶのを止める）。
+  尺ドラッグの move/up は **window に一本化**（帯から始めた場合もハンドルから始めた場合も同じ経路）
+- **`body.ui-big`**（SETTINGSの「大きいUI」・`gUi.uiBig`）。初回だけ `pointer:coarse` で決める。
+  **id付きセレクタで書かれている所（`#board-topbar .btn` / `#tl-minitools .etool` 等）は
+  ui-big 側も id で上書きしないと効かない**。バーの高さは `--bartop` 1か所で
+  `#bar` と `.view{top}` を揃える（伸ばして top を直し忘れると本文がバーに潜る）
+- **`ctx.filter` 非対応（iPad Safari 16以前）の代役**: `CTX_FILTER_OK` を1回だけ判定し、
+  無ければ `filteredSource()` がピクセル処理で焼く（CSSと同じ順 grayscale→brightness→contrast、
+  式は `y = x*b*c + 127.5*(1-c)`）。**ドラッグ中は 1400px・ベイク時は 4096px** の2段
+  （12MPを毎フレーム回すと確実に固まる）。`drawPhoto(ctx,p,hiRes)` の第3引数がその切替で、
+  `bakeCut` だけ true を渡す。**見た目＝焼き上がりの一致は drawPhoto 一本を通すことで保つ**
+- BOARDのCUT枠: **枠線の下に暗い線を1段太く敷き、C# は黒い台紙の上に置く**
+  （白い紙の上で黄色が飛ぶため。枠自体は黒くしない）
+
+■ V2-G のUI整理（重複を落とした・2026-08-15）
+- **撤去**: BOARDの `FIT` ボタン（→ `F` キー）／`#cutframe-panel`（CUT 枠列パネル）ごと／
+  `#board-hint` と `.mini-note`（→ SETTINGS の BOARD 章）／EDITの `◀ STUDIO`（→ 最上部の STUDIO）／
+  `⇄ TOOL` と `⇄`（→ Tab のみ）／ミニツールの HSB・パレット・パレット4ボタン（→ Altスポイト/長押し）／
+  音バーの `⇧ 音を読み込み`（→ 見出し **AUDIO 自体がボタン**）／`#help-note`
+- **移した**: `C#` と `＋枠` → BOARD上端のモードバー（`#cutsel-box`）／
+  `★`（`cam[k].key`）→ **SHEET行**（`.cam-stars`・枠が2つ以上のカットだけ）／
+  `余`(bakeExpand) → SETTINGSのヘッダ（選択枠が無いと `.off`）／
+  枠ごとのコマ数とイーズ → TIMELINE（◆ドラッグ・区間バークリック。もともとそこにある）
+- **`renderCamList()` は名前を据え置いたまま中身を差し替えた**（呼び出し元と `__ECONTE__` の
+  export がそのまま生きる）。いまは「topbarのC#表示＋SETTINGSの余スライダー」の同期だけ
+- `refreshRow(i)` は★の枚数が変わったときだけ行を作り直す（毎回作り直すとスクラブが重い）
+- **SINGLE でも 濃/描画モードを触れるようにした**。以前は GRID 限定で灰色になっていて
+  「バグか仕様か」が分からなかった。対象は `state.curFrame` の枠で、`.pnl-t` に「（対象: A 枠）」と出す。
+  **色を"描く"のは従来どおり GRID だけ**（座標空間が別なので）。
+  SINGLEへ移るとき `gSelCells` は捨てる（見えていないコマに濃が効かないように）
+
+■ 中央の尺欄・タイムコード（2026-08-15）
+- `#cur-dur`（秒+コマ）の隣に **`#cur-durf`（コマ数）** を追加。どちらも `setCutDur()` へ入る
+- **`#cur-frame` / `#cur-tc` は COMPOSER のトランスポート右端と同じ表記**
+  （`frameToTimecode()` は COMPOSER の同名関数と同じ規約＝**先頭コマ=01** の `H:MM:SS:FF`）。
+  クリックで直接入力（`bindTcEdit`・Enter確定/Esc取消）
+- **焼き込みにも TIME を出す**（`burnLabel()` の末尾）。入る文字が伸びたので
+  「画面内」モードの黒帯は `measureText` で実測して敷く
+
+■ マーカー（2026-08-15・composer-timeline-kit 準拠）
+- `gMarkers`＝通しコマ番号の配列。**音と同じ meta レコード**（`{k:'audio'}`）に同居させるので、
+  meta を書くところは全部セットで書く（音のときと同じ落とし穴）
+- `M`＝打つ/消す（`markerNear()` が画面上8px ぶんを「同じ位置」とみなす）／`,` `.`＝前後へ
+- DOMは `#tl-marks`（ルーラーの上・`pointer-events:none`＋▼だけ auto）。
+  **▼の pointerdown は stopPropagation**（帯のスクラブに取られないため）。`layoutTL()` から張り直す
+
+■ 音の「ずらし」スクラブ（2026-08-15）
+- `#audio-offset-scrub` を左右ドラッグ。**1コマ＝`pxPerFrame()`** にしてあるので
+  波形を見ながら合わせられる（数値入力は AE の測定値を打つ用に残す）
+- ドラッグ中は `setAudioOffset(f, true)` で保存を抑え、離した時に1回だけ `scheduleSave()`
+
+■ 画面まわり（2026-08-15）
+- **`@` でカーソル下のペインを最大化**（AEの `~`）。`gPointer` に最後のカーソル位置を持ち、
+  `paneAtPointer()` で BOARD/プレビュー/SHEET/TIMELINE帯 のどれかを選ぶ。
+  実装は `.pane-hide` / `.pane-max` の付け外しだけ（`:has()` に頼らない）。
+  **TIMELINE帯を最大化したときは `#studio-main` を隠す**（帯は studio-main の外にあるため）
+- **中央下「内容・セリフ」欄の高さ**は `#split-cur`（`.hsplit`）＋ `gUi.curH`。
+  `#cur-note{height:var(--curh)}`
+- **ミニツールは横1行・既定は隠し**（`gUi.tools`）。`applyUi()` が `#tl-minitools.hidden` と
+  `#btn-tl-tools` の表示を両方持つ
+- **SETTINGSはスクロールを出さない**。`#help-body` を CSS columns に流し、
+  はみ出したぶんだけ `--hs` で全体を縮める（`fitHelpBody()`・面積で効くので √ で寄せる）。
+  **`toggleHelp` は先に `.on` を付けてから `renderHelp()`**（隠れたままだと clientWidth=0 で測れない）
+- **全消去**（`wipeAll()`・SETTINGSのCLOSE隣）。2段確認。ZIPが唯一の保険なので
+  **`exportProject()` に音とマーカーも入れた**（入れないと全消去で戻せないものが残る）
+
 ■ iPad ダブルタップ（V2-A・SPEC_13 §4-1）
 - `bindDoubleTap(el, fn)` = pointerup 2回が 350ms以内・24px以内。右パネル行とTLクリップに `dblclick` と併用で張る
 - **`pointerType === 'mouse'` は即return**（ネイティブdblclickに任せる＝二重発火防止）。
@@ -462,6 +542,13 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
   最下部の音バー（読み込み・ずらし・波形・24fps）／`+ IMPORT` 表記／`⧉ REF` の寛容パーサ
 - **V2-F2: 実装済み（2026-08-14）** — **EXPORT VIDEO に音を載せた**（WebCodecs=AAC／
   MediaRecorder=recDestのトラック追加）。ミュートは gain に移してモニター専用にした
+- **V2-G: 実装済み（2026-08-15・ブラッシュアップ依頼）** — iPad の指運用（GRID指=選択専用／
+  指の長押しスポイト／SHEET行の長押し並べ替え／当たり判定拡大＋境目優先／大きいUI）／
+  `ctx.filter` 非対応環境での GRAY・明・コの代役／BOARD枠の黒台紙＋暗い縁／
+  UI整理（FIT・枠列パネル・◀STUDIO・⇄・ミニツールのHSB/パレット・音読込ボタンを撤去、
+  ★はSHEETへ、余はSETTINGSへ）／尺のコマ数入力＋FRAME/TIME＋焼き込みTIME／
+  マーカー（M）／ずらしスクラブ／`@`でペイン最大化／内容欄の高さスプリッタ／
+  SETTINGS1画面化＋全消去／PROJ ZIP に音とマーカーを同梱
 - **未着手は V2-E3 のみ**（フォトバッシュ・SINGLE限定）。他のフェーズは全部入っている
   - `cut.layers[]`（最大5・原本Blob＋アフィン変形＋投げ縄マスク＋ブレンド）
     ＋ブラシチップ（**.abrパーサは作らない**・内蔵数種＋透過PNG読み込み）
