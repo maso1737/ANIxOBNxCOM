@@ -15,7 +15,10 @@
   単一HTML・依存ゼロ・file://直開きOK。UI は KINETIC STAGE デザインシステム準拠。
 -->
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+/* Shippori Antique = 漫画のセリフ用アンチック体（SIL OFL・商用可・同梱可）。
+   資料: _Research/manga/HTMLWebアプリで使えるアンチック体.md
+   オフライン(file://)では読めないので、その場合は Noto Sans JP に落ちる */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Shippori+Antique&family=Shippori+Antique+B1&display=swap');
 :root{
   --rouge:#FF4FA8; --ice:#5AE9FF; --gold:#FFD27A; --lavender:#B58EFF; --magenta:#B850FF;
   --bg-0:#07030f; --bg-1:#0c061d; --panel:#150927; --panel-2:#100728; --cell:#0d0620;
@@ -115,6 +118,11 @@ input[type=range]:disabled{opacity:.3}
 input[type=number],select,input[type=text]{background:var(--cell);border:1px solid rgba(255,210,122,.3);color:var(--white);
   font-family:var(--mono);font-size:10px;padding:3px 5px;width:70px}
 select{width:100%}
+/* 文字を打つ欄（◆Items。アンチック体でそのまま見えるようにしてある） */
+#item-params textarea{width:100%;background:var(--cell);border:1px solid rgba(255,210,122,.45);color:var(--white);
+  font-family:'Shippori Antique','Noto Sans JP',serif;font-size:13px;line-height:1.5;padding:6px 7px;
+  margin:6px 0 2px;resize:vertical;outline:0;min-height:56px}
+#item-params textarea:focus{border-color:var(--rouge);box-shadow:0 0 8px rgba(255,79,168,.35)}
 .btn{background:transparent;border:1px solid rgba(255,79,168,.55);color:var(--rouge);font-family:var(--mono);
   font-size:9px;letter-spacing:.18em;text-transform:uppercase;padding:5px 9px;cursor:pointer;user-select:none}
 .btn:hover{background:rgba(255,79,168,.12);box-shadow:0 0 8px rgba(255,79,168,.5)}
@@ -246,6 +254,7 @@ select{width:100%}
     <button class="btn gold" id="pg-next" title="次のページへ（]）">▶</button>
     <span class="t-gap"></span>
     <button class="btn gold" id="btn-settings" title="操作一覧・設定（?）">⚙</button>
+    <button class="btn gold" id="btn-swap" title="ツールレールとパネルの左右入替（TAB）">⇄</button>
     <button class="btn gold" id="btn-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
     <button class="btn" id="btn-home" title="ランディングページに戻る">HOME</button>
   </div>
@@ -258,6 +267,10 @@ select{width:100%}
     <div class="sub" id="dm-v" title="縦に分割（1）">│縦</div>
     <div class="sub" id="dm-h" title="横に分割（2）">─横</div>
     <div class="sub on" id="dm-f" title="斜め自由（3・Shiftで15°スナップ）">╱斜</div>
+    <div class="rail-sep"></div>
+    <div class="tool" id="t-text" title="テキスト（T）。クリックで置いて、右のパネルに打つ。Wクリックで 縦書き⇔横書き">あ<small id="t-text-lb">縦</small></div>
+    <div class="tool" id="t-brush" title="ベクターブラシ（B）。ドラッグで手描き線／囲うと塗り。Wクリックで 筆圧ON/OFF">✎<small id="t-brush-lb">筆圧</small></div>
+    <div class="tool" id="t-white" title="投げ縄ホワイト（W）。囲った中を白でかぶせる。Wクリックで 白⇔黒">◯<small id="t-white-lb">白</small></div>
     <div class="rail-sep"></div>
     <div class="tool" id="t-shade" title="選択コマ以外を青くする（S）">▩<small>BLUE</small></div>
     <div class="tool" id="t-guide" title="トンボ・内枠ガイド表示（G）">⊹<small>GUIDE</small></div>
@@ -283,9 +296,6 @@ select{width:100%}
       <div class="btnrow">
         <button class="btn ice" id="pn-merge" title="直前の分割を戻す（隣のコマと結合）">⤺ 分割を戻す</button>
       </div>
-      <div class="btnrow" style="margin-top:12px">
-        <button class="btn gold" id="io-reset" title="全ページ・全素材を消して新規に戻す（元に戻せません）">✕ 全消去（新規）</button>
-      </div>
     </div></details>
 
     <details class="sp"><summary>◆ Book（用紙・コマ規定）</summary><div class="spb">
@@ -306,6 +316,7 @@ select{width:100%}
         <button class="btn" id="add-tone">＋ トーン</button>
         <button class="btn" id="add-focus">＋ 集中線</button>
         <button class="btn" id="add-stream">＋ 流線</button>
+        <button class="btn gold" id="add-text">＋ 文字</button>
       </div>
       <input type="file" id="img-file" accept="image/*" multiple style="display:none">
       <div id="item-list"></div>
@@ -384,7 +395,7 @@ select{width:100%}
     <div id="help-head">
       <span class="t">MANGA PLATE — 操作一覧</span>
       <span style="flex:1"></span>
-      <button class="btn gold" id="btn-help-tab">左右入替（TAB）</button>
+      <button class="btn" id="io-reset" title="全ページ・全素材を消して新規に戻す（元に戻せません）">✕ 全消去（新規）</button>
       <button class="btn ice" id="btn-help-close">CLOSE</button>
     </div>
     <div id="help-body"></div>
@@ -440,6 +451,8 @@ let PAPER=paperOf('B4_600');
 let BOOK=null, MATSRC={}, MATIMG={};   // MATSRC: srcId→dataURL（保存対象） / MATIMG: srcId→Image（実行時）
 let curPageIdx=0, selPanel=null, selItem=null, selCut=null;
 let tool='sel', divMode='f', selMode='panel', editMode='line';
+let textVert=true, brushPress=true, whiteColor='#FFFFFF';   // レールのWクリックで切り替わる道具の状態
+let gBrushColor='#000000', gBrushLw=0;                      // 次に引く線の色と太さ（0=用紙解像度から初期化）
 let showShade=true, showGuide=true, swapUI=false;
 const view={x:0,y:0,z:0.1};
 
@@ -498,6 +511,11 @@ function migrate(b){
         it.edge=Object.assign({on:false,w:24,color:'#FFFFFF'},it.edge||{});
         it.tone=Object.assign({on:false},it.tone||{});
       }
+      if(it.type==='text'){
+        it.edge=Object.assign({on:false,w:14,color:'#FFFFFF'},it.edge||{});
+        if(typeof it.text!=='string')it.text='';
+      }
+      if(it.type==='brush'&&!Array.isArray(it.pts))it.pts=[];
     });
   });
   return b;
@@ -506,13 +524,25 @@ function curPage(){return BOOK.pages[clamp(curPageIdx,0,BOOK.pages.length-1)];}
 function findPanel(pg,id){return id?pg.panels.find(k=>k.id===id)||null:null;}
 
 /* ---- アイテム定義（スライダーは DEFS から自動生成） ---- */
-const ITEM_DEFS={img:1,tone:1,focus:1,stream:1,frame:1,white:1};
+const ITEM_DEFS={img:1,tone:1,focus:1,stream:1,frame:1,white:1,text:1,brush:1};
+/* 描画の重なりは「種類ごとの段」で決まる（レイヤーもモードも持たない）。
+   画像(0) → 網・線(1・乗算＝線画を覆わない) → 文字・ブラシ・ホワイト(2・常に一番上）。
+   同じ段の中では ◆Items の並び（▲▼・ドラッグ）どおり。 */
+const ITEM_BAND={img:0,frame:1,tone:1,focus:1,stream:1,text:2,brush:2,white:2};
+const INK_MULTIPLY={tone:1,focus:1,stream:1,frame:1};   // 乗算で乗せる＝黒い線を潰さない
+const TEXT_FONTS=[['アンチック',"'Shippori Antique'"],['アンチックB1',"'Shippori Antique B1'"],['ゴシック',"'Noto Sans JP'"]];
+function fontStack(i){return (TEXT_FONTS[i]||TEXT_FONTS[0])[1]+",'Noto Sans JP',serif";}
 function defaultsFor(type,box){
   const S=PAPER.dpi/600;                       // 600dpi基準のpxを解像度に合わせる
   if(type==='img')   return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,scale:1,opacity:1,srcId:null,linkId:null,
                              srcs:null,cell:0,
                              edge:{on:false,w:Math.round(24*S),color:'#FFFFFF'},tone:{on:false}};
   if(type==='white') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,opacity:1,poly:[],color:'#FFFFFF'};
+  if(type==='text')  return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,opacity:1,text:'',
+                             size:Math.round(66*S),lh:1.18,ls:0.02,font:0,vertical:true,
+                             edge:{on:false,w:Math.round(14*S),color:'#FFFFFF'},color:'#000000'};
+  if(type==='brush') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,opacity:1,pts:[],
+                             lw:Math.round(14*S),fill:false,closed:false,color:'#000000'};
   if(type==='tone')  return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,w:Math.round(box.w),h:Math.round(box.h),
                              dot:Math.round(16*S),gap:Math.round(22*S),angle:45,shape:'dot',color:'#000000'};
   if(type==='focus') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,r0:Math.round(Math.min(box.w,box.h)*0.22),
@@ -529,6 +559,8 @@ const DEFS={
   stream:[['w',50,9000,1,'W'],['h',50,9000,1,'H'],['count',2,200,1,'本数'],['lw',1,60,1,'太さ'],['taper',0,1,0.05,'先細り'],['jitter',0,1,0.05,'ゆらぎ'],['seed',1,99,1,'SEED'],['rot',-180,180,1,'ROT']],
   frame: [['w',50,9000,1,'W'],['h',50,9000,1,'H'],['lw',2,120,1,'太さ'],['rot',-90,90,1,'ROT']],
   white: [['rot',-180,180,1,'ROT'],['opacity',0.05,1,0.05,'不透明度']],
+  text:  [['size',12,600,1,'文字の大きさ'],['lh',0.8,2.4,0.02,'行間'],['ls',-0.1,0.6,0.01,'字間'],['rot',-180,180,1,'ROT'],['opacity',0.05,1,0.05,'不透明度']],
+  brush: [['lw',1,200,1,'太さ'],['rot',-180,180,1,'ROT'],['opacity',0.05,1,0.05,'不透明度']],
 };
 const TONE_PRESETS=[['10%',0.42],['20%',0.55],['40%',0.74],['60%',0.90]];   // dot = gap × 比
 const FOCUS_PRESETS=[['標準',{count:110,taper:0.9,jitter:0.35}],['密',{count:220,taper:0.95,jitter:0.25}],
@@ -711,7 +743,97 @@ function drawItem(g,it){
   else if(it.type==='tone')drawTone(g,it);
   else if(it.type==='focus')drawFocus(g,it);
   else if(it.type==='stream')drawStream(g,it);
+  else if(it.type==='text')drawText(g,it);
+  else if(it.type==='brush')drawBrush(g,it);
   g.restore();
+}
+/* ---- 文字（アンチック体・縦書き/横書き） ---- */
+const VERT_ROT='ー－—―‐～〜（）()「」『』【】〔〕｛｝{}［］[]<>＜＞…‥∼';   // 縦書きで90°倒す字
+const VERT_SHIFT='、。，．,.';                                            // 右上に寄せる字
+function textLines(it){return String(it.text==null?'':it.text).split('\n');}
+function drawText(g,it){
+  const lines=textLines(it);
+  if(!lines.length||!lines.join(''))return;
+  g.globalAlpha=clamp(it.opacity===undefined?1:it.opacity,0,1);
+  g.font=it.size+'px '+fontStack(it.font|0);
+  g.textAlign='center';g.textBaseline='middle';
+  const step=it.size*(it.lh||1.18), adv=it.size*(1+(it.ls||0));
+  const paint=(fn)=>{
+    /* フチ（境界効果）は文字にも効かせる＝擬音を絵の上に置いても読める */
+    if(it.edge&&it.edge.on&&it.edge.w>0){
+      g.save();g.strokeStyle=it.edge.color;g.lineWidth=it.edge.w*2;
+      g.lineJoin='round';g.lineCap='round';g.miterLimit=2;
+      fn(true);g.restore();
+    }
+    g.fillStyle=it.color;fn(false);
+  };
+  if(it.vertical){
+    /* 縦書き: 右の列から左へ。1行＝1列 */
+    const cols=lines.length;
+    paint(stroke=>{
+      lines.forEach((ln,ci)=>{
+        const cx0=(cols-1)/2*step-ci*step;                 // 右が先頭
+        const chars=[...ln];
+        chars.forEach((ch,i)=>{
+          const cy=-(chars.length-1)/2*adv+i*adv;
+          g.save();g.translate(cx0,cy);
+          if(VERT_ROT.indexOf(ch)>=0)g.rotate(Math.PI/2);
+          else if(VERT_SHIFT.indexOf(ch)>=0)g.translate(it.size*0.32,-it.size*0.36);
+          if(stroke)g.strokeText(ch,0,0);else g.fillText(ch,0,0);
+          g.restore();
+        });
+      });
+    });
+  }else{
+    paint(stroke=>{
+      lines.forEach((ln,li)=>{
+        const cy=-(lines.length-1)/2*step+li*step;
+        const chars=[...ln];
+        let wsum=0;const ws=chars.map(ch=>{const w=g.measureText(ch).width+it.size*(it.ls||0);wsum+=w;return w;});
+        let x=-wsum/2;
+        chars.forEach((ch,i)=>{
+          if(stroke)g.strokeText(ch,x+ws[i]/2,cy);else g.fillText(ch,x+ws[i]/2,cy);
+          x+=ws[i];
+        });
+      });
+    });
+  }
+}
+/* 文字の外形（選択枠・当たり判定用） */
+function textBox(it){
+  const lines=textLines(it), step=it.size*(it.lh||1.18), adv=it.size*(1+(it.ls||0));
+  if(!lines.length)return{w:it.size,h:it.size};
+  if(it.vertical){
+    const maxc=Math.max(1,...lines.map(l=>[...l].length));
+    return {w:Math.max(it.size,lines.length*step),h:Math.max(it.size,maxc*adv)};
+  }
+  const g=mCtx();g.font=it.size+'px '+fontStack(it.font|0);
+  const maxw=Math.max(it.size,...lines.map(l=>g.measureText(l).width+[...l].length*it.size*(it.ls||0)));
+  return {w:maxw,h:Math.max(it.size,lines.length*step)};
+}
+let _mc=null;
+function mCtx(){if(!_mc){_mc=document.createElement('canvas').getContext('2d');}return _mc;}
+/* ---- ベクターブラシ（点列＋点ごとの太さ。丸を繋ぐ＝入り抜きが素直に出る） ---- */
+function drawBrush(g,it){
+  const p=it.pts;if(!p||!p.length)return;
+  g.globalAlpha=clamp(it.opacity===undefined?1:it.opacity,0,1);
+  g.fillStyle=it.color;
+  if(it.fill&&p.length>2){pathPoly(g,p);g.fill();}      // 囲った中を塗る
+  if(p.length===1){g.beginPath();g.arc(p[0].x,p[0].y,Math.max(0.5,it.lw*(p[0].w||1)/2),0,TAU);g.fill();return;}
+  for(let i=0;i<p.length-1;i++){
+    const a=p[i],b=p[i+1];
+    const ra=Math.max(0.5,it.lw*(a.w||1)/2), rb=Math.max(0.5,it.lw*(b.w||1)/2);
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy);
+    if(L>0.01){
+      const nx=-dy/L, ny=dx/L;
+      g.beginPath();
+      g.moveTo(a.x+nx*ra,a.y+ny*ra);g.lineTo(b.x+nx*rb,b.y+ny*rb);
+      g.lineTo(b.x-nx*rb,b.y-ny*rb);g.lineTo(a.x-nx*ra,a.y-ny*ra);
+      g.closePath();g.fill();
+    }
+    g.beginPath();g.arc(b.x,b.y,rb,0,TAU);g.fill();     // 継ぎ目の丸
+  }
+  g.beginPath();g.arc(p[0].x,p[0].y,Math.max(0.5,it.lw*(p[0].w||1)/2),0,TAU);g.fill();
 }
 function drawTone(g,it){
   g.beginPath();g.rect(-it.w/2,-it.h/2,it.w,it.h);g.clip();
@@ -800,16 +922,29 @@ function drawImgItem(g,it){
   g.drawImage(use,-use.width/2,-use.height/2);
   g.restore();
 }
+/* 描く順。段（ITEM_BAND）が先、同じ段の中は ◆Items の並びどおり */
+function drawOrder(items){
+  return items.map((it,i)=>({it:it,i:i}))
+    .sort((a,b)=>(ITEM_BAND[a.it.type]||0)-(ITEM_BAND[b.it.type]||0)||a.i-b.i)
+    .map(o=>o.it);
+}
+/* 網点・集中線・流線は乗算＝下の線画を塗り潰さない（クリスタのトーンレイヤーと同じ見え方） */
+function drawItemComposited(g,it){
+  const mul=INK_MULTIPLY[it.type]&&it.color!=='#FFFFFF';
+  if(mul)g.globalCompositeOperation='multiply';
+  drawItem(g,it);
+  if(mul)g.globalCompositeOperation='source-over';
+}
 /* ---- ページ1枚を描く（唯一の真実。ステージ/書き出し/サムネが共用） ---- */
 function renderPage(g,pg,o){
   o=o||{};
-  const lw=BOOK.lw;
+  const lw=BOOK.lw, ord=drawOrder(pg.items);
   if(BOOK.bg!=='transparent'){g.fillStyle=BOOK.bg;g.fillRect(0,0,PAPER.w,PAPER.h);}
   /* 1) コマに割り当てた素材＝コマ内でカット */
-  for(const it of pg.items){
+  for(const it of ord){
     if(!it.visible||!it.panelId)continue;
     const k=findPanel(pg,it.panelId);if(!k)continue;
-    g.save();pathPoly(g,dispPoly(k));g.clip();drawItem(g,it);g.restore();
+    g.save();pathPoly(g,dispPoly(k));g.clip();drawItemComposited(g,it);g.restore();
   }
   /* 2) コマ枠線（絵の上に乗る） */
   g.strokeStyle='#000';g.lineJoin='miter';g.lineWidth=lw;
@@ -820,9 +955,9 @@ function renderPage(g,pg,o){
     g.stroke();g.restore();
   }
   /* 3) コマに属さない素材＝枠の上（擬音・飛び出し） */
-  for(const it of pg.items){
+  for(const it of ord){
     if(!it.visible||it.panelId)continue;
-    drawItem(g,it);
+    drawItemComposited(g,it);
   }
 }
 
@@ -992,13 +1127,19 @@ function render(){
       cx.restore();
     }
   }
-  /* 投げ縄（EDIT/白）の途中経過 */
+  /* 投げ縄（W / EDIT白）の途中経過 */
   if(lasso&&lasso.pts.length>1){
     cx.save();
     cx.strokeStyle='#FFD27A';cx.lineWidth=Math.max(2/view.z,PAPER.w*0.0012);
     cx.setLineDash([12/view.z,8/view.z]);
     pathPoly(cx,lasso.pts);cx.stroke();cx.setLineDash([]);
-    cx.fillStyle='rgba(255,255,255,.45)';cx.fill();
+    cx.fillStyle=(lasso.color==='#FFFFFF'||!lasso.color)?'rgba(255,255,255,.45)':'rgba(0,0,0,.35)';cx.fill();
+    cx.restore();
+  }
+  /* ブラシの途中経過（確定後とまったく同じ描き方＝出来上がりが読める） */
+  if(stroke&&stroke.pts.length){
+    cx.save();
+    drawBrush(cx,{pts:stroke.pts,lw:gBrushLw,color:gBrushColor,opacity:1,fill:false});
     cx.restore();
   }
   /* 選択素材 */
@@ -1028,9 +1169,12 @@ function itemBounds(it){
   if(it.type==='focus')return{w:it.r1*2,h:it.r1*2};
   if(it.type==='img'){const im=MATIMG[it.srcId];const s=it.scale||1;
     return im&&im.width?{w:im.width*s,h:im.height*s}:{w:200,h:200};}
-  if(it.type==='white'){
-    if(!it.poly||!it.poly.length)return{w:100,h:100};
-    const b=polyBounds(it.poly);return{w:Math.max(b.w,20),h:Math.max(b.h,20)};}
+  if(it.type==='white'||it.type==='brush'){
+    const p=it.type==='brush'?it.pts:it.poly;
+    if(!p||!p.length)return{w:100,h:100};
+    const b=polyBounds(p), pad=it.type==='brush'?(it.lw||10):0;
+    return{w:Math.max(b.w+pad,20),h:Math.max(b.h+pad,20)};}
+  if(it.type==='text')return textBox(it);
   return{w:it.w,h:it.h};
 }
 function updateStatus(){
@@ -1053,7 +1197,10 @@ function updateStatus(){
       +'。コマ選択中はそのコマだけ、未選択なら横切る全コマ',
     edit:(editMode==='line'
       ?'分割線の●=回転／■=平行移動（Shiftで15°）。破綻する動きは自動で戻ります'
-      :'ドラッグで投げ縄→離すと白でかぶさります（EDITをWクリックで線編集に戻る）')};
+      :'ドラッグで投げ縄→離すと白でかぶさります（EDITをWクリックで線編集に戻る）'),
+    text:'置きたい所をクリック→右の◆Itemsに打つ（'+(textVert?'縦書き':'横書き')+'）。文字をクリックすると編集に戻ります',
+    brush:'ドラッグで手描き線（'+(brushPress?'筆圧あり・ペン軸のみ':'均一な太さ')+'）。描き始めに戻ると囲んだ中を塗ります',
+    white:'ドラッグで投げ縄→離すと'+(whiteColor==='#FFFFFF'?'白でかぶさります':'黒で塗ります')+'（Wクリックで白⇔黒）'};
   $('#bb-hint').textContent=H[tool]||'';
 }
 
@@ -1127,17 +1274,47 @@ function redo(){if(hi<hist.length-1){hi++;applyHist(hist[hi]);}}
 /* ============================================================
    ツール／ポインタ
    ============================================================ */
+const TOOL_BTN={sel:'#t-sel',div:'#t-div',edit:'#t-edit',text:'#t-text',brush:'#t-brush',white:'#t-white'};
+/* 空のまま放置された文字は消す（置いてみて打たなかった分が◆Itemsに溜まらないように） */
+function pruneEmptyText(keep){
+  const pg=curPage(), before=pg.items.length;
+  pg.items=pg.items.filter(it=>it.type!=='text'||it===keep||String(it.text||'').trim());
+  if(pg.items.length!==before){
+    if(selItem&&pg.items.indexOf(selItem)<0)selItem=null;
+    renderItemList();renderItemParams();
+    return true;
+  }
+  return false;
+}
 function setTool(t){
+  if(!BOOK)return;
+  if(tool==='text'&&t!=='text')pruneEmptyText(null);
   tool=t;
-  $('#t-sel').classList.toggle('on',t==='sel');
-  $('#t-div').classList.toggle('on',t==='div');
-  $('#t-edit').classList.toggle('on',t==='edit');
+  for(const k in TOOL_BTN)$(TOOL_BTN[k]).classList.toggle('on',t===k);
   if(t!=='edit')selCut=null;
   syncToolLabels();render();
 }
 function syncToolLabels(){
   $('#t-sel-lb').textContent=selMode==='panel'?'コマ':'素材';
   $('#t-edit-lb').textContent=editMode==='line'?'線':'白';
+  $('#t-text-lb').textContent=textVert?'縦':'横';
+  $('#t-brush-lb').textContent=brushPress?'筆圧':'均一';
+  $('#t-white-lb').textContent=whiteColor==='#FFFFFF'?'白':'黒';
+}
+/* iPadは dblclick が飛ばないことがあるので、タッチのダブルタップも自前で拾う
+   （animator-brush-ops スキルの正準。350ms/28px。両方から来ても1回しか効かせない） */
+function onDoubleActivate(el,handler){
+  if(!el)return;
+  let guard=0;
+  const fire=e=>{const now=performance.now();if(now-guard<400)return;guard=now;handler(e);};
+  el.addEventListener('dblclick',fire);
+  let lastT=0,lastX=0,lastY=0;
+  el.addEventListener('pointerup',e=>{
+    if(e.pointerType!=='touch')return;
+    const now=performance.now();
+    if(now-lastT<350&&Math.hypot(e.clientX-lastX,e.clientY-lastY)<28){lastT=0;e.preventDefault();fire(e);}
+    else{lastT=now;lastX=e.clientX;lastY=e.clientY;}
+  });
 }
 /* SEL の Wクリック: コマ選択 ⇔ 素材選択（トーン・流線が下敷きになっても掴める） */
 function toggleSelMode(){
@@ -1159,11 +1336,31 @@ function setDivMode(m){
   $('#dm-f').classList.toggle('on',m==='f');
   updateStatus();
 }
+/* 文字＝縦/横、ブラシ＝筆圧ON/OFF、ホワイト＝白/黒。どれも Wクリックで切替（レール共通の手ぐせ） */
+function toggleTextVert(){
+  textVert=!textVert;
+  if(selItem&&selItem.type==='text'){selItem.vertical=textVert;commit();renderItemParams();}
+  syncToolLabels();render();toast(textVert?'文字: 縦書き':'文字: 横書き');
+}
+function toggleBrushPress(){
+  brushPress=!brushPress;syncToolLabels();
+  toast(brushPress?'ブラシ: 筆圧あり（ペンのみ）':'ブラシ: 均一な太さ');
+}
+function toggleWhiteColor(){
+  whiteColor=whiteColor==='#FFFFFF'?'#000000':'#FFFFFF';syncToolLabels();
+  toast(whiteColor==='#FFFFFF'?'投げ縄: 白でかぶせる':'投げ縄: 黒で塗る');
+}
 $('#t-sel').addEventListener('click',()=>setTool('sel'));
-$('#t-sel').addEventListener('dblclick',toggleSelMode);
+onDoubleActivate($('#t-sel'),toggleSelMode);
 $('#t-div').addEventListener('click',()=>setTool('div'));
 $('#t-edit').addEventListener('click',()=>setTool('edit'));
-$('#t-edit').addEventListener('dblclick',toggleEditMode);
+onDoubleActivate($('#t-edit'),toggleEditMode);
+$('#t-text').addEventListener('click',()=>setTool('text'));
+onDoubleActivate($('#t-text'),toggleTextVert);
+$('#t-brush').addEventListener('click',()=>setTool('brush'));
+onDoubleActivate($('#t-brush'),toggleBrushPress);
+$('#t-white').addEventListener('click',()=>setTool('white'));
+onDoubleActivate($('#t-white'),toggleWhiteColor);
 $('#dm-v').addEventListener('click',()=>{setDivMode('v');setTool('div');});
 $('#dm-h').addEventListener('click',()=>{setDivMode('h');setTool('div');});
 $('#dm-f').addEventListener('click',()=>{setDivMode('f');setTool('div');});
@@ -1205,11 +1402,17 @@ function cutAt(pg,x,y){
   }
   return best;
 }
-let drag=null, lasso=null;
+let drag=null, lasso=null, stroke=null;
+/* 筆圧: ペン軸のみ。0でも消えないよう下限を持たせる（animator と同じ式） */
+function pressW(ev){
+  if(!brushPress||!ev||ev.pointerType!=='pen')return 1;
+  const p=(typeof ev.pressure==='number'&&ev.pressure>0)?ev.pressure:0.5;
+  return 0.25+0.75*p;
+}
 /* ---- iPad: 指が2本以上のあいだは「ジェスチャ」。1本目の操作は打ち切る ---- */
 const tPts=new Map();          // pointerId → {x,y}（画面座標）
 let gestureLock=false, pinch=null;
-function cancelGestures(){drag=null;lasso=null;divPreview=null;}
+function cancelGestures(){drag=null;lasso=null;stroke=null;divPreview=null;}
 const PINCH_SETTLE=80, PINCH_SLOP=16;   // 指が落ち着くまでの猶予ms / 効き始める移動量px
 function pinchStart(){
   const a=[...tPts.values()];if(a.length<2)return;
@@ -1276,10 +1479,34 @@ cvs.addEventListener('pointerdown',ev=>{
     divPreview=divLine(drag);render();return;
   }
 
-  if(tool==='edit'&&editMode==='white'){
+  /* 投げ縄ホワイト = 専用ツール（W）／ EDIT の Wクリック、どちらからでも同じ動き */
+  if(tool==='white'||(tool==='edit'&&editMode==='white')){
     const k=panelAt(pg,p.x,p.y);
-    lasso={pts:[{x:p.x,y:p.y}],panelId:k?k.id:null};
+    lasso={pts:[{x:p.x,y:p.y}],panelId:k?k.id:null,color:tool==='white'?whiteColor:'#FFFFFF'};
     drag={t:'lasso'};render();return;
+  }
+
+  /* ベクターブラシ: 点列＋筆圧。ペン軸のときだけ太さが変わる（指で細るのは事故のもと） */
+  if(tool==='brush'){
+    const k=panelAt(pg,p.x,p.y);
+    stroke={pts:[{x:p.x,y:p.y,w:pressW(ev)}],panelId:k?k.id:null};
+    drag={t:'brush'};render();return;
+  }
+
+  /* テキスト: 置いた場所に空の文字を作って、右のパネルにそのまま打てる状態にする */
+  if(tool==='text'){
+    pruneEmptyText(null);                           // 打たずに置きっぱなしの分を掃除
+    const it=itemAt(pg,p.x,p.y);
+    if(it&&it.type==='text'){                       // 既にある文字を触ったら編集に入る
+      selItem=it;selPanel=null;drag={t:'item',px:p.x,py:p.y,ox:it.x,oy:it.y};
+      renderItemList();renderItemParams();renderPanelSec();render();focusTextArea();return;
+    }
+    const k=panelAt(pg,p.x,p.y);
+    selPanel=k;                                     // addItem がコマ割当と初期位置に使う
+    const nt=addItem('text');
+    nt.x=Math.round(p.x);nt.y=Math.round(p.y);nt.vertical=textVert;
+    commit();renderItemParams();focusTextArea();
+    drag={t:'none'};return;
   }
 
   if(tool==='edit'&&editMode==='line'){
@@ -1330,6 +1557,10 @@ cvs.addEventListener('pointermove',ev=>{
     const q=lasso.pts[lasso.pts.length-1], mn=Math.max(6/view.z,PAPER.w*0.002);
     if(Math.hypot(p.x-q.x,p.y-q.y)>mn)lasso.pts.push({x:p.x,y:p.y});
     renderQ();return;}
+  if(drag.t==='brush'&&stroke){
+    const q=stroke.pts[stroke.pts.length-1], mn=Math.max(2.5/view.z,PAPER.w*0.0008);
+    if(Math.hypot(p.x-q.x,p.y-q.y)>mn)stroke.pts.push({x:p.x,y:p.y,w:pressW(ev)});
+    renderQ();return;}
   if(drag.t==='cut'){
     const pg=curPage(), cu=cutsOfPage(pg).find(c=>c.id===drag.cid);
     if(!cu)return;
@@ -1372,19 +1603,40 @@ cvs.addEventListener('pointerup',ev=>{
     return;
   }
   if(drag&&drag.t==='lasso'&&lasso){
-    const pts=lasso.pts, pid=lasso.panelId;
+    const pts=lasso.pts, pid=lasso.panelId, col=lasso.color||'#FFFFFF';
     lasso=null;drag=null;
     if(pts.length>2&&polyArea(pts)>minArea()){
       const b=polyBounds(pts);
       const pg=curPage();
       const it=Object.assign({id:uid('i_'),type:'white',visible:true,panelId:pid,
-          name:'WHITE '+(pg.items.length+1)},
+          name:(col==='#FFFFFF'?'WHITE ':'FILL ')+(pg.items.length+1)},
         JSON.parse(JSON.stringify(defaultsFor('white',PAPER.bas))));
-      it.x=Math.round(b.cx);it.y=Math.round(b.cy);
+      it.x=Math.round(b.cx);it.y=Math.round(b.cy);it.color=col;
       it.poly=pts.map(q=>({x:q.x-b.cx,y:q.y-b.cy}));
       pg.items.push(it);selItem=it;selPanel=null;
       commit();renderItemList();renderItemParams();renderPanelSec();
-      toast('ホワイトをかぶせました（◆Items で色や不透明度を変更できます）');
+      toast(col==='#FFFFFF'?'ホワイトをかぶせました（◆Items で色や不透明度を変更できます）':'塗りました');
+    }else render();
+    return;
+  }
+  if(drag&&drag.t==='brush'&&stroke){
+    const pts=stroke.pts, pid=stroke.panelId;
+    stroke=null;drag=null;
+    if(pts.length>1){
+      const b=polyBounds(pts), pg=curPage();
+      const it=Object.assign({id:uid('i_'),type:'brush',visible:true,panelId:pid,
+          name:'BRUSH '+(pg.items.length+1)},
+        JSON.parse(JSON.stringify(defaultsFor('brush',PAPER.bas))));
+      it.color=gBrushColor;it.lw=gBrushLw;
+      /* 描き終わりが描き始めに戻っていたら「囲った」とみなして塗る */
+      const d0=Math.hypot(pts[pts.length-1].x-pts[0].x,pts[pts.length-1].y-pts[0].y);
+      it.closed=d0<Math.max(it.lw*3,polyBounds(pts).w*0.18);
+      it.fill=it.closed;
+      it.x=Math.round(b.cx);it.y=Math.round(b.cy);
+      it.pts=pts.map(q=>({x:+(q.x-b.cx).toFixed(1),y:+(q.y-b.cy).toFixed(1),w:+(q.w||1).toFixed(2)}));
+      pg.items.push(it);selItem=it;selPanel=null;
+      commit();renderItemList();renderItemParams();renderPanelSec();
+      if(it.fill)toast('囲った中を塗りました（◆Items の「囲みを塗る」でOFFにできます）');
     }else render();
     return;
   }
@@ -1534,6 +1786,8 @@ function addItem(type,srcId,linkId){
   return it;
 }
 $('#add-tone').addEventListener('click',()=>addItem('tone'));
+$('#add-text').addEventListener('click',()=>{
+  const it=addItem('text');it.vertical=textVert;commit();renderItemParams();focusTextArea();});
 $('#add-focus').addEventListener('click',()=>addItem('focus'));
 $('#add-stream').addEventListener('click',()=>addItem('stream'));
 $('#add-img').addEventListener('click',()=>$('#img-file').click());
@@ -1626,35 +1880,51 @@ function renderItemList(){
       if(ev.target.dataset&&ev.target.dataset.a)return;
       startRename(row,it);
     });
-    /* 行の本体をつかんで上下に並べ替え */
+    /* 行の本体をつかんで上下に並べ替え。
+       move/up は window 側に張ってある（行を作り直すと行のイベントが死ぬため。
+       以前これが原因で「上へは1つずつしか動かない」状態になっていた） */
     row.addEventListener('pointerdown',ev=>{
       const a=ev.target.dataset&&ev.target.dataset.a;
       if(a||ev.target.tagName==='INPUT')return;
       rowDrag={id:it.id,y0:ev.clientY,moved:false};
-      row.setPointerCapture(ev.pointerId);
-    });
-    row.addEventListener('pointermove',ev=>{
-      if(!rowDrag||rowDrag.id!==it.id)return;
-      if(!rowDrag.moved&&Math.abs(ev.clientY-rowDrag.y0)<5)return;
-      rowDrag.moved=true;
-      const rows=[...box.querySelectorAll('.el-row')];
-      let to=rows.length-1;
-      for(let d=0;d<rows.length;d++){
-        const r=rows[d].getBoundingClientRect();
-        if(ev.clientY<r.top+r.height/2){to=d;break;}
-      }
-      const from=pg.items.indexOf(it);
-      const toIdx=pg.items.length-1-to;                       // 表示index → 配列index
-      if(toIdx===from||toIdx<0||toIdx>=pg.items.length)return;
-      pg.items.splice(from,1);pg.items.splice(toIdx,0,it);
-      selItem=it;renderItemList();commitD();
-    });
-    row.addEventListener('pointerup',()=>{
-      if(rowDrag&&rowDrag.moved){commit();renderItemList();}
-      setTimeout(()=>{rowDrag=null;},0);
     });
     box.appendChild(row);
   });
+}
+function rowDragMove(ev){
+  if(!rowDrag)return;
+  const pg=curPage(), it=pg.items.find(o=>o.id===rowDrag.id);
+  if(!it){rowDrag=null;return;}
+  if(!rowDrag.moved&&Math.abs(ev.clientY-rowDrag.y0)<5)return;
+  rowDrag.moved=true;
+  const rows=[...$('#item-list').querySelectorAll('.el-row')];
+  if(!rows.length)return;
+  /* カーソルが入っている行に置く（上下対称。行の中心で比べると上下で1行ぶんズレる） */
+  let to=rows.length-1;
+  for(let d=0;d<rows.length;d++){if(ev.clientY<rows[d].getBoundingClientRect().bottom){to=d;break;}}
+  const from=pg.items.indexOf(it);
+  const toIdx=pg.items.length-1-to;                       // 表示index → 配列index（前面が上）
+  if(toIdx===from||toIdx<0||toIdx>=pg.items.length)return;
+  pg.items.splice(from,1);pg.items.splice(toIdx,0,it);
+  selItem=it;renderItemList();commitD();
+}
+function rowDragEnd(){
+  if(rowDrag&&rowDrag.moved){commit();renderItemList();}
+  setTimeout(()=>{rowDrag=null;},0);
+}
+window.addEventListener('pointermove',rowDragMove);
+window.addEventListener('pointerup',rowDragEnd);
+window.addEventListener('pointercancel',rowDragEnd);
+/* ◆Items の並べ替え（AE/COMPOSER と同じ語彙）: Ctrl+↑↓ で1つ動かす・Shift併用で最前面/最背面 */
+function moveItem(dir,toEnd){
+  const pg=curPage();
+  if(!selItem)return;
+  const from=pg.items.indexOf(selItem);if(from<0)return;
+  const to=toEnd?(dir>0?pg.items.length-1:0):clamp(from+dir,0,pg.items.length-1);
+  if(to===from)return;
+  pg.items.splice(from,1);pg.items.splice(to,0,selItem);
+  commit();renderItemList();renderItemParams();
+  toast(dir>0?(toEnd?'最前面へ':'前面へ'):(toEnd?'最背面へ':'背面へ'));
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function renderItemParams(){
@@ -1669,6 +1939,26 @@ function renderItemParams(){
   rowP.innerHTML='<span class="lb">配置</span><select>'+opts+'</select>';
   rowP.querySelector('select').addEventListener('change',e=>{it.panelId=e.target.value||null;commit();renderItemList();});
   box.appendChild(rowP);
+  /* 文字は「打つ欄」が先頭。ここに打つと即反映される */
+  if(it.type==='text'){
+    const ta=document.createElement('textarea');
+    ta.id='text-area';ta.value=it.text||'';ta.rows=3;ta.spellcheck=false;
+    ta.placeholder='ここに打つ（改行＝縦書きなら次の列）';
+    ta.addEventListener('input',()=>{it.text=ta.value;commitD();});
+    ta.addEventListener('keydown',e=>e.stopPropagation());   // ツールのショートカットに食われない
+    box.appendChild(ta);
+    const r0=document.createElement('div');r0.className='tr';
+    r0.innerHTML='<span class="lb">書体</span><select>'+TEXT_FONTS.map((f,i)=>
+      '<option value="'+i+'"'+((it.font|0)===i?' selected':'')+'>'+f[0]+'</option>').join('')+'</select>';
+    r0.querySelector('select').addEventListener('change',e=>{it.font=parseInt(e.target.value);commit();});
+    box.appendChild(r0);
+    const r1=document.createElement('div');r1.className='tr';
+    r1.innerHTML='<span class="lb">組み方</span><button class="btn gold'+(it.vertical?' on':'')+'" style="flex:1">'
+      +(it.vertical?'縦書き':'横書き')+'</button>';
+    r1.querySelector('button').addEventListener('click',()=>{
+      it.vertical=!it.vertical;textVert=it.vertical;syncToolLabels();commit();renderItemParams();});
+    box.appendChild(r1);
+  }
   /* 数値スライダー */
   DEFS[it.type].forEach(([key,mn,mx,st,lb])=>{
     const row=document.createElement('div');row.className='tr';
@@ -1679,6 +1969,7 @@ function renderItemParams(){
       it[key]=st<1?parseFloat(rg.value):parseInt(rg.value);
       vv.textContent=st<1?it[key].toFixed(2):it[key];
       if(it.type==='tone')updateCov();
+      if(it.type==='brush'&&key==='lw')gBrushLw=it.lw;      // 次に引く線にも引き継ぐ
       commitD();});
     box.appendChild(row);
   });
@@ -1692,6 +1983,32 @@ function renderItemParams(){
       const c=document.createElement('span');c.className='fp';c.textContent=nm;
       c.addEventListener('click',()=>{it.dot=Math.max(2,Math.round(it.gap*ratio));commit();renderItemParams();});pr.appendChild(c);});
     updateCov();
+  }
+  /* 文字とブラシの共通: 白フチ（擬音を絵の上に置いても読める） */
+  if(it.type==='text'){
+    const e=it.edge;
+    const r2=document.createElement('div');r2.className='tr';
+    r2.innerHTML='<span class="lb">白フチ</span><button class="btn gold'+(e.on?' on':'')+'" style="flex:1">フチ '+(e.on?'ON':'OFF')+'</button>';
+    r2.querySelector('button').addEventListener('click',()=>{e.on=!e.on;commit();renderItemParams();});
+    box.appendChild(r2);
+    const r3=document.createElement('div');r3.className='tr';
+    r3.innerHTML='<span class="lb">フチの太さ</span><input type="range" min="1" max="120" step="1" value="'+e.w+'"'+(e.on?'':' disabled')+'><span class="vv">'+e.w+'</span>';
+    const rg=r3.querySelector('input'),vv=r3.querySelector('.vv');
+    rg.addEventListener('input',()=>{e.w=parseInt(rg.value);vv.textContent=e.w;commitD();});
+    box.appendChild(r3);
+    const r4=document.createElement('div');r4.className='tr';
+    r4.innerHTML='<span class="lb">フチの色</span><button class="btn gold" style="flex:1">'+(e.color==='#FFFFFF'?'白':'黒')+'</button>';
+    r4.querySelector('button').addEventListener('click',()=>{e.color=e.color==='#FFFFFF'?'#000000':'#FFFFFF';commit();renderItemParams();});
+    box.appendChild(r4);
+  }
+  if(it.type==='brush'){
+    const r1=document.createElement('div');r1.className='tr';
+    r1.innerHTML='<span class="lb">囲みを塗る</span><button class="btn gold'+(it.fill?' on':'')+'" style="flex:1">'+(it.fill?'塗る':'線だけ')+'</button>';
+    r1.querySelector('button').addEventListener('click',()=>{it.fill=!it.fill;commit();renderItemParams();});
+    box.appendChild(r1);
+    const r2=document.createElement('div');r2.className='note';
+    r2.innerHTML='太さ・色は<b>次に引く線</b>にも引き継がれます。囲って終わると自動で「塗る」になります。';
+    box.appendChild(r2);
   }
   if(it.type==='focus')FOCUS_PRESETS.forEach(([nm,p])=>{
     const c=document.createElement('span');c.className='fp';c.textContent=nm;
@@ -1752,9 +2069,18 @@ function renderPalette(){
   MANGA_PAL.forEach(col=>{
     const sw=document.createElement('span');sw.className='sw'+(selItem.color===col?' sel':'');
     sw.style.background=col;
-    sw.addEventListener('click',()=>{selItem.color=col;commit();renderPalette();});
+    sw.addEventListener('click',()=>{
+      selItem.color=col;
+      if(selItem.type==='brush')gBrushColor=col;            // 次に引く線にも引き継ぐ
+      commit();renderPalette();});
     box.appendChild(sw);
   });
+}
+/* 文字を置いた直後・触った直後は、そのまま打てる状態にする */
+function focusTextArea(){
+  const ta=$('#text-area');if(!ta)return;
+  ta.focus();
+  const n=ta.value.length;try{ta.setSelectionRange(n,n);}catch(e){}
 }
 
 /* ============================================================
@@ -2226,13 +2552,17 @@ $('#io-file').addEventListener('change',async ev=>{
     toast('✓ 読み込みました');
   }catch(e){modalAlert('MANGA_BOOK_v2 のJSONではありません。');}
 });
+/* 全消去は ⚙ の中（econte と同じ場所・同じ2段確認。JSONが唯一の保険なので念を押す） */
 $('#io-reset').addEventListener('click',()=>{
-  modalConfirm('全ページ・全素材を消して新規に戻します。取り消せません。続けますか？',async()=>{
-    BOOK=newBook();MATSRC={};MATIMG={};PAPER=paperOf(BOOK.paper);
-    curPageIdx=0;selPanel=null;selItem=null;thumbCache={};
-    hist.length=0;hi=-1;commit();
-    syncUI();renderItemList();renderItemParams();renderPanelSec();fitView();
-    toast('新規に戻しました');
+  modalConfirm('全ページ・全素材を消して新規に戻します。\n先に EXPORT JSON で保存しましたか？（画像も同梱されます）\nこの操作は元に戻せません。',()=>{
+    modalConfirm('本当に全部消します。よろしいですか？',()=>{
+      BOOK=newBook();MATSRC={};MATIMG={};PAPER=paperOf(BOOK.paper);
+      curPageIdx=0;selPanel=null;selItem=null;selCut=null;thumbCache={};
+      hist.length=0;hi=-1;commit();
+      toggleHelp(false);
+      syncUI();renderItemList();renderItemParams();renderPanelSec();fitView();
+      toast('新規に戻しました');
+    });
   });
 });
 
@@ -2245,7 +2575,16 @@ const HELP_GROUPS=[
     ['D','<b>DIV</b> コマ分割。ドラッグで線を引く'],
     ['P','<b>EDIT</b> コマ線編集。<b>Wクリックで 線⇔白</b> を切替'],
     ['1 / 2 / 3','分割の向き 縦 / 横 / 斜め（既定は斜め）'],
-    ['TAB','ツールとパネルの左右入替'],
+    ['T','<b>文字</b>。置きたい所をクリック→右の欄に打つ。<b>Wクリックで 縦書き⇔横書き</b>'],
+    ['B','<b>ブラシ</b>。ベクターの手描き線。<b>Wクリックで 筆圧ON/OFF</b>（既定ON・ペン軸のみ）'],
+    ['W','<b>ホワイト</b>。投げ縄で囲った中を白でかぶせる。<b>Wクリックで 白⇔黒</b>'],
+    ['TAB / ⇄','ツールとパネルの左右入替'],
+  ]],
+  ['文字・ブラシ・ホワイト（新しい3つ）',[
+    ['文字','書体は<b>アンチック体</b>（しっぽりアンチック）。縦書きは改行＝次の列（右から左）。<b>白フチ</b>で絵の上でも読める'],
+    ['ブラシ','ドラッグで線。<b>描き始めに戻ると「囲った」とみなして中を塗る</b>。太さ・色は次の線にも引き継ぐ'],
+    ['ホワイト','ドラッグで投げ縄。EDITのWクリック（線⇔白）からも同じことができる'],
+    ['重なり','この3つは<b>いつも一番上</b>。トーン・集中線・流線は<b>乗算</b>なので、下の線画を塗り潰さない'],
   ]],
   ['コマを割る（DIV）',[
     ['ドラッグ','線を引いた位置で分割。コマ間隔は線の向きで 左右／上下 が自動で選ばれる'],
@@ -2264,7 +2603,9 @@ const HELP_GROUPS=[
     ['◆Items','色を黒に変えれば「足す」側にも使える'],
   ]],
   ['素材（◆Items）',[
-    ['↑ / ↓','リストの素材を順に選択'],
+    ['↑ / ↓','リストの素材を順に選択（<b>Shift</b>で先頭／末尾へ）'],
+    ['Ctrl+↑ / ↓','<b>選択した素材を前後に動かす</b>（<b>Shift</b>併用で最前面／最背面）＝AE・COMPOSERと同じ'],
+    ['つかんで上下','リストの行を直接ドラッグしても並べ替えできる'],
     ['DEL','選択中の素材／コマを削除'],
     ['配置','「コマNの中」＝マスクされて枠の下 ／「上に乗せる」＝枠の上（擬音）'],
     ['境界効果','擬音などのアルファに白フチ。フチONのときだけ太さが効く'],
@@ -2273,7 +2614,7 @@ const HELP_GROUPS=[
   ]],
   ['ページ・見開き',[
     ['PAGES','クリック=一覧（一覧の中はWクリックでそのページへ）'],
-    ['PAGES Wクリック','<b>左右見開き作業 ON/OFF</b>（キーは <b>W</b>）'],
+    ['PAGES Wクリック','<b>左右見開き作業 ON/OFF</b>（キーは <b>M</b>）'],
     ['見開き中','<b>反対のページをタップすると、そちらが作業対象になる</b>（P◯ ● が作業中の側）'],
     ['[ / ]','前のページ / 次のページ'],
     ['—','1ページ目は単独（表紙）、以降は見開き。右綴じなら右が若い番号'],
@@ -2294,10 +2635,11 @@ const HELP_GROUPS=[
   ['表示・その他',[
     ['S','選択コマ以外を青くする ON/OFF'],
     ['G','トンボ・内枠ガイド ON/OFF'],
-    ['W','左右見開き作業 ON/OFF'],
+    ['M','左右見開き作業 ON/OFF'],
     ['F','用紙を画面に合わせる'],
     ['Ctrl+Z / Ctrl+Y','元に戻す / やり直し'],
     ['ESC','選択解除・オーバーレイを閉じる'],
+    ['✕ 全消去','この画面の右上（危ないので ⚙ の中に置いてあります・2段確認）'],
   ]],
 ];
 function buildHelp(){
@@ -2320,7 +2662,7 @@ function toggleHelp(force){
 }
 $('#btn-settings').addEventListener('click',()=>toggleHelp());
 $('#btn-help-close').addEventListener('click',()=>toggleHelp(false));
-$('#btn-help-tab').addEventListener('click',toggleSwapUI);
+$('#btn-swap').addEventListener('click',toggleSwapUI);
 $('#help-ovl').addEventListener('click',e=>{if(e.target===$('#help-ovl'))toggleHelp(false);});
 
 /* ===== 全画面表示（animator と同じ実装。iPhone Safari は非対応なので隠す）===== */
@@ -2410,11 +2752,12 @@ $('#main').addEventListener('drop',async ev=>{
    キーボード（フォーカスガード必須 — KINETIC STAGE規約）
    ============================================================ */
 /* ◆Items を ↑↓ で送る（表示は前面が上なので ↑=前面へ） */
-function stepItemSel(d){
+function stepItemSel(d,toEnd){
   const pg=curPage();
   if(!pg.items.length)return;
   const i=pg.items.indexOf(selItem);
-  const n=(i<0)?(d<0?pg.items.length-1:0):clamp(i+d,0,pg.items.length-1);
+  const n=toEnd?(d>0?pg.items.length-1:0)
+               :((i<0)?(d<0?pg.items.length-1:0):clamp(i+d,0,pg.items.length-1));
   selItem=pg.items[n];selPanel=null;
   if(selMode!=='item'){selMode='item';syncToolLabels();}
   renderItemList();renderItemParams();renderPanelSec();render();
@@ -2431,8 +2774,15 @@ window.addEventListener('keydown',ev=>{
     return;
   }
   if(ev.key==='Tab'){ev.preventDefault();toggleSwapUI();return;}
-  if(ev.key==='ArrowUp'){ev.preventDefault();stepItemSel(1);return;}
-  if(ev.key==='ArrowDown'){ev.preventDefault();stepItemSel(-1);return;}
+  /* ◆Items: ↑↓=選択送り（Shift=先頭/末尾） ／ Ctrl+↑↓=並べ替え（Shift併用で最前面/最背面）
+     ＝ AE・COMPOSER のトラックと同じ語彙 */
+  if(ev.key==='ArrowUp'||ev.key==='ArrowDown'){
+    ev.preventDefault();
+    const d=ev.key==='ArrowUp'?1:-1;
+    if(ev.ctrlKey||ev.metaKey)moveItem(d,ev.shiftKey);
+    else stepItemSel(d,ev.shiftKey);
+    return;
+  }
   if(ev.key==='?'||(ev.shiftKey&&ev.key==='/')){toggleHelp();return;}
   if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();undo();return;}
   if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return;}
@@ -2441,10 +2791,13 @@ window.addEventListener('keydown',ev=>{
   if(k==='v')setTool('sel');
   else if(k==='d')setTool('div');
   else if(k==='p')setTool('edit');
+  else if(k==='t')setTool('text');
+  else if(k==='b')setTool('brush');
+  else if(k==='w')setTool('white');
   else if(k==='1')setDivMode('v');
   else if(k==='2')setDivMode('h');
   else if(k==='3')setDivMode('f');
-  else if(k==='w')setSpread(!spreadOn);
+  else if(k==='m')setSpread(!spreadOn);
   else if(k==='s'){showShade=!showShade;$('#t-shade').classList.toggle('on',showShade);render();}
   else if(k==='g'){showGuide=!showGuide;$('#t-guide').classList.toggle('on',showGuide);render();}
   else if(k==='f')fitView();
@@ -2472,12 +2825,20 @@ window.addEventListener('resize',setupCanvas);
   document.body.classList.toggle('swap',swapUI);
   try{spreadOn=localStorage.getItem('mp_spread')==='1';}catch(e){}
   $('#btn-pages').classList.toggle('on',spreadOn);
+  gBrushLw=Math.round(14*PAPER.dpi/600);
   syncUI();
   setDivMode('f');setTool('sel');
   setupCanvas();fitView();
   renderItemList();renderItemParams();renderPanelSec();
   pushHist();                 // 履歴の初期状態
   setupLive();
+  /* アンチック体を先に読み込んでおく。
+     canvas は ctx.font に指定しただけでは Webフォントを取りに行かないので、
+     明示的に load しないと黙ってゴシックで描かれてしまう（届いたら描き直す） */
+  if(document.fonts&&document.fonts.load){
+    Promise.all(TEXT_FONTS.map(f=>document.fonts.load('64px '+f[1],'あ亜ア1')))
+      .then(()=>{thumbCache={};render();}).catch(()=>{});
+  }
 })();
 </script>
 </body>
