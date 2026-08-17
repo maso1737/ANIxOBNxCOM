@@ -78,12 +78,26 @@ body{
   position:absolute;left:0;right:0;top:0;height:34px;z-index:12;box-sizing:border-box;
   display:flex;align-items:center;gap:6px;padding:0 10px;
   background:rgba(21,9,39,.94);border-bottom:1px solid var(--border);backdrop-filter:blur(3px);
+  /* 写真の操作もここに載せたので、BOARDを細くしたときは横スクロールで逃がす（折り返して2段にしない） */
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
 }
-#board-topbar .btn{padding:5px 12px}
+#board-topbar::-webkit-scrollbar{height:0}
+#board-topbar .btn{padding:5px 12px;flex:none;white-space:nowrap}
+#board-topbar > span:not([style*="flex:1"]){flex:none}
 /* MOVE / CUT は BOARD 専用の「置く道具」なので、上部メニューの STUDIO/EDIT（ピンク）と
-   混ざらないよう **紫系**にする。2つは濃さで区別（MOVE=濃い / CUT=明るい） */
-#btn-tool-move,#btn-tool-cut{border-color:rgba(184,80,255,.5);color:#C88BFF}
-#btn-tool-move:hover,#btn-tool-cut:hover{border-color:rgba(184,80,255,.9);color:#E3C2FF}
+   混ざらないよう **紫系**にする。2つは濃さで区別（MOVE=濃い / CUT=明るい）。
+   BOARDの「置く道具」は全部この紫（CUT枠の表示ON/OFF・選択中の写真の操作も同じ扱い） */
+#btn-tool-move,#btn-tool-cut,#btn-cut-vis,
+#photosel-box .btn{border-color:rgba(184,80,255,.5);color:#C88BFF}
+#btn-tool-move:hover,#btn-tool-cut:hover,#btn-cut-vis:hover,
+#photosel-box .btn:hover{border-color:rgba(184,80,255,.9);color:#E3C2FF}
+#btn-cut-vis.on{background:rgba(139,63,224,.28);border-color:rgba(184,80,255,.75);color:#E3C2FF}
+#btn-cut-vis:not(.on){opacity:.55}
+/* 写真を選んだときだけ % の右に出る（未選択のときは1個も出さない＝並びが暴れない） */
+#photosel-box{display:none;align-items:center;gap:6px}
+#photosel-box.on{display:flex}
+#btn-photo-gray.on{background:rgba(139,63,224,.35);border-color:rgba(184,80,255,.85);color:#F4E8FF}
+#btn-photo-ref.mode{border-color:rgba(90,233,255,.75);color:var(--ice)}
 #btn-tool-move.on{
   background:linear-gradient(135deg,#8B3FE0,#5B2A9E);border-color:transparent;color:#F4E8FF;
   box-shadow:0 0 14px rgba(139,63,224,.5);
@@ -98,14 +112,6 @@ body{
 /* 選択中CUT枠の表示（枠を選んだときだけ出す） */
 #cutsel-box{display:none;align-items:center;gap:6px}
 #cutsel-box.on{display:flex}
-#board-tools{
-  position:absolute;left:12px;top:46px;display:none;flex-direction:column;gap:6px;
-  background:rgba(21,9,39,.86);border:1px solid var(--border);padding:9px;z-index:10;
-  backdrop-filter:blur(3px);max-height:calc(100% - 58px);overflow-y:auto;
-}
-#board-tools.on{display:flex}
-#studio-board.has-clip #board-tools{top:72px}
-#board-tools .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 #zoom-label{color:var(--gold);font-size:9px;letter-spacing:.1em}
 /* REF BOARD クリップ帯（SPEC_13 §2-1a） */
 #clip-bar{
@@ -115,11 +121,6 @@ body{
 }
 #clip-tx{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #clip-bar .btn{padding:3px 7px;font-size:8px}
-/* 選択中オブジェクトのパネル */
-#photo-panel{display:none;flex-direction:column;gap:5px}
-#photo-panel.on{display:flex}
-#board-tools .sld-row{gap:5px}
-#board-tools .sld-row input[type=range]{width:96px}
 .sld-k{color:var(--grey);font-size:9px;min-width:14px}
 #photo-ref-tx{color:var(--ice);font-size:9px;font-family:var(--jp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:120px}
 #cutframe-label{font-family:var(--bank);font-size:12px;letter-spacing:.1em;color:var(--acid)}
@@ -187,8 +188,15 @@ body{
   position:absolute;left:6px;right:6px;height:2px;background:var(--acid);
   box-shadow:0 0 8px rgba(255,79,168,.9);display:none;pointer-events:none;z-index:5;
 }
+.sp-row.sel{border-color:var(--gold);background:rgba(255,210,122,.10)}
+.sp-row.sel.focus{border-color:var(--ice)}
 .sp-head{display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap}
-.sp-no{font-family:var(--bank);font-size:12px;letter-spacing:.08em;color:var(--acid)}
+/* C# の欄は幅を固定する（A→B が付いた行だけ伸びて、尺の欄が上下でズレるのを止める） */
+.sp-no{font-family:var(--bank);font-size:12px;letter-spacing:.08em;color:var(--acid);
+       min-width:58px;flex:none;white-space:nowrap}
+/* ⚠ / クランプ表示は尺の右。出ていない行でも幅を取っておく＝★の位置も揃う */
+.sp-flags{font-family:var(--mono);font-size:9px;color:var(--gold);min-width:30px;flex:none;white-space:nowrap}
+#sheet-sel{color:var(--gold);font-size:9px;letter-spacing:.06em}
 .sp-dur{
   width:48px;background:var(--black);border:1px solid var(--border);color:var(--gold);
   font-family:var(--mono);font-size:10px;text-align:center;padding:2px;
@@ -248,6 +256,14 @@ body{
 }
 .etool:hover{border-color:var(--border-bright);color:var(--ice)}
 .etool.on{background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#04121a}
+/* REF UP / DOWN は「まずどう参照するか」を決めるボタン＝BOARDの MOVE / CUT 16:9 と同じ紫扱い。
+   下の TOOL（PEN/ERASE/FILL・水色）と役割が違うことが色で分かる */
+#ref-over-pick .etool{border-color:rgba(184,80,255,.5);color:#C88BFF}
+#ref-over-pick .etool:hover{border-color:rgba(184,80,255,.9);color:#E3C2FF}
+#ref-over-pick .etool.on{
+  background:linear-gradient(135deg,#8B3FE0,#5B2A9E);border-color:transparent;color:#F4E8FF;
+  box-shadow:0 0 12px rgba(139,63,224,.45);
+}
 .etool.off{opacity:.35;pointer-events:none}
 .etool{position:relative}
 .etool.pp-on::after{                 /* 筆圧ペンON */
@@ -284,8 +300,6 @@ body{
   -webkit-user-select:text;user-select:text;
 }
 .hsv-num:focus{outline:none;border-color:var(--border-bright)}
-.hsv-step{display:flex;flex-direction:column;gap:1px}
-.hsv-step .btn{padding:0 3px;font-size:6px;line-height:1.3}
 .palette{display:grid;grid-template-columns:repeat(8,1fr);gap:3px}
 .pal-cell{aspect-ratio:1;cursor:pointer;border:1px solid rgba(255,255,255,.12)}
 .pal-cell.on{outline:2px solid var(--acid);outline-offset:1px;border-color:transparent}
@@ -586,8 +600,6 @@ body.ui-big .sld-k{font-size:11px;min-width:18px}
 body.ui-big input[type=range]{height:24px}
 body.ui-big #board-topbar{height:46px}
 body.ui-big #board-topbar .btn{padding:9px 14px}
-body.ui-big #studio-board.has-clip #board-tools{top:84px}
-body.ui-big #board-tools{top:58px}
 body.ui-big .splitter{width:9px}
 body.ui-big .hsplit,body.ui-big #tl-resize{height:11px}
 body.ui-big .tl-clip-h{width:30px}
@@ -596,7 +608,8 @@ body.ui-big .tl-key::after{width:15px;height:15px;margin:-7.5px 0 0 -7.5px}
 body.ui-big .tl-mark{border-left-width:8px;border-right-width:8px;border-top-width:12px;margin-left:-8px}
 body.ui-big .sp-btns .btn{padding:5px 8px;font-size:12px}
 body.ui-big .sp-dur{width:62px;font-size:12px;padding:5px}
-body.ui-big .sp-no{font-size:14px}
+body.ui-big .sp-no{font-size:14px;min-width:70px}
+body.ui-big .sp-flags{font-size:11px;min-width:34px}
 body.ui-big #cur-dur,body.ui-big #cur-durf,body.ui-big #audio-offset{font-size:13px;padding:7px 4px}
 body.ui-big .gc-cap{height:19px;font-size:10px}
 body.ui-big .gc-edit{font-size:12px;padding:0 9px}
@@ -659,6 +672,8 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
       <div id="board-topbar">
         <button class="btn mode on" id="btn-tool-move" title="写真とCUT枠を動かす (V)">MOVE</button>
         <button class="btn mode" id="btn-tool-cut" title="矩形ドラッグでコマを切り出す (C)">CUT 16:9</button>
+        <!-- CUT枠の表示ON/OFF (H)。OFFのあいだは枠を掴めない＝写真だけを気楽に動かせる -->
+        <button class="btn mode on" id="btn-cut-vis" title="CUT枠の表示 ON/OFF (H)。OFFのあいだは枠を選べません">&#128065; CUTS</button>
         <!-- 選択中CUT枠の表示と ＋枠 はここ（旧「CUT 枠列（カメラ）」パネルは撤去した。
              ✎編集は中央の ✎EDIT／✕削除は SHEET行と Delete にあるので、ここには置かない） -->
         <span id="cutsel-box">
@@ -667,31 +682,19 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
         </span>
         <span class="tb-div"></span>
         <span id="zoom-label" title="全体が入る表示は F キー">50%</span>
+        <!-- 選択中の写真の操作は **絵の上に浮かせない**（旧 #board-tools パネルは撤去）。
+             CUT の並びに続けて % の右に出す＝写真を隠さないし、指でも同じ高さで届く。
+             明/コントラストは写真アプリ側でやる運用にしたので置かない（GRAYだけ残す） -->
+        <span id="photosel-box">
+          <span class="tb-div"></span>
+          <button class="btn" id="btn-photo-rot" title="90°回転">&#8634; 90&deg;</button>
+          <button class="btn mode" id="btn-photo-gray" title="モノクロ化">GRAY</button>
+          <button class="btn" id="btn-photo-ref" title="REF BOARDの元リンクを開く／クリップがあれば紐づけ">&#128279;</button>
+          <button class="btn" id="btn-photo-del" title="この写真をボードから削除（Ctrl+Z で戻せます）">DEL</button>
+          <span id="photo-ref-tx"></span>
+        </span>
         <span style="flex:1"></span>
         <span id="board-lock-tx" title="ロック中のカットはBOARDで選べません（SHEETの 🔒 で解除）"></span>
-      </div>
-      <div id="board-tools">
-        <!-- 選択中の写真 -->
-        <div id="photo-panel">
-          <div class="pnl-t">PHOTO</div>
-          <div class="row">
-            <button class="btn" id="btn-photo-rot" title="90°回転">&#8634; 90&deg;</button>
-            <button class="btn mode" id="btn-photo-gray" title="モノクロ化">GRAY</button>
-            <button class="btn" id="btn-photo-ref" title="REF BOARDの元リンクを開く／クリップがあれば紐づけ">&#128279;</button>
-            <button class="btn" id="btn-photo-del" disabled>DEL</button>
-          </div>
-          <div class="sld-row">
-            <span class="sld-k">明</span>
-            <input type="range" id="photo-bright" min="50" max="200" step="5" value="100" title="明るさ 0.5〜2.0">
-            <span class="sld-val" id="photo-bright-val">1.00</span>
-          </div>
-          <div class="sld-row">
-            <span class="sld-k">コ</span>
-            <input type="range" id="photo-contrast" min="50" max="200" step="5" value="100" title="コントラスト 0.5〜2.0">
-            <span class="sld-val" id="photo-contrast-val">1.00</span>
-          </div>
-          <div id="photo-ref-tx"></div>
-        </div>
       </div>
     </div>
 
@@ -718,13 +721,13 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
           </div>
           <span class="tb-div"></span>
           <div class="sld-row">
-            <span class="sld-k">B</span>
-            <input type="range" id="tl-base-alpha" min="0" max="100" value="100" title="元の絵の濃度（トレース）">
-            <span class="sld-val" id="tl-base-alpha-val">100%</span>
+            <span class="sld-k">REF</span>
+            <input type="range" id="tl-base-alpha" min="0" max="100" value="50" title="元の絵の濃度（既定50%）">
+            <span class="sld-val" id="tl-base-alpha-val">50%</span>
           </div>
           <div class="etools">
-            <div class="etool on" data-baseover="0" title="元の絵を加筆の下に敷く">元絵 下</div>
-            <div class="etool" data-baseover="1" title="元の絵を加筆の上に重ねる（REF扱い）">元絵 上</div>
+            <div class="etool on" data-baseover="0" title="元の絵を加筆の下に敷く">REF DOWN</div>
+            <div class="etool" data-baseover="1" title="元の絵を加筆の上に重ねる（REF扱い）">REF UP</div>
           </div>
           <div id="tl-mini-swatch" title="現在色（Alt+クリック／指の長押しでスポイト）"></div>
           <button class="btn" id="btn-tl-tools-hide" title="ツールバーを隠す（✎ TOOLS で戻る）">HIDE</button>
@@ -745,7 +748,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
           <span class="tc" id="cur-tc" title="このカットの尺（時間 H:MM:SS:FF）。クリックで直接入力">0:00:00:00</span>
           <span id="cur-info"></span>
           <span style="flex:1"></span>
-          <button class="btn" id="btn-cur-edit" title="このカットを加筆EDITで開く">&#9998; EDIT</button>
+          <!-- ✎EDIT ボタンは置かない（SHEET行のWクリック / TLクリップのWクリック / 上部の EDIT で入れる） -->
         </div>
         <textarea id="cur-note" placeholder="内容・セリフ"></textarea>
       </div>
@@ -758,6 +761,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
       <div id="sheet-head">
         <button class="btn ex" id="btn-add-empty">+ 空コマ</button>
         <span id="sheet-total"></span>
+        <span id="sheet-sel" title="指=1本を行に置いたまま次の行をタップ ／ ペン・マウス=Ctrl / Shift+クリック"></span>
       </div>
       <div id="sheet-list"><div id="sp-drop"></div></div>
     </div>
@@ -847,32 +851,44 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
       <span id="grid-sel"></span>
     </span>
     <span style="flex:1"></span>
-    <button class="btn" id="btn-clear-draw" title="加筆レイヤーを消去（Undo可）">CLEAR DRAW</button>
+    <!-- CLEAR DRAW / CLEAR COLOR は ERASE のWクリックと同じ意味なのでボタンは置かない（CLEAR BASE だけ残す） -->
     <button class="btn" id="btn-clear-base" title="元の絵（切り出しベース）を破棄（直後の Ctrl+Z で戻せる）">CLEAR BASE</button>
   </div>
   <div id="edit-main">
     <div id="edit-side">
+      <!-- **先頭は REF**（＝元の絵をどう参照するか）。ここを最初に決めてから描く、という順に並べる。
+           ボタンの色は BOARD の MOVE / CUT 16:9 と同じ紫扱い（「置く道具」の仲間） -->
+      <div>
+        <div class="pnl-t">REF（元の絵）</div>
+        <div class="etools" id="ref-over-pick">
+          <div class="etool on" data-baseover="0" title="元の絵を加筆の下に敷く（ふつうの絵コンテ）">REF DOWN</div>
+          <div class="etool" data-baseover="1" title="元の絵を加筆の上に重ねる（ANIMATORのREFと同じ扱い＝透かして参考にする）">REF UP</div>
+        </div>
+        <div class="sld-row" style="margin-top:5px">
+          <input type="range" id="base-alpha" min="0" max="100" value="50" title="元の絵の濃度（既定50%＝上に色を乗せても見える）。GRIDで複数選択中はまとめて変わります">
+          <span class="sld-val" id="base-alpha-val">50%</span>
+        </div>
+      </div>
       <div>
         <div class="pnl-t">TOOL</div>
         <div class="etools">
           <div class="etool on" data-tool="pen" title="ペン (B) ／ Wクリックで筆圧">PEN</div>
-          <div class="etool" data-tool="eraser" title="消しゴム (E) ／ WクリックでCLEAR">ERASE</div>
+          <div class="etool" data-tool="eraser" title="消しゴム (E) ／ WクリックでCLEAR（この2つで消す操作は足りるので CLEAR DRAW ボタンは置かない）">ERASE</div>
           <div class="etool" data-tool="fill" title="塗りつぶし (G) ／ Wクリックで投げ縄塗り・長押しで投げ縄透明消し">FILL</div>
         </div>
       </div>
       <div>
-        <!-- 線画と色は別レイヤー（色だけ乗算/濃を持ち、CLEAR も別々にできる）ので入口は2つのまま。
+        <!-- 線画と色は別レイヤー（色だけ乗算/濃を持つ）ので入口は2つのまま。
              SINGLE でも GRID でも同じように使える -->
         <div class="pnl-t">描く先</div>
         <div class="etools">
-          <div class="etool on" data-target="draw" title="線画レイヤー（加筆）／CLEAR DRAW で消える">線画</div>
-          <div class="etool" data-target="color" title="カラースクリプト層（一覧と同じレイヤー）／CLEAR COLOR で消える">色</div>
+          <div class="etool on" data-target="draw" title="線画レイヤー（加筆）／ERASE をWクリックで消える">line</div>
+          <div class="etool" data-target="color" title="カラースクリプト層（一覧と同じレイヤー）／ERASE をWクリックで消える">color</div>
         </div>
       </div>
       <div>
         <div class="pnl-t" id="color-pnl-t">COLOR LAYER（カラースクリプト）</div>
-        <!-- 色は枠ごとに1枚。枠が2つ以上あるカットではどの枠を塗るかをここで選ぶ -->
-        <div class="etools" id="color-frame-pick"></div>
+        <!-- 色は枠ごとに1枚。**どの枠を塗るかは「塗った場所」で決まる**（枠選びのチップは撤去した） -->
         <div class="sld-row">
           <select id="color-blend" title="描画モード"></select>
         </div>
@@ -903,17 +919,6 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
         </div>
       </div>
       <div>
-        <div class="pnl-t">BASE（元の絵）</div>
-        <div class="sld-row">
-          <input type="range" id="base-alpha" min="0" max="100" value="100" title="元の絵の濃度（20〜40%がトレース用）">
-          <span class="sld-val" id="base-alpha-val">100%</span>
-        </div>
-        <div class="etools" style="margin-top:5px">
-          <div class="etool on" data-baseover="0" title="元の絵を加筆の下に敷く（ふつうの絵コンテ）">元絵 下</div>
-          <div class="etool" data-baseover="1" title="元の絵を加筆の上に重ねる（ANIMATORのREFと同じ扱い＝透かして参考にする）">元絵 上</div>
-        </div>
-      </div>
-      <div>
         <div class="pnl-t">BG GRAY（下地）</div>
         <div class="sld-row">
           <input type="range" id="bg-slider" min="0" max="255" value="232">
@@ -925,13 +930,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
           <button class="btn" id="btn-bg-black">BLACK</button>
         </div>
       </div>
-      <div>
-        <div class="pnl-t">HISTORY</div>
-        <div class="etools">
-          <button class="btn" id="btn-undo" title="Ctrl+Z">UNDO</button>
-          <button class="btn" id="btn-redo" title="Ctrl+Y">REDO</button>
-        </div>
-      </div>
+      <!-- HISTORY（UNDO/REDO ボタン）は置かない。Ctrl+Z / 2本指タップ=UNDO・3本指タップ=REDO で足りる -->
     </div>
     <div id="edit-stage"><canvas id="edit-cv" width="1280" height="720"></canvas></div>
     <div id="edit-grid"><div id="grid-wrap"></div><div id="grid-empty">カットがありません</div></div>
@@ -980,6 +979,10 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
    V2-A: 旧 BOARD/SHEET/TIMELINE の3ビューを STUDIO 1画面へ統合。
    ============================================================ */
 const CONTE_W = 1280, CONTE_H = 720, FPS = 24;
+/* 元の絵（BASE）の既定の濃さ。**既定で薄い**のが要点 —
+   紙のネームが濃いままだと「元絵の上では色が乗らない」と勘違いしやすいので、
+   最初から透かして見えている状態にしておく（GRIDで複数選択すればまとめて上げ下げできる） */
+const DEFAULT_BASE_ALPHA = 0.5;
 const PAL_LS = 'econte_palette_v1';
 const UI_LS = 'econte_ui_v1';
 /* REF BOARD 連携（SPEC_13 §2-1a）— 送信側 Tools/ref-board/ref-board.html と同契約 */
@@ -1018,6 +1021,7 @@ const state = {
   paintTarget: 'draw',   // 'draw'=線画レイヤー / 'color'=カラースクリプト層（V2-E2）
   curFrame: 0,           // 色を編集している枠index（cam[]の何枚目か）
   selCut: null,          // {i,k} 選択中のCUT枠（k = cam[]の枠index）
+  showCuts: true,        // BOARDのCUT枠を出すか（H）。OFF中は描画も当たり判定も止める
   editView: { x: 0, y: 0, z: 1 },   // EDITのズーム/パン（z=1 が fit）
   tl: { frame: 0, playing: false, loop: true, lastTs: 0, acc: 0 },
   board: { x: -800, y: -450, z: 0.5 }
@@ -1069,6 +1073,34 @@ function blobToImage(blob){
 }
 function canvasToBlob(c, type, q){
   return new Promise(res => c.toBlob(b => res(b), type || 'image/png', q));
+}
+/* --- ダウンロードの唯一の出口（2026-08-17） ---
+   iPad Safari で「押しても何も起きない」が出ていた原因は2つあって、両方ここで潰す:
+   ① `a` を DOM に入れずに click すると無視されることがある → 必ず一度 body へ入れる
+   ② click 直後に revokeObjectURL すると、保存が始まる前に URL が死ぬ → 60秒後に解放
+   それでも駄目な環境（download 属性が効かない古い WebView）のために新規タブへ逃がす。 */
+function downloadBlob(blob, name){
+  if(!blob) return false;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.rel = 'noopener';
+  a.style.cssText = 'position:fixed;left:-9999px;top:0';
+  document.body.appendChild(a);
+  let ok = true;
+  try{
+    if(typeof a.download === 'undefined'){ window.open(url, '_blank'); }
+    else a.click();
+  }catch(e){
+    ok = false;
+    try{ window.open(url, '_blank'); }catch(e2){}
+  }
+  setTimeout(() => { try{ a.remove(); URL.revokeObjectURL(url); }catch(e){} }, 60000);
+  return ok;
+}
+function stampName(base, ext){
+  return base + '_' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.' + ext;
 }
 
 /* ---------------- toast / modal ---------------- */
@@ -1171,7 +1203,7 @@ async function saveAll(){
       const c = cuts[i];
       await encodeCut(c);   // 非常駐カットは既に焼き付け済みなので何もしない
       cutItems.push({ id: c.id, order: i, bg: c.bg, durF: c.durF, note: c.note,
-                      baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : 1),
+                      baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : DEFAULT_BASE_ALPHA),
                       baseOver: !!c.baseOver, lock: !!c.lock,
                       cam: (c.cam || []).map(k => ({ k: k.k, x: k.x, y: k.y, w: k.w, h: k.h,
                                                      dur: k.dur | 0, ease: k.ease || 'LINEAR',
@@ -1226,7 +1258,7 @@ async function loadAll(){
     for(const c of cutItems){
       // V2-D2: ここではデコードしない（Blobが正・必要になったカットだけ ensureResident する）
       const cut = { id: c.id, baseC: null, drawC: null, bg: (typeof c.bg === 'number' ? c.bg : 232),
-                    baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : 1),
+                    baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : DEFAULT_BASE_ALPHA),
                     baseOver: !!c.baseOver, lock: !!c.lock,
                     durF: c.durF || FPS * 2, note: c.note || '',
                     cam: c.cam || null, bakeRect: c.bakeRect || null,
@@ -1340,45 +1372,56 @@ function colorMixAt(cut, f){
   return { a: colorSlot(cut, cam.length - 1), b: null, t: 0 };
 }
 function getBase(cut){ if(isResident(cut)){ touchLru(cut); return cut.baseC; } requestResident(cut); return null; }
-/* 常駐させる（非同期）。描く前に必ずこれを await する経路を通す */
+/* 常駐させる（非同期）。描く前に必ずこれを await する経路を通す。
+   ★ **失敗しても cut.loading を必ず null に戻す**（try/finally）。
+   ここを素通りにしていた頃は、途中で1回でも例外が出ると「解決しない Promise」が
+   cut.loading に残り続け、以後 requestResident が毎回そこで引き返す＝
+   そのカットだけ絵が出ないまま ⟳ を押しても無反応、という状態になっていた。 */
 function ensureResident(cut){
   if(!cut) return Promise.resolve(null);
   if(isResident(cut)){ touchLru(cut); return Promise.resolve(cut); }
   if(cut.loading) return cut.loading;
   cut.loading = (async () => {
-    const s = bakeSize(cut);
-    const drawC = blankCanvas(s.w, s.h);
-    if(cut.drawBlob){
-      try{ const im = await blobToImage(cut.drawBlob); ctx2d(drawC).drawImage(im, 0, 0); }catch(e){}
+    try{
+      const s = bakeSize(cut);
+      const drawC = blankCanvas(s.w, s.h);
+      if(cut.drawBlob){
+        try{ const im = await blobToImage(cut.drawBlob); ctx2d(drawC).drawImage(im, 0, 0); }catch(e){}
+      }
+      let baseC = null;
+      if(cut.baseBlob){
+        baseC = blankCanvas(s.w, s.h);
+        try{ const im = await blobToImage(cut.baseBlob); ctx2d(baseC).drawImage(im, 0, 0); }catch(e){}
+      }
+      cut.drawC = drawC;
+      cut.baseC = baseC;
+      cut.cellCache = null;      // 本物が戻ったので控えは捨てる（以後は本物から描く）
+      touchLru(cut);
+      try{ await evictLru(); }catch(e){ console.error('evictLru failed', e); }
+      return cut;
+    }finally{
+      cut.loading = null;        // 成否にかかわらず必ず解く（次の要求が通るように）
     }
-    let baseC = null;
-    if(cut.baseBlob){
-      baseC = blankCanvas(s.w, s.h);
-      try{ const im = await blobToImage(cut.baseBlob); ctx2d(baseC).drawImage(im, 0, 0); }catch(e){}
-    }
-    cut.drawC = drawC;
-    cut.baseC = baseC;
-    cut.cellCache = null;      // 本物が戻ったので控えは捨てる（以後は本物から描く）
-    cut.loading = null;
-    touchLru(cut);
-    await evictLru();
-    return cut;
   })();
   return cut.loading;
 }
 /* 非同期デコードを投げっぱなしで頼む（描画経路から呼ぶ用）。完了したら描き直す */
 let gResidentPending = 0;
 function requestResident(cut){
-  if(!cut || isResident(cut) || cut.loading) return;
+  if(!cut || isResident(cut)) return;
+  // 読み込み中でも **描き直しの予約だけは重ねる**。頼んだ画面と最初に頼んだ画面が違うと、
+  // 出来上がっても手前の画面が描き直されず「絵が消えたまま」に見える
   gResidentPending++;
   ensureResident(cut).then(() => {
     gResidentPending--;
     // **GRIDを忘れないこと**: セルは drawCell → getBase() 経由なので、非常駐のあいだ白く抜ける。
     // ここで描き直さないと「絵が消えたまま戻らない」（スクロールするまで直らない）。
-    if(inGrid()) refreshGridCells(cuts.indexOf(cut));
-    else if(state.view === 'studio') renderTL();
+    const i = cuts.indexOf(cut);
+    if(i < 0) return;                       // その間に消されたカットなら何もしない
+    if(inGrid()) refreshGridCells(i);
+    else if(state.view === 'studio'){ renderTL(); refreshRow(i); }
     else renderEditCanvas();
-  }).catch(() => { gResidentPending--; });
+  }).catch(err => { gResidentPending--; console.error('ensureResident failed', err); });
 }
 /* 追い出さないカット: EDIT中 / プレイヘッド前後1カット */
 function keepResident(cut){
@@ -1516,7 +1559,6 @@ function renderStudioSync(force){
   durEl.title = cam ? '秒+コマ（24fps）。枠列カットは尻の止まり（tail）が伸び縮みします'
                     : '秒+コマ（24fps）例: 3+12';
   note.disabled = !has;
-  $('#btn-cur-edit').disabled = !has;
   lab.textContent = has ? 'C' + (i + 1) : '—';
   let tail = '';
   if(has){
@@ -1720,7 +1762,7 @@ function renderBoard(){
     }
   }
   // 素材はみ出し警告（SPEC_13 §5e）: 注目カットの bakeRect のうち写真が無い所を赤ハッチ
-  const warnCut = cuts[state.selCut ? state.selCut.i : gFocusCut];
+  const warnCut = state.showCuts ? cuts[state.selCut ? state.selCut.i : gFocusCut] : null;
   if(warnCut && warnCut.covGrid && warnCut.uncov > 0 && warnCut.bakeRect){
     const br = warnCut.bakeRect;
     const cw = br.w / COV_X, ch = br.h / COV_Y;
@@ -1735,9 +1777,9 @@ function renderBoard(){
     boardCtx.lineWidth = 1 / b.z;
     boardCtx.strokeRect(br.x, br.y, br.w, br.h);
   }
-  // existing cut frames
+  // existing cut frames（H で消せる＝写真だけを見たいとき・写真を動かしたいとき）
   boardCtx.font = (13 / b.z) + 'px monospace';
-  cuts.forEach((c, i) => {
+  if(state.showCuts) cuts.forEach((c, i) => {
     for(let k = 0; k < camCount(c); k++){
       const r = camRect(c, k);
       const foc = (i === gFocusCut);   // 現在カット（プレイヘッド位置）だけ色を変える
@@ -1788,6 +1830,19 @@ function setBoardTool(t){
   $('#btn-tool-cut').classList.toggle('on', state.tool === 'cut');
   boardCv.style.cursor = (state.tool === 'cut') ? 'crosshair' : 'default';
 }
+/* CUT枠の表示 ON/OFF（H）。OFF にしたら選択も外す＝「見えないものが選ばれたまま」を作らない */
+function setCutsVisible(v, quiet){
+  state.showCuts = !!v;
+  const bt = $('#btn-cut-vis');
+  if(bt){
+    bt.classList.toggle('on', state.showCuts);
+    bt.textContent = (state.showCuts ? '\u{1F441} CUTS' : '\u{1F441} CUTS OFF');
+  }
+  if(!state.showCuts && state.selCut) selectCutFrame(null);
+  else { syncBoardPanels(); renderBoard(); }
+  if(!quiet) toast('CUT枠: ' + (state.showCuts ? '表示' : '非表示（枠は掴めません）'));
+}
+function toggleCutsVisible(){ setCutsVisible(!state.showCuts); }
 function boardZoomAt(clientX, clientY, factor){
   const b = state.board;
   const before = screenToBoard(clientX, clientY);
@@ -1854,10 +1909,15 @@ function bDown(e){
                   before: { x: r.x, y: r.y, w: r.w, h: r.h } };
       }else{
         const p = hitPhoto(bp.x, bp.y);
+        // 枠を選んでいる最中に写真へ触っても **その場では動かさない**（選択を切り替えるだけ）。
+        // 枠を合わせているときに下の写真をうっかりズラす事故がこれで消える。
+        // もう一度触れば（＝意図して選び直した状態で）ふつうに動かせる
+        const guard = !!state.selCut && !!p;
         if(state.selCut) selectCutFrame(null);
         if(p){
           state.selPhoto = p.id;
-          bDrag = { mode: 'photo', p, ox: bp.x - p.x, oy: bp.y - p.y, before: { x: p.x, y: p.y } };
+          bDrag = guard ? { mode: 'idle' }
+                        : { mode: 'photo', p, ox: bp.x - p.x, oy: bp.y - p.y, before: { x: p.x, y: p.y } };
         }else{
           state.selPhoto = null;
           bDrag = { mode: 'pan', sx: e.clientX, sy: e.clientY, bx: state.board.x, by: state.board.y };
@@ -2024,12 +2084,11 @@ async function importFiles(files, at){
     }catch(e){ toast('読み込み失敗: ' + (f.name || '画像') + '（' + (e.message || e) + '）'); }
   }
 }
-async function deleteSelPhoto(){
+/* 削除の確認ダイアログは出さない（Ctrl+Z で戻せる操作は聞かずにやる） */
+function deleteSelPhoto(){
   const i = photos.findIndex(p => p.id === state.selPhoto);
   if(i < 0) return;
   const p = photos[i];
-  const ok = await modalConfirm('写真「' + p.name + '」をボードから削除しますか？');
-  if(!ok) return;
   photos.splice(i, 1);
   state.selPhoto = null;
   pushLog({ type: 'photo-del',
@@ -2040,6 +2099,7 @@ async function deleteSelPhoto(){
   renderBoard();
   refreshStudio();
   scheduleSave();
+  toast('写真「' + (p.name || 'photo') + '」を削除しました（Ctrl+Z で戻せます）');
 }
 function selPhotoObj(){ return photos.find(p => p.id === state.selPhoto) || null; }
 /* 90°回転。外接矩形（p.w/p.h）も一緒に回すので当たり判定は追従する */
@@ -2097,21 +2157,15 @@ function syncBoardPanels(){
   const p = selPhotoObj();
   if(!p && state.selPhoto) state.selPhoto = null;
   if(state.selCut && !camRect(cuts[state.selCut.i], state.selCut.k)) state.selCut = null;
-  $('#photo-panel').classList.toggle('on', !!p);
-  $('#btn-photo-del').disabled = !p;
+  // 写真の操作はモードバーの % の右（#photosel-box）。選んだときだけ出す
+  $('#photosel-box').classList.toggle('on', !!p);
   if(p){
     const f = normFilter(p.filter);
     p.filter = f;
     $('#btn-photo-gray').classList.toggle('on', f.gray);
-    $('#photo-bright').value = Math.round(f.bright * 100);
-    $('#photo-bright-val').textContent = f.bright.toFixed(2);
-    $('#photo-contrast').value = Math.round(f.contrast * 100);
-    $('#photo-contrast-val').textContent = f.contrast.toFixed(2);
     $('#photo-ref-tx').textContent = p.ref ? ('REF: ' + (p.ref.title || p.ref.url)) : '';
     $('#btn-photo-ref').classList.toggle('mode', !!p.ref);
   }
-  // BOARDの浮きパネルは「選択中の写真」だけを持つ。中身が無いときは箱ごと出さない
-  $('#board-tools').classList.toggle('on', !!p);
   renderCamList();
 }
 
@@ -2158,6 +2212,7 @@ function addCamFrame(){
             redo(){ restoreCam(cut, after); rebakeFromCam(cut); } });
   state.selCut = { i: sc.i, k: at };
   afterCamChange(sc.i);
+  focusCutInSheet(sc.i);   // 枠を足したカットを SHEET でも「今これ」にする
   toast(camLabel(sc.i, at) + ' 枠を追加しました（枠をドラッグして行き先を決める）');
 }
 function delCamFrame(i, k){
@@ -2389,13 +2444,7 @@ async function exportProject(){
     meta.markers = gMarkers.slice();
     zip.file('project.json', JSON.stringify(meta, null, 1));
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    a.href = url;
-    a.download = 'econte_project_' + ts + '.zip';
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, stampName('econte_project', 'zip'));
     toast('プロジェクトを書き出しました（' + Math.round(blob.size / 1024) + 'KB）');
   }catch(e){
     toast('書き出し失敗: ' + (e.message || e));
@@ -2442,7 +2491,7 @@ async function importProject(file){
                     bakeW: bw, bakeH: bh, bakeExpand: c.bakeExpand || 1.02, bakeClamp: 1,
                     camLead: c.camLead | 0, camTail: c.camTail | 0,
                     baseC: null, drawC, colors: null, bg: (typeof c.bg === 'number' ? c.bg : 232),
-                    baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : 1),
+                    baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : DEFAULT_BASE_ALPHA),
                     baseOver: !!c.baseOver, lock: !!c.lock,
                     durF: c.durF || FPS * 2, note: c.note || '',
                     baseBlob: null, drawBlob: null,
@@ -2686,6 +2735,7 @@ function camCorners(r){
    **当たり判定そのものを外す**（選択はできるが動かせない、だと結局動く） */
 function cutLocked(i){ return !!(cuts[i] && cuts[i].lock); }
 function hitCutFrame(bx, by){
+  if(!state.showCuts) return null;   // 枠を隠しているあいだは掴めない（見えないものは触らせない）
   const tol = CAM_EDGE / state.board.z;
   const lw = 42 / state.board.z, lh = 20 / state.board.z;
   for(let i = cuts.length - 1; i >= 0; i--){
@@ -2704,7 +2754,7 @@ function hitCutFrame(bx, by){
 }
 function hitCutHandle(bx, by){
   const s = state.selCut;
-  if(!s || cutLocked(s.i)) return null;
+  if(!state.showCuts || !s || cutLocked(s.i)) return null;
   const r = camRect(cuts[s.i], s.k);
   if(!r) return null;
   const h = (CAM_HANDLE + 4) / state.board.z / 2;
@@ -2859,50 +2909,89 @@ function bakeCut(src, w, h){
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   return c;
 }
-function createCutFromRect(src){
-  const cut = { id: uid(), cam: [mkCam(src, 0)], bakeRect: { x: src.x, y: src.y, w: src.w, h: src.h },
-                bakeW: CONTE_W, bakeH: CONTE_H, bakeExpand: 1.02,
-                baseC: bakeCut(src, CONTE_W, CONTE_H), drawC: blankCanvas(CONTE_W, CONTE_H), bg: 232, baseAlpha: 1,
-                durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: true, dirtyDraw: true, thumb: null };
-  updateCoverage(cut);
-  touchLru(cut);
-  cuts.push(cut);
-  let slot = cuts.length - 1;   // 並べ替え後でも元の位置に戻す
+/* 新しいカットの入る場所 ＝ **SHEETで選んでおいたカットの次**（無ければ末尾）。
+   切り出した順が話の順とは限らないので、「ここの続き」を指しておけるようにする。 */
+function newCutSlot(){
+  const sel = (gSelRows.length === 1) ? gSelRows[0] : -1;
+  const at = (sel >= 0) ? sel : gFocusCut;
+  return (at >= 0 && at < cuts.length) ? at + 1 : cuts.length;
+}
+/* 足したカットを SHEET でも「今これ」にする（行が光って見える所へ来る）。
+   renderStudioSync が focus 行を scrollIntoView するので、seek を通すだけでよい */
+function focusCutInSheet(i){
+  if(i < 0 || i >= cuts.length) return;
+  pause();
+  seek(cutStartFrame(i));
+  renderStudioSync(true);
+}
+function insertCut(cut, at){
+  at = clamp(at, 0, cuts.length);
+  cuts.splice(at, 0, cut);
+  let slot = at;   // 並べ替え後でも元の位置に戻す
   pushLog({ type: 'cut-add',
             undo(){ const k = cuts.indexOf(cut); if(k >= 0){ slot = k; cuts.splice(k, 1); } state.selCut = null; },
             redo(){ if(cuts.indexOf(cut) < 0) cuts.splice(Math.min(slot, cuts.length), 0, cut); } });
-  toast('C' + cuts.length + ' を追加しました（右パネルで確認）');
+  return at;
+}
+function createCutFromRect(src){
+  const cut = { id: uid(), cam: [mkCam(src, 0)], bakeRect: { x: src.x, y: src.y, w: src.w, h: src.h },
+                bakeW: CONTE_W, bakeH: CONTE_H, bakeExpand: 1.02,
+                baseC: bakeCut(src, CONTE_W, CONTE_H), drawC: blankCanvas(CONTE_W, CONTE_H), bg: 232,
+                baseAlpha: DEFAULT_BASE_ALPHA,
+                durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: true, dirtyDraw: true, thumb: null };
+  updateCoverage(cut);
+  touchLru(cut);
+  const at = insertCut(cut, newCutSlot());
+  toast('C' + (at + 1) + ' を追加しました（右パネルで選択中）');
   refreshStudio();
+  focusCutInSheet(at);
   scheduleSave();
   return cut;
 }
 function addEmptyCut(){
   const cut = { id: uid(), cam: [], bakeRect: null, bakeW: CONTE_W, bakeH: CONTE_H, bakeExpand: 1.02,
-                baseC: null, drawC: blankCanvas(CONTE_W, CONTE_H), bg: 232, baseAlpha: 1,
+                baseC: null, drawC: blankCanvas(CONTE_W, CONTE_H), bg: 232, baseAlpha: DEFAULT_BASE_ALPHA,
                 durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: false, dirtyDraw: true, thumb: null };
   touchLru(cut);
-  cuts.push(cut);
-  let slot = cuts.length - 1;
-  pushLog({ type: 'cut-add',
-            undo(){ const k = cuts.indexOf(cut); if(k >= 0){ slot = k; cuts.splice(k, 1); } },
-            redo(){ if(cuts.indexOf(cut) < 0) cuts.splice(Math.min(slot, cuts.length), 0, cut); } });
+  const at = insertCut(cut, newCutSlot());
   refreshStudio();
+  focusCutInSheet(at);
   scheduleSave();
 }
-async function deleteCut(i){
+/* 削除はダイアログを出さない（Ctrl+Z で戻せる操作は聞かない）。
+   **消えた1枚ぶんの添字を全部詰める**のがここの肝 — 詰め忘れると
+   GRID / 中央UI / EDIT が1つズレた別のカットを指したまま残る */
+function deleteCut(i){
   const cut = cuts[i];
   if(!cut) return;
-  const ok = await modalConfirm('C' + (i + 1) + ' を削除しますか？（STUDIOの Ctrl+Z で戻せます）');
-  if(!ok) return;
   cuts.splice(i, 1);
   state.selCut = null;
-  if(state.curCut >= cuts.length) state.curCut = cuts.length - 1;
+  shiftCutRefs(i, -1);
+  // LRU から消したカットのidを抜く（残すと「常駐枠」を無駄に食って、生きているカットが先に追い出される）
+  const lk = gLru.indexOf(cut.id);
+  if(lk >= 0) gLru.splice(lk, 1);
   pushLog({ type: 'cut-del',
             undo(){ cuts.splice(Math.min(i, cuts.length), 0, cut); },
             redo(){ const k = cuts.indexOf(cut); if(k >= 0) cuts.splice(k, 1); } });
   syncBoardPanels();
   refreshStudio();
+  if(inGrid()) renderGrid();
   scheduleSave();
+  toast('C' + (i + 1) + ' を削除しました（Ctrl+Z で戻せます）');
+}
+/* カットが1枚抜けた/入ったときに、**添字で覚えている物**をまとめて直す。
+   ここを通さずに splice すると「サムネには絵があるのに中央/GRID/STUDIOでは別の絵」になる。 */
+function shiftCutRefs(at, d){
+  const fix = n => (n < at ? n : (d < 0 ? (n === at ? -1 : n - 1) : n + 1));
+  if(state.curCut >= 0){
+    const n = fix(state.curCut);
+    state.curCut = clamp(n < 0 ? at : n, -1, cuts.length - 1);
+  }
+  if(state.curCut >= cuts.length) state.curCut = cuts.length - 1;
+  // 添字で持っている選択はここで全部捨てる（残すと必ずズレる）
+  if(gSelCells.length) setSelCells([]);
+  if(gSelRows.length) setSelRows([]);
+  undoStack = []; redoStack = [];
 }
 function rebakeCut(i){
   const c = cuts[i];
@@ -2981,46 +3070,57 @@ function compositeTo(ctx, cut, w, h){
   if(draw) ctx.drawImage(draw, 0, 0, dw, dh);
   if(base && over) drawBaseLayer(ctx, cut, base, null, dw, dh);
 }
-function baseAlphaOf(cut){ return (cut && typeof cut.baseAlpha === 'number') ? clamp(cut.baseAlpha, 0, 1) : 1; }
+function baseAlphaOf(cut){ return (cut && typeof cut.baseAlpha === 'number') ? clamp(cut.baseAlpha, 0, 1) : DEFAULT_BASE_ALPHA; }
 /* 元の絵を加筆の「上」に置くか（＝ANIMATORのREFと同じ扱い）。既定は従来どおり下敷き。
    **どちらか一方だけ**（元の絵は1枚しか無いので、上下に同時には出さない） */
 function baseOverOf(cut){ return !!(cut && cut.baseOver); }
+/* REF（元の絵）の濃さ・上下は **濃/描画モードと同じように一括で効く**。
+   GRIDでセルを複数選んでいればそのカット全部、SHEETで行を複数選んでいればその行全部、
+   どちらも無ければ今のカット1枚だけ。（重複するカットは1回だけ触る） */
+function eachBaseCut(fn){
+  const set = [];
+  const add = i => { if(cuts[i] && set.indexOf(i) < 0) set.push(i); };
+  if(gSelCells.length) selCellsResolved().forEach(o => add(o.i));
+  else if(gSelRows.length) gSelRows.forEach(add);
+  else add(activeCutIndex());
+  set.forEach(i => fn(cuts[i], i));
+  return set;
+}
 function setBaseOver(v){
-  const i = activeCutIndex();
-  const cut = cuts[i];
-  if(!cut) return;
-  cut.baseOver = !!v;
-  cut.thumb = null;
+  const list = eachBaseCut(cut => { cut.baseOver = !!v; cut.thumb = null; });
+  if(!list.length) return;
   syncBaseAlphaUI();
   renderPaintViews();
-  refreshRow(i);
-  if(inGrid()) refreshGridCells(i);
+  list.forEach(i => { refreshRow(i); if(inGrid()) refreshGridCells(i); });
   scheduleSave();
-  toast('元の絵: 加筆の' + (cut.baseOver ? '上（REF扱い）' : '下'));
+  toast('元の絵: 加筆の' + (v ? '上（REF UP）' : '下（REF DOWN）') + (list.length > 1 ? '（' + list.length + '枚）' : ''));
 }
 /* baseAlpha を編集する対象カット: EDIT中は編集中のカット、STUDIOではプレイヘッド位置のカット */
 function activeCutIndex(){ return state.view === 'edit' ? state.curCut : gFocusCut; }
 function setBaseAlpha(v){
-  const i = activeCutIndex();
-  const cut = cuts[i];
-  if(!cut) return;
-  cut.baseAlpha = clamp(v, 0, 1);
-  cut.thumb = null;
+  const a = clamp(v, 0, 1);
+  const list = eachBaseCut(cut => { cut.baseAlpha = a; cut.thumb = null; });
+  if(!list.length) return;
   syncBaseAlphaUI();
   renderPaintViews();
-  refreshRow(i);
+  list.forEach(i => { refreshRow(i); if(inGrid()) refreshGridCells(i); });
   scheduleSave();
 }
 /* EDITサイド と STUDIOミニツールの両方を更新する（片方だけだと状態がズレる） */
 function syncBaseAlphaUI(){
-  const cut = cuts[activeCutIndex()];
+  // 表示する値は「これから触る先の1枚目」に合わせる（一括中は枚数も出す＝黙って何枚も動かさない）
+  let n = 0, first = -1;
+  if(gSelCells.length){ const s = [...new Set(selCellsResolved().map(o => o.i))]; n = s.length; first = s[0]; }
+  else if(gSelRows.length){ n = gSelRows.length; first = gSelRows[0]; }
+  const cut = cuts[first >= 0 ? first : activeCutIndex()];
   const pct = Math.round(baseAlphaOf(cut) * 100);
   ['#base-alpha', '#tl-base-alpha'].forEach(id => {
     const el = $(id);
     if(el && document.activeElement !== el) el.value = pct;
     if(el) el.disabled = !cut;
   });
-  ['#base-alpha-val', '#tl-base-alpha-val'].forEach(id => { const el = $(id); if(el) el.textContent = pct + '%'; });
+  const tail = n > 1 ? ' ×' + n : '';
+  ['#base-alpha-val', '#tl-base-alpha-val'].forEach(id => { const el = $(id); if(el) el.textContent = pct + '%' + tail; });
   // 元絵 上/下 のトグルも EDITサイド・ミニツールの両方を同時に更新する
   const over = baseOverOf(cut) ? '1' : '0';
   document.querySelectorAll('.etool[data-baseover]').forEach(el => {
@@ -3067,13 +3167,52 @@ function updateTotals(){
 }
 
 /* ---------------- SHEETパネル（STUDIO右・レイヤー一覧風） ---------------- */
-/* 行の見出し: C# ＋ 枠列（A→B）＋ ⚠（素材はみ出し §5e）＋ 解像度クランプ（§5c） */
+/* 行の見出し: C# ＋ 枠列（A→B）だけ。
+   ⚠（素材はみ出し §5e）と 解像度クランプ（§5c）は **rowFlags で尺の右**に出す
+   （見出しに混ぜると出た行だけ横に伸びて、尺の欄が上下でガタつく） */
 function rowLabel(cut, i){
   let s = 'C' + (i + 1);
   if(isCamCut(cut)) s += ' ' + cut.cam.map(c => c.k).join('→');
-  if(cut.uncov > 0) s += ' ⚠';
-  if(cut.bakeClamp && cut.bakeClamp < 0.995) s += ' ' + cut.bakeClamp.toFixed(2) + 'x';
   return s;
+}
+function rowFlags(cut){
+  let s = '';
+  if(cut.uncov > 0) s += '⚠';
+  if(cut.bakeClamp && cut.bakeClamp < 0.995) s += (s ? ' ' : '') + cut.bakeClamp.toFixed(2) + 'x';
+  return s;
+}
+/* SHEETの行の複数選択（尺の一括合わせ・REF濃度の一括変更に効く）。
+   選び方は GRID のセルと揃える: 指=1本を押さえたまま次の行をタップで足す ／ ペン・マウス=Ctrl / Shift+クリック */
+let gSelRows = [];
+function setSelRows(list){
+  gSelRows = [...new Set(list)].filter(i => cuts[i]).sort((a, b) => a - b);
+  const set = new Set(gSelRows);
+  spRows().forEach((r, k) => r.classList.toggle('sel', set.has(k)));
+  const el = $('#sheet-sel');
+  if(el) el.textContent = gSelRows.length > 1 ? (gSelRows.length + '枚選択（尺・REFは一括）') : '';
+  syncBaseAlphaUI();
+}
+function toggleSelRow(i, mode){
+  if(mode === 'range' && gSelRows.length){
+    const a = gSelRows[gSelRows.length - 1];
+    setSelRows(rangeInts(Math.min(a, i), Math.max(a, i)));
+  }else if(mode === 'add'){
+    const s = new Set(gSelRows);
+    if(s.has(i)) s.delete(i); else s.add(i);
+    setSelRows([...s]);
+  }else{
+    setSelRows(gSelRows.length === 1 && gSelRows[0] === i ? [] : [i]);
+  }
+}
+function rangeInts(a, b){ const o = []; for(let i = a; i <= b; i++) o.push(i); return o; }
+/* 尺を打ったとき、その行が複数選択に入っていれば **選択ぶん全部**を同じ尺にする */
+function setCutDurMaybeBatch(i, f){
+  if(gSelRows.length > 1 && gSelRows.indexOf(i) >= 0){
+    gSelRows.forEach(k => setCutDur(k, f));
+    toast(gSelRows.length + '枚の尺を ' + fmtDur(f) + ' に揃えました');
+    return;
+  }
+  setCutDur(i, f);
 }
 function setCutDur(i, f){
   const cut = cuts[i];
@@ -3114,8 +3253,13 @@ function makeSheetRow(cut, i){
   dur.addEventListener('change', () => {
     const f = parseDur(dur.value);
     if(f === null || f <= 0){ dur.value = fmtDur(cut.durF); return; }
-    setCutDur(i, f);
+    setCutDurMaybeBatch(i, f);
   });
+  // ⚠（素材はみ出し）と クランプ表示は **尺の右**。C# 側に足すと桁が伸びて尺の位置が毎行ズレる
+  const flags = document.createElement('span');
+  flags.className = 'sp-flags';
+  flags.textContent = rowFlags(cut);
+  flags.title = '⚠ = 枠の中に写真が無い所がある（BOARDで赤ハッチ）';
   // 枠ごとの★（カラースクリプト一覧に出す枠）。枠が2つ以上あるカットにだけ出す
   const stars = document.createElement('div');
   stars.className = 'cam-stars';
@@ -3152,7 +3296,8 @@ function makeSheetRow(cut, i){
   lockBt.classList.toggle('lk-on', !!cut.lock);
   mk('⟳', 'BOARDの切り出し元から再ベイク', () => rebakeCut(i));
   mk('✕', '削除', () => deleteCut(i));
-  head.appendChild(no); head.appendChild(dur); head.appendChild(stars); head.appendChild(btns);
+  head.appendChild(no); head.appendChild(dur); head.appendChild(flags);
+  head.appendChild(stars); head.appendChild(btns);
 
   const body = document.createElement('div');
   body.className = 'sp-body';
@@ -3166,8 +3311,12 @@ function makeSheetRow(cut, i){
   body.appendChild(thumb); body.appendChild(note);
 
   row.appendChild(head); row.appendChild(body);
-  row.addEventListener('click', () => {
+  row.addEventListener('click', e => {
     if(gRowDragged) return;              // ドラッグ直後のクリックは食わせない
+    if(gRowMultiTap.has(i)){ gRowMultiTap.delete(i); return; }   // 「押さえたまま次をタップ」は選択で完結
+    if(e.ctrlKey || e.metaKey){ toggleSelRow(i, 'add'); return; }
+    if(e.shiftKey){ toggleSelRow(i, 'range'); return; }
+    setSelRows([]);                      // ふつうのクリックは複数選択を解除して1枚に戻す
     pause(); seek(cutStartFrame(i));
   });
   row.addEventListener('dblclick', () => openEdit(i));
@@ -3181,11 +3330,28 @@ function makeSheetRow(cut, i){
    ペン/マウスは従来どおり 6px 動かした時点でドラッグ開始。 */
 const ROW_HOLD_MS = 350;
 let gRowDrag = null, gRowDragged = false, gRowHoldT = 0;
+const gRowMultiTap = new Set();   // 複数選択タップの直後に飛んでくる click を食う行
 function rowDragDown(e, i, row){
   const t = e.target;
   // ボタン/★/尺入力は対象外
   if((t.closest && (t.closest('.sp-btns') || t.closest('.cam-stars'))) || t.tagName === 'INPUT') return;
   const touch = (e.pointerType === 'touch');
+  // 指で **1本を行に置いたまま別の行をタップ** ＝ 複数選択（GRIDのセルと同じ手つき）。
+  // 押さえていた行の並べ替えドラッグはここで取り下げる（掴みかけと選択が喧嘩しないように）
+  if(touch && gRowDrag && gRowDrag.touch && gRowDrag.i !== i){
+    clearTimeout(gRowHoldT);
+    gRowDrag.row.classList.remove('dragging');
+    $('#sp-drop').style.display = 'none';
+    const held = gRowDrag.i;
+    const base = gSelRows.length ? gSelRows : [held];
+    setSelRows([...base, held, i]);
+    gRowDrag = null;
+    // タップした行と、押さえていた行が離れたときの click を1回ずつ食う
+    // （食わないと、指を離した瞬間に「ふつうのクリック」扱いで選択が解けてしまう）
+    gRowMultiTap.add(i); gRowMultiTap.add(held);
+    toast(gSelRows.length + '枚選択（尺を打てば全部そろいます）');
+    return;
+  }
   gRowDrag = { i, row, y0: e.clientY, active: false, to: i, touch, armed: !touch };
   gRowDragged = false;
   clearTimeout(gRowHoldT);
@@ -3249,7 +3415,11 @@ function moveCutTo(from, to){
   pushLog({ type: 'cut-order', undo(){ apply(to, from); }, redo(){ apply(from, to); } });
   if(state.selCut && state.selCut.i === from) state.selCut = { i: to, k: state.selCut.k };
   if(state.curCut === from) state.curCut = to;
+  // 添字で覚えている選択は並べ替えでも狂うので捨てる（GRIDのセル・SHEETの行）
+  if(gSelCells.length) setSelCells([]);
+  if(gSelRows.length) setSelRows([]);
   refreshStudio();
+  if(inGrid()) renderGrid();
   syncBoardPanels();
   scheduleSave();
 }
@@ -3275,10 +3445,12 @@ function spRows(){ return $('#sheet-list').querySelectorAll('.sp-row'); }
 function renderSheetPanel(){
   const list = $('#sheet-list');
   list.querySelectorAll('.sp-row').forEach(el => el.remove());   // #sp-drop は残す
+  const sel = new Set(gSelRows);
   cuts.forEach((c, i) => {
     const row = makeSheetRow(c, i);
     if(i === gFocusCut) row.classList.add('focus');
     if(c.lock) row.classList.add('locked');
+    if(sel.has(i)) row.classList.add('sel');
     list.appendChild(row);
   });
   updateTotals();
@@ -3296,6 +3468,8 @@ function refreshRow(i){
   if(du && document.activeElement !== du) du.value = fmtDur(cut.durF);
   const no = row.querySelector('.sp-no');
   if(no) no.textContent = rowLabel(cut, i);
+  const fl = row.querySelector('.sp-flags');
+  if(fl) fl.textContent = rowFlags(cut);
   const nt = row.querySelector('.sp-note');
   if(nt){
     nt.textContent = cut.note || '内容・セリフ';
@@ -3317,6 +3491,7 @@ function refreshRow(i){
       const fresh = makeSheetRow(cut, i);
       fresh.classList.toggle('focus', i === gFocusCut);
       fresh.classList.toggle('locked', !!cut.lock);
+      fresh.classList.toggle('sel', gSelRows.indexOf(i) >= 0);
       row.replaceWith(fresh);
       return;
     }
@@ -3429,7 +3604,13 @@ function renderGrid(){
       cv.addEventListener('pointerup', paintUp);
       cv.addEventListener('pointercancel', paintUp);
       bindTouchEyedrop(cv);                     // 指の長押し＝スポイト
-      bindDoubleTap(cv, e => { if(e.pointerType === 'touch'){ state.curCut = ce.i; openEdit(ce.i); } });
+      // 複数選択のタップ中（別の指がセルに乗っている）は EDIT を開かない。
+      // 開いてしまうと SINGLE へ飛んで、いま組み立てた選択がその場で捨てられる
+      bindDoubleTap(cv, e => {
+        if(e.pointerType !== 'touch' || gGridAdding || gGPtr.size) return;
+        state.curCut = ce.i;
+        openEdit(ce.i);
+      });
       const cap = document.createElement('div');
       cap.className = 'gc-cap';
       cap.title = 'クリックで選択 ／ Ctrl+クリックで追加 ／ Shift+クリックで範囲';
@@ -3624,10 +3805,22 @@ function gridFit(){ gGridZoom = 1; renderGrid(); }
 /* 指の操作（ペンは描画に通すので touch だけ拾う） */
 const gGPtr = new Map();
 let gGest = null;
+/* 「1本を置いたまま次をタップ」で複数選択にするための判定。
+   **押さえっぱなしが 250ms 以上・ほぼ動いていない** 指があるときだけ足しにいく。
+   こうしておけばピンチ（2本がほぼ同時に降りてくる）とは取り違えない。 */
+const HOLD_ADD_MS = 250;
+function hasHeldFinger(){
+  const now = performance.now();
+  for(const v of gGPtr.values()){
+    if(now - v.t >= HOLD_ADD_MS && Math.hypot(v.x - v.x0, v.y - v.y0) < 14) return true;
+  }
+  return false;
+}
 function gridTouchDown(e){
   if(e.pointerType !== 'touch') return;
-  gGPtr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  gGPtr.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t: performance.now() });
   const box = $('#edit-grid');
+  if(gGridAdding){ gGest = null; return; }   // 複数選択のタップ中はピンチにもスクロールにもしない
   if(gGPtr.size === 2){
     const p = [...gGPtr.values()];
     gGest = { mode: 'pinch', d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) };
@@ -3637,7 +3830,8 @@ function gridTouchDown(e){
 }
 function gridTouchMove(e){
   if(e.pointerType !== 'touch' || !gGPtr.has(e.pointerId) || !gGest) return;
-  gGPtr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const o = gGPtr.get(e.pointerId);
+  gGPtr.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: o.x0, y0: o.y0, t: o.t });
   const box = $('#edit-grid');
   if(gGest.mode === 'pinch' && gGPtr.size === 2){
     const p = [...gGPtr.values()];
@@ -3653,16 +3847,30 @@ function gridTouchMove(e){
 function gridTouchUp(e){
   if(e.pointerType !== 'touch') return;
   gGPtr.delete(e.pointerId);
-  if(!gGPtr.size){ gGest = null; updateCellRes(); }
+  if(!gGPtr.size){ gGest = null; gGridAdding = false; updateCellRes(); }
 }
+let gGridAdding = false;   // 複数選択のタップ中（この間はスクロール/ピンチに渡さない）
 function gridPaintDown(e, cv){
   const i = +cv.dataset.ci, k = +cv.dataset.ck || 0;
   // **指は選択専用**（ANIMATOR と同じ＝描くのはペン/マウスだけ）。
   // これが無いと、セルを選ぼうと触っただけで色が画に乗る（gridStrokeStart が pointerType を見ていなかった）
   if(e.pointerType === 'touch'){
+    // 指を1本セルに置いたまま別のセルをタップ ＝ 選択に足していく（PROCREATE風の横スライドではなく
+    // SHEETの行と同じ手つきに統一した。マウス/ペンの Ctrl+クリックと同じ結果になる）
+    const add = hasHeldFinger();
     state.curCut = i; state.curFrame = k;
     undoStack = []; redoStack = [];
-    setSelCells([i + ':' + k]);
+    if(add){
+      gGridAdding = true;
+      gGest = null;
+      const all = colorCells().map(c => c.i + ':' + c.k);
+      const set = new Set(gSelCells);
+      set.add(i + ':' + k);
+      setSelCells(all.filter(x => set.has(x)));
+      toast(gSelCells.length + ' コマ選択中（濃・描画モード・REFはまとめて効きます）');
+    }else{
+      setSelCells([i + ':' + k]);
+    }
     syncEditPanels();
     return;
   }
@@ -3797,7 +4005,6 @@ function setPaintTarget(t){
   state.paintTarget = (t === 'color') ? 'color' : 'draw';
   document.querySelectorAll('.etool[data-target]').forEach(el =>
     el.classList.toggle('on', el.dataset.target === state.paintTarget));
-  $('#btn-clear-draw').textContent = (state.paintTarget === 'color') ? 'CLEAR COLOR' : 'CLEAR DRAW';
   setBrush(state.brush);   // 上限が変わるのでクランプし直す
 }
 /* カラー層の描画モード・不透明度（対象は現在カット） */
@@ -3820,15 +4027,16 @@ function syncEditPanels(){
   $('#color-alpha').disabled = !canColor;
   const pnl = $('#color-pnl-t');
   if(pnl){
-    const tgtLabel = (cut && isCamCut(cut)) ? ('（' + cut.cam[state.curFrame].k + ' 枠）') : '';
+    // どの枠を塗るかは **塗った場所**で決まる（チップは撤去）。今どこを触っているかを表題に出す
+    const tgtLabel = (cut && isCamCut(cut)) ? ('（いま ' + cut.cam[state.curFrame].k + ' 枠）') : '';
     pnl.textContent = 'COLOR LAYER（カラースクリプト）' + tgtLabel;
+    pnl.title = isCamCut(cut) ? '枠が2つ以上あるカットは、塗った場所がどちらの枠かで行き先が決まります（またいで引けば両方に乗ります）' : '';
   }
   const colorBtn = document.querySelector('.etool[data-target="color"]');
   if(colorBtn){
     colorBtn.classList.remove('off');   // SINGLE でも塗れるようになったのでグレーアウトしない
-    colorBtn.title = 'カラースクリプト層（枠ごと）／CLEAR COLOR で消える';
+    colorBtn.title = 'カラースクリプト層（枠ごと）／ERASE をWクリックで消える';
   }
-  renderColorFramePick(cut);
   if(cut){
     sel.value = colorBlendOf(cut, state.curFrame);
     const a = Math.round(colorAlphaOf(cut, state.curFrame) * 100);
@@ -3837,34 +4045,29 @@ function syncEditPanels(){
   }
   syncBaseAlphaUI();
 }
-/* SINGLE で「どの枠の色を塗るか」を選ぶチップ（GRIDはセルを触れば決まるので出さない） */
-function renderColorFramePick(cut){
-  const box = $('#color-frame-pick');
-  if(!box) return;
-  const show = !!cut && isCamCut(cut) && !inGrid();
-  box.style.display = show ? 'flex' : 'none';
-  // **dataset.keys も一緒に捨てる**。中身だけ消して鍵を残すと、次に出すとき
-  // 「同じ枠構成だから作り直し不要」と判断して空のまま出る
-  if(!show){ box.innerHTML = ''; box.dataset.keys = ''; return; }
-  const keys = cut.cam.map(c => c.k).join(',');
-  if(box.dataset.keys !== keys){
-    box.innerHTML = '';
-    cut.cam.forEach((c, k) => {
-      const el = document.createElement('div');
-      el.className = 'etool';
-      el.textContent = c.k;
-      el.title = c.k + ' 枠の色を塗る（色は枠ごとに1枚）';
-      el.addEventListener('click', () => {
-        state.curFrame = k;
-        undoStack = []; redoStack = [];   // 枠をまたいだ undo の破損防止（カット切替と同じ扱い）
-        syncEditPanels();
-        renderPaintViews();
-      });
-      box.appendChild(el);
-    });
-    box.dataset.keys = keys;
+/* --- SINGLE（ベイク面）で「その場所はどの枠か」を決める（A/B のチップは撤去した） ---
+   drawColorPlate は cam[] の順に重ねて置くので、**後の枠ほど上に見えている**。
+   だから「含む枠のうち一番後ろ」＝いま目に見えている色の持ち主。
+   T.U.（B が A の内側）も PAN（横並び）も、この1本の規則で見た目と一致する。 */
+function frameAtBake(cut, bx, by){
+  const n = camCount(cut), br = cut && cut.bakeRect;
+  if(!br || n <= 1) return 0;
+  const s = bakeSize(cut);
+  const px = bx / s.w * br.w + br.x, py = by / s.h * br.h + br.y;   // ベイク座標 → BOARD座標
+  for(let k = n - 1; k >= 0; k--){
+    const r = cut.cam[k];
+    if(px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) return k;
   }
-  [...box.children].forEach((el, k) => el.classList.toggle('on', k === state.curFrame));
+  // どの枠にも入らない（のりしろの余白）→ 一番近い枠に寄せる＝縁ぎりぎりでも線が切れない
+  let best = 0, bd = Infinity;
+  for(let k = 0; k < n; k++){
+    const r = cut.cam[k];
+    const dx = Math.max(r.x - px, 0, px - (r.x + r.w));
+    const dy = Math.max(r.y - py, 0, py - (r.y + r.h));
+    const d = dx * dx + dy * dy;
+    if(d < bd){ bd = d; best = k; }
+  }
+  return best;
 }
 /* 選択中のセル全部に適用（選択が無ければ現在セル） */
 function setColorBlend(v){
@@ -4073,8 +4276,19 @@ function markPainted(cut){
   }else cut.dirtyDraw = true;
   cut.thumb = null;
 }
-/* undo/redo は「そのレイヤーの実寸」で撮る。CONTE_W/H で撮ると別寸法のカットで静かに壊れる */
+/* undo/redo は「そのレイヤーの実寸」で撮る。CONTE_W/H で撮ると別寸法のカットで静かに壊れる。
+   色のときは **枠ぶん全部**（1ストロークが A枠と B枠の両方に乗り得るため。
+   512×288 と小さいので枚数が増えても知れている） */
 function paintSnap(cut){
+  if(state.paintTarget === 'color'){
+    const n = colorSlots(cut).length;
+    const all = [];
+    for(let k = 0; k < n; k++){
+      const c = getColorAt(cut, k);
+      all.push(ctx2d(c).getImageData(0, 0, c.width, c.height));
+    }
+    return { t: 'color', k: state.curFrame, all };
+  }
   const c = paintCanvas(cut);
   if(!c) return null;
   return { t: state.paintTarget, k: state.curFrame, data: ctx2d(c).getImageData(0, 0, c.width, c.height) };
@@ -4103,6 +4317,17 @@ function beginPaintUndo(){
 }
 function applySnap(cut, snap){
   if(!snap) return;
+  if(snap.all){                     // 色: 枠ぶんまとめて戻す
+    snap.all.forEach((d, k) => {
+      const c = getColorAt(cut, k);
+      if(!c || c.width !== d.width || c.height !== d.height) return;
+      ctx2d(c).putImageData(d, 0, 0);
+      const s = colorSlot(cut, k);
+      if(s) s.dirty = true;
+    });
+    cut.thumb = null;
+    return;
+  }
   const c = (snap.t === 'color') ? getColorAt(cut, snap.k) : getDraw(cut);
   if(!c || c.width !== snap.data.width || c.height !== snap.data.height) return;   // 寸法違いは当てない
   ctx2d(c).putImageData(snap.data, 0, 0);
@@ -4142,10 +4367,31 @@ function doRedo(){
   refreshRow(state.curCut);
   scheduleSave();
 }
+/* SINGLE で色を塗っているあいだは true。**座標をベイク空間で持ち回る**（枠をまたぐので、
+   どの枠の層に落とすかは1区間ごとに決める）。GRIDの「コマまたぎ塗り」の枠版。 */
+let gPlateMode = false;
+function plateStrokeSeg(cut, a, b){
+  const ka = frameAtBake(cut, a.x, a.y), kb = frameAtBake(cut, b.x, b.y);
+  const put = k => {
+    strokeSegOn(cut, getColorAt(cut, k),
+                bakeToColorCoord(cut, k, a.x, a.y), bakeToColorCoord(cut, k, b.x, b.y));
+    const s = colorSlot(cut, k);
+    if(s) s.dirty = true;
+  };
+  put(kb);
+  if(ka !== kb) put(ka);   // 境界をまたいだ区間だけ両方に引く＝継ぎ目で線が切れない
+  cut.thumb = null;
+  if(state.curFrame !== kb){ state.curFrame = kb; syncEditPanels(); }
+}
 function strokeSeg(a, b){
   const cut = cuts[state.curCut];
   if(!cut) return;
+  if(gPlateMode){ plateStrokeSeg(cut, a, b); return; }
   strokeSegOn(cut, paintCanvas(cut), a, b);
+}
+/* ストロークで持ち回る座標。gPlateMode のときだけベイク空間、ほかは従来どおり塗る先の空間 */
+function strokeCoord(clientX, clientY, cv){
+  return gPlateMode ? toBakeCoord(clientX, clientY, cv) : paintCoord(clientX, clientY, cv);
 }
 /* --- ブラシ幅の基準（SPEC_13 §9b） ---
    ブラシの数値は **出力枠(1280px)基準** で解釈する。
@@ -4397,7 +4643,6 @@ function buildHsv(){
   HSV_BOXES.forEach((id, bi) => {
     const box = $(id);
     if(!box) return;
-    const compact = (bi === 1);
     box.innerHTML = '';
     ['H', 'S', 'V'].forEach(k => {
       const row = document.createElement('div');
@@ -4418,20 +4663,8 @@ function buildHsv(){
         const v = parseFloat(nu.value);
         if(isFinite(v)) setHsv(k, v); else renderHsv();
       });
+      // ▲▼ の上下スピナーは置かない（指では小さすぎて当たらない。スライダーと数値欄で足りる）
       row.appendChild(lb); row.appendChild(sl); row.appendChild(nu);
-      if(!compact){
-        const st = document.createElement('div');
-        st.className = 'hsv-step';
-        const mk = (t, d) => {
-          const bt = document.createElement('button');
-          bt.className = 'btn';
-          bt.textContent = t;
-          bt.addEventListener('click', () => setHsv(k, gHsv[k] + d));
-          st.appendChild(bt);
-        };
-        mk('▲', 1); mk('▼', -1);
-        row.appendChild(st);
-      }
       box.appendChild(row);
     });
   });
@@ -4503,10 +4736,13 @@ function sampleCompositeColor(cx, cy){
   }
   return rgbToHex(cut.bg, cut.bg, cut.bg);
 }
-function takeColor(hex){
+/* noPal=true は「まだ選んでいる途中」。指を滑らせている最中に毎回パレットへ書き込むと
+   localStorage と再描画が動きっぱなしになるので、確定（指を離す）まで色だけ動かす */
+function takeColor(hex, noPal){
   if(!hex) return false;
   state.fillColor = hex;
   updateSwatch();
+  if(noPal) return true;
   if(gPalSlot >= 0 && gPalSlot < gPalette.length){
     gPalette[gPalSlot] = hex;
     savePalette();
@@ -4521,37 +4757,52 @@ function eyedropAt(clientX, clientY, cv){
 }
 /* **表示されている画そのもの**から色を拾う（見たまま＝WYSIWYG）。
    非常駐カットでも効くので、指の長押しスポイトはこちらを使う */
-function eyedropView(clientX, clientY, cv){
+function eyedropView(clientX, clientY, cv, noPal){
   const p = toCanvasCoord(clientX, clientY, cv);
   try{
     const d = ctx2d(cv).getImageData(clamp(Math.floor(p.x), 0, cv.width - 1),
                                      clamp(Math.floor(p.y), 0, cv.height - 1), 1, 1).data;
     if(d[3] < 8) return false;
-    return takeColor(rgbToHex(d[0], d[1], d[2]));
+    return takeColor(rgbToHex(d[0], d[1], d[2]), noPal);
   }catch(e){ return false; }
 }
-/* iPad: 指で 500ms 押さえたらスポイト（ペンは Alt が無いので、指だけの逃げ道） */
+/* iPad: 指で 500ms 押さえたらスポイト（ペンは Alt が無いので、指だけの逃げ道）。
+   **決まったあとは指を離すまで拾い続ける**（PROCREATE と同じ＝なぞって色を滑らせて選べる）。
+   決まる前に動いたらキャンセル（＝スクロール/パンしたいだけ）という切り分けは従来どおり。 */
 const EYE_HOLD_MS = 500;
 function bindTouchEyedrop(cv){
-  let t = 0, sx = 0, sy = 0, id = -1;
-  const clear = () => { if(t){ clearTimeout(t); t = 0; } id = -1; };
+  let t = 0, sx = 0, sy = 0, id = -1, live = false;
+  const clear = () => { if(t){ clearTimeout(t); t = 0; } id = -1; live = false; };
   cv.addEventListener('pointerdown', e => {
     if(e.pointerType !== 'touch'){ clear(); return; }
     if(id >= 0){ clear(); return; }        // 2本目が乗ったらピンチ扱い＝スポイトはやめる
-    id = e.pointerId; sx = e.clientX; sy = e.clientY;
+    id = e.pointerId; sx = e.clientX; sy = e.clientY; live = false;
     t = setTimeout(() => {
       t = 0;
       if(eyedropView(sx, sy, cv)){
+        live = true;
+        try{ cv.setPointerCapture(id); }catch(err){}   // 以後の move をこのキャンバスで握る
         cancelGestures();                  // 直前のパン/ピンチを打ち切る
-        toast('スポイト ' + state.fillColor);
+        toast('スポイト ' + state.fillColor + '（指を滑らせて選べます）');
       }
     }, EYE_HOLD_MS);
   });
   cv.addEventListener('pointermove', e => {
     if(e.pointerId !== id) return;
+    if(live){                              // 決まったあと＝なぞって色を拾い直す（確定は指を離したとき）
+      e.preventDefault();
+      eyedropView(e.clientX, e.clientY, cv, true);
+      return;
+    }
     if(t && Math.hypot(e.clientX - sx, e.clientY - sy) > 12) clear();
   });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => cv.addEventListener(ev, clear));
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => cv.addEventListener(ev, e => {
+    if(live && e.pointerId === id){
+      takeColor(state.fillColor);          // ここで初めてパレットの選択スロットへ落とす
+      toast('スポイト ' + state.fillColor);
+    }
+    clear();
+  }));
 }
 
 /* --- paint pointers（EDITキャンバスとTIMELINEプレビューで共用） --- */
@@ -4568,6 +4819,17 @@ function paintDown(e, cv){
   e.preventDefault();
   try{ cv.setPointerCapture(e.pointerId); }catch(err){}   // 合成イベントでは投げるので握りつぶす
   paintCv = cv;
+  {
+    // **SINGLE の色は「塗った場所の枠」へ落とす**（A/Bのチップは撤去した）。
+    // FILL / 投げ縄 / スポイト もこの1行で行き先が決まる（それぞれ state.curFrame を見るため）
+    const cut = cuts[state.curCut];
+    gPlateMode = !!(cut && cv === editCv && state.paintTarget === 'color');
+    if(gPlateMode){
+      const b = toBakeCoord(e.clientX, e.clientY, cv);
+      const k = frameAtBake(cut, b.x, b.y);
+      if(state.curFrame !== k){ state.curFrame = k; syncEditPanels(); }
+    }
+  }
   {   // ブラシ幅の基準を決める（tlCvは今のカメラ位置、EDITはA枠）
     const cut = cuts[state.curCut];
     const tgt = cut ? paintCanvas(cut) : null;
@@ -4577,12 +4839,15 @@ function paintDown(e, cv){
     gStrokeK = (state.paintTarget === 'color') ? (COLOR_W / CONTE_W)
              : ((cut && tgt) ? strokeScaleFor(cut, tgt.width, ca ? ca.local : 0) : 1);
   }
-  const p = paintCoord(e.clientX, e.clientY, cv);
   if(e.altKey){                       // EYEツールは廃止。Alt+クリックでスポイト（ANIMATOR準拠）
+    gPlateMode = false;
     eyedropAt(e.clientX, e.clientY, cv);
     return;
   }
   if(state.etool === 'fill'){
+    // FILL / 投げ縄は1つの枠の中で完結させる（面で塗るので、またいで両方に落とす意味が無い）
+    gPlateMode = false;
+    const p = paintCoord(e.clientX, e.clientY, cv);
     if(state.fillMode === 'lasso'){ lassoBegin(e, cv); return; }   // 囲って一括塗り
     beginPaintUndo();
     floodFill(p.x, p.y);
@@ -4596,15 +4861,15 @@ function paintDown(e, cv){
   }
   beginPaintUndo();
   stroking = true;
-  strokeLast = p;
+  strokeLast = strokeCoord(e.clientX, e.clientY, cv);
   gStrokePress = pressFactor(e);
-  strokeSeg(p, p);
+  strokeSeg(strokeLast, strokeLast);
   renderPaintViews();
 }
 function paintMove(e){
   if(gLasso){ lassoAdd(e.clientX, e.clientY); return; }
   if(!stroking || !paintCv) return;
-  const p = paintCoord(e.clientX, e.clientY, paintCv);
+  const p = strokeCoord(e.clientX, e.clientY, paintCv);
   gStrokePress = pressFactor(e);
   strokeSeg(strokeLast, p);
   strokeLast = p;
@@ -4613,6 +4878,7 @@ function paintMove(e){
 function paintUp(){
   if(gLasso){ lassoEnd(); paintCv = null; return; }
   paintCv = null;
+  gPlateMode = false;
   if(!stroking) return;
   stroking = false;
   gStrokePress = 1;
@@ -4624,11 +4890,10 @@ function paintUp(){
    統合ログ(gLog)には積まない — EDITのCtrl+Zが統合ログへ抜けると
    cut-add / photo-add まで遡ってしまう（2026-08-02 の事故と同じ経路になる）。 */
 let gBaseUndo = null;
-async function clearBase(){
+function clearBase(){
   const cut = cuts[state.curCut];
   if(!cut || !(cut.baseC || cut.baseBlob)){ toast('元の絵はありません'); return; }
-  const ok = await modalConfirm('元の絵（切り出しベース）を破棄します。加筆と色は残ります。\n直後の Ctrl+Z で戻せます（BOARDに写真が残っていれば ⟳ でも焼き直せます）。');
-  if(!ok) return;
+  // 確認は出さない（直後の Ctrl+Z で戻せる／BOARDに写真が残っていれば ⟳ でも焼き直せる）
   gBaseUndo = { cut, baseC: cut.baseC, baseBlob: cut.baseBlob };
   cut.baseC = null;
   cut.baseBlob = null;
@@ -4657,6 +4922,23 @@ function undoClearBase(){
 function clearDraw(){
   const cut = cuts[state.curCut];
   if(!cut) return;
+  // SINGLE は「紙の全面」を見ている画面なので、色を消すときは **見えている枠ぶん全部**消す。
+  // GRID はセル＝1枠なのでその1枚だけ（どちらも「見えているものが消える」で一致する）
+  const wide = (state.paintTarget === 'color' && !inGrid() && camCount(cut) > 1);
+  if(wide){
+    beginPaintUndo();
+    colorSlots(cut).forEach((s, k) => {
+      const c = getColorAt(cut, k);
+      ctx2d(c).clearRect(0, 0, c.width, c.height);
+      s.dirty = true;
+    });
+    cut.thumb = null;
+    endPaintUndo();
+    renderPaintViews();
+    refreshRow(state.curCut);
+    scheduleSave();
+    return;
+  }
   const d = paintCanvas(cut);   // 今のペイント先（線画 or 色）だけを消す
   if(!d) return;
   beginPaintUndo();             // ★ pushUndo 直呼びだとGRIDで戻せない（行き先が違う）
@@ -5677,11 +5959,7 @@ async function exportVideo(){
     try{
       const blob = await exportMP4();
       if(blob){
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        a.href = url; a.download = 'econte_' + ts + '.mp4'; a.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, stampName('econte', 'mp4'));
         toast('MP4を書き出しました（' + Math.round(blob.size / 1024) + 'KB）');
       }else{
         toast('書き出しを中断しました');
@@ -5753,23 +6031,30 @@ function saveExportBlob(){
   const ext = mime.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
   const blob = new Blob(gRecChunks, { type: mime });
   gRecChunks = [];
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  a.href = url;
-  a.download = 'econte_' + ts + '.' + ext;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, stampName('econte', ext));
   toast('動画コンテを書き出しました（' + ext.toUpperCase() + '）');
 }
 /* --- カラースクリプト一覧PNG（SPEC_13 §5h） ---
    **GRIDで見えているものをそのまま大きく描く**（描く画面と出す画面を同じにする）。
+   2026-08-17: 「形も同じに」— 列数・列間・行間・色帯 の4つを GRID の表示設定から取る。
+   色帯は GRID と同じ **行に1本**（以前はセルごとに敷いていて形が違った）。
    プリント体裁は作らない。1枚の長いPNG。 */
+function gridColsNow(){
+  // いま画面に並んでいる列数をそのまま使う（無ければ4列）。横に伸びすぎないよう8列で頭を打つ
+  const n = gGridRows.length ? Math.max(...gGridRows.map(r => r.cells.length)) : 0;
+  return clamp(n || 4, 1, 8);
+}
 async function exportColorScript(){
   const cells = colorCells();
   if(!cells.length){ toast('カットがありません'); return; }
-  const COLS = 4, CW = 480, CH = 270, GAP = 14, MG = 28;
-  const BAR = 5, CAP = 30, PAL = 20, ROWGAP = 34;
+  const showPal = !!($('#chk-grid-pal') && $('#chk-grid-pal').checked);
+  const wideRow = !!($('#chk-grid-gap') && $('#chk-grid-gap').checked);
+  const showCol = !!($('#chk-grid-col') && $('#chk-grid-col').checked);
+  const COLS = gridColsNow(), CW = 480, CH = 270, MG = 28;
+  const GAP = showCol ? 14 : 0;                       // 列間 ON/OFF（GRIDの colGap と同じ考え方）
+  const BAR = 5, CAP = 30;
+  const PAL = showPal ? 20 : 0;                       // 色帯 ON/OFF
+  const ROWGAP = wideRow ? Math.round(CH * 0.34) : 8; // 行間 ON/OFF（GRIDの marginBottom と同じ比率）
   const rows = Math.ceil(cells.length / COLS);
   const W = MG * 2 + COLS * CW + (COLS - 1) * GAP;
   const H = MG * 2 + 46 + rows * (BAR + CH + CAP + PAL + ROWGAP);
@@ -5783,9 +6068,11 @@ async function exportColorScript(){
   const cell = blankCanvas(CW, CH);
   const cctx = ctx2d(cell);
   const maxF = Math.max(1, ...cells.map(ce => cellFrames(cuts[ce.i], ce.k)));
+  const rowW = COLS * CW + (COLS - 1) * GAP;
   let y = MG + 46;
   for(let s = 0; s < cells.length; s += COLS){
     const row = cells.slice(s, s + COLS);
+    const pals = [];
     for(let c = 0; c < row.length; c++){
       const ce = row[c], cut = cuts[ce.i];
       await ensureResident(cut);
@@ -5803,21 +6090,25 @@ async function exportColorScript(){
       ctx.fillStyle = 'rgba(157,141,179,0.9)';
       ctx.font = '13px monospace';
       ctx.fillText(cellSub(cut, ce.k), x + 74, y + BAR + CH + 18);
-      const pal = extractPalette(cell, 6);       // 代表色（セル下に直接）
-      if(pal.length){
-        const sw = CW / pal.length;
-        pal.forEach((hex, k) => { ctx.fillStyle = hex; ctx.fillRect(x + k * sw, y + BAR + CH + CAP, Math.ceil(sw) + 0.5, PAL - 4); });
-      }
+      if(showPal) pals.push(extractPalette(cell, 6));
+    }
+    if(showPal && pals.length){                  // 色帯は GRID と同じく「行に1本」
+      const py = y + BAR + CH + CAP;
+      const seg = rowW / Math.max(1, pals.length);
+      pals.forEach((pal, ci) => {
+        if(!pal.length) return;
+        const sw = seg / pal.length;
+        pal.forEach((hex, k) => {
+          ctx.fillStyle = hex;
+          ctx.fillRect(MG + ci * seg + k * sw, py, Math.ceil(sw) + 0.5, PAL - 4);
+        });
+      });
     }
     y += BAR + CH + CAP + PAL + ROWGAP;
   }
   const blob = await canvasToBlob(out, 'image/png');
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  a.href = url; a.download = 'econte_colorscript_' + ts + '.png'; a.click();
-  URL.revokeObjectURL(url);
-  toast('カラースクリプトを書き出しました（' + W + '×' + H + '・' + Math.round(blob.size / 1024) + 'KB）');
+  downloadBlob(blob, stampName('econte_colorscript', 'png'));
+  toast('カラースクリプトを書き出しました（' + COLS + '列・' + W + '×' + H + '・' + Math.round(blob.size / 1024) + 'KB）');
 }
 function tlPaintDown(e){
   if(gExporting) return;
@@ -5855,6 +6146,7 @@ const SHORTCUT_ACTIONS = [
   { id: 'sheet',     label: 'SHEETパネル 開閉',     def: 'S',          run: () => toggleSheetPanel() },
   { id: 'toolMove',  label: 'BOARD: MOVE',          def: 'V',          run: () => setBoardTool('move') },
   { id: 'toolCut',   label: 'BOARD: CUT 16:9',      def: 'C',          run: () => setBoardTool('cut') },
+  { id: 'cutsVis',   label: 'BOARD: CUT枠の表示 ON/OFF', def: 'H',     run: () => toggleCutsVisible() },
   { id: 'fit',       label: 'BOARD 全体表示（EDITでは表示リセット）', def: 'F', run: () => boardFit() },
   { id: 'marker',    label: 'マーカーを打つ / 消す', def: 'M',          run: () => toggleMarkerHere() },
   { id: 'prevMark',  label: '前のマーカーへ',       def: ',',          run: () => seekMarker(-1) },
@@ -6269,14 +6561,18 @@ function redoActive(){ if(useCutStack()) doRedo(); else if(inGrid()) colorRedo()
 
 /* ---------------- ANIMATOR準拠のブラシ操作（正準: animator.html） ----------------
    Wクリック / 長押し / 右ドラッグ の判定は animator と同じ数値にしてある。 */
+/* Wタップの判定は **指では素直に決まらない**（2回目が数十px ずれる・間が空く）。
+   iPadで取りこぼすという声があったので窓を広げてある: 550ms / 48px。
+   ペンも触覚は指と同じなので同じ経路に通す（マウスだけネイティブ dblclick に任せる＝二重発火しない） */
+const DTAP_MS = 550, DTAP_PX = 48;
 function onDoubleActivate(el, handler){
   if(!el) return;
   el.addEventListener('dblclick', handler);
   let lastT = 0, lastX = 0, lastY = 0;
   el.addEventListener('pointerup', e => {
-    if(e.pointerType !== 'touch') return;        // マウスはネイティブdblclickに任せる
+    if(e.pointerType === 'mouse') return;        // マウスはネイティブdblclickに任せる
     const now = performance.now();
-    if(now - lastT < 350 && Math.hypot(e.clientX - lastX, e.clientY - lastY) < 28){
+    if(now - lastT < DTAP_MS && Math.hypot(e.clientX - lastX, e.clientY - lastY) < DTAP_PX){
       lastT = 0;
       e.preventDefault();
       handler(e);
@@ -6324,6 +6620,9 @@ function bindDoubleTap(el, fn){
   let lt = 0, lx = 0, ly = 0;
   el.addEventListener('pointerup', e => {
     if(e.pointerType === 'mouse') return;   // マウスはネイティブ dblclick に任せる（二重発火防止）
+    // ★ここは onDoubleActivate より窓を狭く保つ（350ms/24px）。
+    //   行き先が「加筆EDITを開く」＝画面が変わる操作なので、緩めると誤爆したときの被害が大きい。
+    //   緩めたいのはツールのWタップ（onDoubleActivate）のほうだけ
     const t = e.timeStamp || Date.now();
     if(t - lt < 350 && Math.hypot(e.clientX - lx, e.clientY - ly) < 24){
       lt = 0;
@@ -6397,26 +6696,27 @@ const HELP_GROUPS = [
     ['大きいUI', 'ボタン・スライダーを大きく（この画面の上で切替）']
   ] },
   { t: 'レイヤーと消去（元の絵は壊れません）', rows: [
-    ['線画 / 色', '描く先は2枚。色だけ 乗算・濃 を持つので入口を分けてある'],
-    ['CLEAR DRAW', '線画レイヤーだけ消す（元の絵はそのまま）'],
-    ['CLEAR COLOR', 'カラー層だけ消す（元の絵はそのまま）'],
-    ['元絵 下 / 上', '重ね順を変えるだけ。上でも下でも元の絵は非破壊'],
-    ['BASE スライダー', '元の絵の濃度（20〜40%がトレース用）'],
+    ['line / color', '描く先は2枚。color だけ 乗算・濃 を持つので入口を分けてある'],
+    ['ERASE をWクリック', '今の描く先（line か color）を消す＝CLEARボタンは置いていない'],
+    ['REF DOWN / UP', '元の絵の重ね順を変えるだけ。上でも下でも元の絵は非破壊'],
+    ['REF スライダー', '元の絵の濃度（既定50%）。GRID・SHEETで複数選択中はまとめて動く'],
     ['CLEAR BASE', '元の絵を捨てる唯一の操作（直後の Ctrl+Z で戻せる）'],
     ['SHEETの ⟳', 'BOARDの写真から元の絵を焼き直す']
   ] },
   { t: 'EDIT', rows: [
-    ['SINGLE', '1カットを大きく詰める（線画も色も描ける）'],
+    ['SINGLE', '1カットを大きく詰める（line も color も描ける）'],
     ['GRID', '一覧でカラースクリプト（コマをまたいで塗れる）'],
-    ['A / B チップ', 'SINGLEでどの枠の色を塗るか（色は枠ごとに1枚）'],
+    ['枠が2つ以上のカット', '色の行き先は **塗った場所**で決まる（A/Bのチップは無し）。またいで引けば両方に乗る'],
     ['ホイール', 'カーソル中心ズーム'], ['1本指ドラッグ', 'パン'], ['2本指', 'ピンチ拡縮＋パン'],
     ['F', 'ズーム/パンをリセット（GRIDは既定の大きさへ）']
   ] },
   { t: 'iPad（指＝操作 / ペン＝描画）', rows: [
     ['指でなぞる', 'スクロール・パン（指では描きません）'],
     ['指でセルを触る', 'GRIDはそのコマを選ぶだけ（色は乗りません）'],
-    ['指の長押し', 'スポイト（見えている色をそのまま拾う）'],
+    ['指の長押し', 'スポイト。そのまま滑らせて色を選び直せます（離すと確定）'],
+    ['1本を置いたまま次をタップ', '複数選択（GRIDのセル / SHEETの行）'],
     ['SHEET行を長押し', 'そのまま上下ドラッグで並べ替え'],
+    ['複数選択中に尺を打つ', '選んだ行を全部その尺にそろえる'],
     ['ダブルタップ', '加筆EDITへ（行・クリップ・セル）'],
     ['2本指タップ', 'UNDO'], ['3本指タップ', 'REDO'],
     ['ペン', '枠置き・ペイント（画面が指で隠れない）']
@@ -6614,10 +6914,7 @@ function wire(){
     if(!p) return;
     setPhotoFilter('gray', !normFilter(p.filter).gray, true);
   });
-  $('#photo-bright').addEventListener('input', e => setPhotoFilter('bright', +e.target.value / 100, false));
-  $('#photo-bright').addEventListener('change', e => setPhotoFilter('bright', +e.target.value / 100, true));
-  $('#photo-contrast').addEventListener('input', e => setPhotoFilter('contrast', +e.target.value / 100, false));
-  $('#photo-contrast').addEventListener('change', e => setPhotoFilter('contrast', +e.target.value / 100, true));
+  $('#btn-cut-vis').addEventListener('click', toggleCutsVisible);
   $('#btn-cam-add').addEventListener('click', addCamFrame);
   $('#cam-expand').addEventListener('input', e => {
     $('#cam-expand-val').textContent = (+e.target.value / 100).toFixed(2);
@@ -6670,8 +6967,7 @@ function wire(){
   });
   // SHEETパネル
   $('#btn-add-empty').addEventListener('click', addEmptyCut);
-  // STUDIO中央: 現在カットの編集欄
-  $('#btn-cur-edit').addEventListener('click', () => { if(gFocusCut >= 0) openEdit(gFocusCut); });
+  // STUDIO中央: 現在カットの編集欄（✎EDIT ボタンは撤去。SHEET行のWクリック等で入る）
   $('#cur-dur').addEventListener('change', () => {
     const cut = cuts[gFocusCut];
     if(!cut) return;
@@ -6736,10 +7032,7 @@ function wire(){
     if(f === null || f <= 0){ $('#edit-dur').value = fmtDur(cut.durF); return; }
     setCutDur(state.curCut, f);
   });
-  $('#btn-clear-draw').addEventListener('click', clearDraw);
   $('#btn-clear-base').addEventListener('click', clearBase);
-  $('#btn-undo').addEventListener('click', doUndo);
-  $('#btn-redo').addEventListener('click', doRedo);
   document.querySelectorAll('.etool[data-tool]').forEach(el => {
     el.addEventListener('click', () => setETool(el.dataset.tool));
   });
@@ -6947,11 +7240,7 @@ function wire(){
   };
   const palSave = () => {
     const blob = new Blob([JSON.stringify({ format: 'PALETTE_v1', colors: gPalette }, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    a.href = url; a.download = 'econte_palette_' + ts + '.json'; a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, stampName('econte_palette', 'json'));
   };
   const palLoad = () => $('#pal-file-input').click();
   // パレットは EDIT サイドだけ（STUDIOのミニツールからは撤去した＝Altスポイト/指の長押しで拾う）
@@ -7087,7 +7376,7 @@ window.__ECONTE__ = {
   get markers(){ return gMarkers.map(m => ({ f: m.f, label: m.label })); },
   toggleMarkerHere, delMarker, seekMarker, layoutMarkers, markerNear, editMarkerLabel, markerLabelOf,
   durToTimecode, parseDurTimecode, enterEdit, gotoEditMode, swapStudioGrid,
-  bakeToColorCoord, renderColorFramePick,
+  bakeToColorCoord, frameAtBake, plateStrokeSeg,
   offsetScrubDown, offsetScrubMove, offsetScrubUp,
   frameToTimecode, parseTimecodeToFrame, updateTimecodeHud, bindTcEdit,
   clipEdgeAt, togglePaneMax, clearPaneMax, paneAtPointer, get paneMax(){ return gPaneMax; },

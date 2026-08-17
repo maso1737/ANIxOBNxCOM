@@ -598,6 +598,48 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
   中央=カット尺・TIMELINE=通し位置 の FRAME/TIME 2系統／
   マーカーを `{f,label}` にして ドラッグ移動・Ctrl+クリック削除・Wクリックでメモ／
   `setPointerCapture` を全部 try/catch
+- **V2-G3: 実装済み（2026-08-17・追いブラッシュアップ）** — 下記の18点。
+  設計上いちばん効いているのは **「A/Bチップの撤去」と「添字ズレの一括修正」** の2つ。
+
+  | | 変えたこと | 要点（次に触る人向け） |
+  |---|---|---|
+  | 1 | **SINGLEの色は「塗った場所」で枠が決まる** | `frameAtBake()` が `cam[]` を**後ろから**探す＝`drawColorPlate` の重ね順と一致する（＝見えている色の持ち主）。T.U.（B⊂A）でも PAN でもこの1本の規則で足りる。A/Bチップ (`#color-frame-pick` / `renderColorFramePick`) は撤去 |
+  | 2 | 枠をまたぐ1ストローク | `gPlateMode` 中は**座標をベイク空間で持ち回る**。`plateStrokeSeg()` が区間ごとに行き先の枠を決め、**またいだ区間だけ両方の層に引く**（継ぎ目で切れない）。GRIDの「コマまたぎ塗り」の枠版 |
+  | 3 | 色のUndoは枠ぶんまとめて | `paintSnap()` が `state.paintTarget==='color'` のとき `{all:[ImageData…]}` を返す。1ストロークがA/B両方に乗るので、片方だけ撮ると戻せない |
+  | 4 | CLEAR DRAW / COLOR ボタン撤去 | ERASE のWクリックと同義だったため。**SINGLEの色は見えている枠ぶん全部**消す（`clearDraw()` の `wide` 分岐）。CLEAR BASE は残す |
+  | 5 | 線画/色 → `line` / `color` 表記 | |
+  | 6 | BASE → **REF**、TOOLの上へ | `REF DOWN` / `REF UP`（ANIMATOR の語彙）。色は BOARD の MOVE / CUT 16:9 と同じ紫（`#ref-over-pick`）＝「まずどう参照するか」を先に決める並び |
+  | 7 | 削除の確認ダイアログ撤去 | `deleteCut` / `deleteSelPhoto` / `clearBase`。**Undoできる操作は聞かない**。戻せない `wipeAll` / `importProject` の確認は残す |
+  | 8 | 写真の操作をモードバーへ | `#board-tools` / `#photo-panel` を撤去し `#photosel-box`（% の右）へ。**明/コントラストのスライダーは撤去**（写真アプリ側でやる運用）。GRAY は残す |
+  | 9 | CUT追加はシートで選んだカットの次へ | `newCutSlot()`（`gSelRows` が1件ならそれ、無ければ `gFocusCut` の次）＋ `insertCut()`。追加後は `focusCutInSheet()` でシートが追従 |
+  | 10 | ⚠ は尺の右へ | `rowLabel()` から抜いて `rowFlags()` ＋ `.sp-flags` に。`.sp-no` を `min-width` 固定にしたので、`A→B` が付いた行でも**尺の欄が上下でそろう** |
+  | 11 | CUT枠の表示ON/OFF (H) | `state.showCuts`。OFF中は `renderBoard` も `hitCutFrame`/`hitCutHandle` も止める＝**見えないものは掴めない** |
+  | 12 | 中央の ✎EDIT 撤去 | SHEET行Wクリック / TLクリップWクリック / 上部EDIT で入れる |
+  | 13 | MOVEで枠選択中は写真がズレない | `bDown` の `guard`。枠を選んでいるあいだ写真に触っても `mode:'idle'`＝**選択が切り替わるだけ**。もう一度触ればふつうに動く |
+  | 14 | HISTORY パネル撤去 | 2本指=UNDO / 3本指=REDO ＋ Ctrl+Z で足りる |
+  | 15 | 指の長押しスポイトを**滑らせて選べる**ように | `bindTouchEyedrop` に `live` を追加（PROCREATE風）。滑っているあいだは `takeColor(hex, true)` で**パレットに書かない**（毎moveで localStorage を叩かないため）。指を離したとき確定 |
+  | 16 | Wタップの窓を広げた | `onDoubleActivate` = `DTAP_MS 550 / 48px`（ツール用）。**`bindDoubleTap` は 350/24 のまま**（行き先が「EDITを開く」なので誤爆の被害が大きい）。この非対称は意図的 |
+  | 17 | BASE(REF)の既定を50% | `DEFAULT_BASE_ALPHA`。「元絵の上ではペイントが効かない」と勘違いしないため。**GRIDのセル / SHEETの行を複数選べば一括で上げ下げ**（`eachBaseCut()`） |
+  | 18 | 複数選択の手つきを統一 | 指=**1本を置いたまま次をタップ**（GRIDのセル＝`hasHeldFinger()` / SHEETの行＝`rowDragDown` の分岐）。ペン・マウスは Ctrl / Shift+クリック。SHEETは複数選択中に尺を打つと**全部そろう**（`setCutDurMaybeBatch`） |
+
+- **V2-G3で直したバグ（2026-08-17）**
+  - **「絵が消えて ⟳ を押しても無反応」** — `ensureResident()` が途中で1回でも例外を出すと
+    `cut.loading` に**解決しない Promise が残り続け**、以後 `requestResident` が毎回そこで
+    引き返していた。`try/finally` で必ず `cut.loading = null` に戻す。`evictLru()` も
+    個別に try で包んだ（ここが投げても常駐化は成功扱いにする）
+  - **「シートで消したカットがGRIDに残る／別のにズレる」** — `deleteCut` が `cuts.splice` の後に
+    **添字を詰めていなかった**。`shiftCutRefs()` を通して `state.curCut` を追従させ、
+    添字で持っている選択（`gSelCells` / `gSelRows`）と `undoStack` は捨てる。
+    `gLru` からも消したカットのidを抜く。`moveCutTo` も同じ扱いにした。
+    削除・並べ替えの後は GRID を張り直す
+  - **iPadでダウンロードが無反応** — `downloadBlob()` に一本化。
+    ① `a` を必ず一度 DOM に入れる ② `revokeObjectURL` を**60秒後**にする
+    （click直後に revoke すると保存が始まる前にURLが死ぬ）③ download 属性が効かなければ新規タブ。
+    PROJ ZIP / MP4 / WebM / C.SCRIPT / パレットJSON の**5か所すべて**がここを通る
+  - **C.SCRIPT の形が画面と違う** — 列数を `gridColsNow()`（画面の列数・上限8）にし、
+    **行間・列間・色帯のON/OFFをそのまま反映**。色帯は GRID と同じ「行に1本」にした
+    （以前はセルごとに敷いていて形が違った）
+
 - **未着手は V2-E3 のみ**（フォトバッシュ・SINGLE限定）。他のフェーズは全部入っている
   - `cut.layers[]`（最大5・原本Blob＋アフィン変形＋投げ縄マスク＋ブレンド）
     ＋ブラシチップ（**.abrパーサは作らない**・内蔵数種＋透過PNG読み込み）
