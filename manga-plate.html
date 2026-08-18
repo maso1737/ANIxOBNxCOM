@@ -73,6 +73,13 @@ body.swap #side{border-right:1px solid rgba(255,210,122,.18);border-left:0}
 .tool:hover{background:rgba(255,79,168,.12)}
 .tool.on{background:var(--grad-btn);border-color:transparent;color:#fff;box-shadow:0 0 14px rgba(255,79,168,.55)}
 .rail-sep{width:24px;height:1px;background:rgba(255,210,122,.25);flex:none;margin:3px 0}
+/* レール最上段の小さい黄色ボタン（左右入替・全画面）。ツールより一回り小さくして道具と区別する */
+.railtop{display:flex;gap:4px;flex:none;margin-bottom:4px}
+.rt{width:17px;height:20px;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:1px solid rgba(255,210,122,.45);color:var(--gold);
+  cursor:pointer;user-select:none;font-size:10px;line-height:1}
+.rt:hover{background:rgba(255,210,122,.14)}
+.rt.on{background:linear-gradient(135deg,#FFD27A,#FF9A3C);border-color:transparent;color:#2a1600}
 .sub{width:38px;height:22px;display:flex;align-items:center;justify-content:center;flex:none;
   background:transparent;border:1px solid rgba(90,233,255,.35);color:var(--ice);cursor:pointer;font-size:9px;letter-spacing:.1em;user-select:none}
 .sub.on{background:rgba(90,233,255,.9);border-color:transparent;color:#04202a;font-weight:600}
@@ -150,6 +157,17 @@ select{width:100%}
 .el-row .el-nm{cursor:grab}
 .el-row .el-nm input.el-edit{width:100%;background:var(--bg-0);border:1px solid var(--rouge);color:var(--white);
   font-family:var(--mono);font-size:10px;padding:1px 3px}
+/* コマごとの区切り線＋左の色帯。グループ化はせず「どのコマの素材か」が目で追えればよい */
+.el-row{border-left:3px solid transparent}
+.el-row.lock{opacity:.6}
+.el-row.lock .el-nm{font-style:italic}
+.el-row .el-lk{cursor:pointer;color:rgba(181,142,255,.45);width:11px;text-align:center;font-size:11px}
+.el-row .el-lk.on{color:var(--gold)}
+.el-row .el-mg{font-size:8px;letter-spacing:.04em;color:var(--ice);cursor:pointer;padding:0 2px}
+.el-row .el-mg.off{color:rgba(181,142,255,.28);cursor:default}
+.el-sep{display:flex;align-items:center;gap:6px;margin:6px 0 2px;user-select:none}
+.el-sep i{flex:1;height:1px;background:rgba(181,142,255,.22)}
+.el-sep span{font-size:8px;letter-spacing:.2em;color:rgba(181,142,255,.7);white-space:nowrap}
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 .fp{font-size:8px;letter-spacing:.12em;padding:3px 7px;border:1px solid rgba(255,210,122,.4);color:var(--gold);
   cursor:pointer;text-transform:uppercase;user-select:none}
@@ -254,12 +272,15 @@ select{width:100%}
     <button class="btn gold" id="pg-next" title="次のページへ（]）">▶</button>
     <span class="t-gap"></span>
     <button class="btn gold" id="btn-settings" title="操作一覧・設定（?）">⚙</button>
-    <button class="btn gold" id="btn-swap" title="ツールレールとパネルの左右入替（TAB）">⇄</button>
     <button class="btn gold" id="btn-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
     <button class="btn" id="btn-home" title="ランディングページに戻る">HOME</button>
   </div>
 
   <div id="rail">
+    <div class="railtop">
+      <div class="rt" id="btn-swap" title="ツールレールとパネルの左右入替（TAB）">⇄</div>
+      <div class="rt" id="btn-fs2" title="全画面表示 ON/OFF">⛶</div>
+    </div>
     <div class="tool on" id="t-sel" title="選択（V）。Wクリックで コマ⇔素材 を切替">▣<small id="t-sel-lb">コマ</small></div>
     <div class="tool" id="t-div" title="コマ分割（D）— ドラッグで分割線。用紙の外から引くと定規のように縦横が決まる">╱<small>DIV</small></div>
     <div class="tool" id="t-edit" title="コマ線編集（P）。Wクリックで 線⇔ホワイト を切替">◈<small id="t-edit-lb">線</small></div>
@@ -451,8 +472,9 @@ let PAPER=paperOf('B4_600');
 let BOOK=null, MATSRC={}, MATIMG={};   // MATSRC: srcId→dataURL（保存対象） / MATIMG: srcId→Image（実行時）
 let curPageIdx=0, selPanel=null, selItem=null, selCut=null;
 let tool='sel', divMode='f', selMode='panel', editMode='line';
-let textVert=true, brushPress=true, whiteColor='#FFFFFF';   // レールのWクリックで切り替わる道具の状態
-let gBrushColor='#000000', gBrushLw=0;                      // 次に引く線の色と太さ（0=用紙解像度から初期化）
+let textVert=true, brushPress=true, whiteErase=false;       // レールのWクリック/長押しで切り替わる道具の状態
+/* 次に置くもの の色と太さ。◆Items のパレット（下の色チップ）で選ぶ */
+let gWhiteColor='#FFFFFF', gBrushColor='#000000', gTextColor='#000000', gBrushLw=0;
 let showShade=true, showGuide=true, swapUI=false;
 const view={x:0,y:0,z:0.1};
 
@@ -515,7 +537,13 @@ function migrate(b){
         it.edge=Object.assign({on:false,w:14,color:'#FFFFFF'},it.edge||{});
         if(typeof it.text!=='string')it.text='';
       }
-      if(it.type==='brush'&&!Array.isArray(it.pts))it.pts=[];
+      if(it.type==='brush'){
+        if(!Array.isArray(it.pts))it.pts=[];
+        it.edge=Object.assign({on:false,w:14,color:'#FFFFFF'},it.edge||{});
+      }
+      if(it.type==='white'&&it.erase===undefined)it.erase=false;
+      if((it.type==='brush'||it.type==='white')&&!Array.isArray(it.subs))it.subs=[];
+      if(it.locked===undefined)it.locked=false;
     });
   });
   return b;
@@ -537,12 +565,13 @@ function defaultsFor(type,box){
   if(type==='img')   return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,scale:1,opacity:1,srcId:null,linkId:null,
                              srcs:null,cell:0,
                              edge:{on:false,w:Math.round(24*S),color:'#FFFFFF'},tone:{on:false}};
-  if(type==='white') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,opacity:1,poly:[],color:'#FFFFFF'};
+  if(type==='white') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,opacity:1,poly:[],subs:[],erase:false,color:'#FFFFFF'};
   if(type==='text')  return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,opacity:1,text:'',
                              size:Math.round(66*S),lh:1.18,ls:0.02,font:0,vertical:true,
                              edge:{on:false,w:Math.round(14*S),color:'#FFFFFF'},color:'#000000'};
-  if(type==='brush') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,opacity:1,pts:[],
-                             lw:Math.round(14*S),fill:false,closed:false,color:'#000000'};
+  if(type==='brush') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,opacity:1,pts:[],subs:[],
+                             lw:Math.round(14*S),fill:false,closed:false,
+                             edge:{on:false,w:Math.round(14*S),color:'#FFFFFF'},color:'#000000'};
   if(type==='tone')  return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,w:Math.round(box.w),h:Math.round(box.h),
                              dot:Math.round(16*S),gap:Math.round(22*S),angle:45,shape:'dot',color:'#000000'};
   if(type==='focus') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,r0:Math.round(Math.min(box.w,box.h)*0.22),
@@ -566,6 +595,7 @@ const TONE_PRESETS=[['10%',0.42],['20%',0.55],['40%',0.74],['60%',0.90]];   // d
 const FOCUS_PRESETS=[['標準',{count:110,taper:0.9,jitter:0.35}],['密',{count:220,taper:0.95,jitter:0.25}],
                      ['芯くずし',{core:0.55,jitter:0.45}],['真円',{core:0}]];
 const STREAM_PRESETS=[['標準',{count:34,taper:0.85}],['太',{count:16,taper:0.6}]];
+const PIN_COLORS=['#FF4FA8','#5AE9FF','#FFD27A','#B58EFF','#7CFF9E','#FF9A3C'];   // ◆Items のコマ別の色帯
 const MANGA_PAL=['#000000','#FFFFFF','#EBEBEB','#D4D4D4','#ABABAB','#808080','#555555','#2B2B2B','#F5F1E8','#FF3355'];
 
 /* ============================================================
@@ -734,10 +764,14 @@ function drawItem(g,it){
   g.save();g.translate(it.x,it.y);g.rotate((it.rot||0)*Math.PI/180);
   g.fillStyle=it.color;g.strokeStyle=it.color;
   if(it.type==='white'){
-    if(it.poly&&it.poly.length>2){
-      g.globalAlpha=clamp(it.opacity===undefined?1:it.opacity,0,1);
-      pathPoly(g,it.poly);g.fill();
+    /* 透明消し: 下の絵を消す。用紙が白なら白で塗る＝同じ見え方、
+       透過用紙（OBAN用）のときは destination-out で本当に抜く */
+    if(it.erase){
+      if(BOOK.bg==='transparent'){g.globalCompositeOperation='destination-out';g.fillStyle='#000';}
+      else g.fillStyle=BOOK.bg||'#FFFFFF';
     }
+    g.globalAlpha=clamp(it.opacity===undefined?1:it.opacity,0,1);
+    polysOf(it).forEach(p=>{if(p.length>2){pathPoly(g,p);g.fill();}});
   }
   else if(it.type==='frame'){g.lineWidth=it.lw;g.lineJoin='miter';g.strokeRect(-it.w/2,-it.h/2,it.w,it.h);}
   else if(it.type==='tone')drawTone(g,it);
@@ -767,16 +801,18 @@ function drawText(g,it){
     }
     g.fillStyle=it.color;fn(false);
   };
+  /* 段落は「先頭合わせ」。中央合わせにすると行ごとに頭がズレて、
+     セリフでも擬音でも読みにくい（縦書き＝上端そろえ／横書き＝左端そろえ） */
   if(it.vertical){
-    /* 縦書き: 右の列から左へ。1行＝1列 */
+    /* 縦書き: 右の列から左へ。1行＝1列。全列の書き出しは同じ高さ */
     const cols=lines.length;
+    const maxc=Math.max(1,...lines.map(l=>[...l].length));
+    const top=-(maxc-1)/2*adv;
     paint(stroke=>{
       lines.forEach((ln,ci)=>{
         const cx0=(cols-1)/2*step-ci*step;                 // 右が先頭
-        const chars=[...ln];
-        chars.forEach((ch,i)=>{
-          const cy=-(chars.length-1)/2*adv+i*adv;
-          g.save();g.translate(cx0,cy);
+        [...ln].forEach((ch,i)=>{
+          g.save();g.translate(cx0,top+i*adv);
           if(VERT_ROT.indexOf(ch)>=0)g.rotate(Math.PI/2);
           else if(VERT_SHIFT.indexOf(ch)>=0)g.translate(it.size*0.32,-it.size*0.36);
           if(stroke)g.strokeText(ch,0,0);else g.fillText(ch,0,0);
@@ -785,15 +821,16 @@ function drawText(g,it){
       });
     });
   }else{
+    const wOf=ln=>[...ln].reduce((s,ch)=>s+g.measureText(ch).width+it.size*(it.ls||0),0);
+    const left=-Math.max(0,...lines.map(wOf))/2;           // 一番長い行を基準に左端をそろえる
     paint(stroke=>{
       lines.forEach((ln,li)=>{
         const cy=-(lines.length-1)/2*step+li*step;
-        const chars=[...ln];
-        let wsum=0;const ws=chars.map(ch=>{const w=g.measureText(ch).width+it.size*(it.ls||0);wsum+=w;return w;});
-        let x=-wsum/2;
-        chars.forEach((ch,i)=>{
-          if(stroke)g.strokeText(ch,x+ws[i]/2,cy);else g.fillText(ch,x+ws[i]/2,cy);
-          x+=ws[i];
+        let x=left;
+        [...ln].forEach(ch=>{
+          const w=g.measureText(ch).width+it.size*(it.ls||0);
+          if(stroke)g.strokeText(ch,x+w/2,cy);else g.fillText(ch,x+w/2,cy);
+          x+=w;
         });
       });
     });
@@ -813,27 +850,39 @@ function textBox(it){
 }
 let _mc=null;
 function mCtx(){if(!_mc){_mc=document.createElement('canvas').getContext('2d');}return _mc;}
+/* 結合したアイテムは形を複数持つ（subs）。描画も当たり判定もこれで回す */
+function polysOf(it){
+  const head=it.type==='brush'?it.pts:it.poly;
+  return [head||[]].concat(it.subs||[]).filter(p=>p&&p.length);
+}
 /* ---- ベクターブラシ（点列＋点ごとの太さ。丸を繋ぐ＝入り抜きが素直に出る） ---- */
 function drawBrush(g,it){
-  const p=it.pts;if(!p||!p.length)return;
+  const strokes=polysOf(it);if(!strokes.length)return;
   g.globalAlpha=clamp(it.opacity===undefined?1:it.opacity,0,1);
-  g.fillStyle=it.color;
-  if(it.fill&&p.length>2){pathPoly(g,p);g.fill();}      // 囲った中を塗る
-  if(p.length===1){g.beginPath();g.arc(p[0].x,p[0].y,Math.max(0.5,it.lw*(p[0].w||1)/2),0,TAU);g.fill();return;}
-  for(let i=0;i<p.length-1;i++){
-    const a=p[i],b=p[i+1];
-    const ra=Math.max(0.5,it.lw*(a.w||1)/2), rb=Math.max(0.5,it.lw*(b.w||1)/2);
-    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy);
-    if(L>0.01){
-      const nx=-dy/L, ny=dx/L;
-      g.beginPath();
-      g.moveTo(a.x+nx*ra,a.y+ny*ra);g.lineTo(b.x+nx*rb,b.y+ny*rb);
-      g.lineTo(b.x-nx*rb,b.y-ny*rb);g.lineTo(a.x-nx*ra,a.y-ny*ra);
-      g.closePath();g.fill();
-    }
-    g.beginPath();g.arc(b.x,b.y,rb,0,TAU);g.fill();     // 継ぎ目の丸
-  }
-  g.beginPath();g.arc(p[0].x,p[0].y,Math.max(0.5,it.lw*(p[0].w||1)/2),0,TAU);g.fill();
+  /* 同じ形を「太らせた色」で1回、そのあと本体で1回＝フチ（文字・画像と同じ考え方） */
+  const body=(pad,col)=>{
+    g.fillStyle=col;
+    strokes.forEach(p=>{
+      if(it.fill&&p.length>2){pathPoly(g,p);g.fill();}          // 囲った中を塗る
+      const r=i=>Math.max(0.5,it.lw*(p[i].w||1)/2+pad);
+      if(p.length===1){g.beginPath();g.arc(p[0].x,p[0].y,r(0),0,TAU);g.fill();return;}
+      for(let i=0;i<p.length-1;i++){
+        const a=p[i],b=p[i+1], ra=r(i), rb=r(i+1);
+        const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy);
+        if(L>0.01){
+          const nx=-dy/L, ny=dx/L;
+          g.beginPath();
+          g.moveTo(a.x+nx*ra,a.y+ny*ra);g.lineTo(b.x+nx*rb,b.y+ny*rb);
+          g.lineTo(b.x-nx*rb,b.y-ny*rb);g.lineTo(a.x-nx*ra,a.y-ny*ra);
+          g.closePath();g.fill();
+        }
+        g.beginPath();g.arc(b.x,b.y,rb,0,TAU);g.fill();          // 継ぎ目の丸
+      }
+      g.beginPath();g.arc(p[0].x,p[0].y,r(0),0,TAU);g.fill();
+    });
+  };
+  if(it.edge&&it.edge.on&&it.edge.w>0)body(it.edge.w,it.edge.color);
+  body(0,it.color);
 }
 function drawTone(g,it){
   g.beginPath();g.rect(-it.w/2,-it.h/2,it.w,it.h);g.clip();
@@ -1133,13 +1182,14 @@ function render(){
     cx.strokeStyle='#FFD27A';cx.lineWidth=Math.max(2/view.z,PAPER.w*0.0012);
     cx.setLineDash([12/view.z,8/view.z]);
     pathPoly(cx,lasso.pts);cx.stroke();cx.setLineDash([]);
-    cx.fillStyle=(lasso.color==='#FFFFFF'||!lasso.color)?'rgba(255,255,255,.45)':'rgba(0,0,0,.35)';cx.fill();
+    cx.fillStyle=lasso.erase?'rgba(255,79,168,.22)'
+      :((lasso.color==='#FFFFFF'||!lasso.color)?'rgba(255,255,255,.45)':'rgba(0,0,0,.35)');cx.fill();
     cx.restore();
   }
   /* ブラシの途中経過（確定後とまったく同じ描き方＝出来上がりが読める） */
   if(stroke&&stroke.pts.length){
     cx.save();
-    drawBrush(cx,{pts:stroke.pts,lw:gBrushLw,color:gBrushColor,opacity:1,fill:false});
+    drawBrush(cx,{type:'brush',pts:stroke.pts,subs:[],lw:gBrushLw,color:gBrushColor,opacity:1,fill:false});
     cx.restore();
   }
   /* 選択素材 */
@@ -1170,9 +1220,9 @@ function itemBounds(it){
   if(it.type==='img'){const im=MATIMG[it.srcId];const s=it.scale||1;
     return im&&im.width?{w:im.width*s,h:im.height*s}:{w:200,h:200};}
   if(it.type==='white'||it.type==='brush'){
-    const p=it.type==='brush'?it.pts:it.poly;
-    if(!p||!p.length)return{w:100,h:100};
-    const b=polyBounds(p), pad=it.type==='brush'?(it.lw||10):0;
+    const all=[].concat(...polysOf(it));
+    if(!all.length)return{w:100,h:100};
+    const b=polyBounds(all), pad=it.type==='brush'?(it.lw||10)+((it.edge&&it.edge.on)?it.edge.w*2:0):0;
     return{w:Math.max(b.w+pad,20),h:Math.max(b.h+pad,20)};}
   if(it.type==='text')return textBox(it);
   return{w:it.w,h:it.h};
@@ -1200,7 +1250,10 @@ function updateStatus(){
       :'ドラッグで投げ縄→離すと白でかぶさります（EDITをWクリックで線編集に戻る）'),
     text:'置きたい所をクリック→右の◆Itemsに打つ（'+(textVert?'縦書き':'横書き')+'）。文字をクリックすると編集に戻ります',
     brush:'ドラッグで手描き線（'+(brushPress?'筆圧あり・ペン軸のみ':'均一な太さ')+'）。描き始めに戻ると囲んだ中を塗ります',
-    white:'ドラッグで投げ縄→離すと'+(whiteColor==='#FFFFFF'?'白でかぶさります':'黒で塗ります')+'（Wクリックで白⇔黒）'};
+    white:whiteErase
+      ?'ドラッグで投げ縄→離すと囲った中の絵が消えます（長押しで塗りに戻る）'
+      :'ドラッグで投げ縄→離すと'+(gWhiteColor==='#FFFFFF'?'白でかぶさります':'その色で塗ります')
+        +'（色は下のチップ／長押しで透明消し）'};
   $('#bb-hint').textContent=H[tool]||'';
 }
 
@@ -1299,7 +1352,7 @@ function syncToolLabels(){
   $('#t-edit-lb').textContent=editMode==='line'?'線':'白';
   $('#t-text-lb').textContent=textVert?'縦':'横';
   $('#t-brush-lb').textContent=brushPress?'筆圧':'均一';
-  $('#t-white-lb').textContent=whiteColor==='#FFFFFF'?'白':'黒';
+  $('#t-white-lb').textContent=whiteErase?'消':(gWhiteColor==='#FFFFFF'?'白':'色');
 }
 /* iPadは dblclick が飛ばないことがあるので、タッチのダブルタップも自前で拾う
    （animator-brush-ops スキルの正準。350ms/28px。両方から来ても1回しか効かせない） */
@@ -1346,9 +1399,23 @@ function toggleBrushPress(){
   brushPress=!brushPress;syncToolLabels();
   toast(brushPress?'ブラシ: 筆圧あり（ペンのみ）':'ブラシ: 均一な太さ');
 }
-function toggleWhiteColor(){
-  whiteColor=whiteColor==='#FFFFFF'?'#000000':'#FFFFFF';syncToolLabels();
-  toast(whiteColor==='#FFFFFF'?'投げ縄: 白でかぶせる':'投げ縄: 黒で塗る');
+/* 長押し＝透明消し（ANIMATOR の FILL長押しと同じ手ぐせ）。もう一度長押しで塗りに戻る */
+function toggleWhiteErase(){
+  whiteErase=!whiteErase;syncToolLabels();render();
+  toast(whiteErase?'投げ縄: 透明消し（囲った中の絵を消す）':'投げ縄: 塗り（下の色チップの色でかぶせる）');
+}
+/* 長押し。クリック/Wクリックとは独立に張る（500ms/12px＝animator と同じ数値） */
+function onLongPress(el,handler,ms){
+  if(!el)return;
+  let timer=null,sx=0,sy=0;
+  const clear=()=>{if(timer){clearTimeout(timer);timer=null;}};
+  el.addEventListener('pointerdown',e=>{
+    if(e.button!==undefined&&e.button!==0)return;
+    sx=e.clientX;sy=e.clientY;clear();
+    timer=setTimeout(()=>{timer=null;handler(e);},ms||500);
+  });
+  el.addEventListener('pointermove',e=>{if(timer&&Math.hypot(e.clientX-sx,e.clientY-sy)>12)clear();});
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,clear));
 }
 $('#t-sel').addEventListener('click',()=>setTool('sel'));
 onDoubleActivate($('#t-sel'),toggleSelMode);
@@ -1360,7 +1427,7 @@ onDoubleActivate($('#t-text'),toggleTextVert);
 $('#t-brush').addEventListener('click',()=>setTool('brush'));
 onDoubleActivate($('#t-brush'),toggleBrushPress);
 $('#t-white').addEventListener('click',()=>setTool('white'));
-onDoubleActivate($('#t-white'),toggleWhiteColor);
+onLongPress($('#t-white'),toggleWhiteErase);
 $('#dm-v').addEventListener('click',()=>{setDivMode('v');setTool('div');});
 $('#dm-h').addEventListener('click',()=>{setDivMode('h');setTool('div');});
 $('#dm-f').addEventListener('click',()=>{setDivMode('f');setTool('div');});
@@ -1377,13 +1444,17 @@ function panelAt(pg,x,y){
   for(let i=pg.panels.length-1;i>=0;i--)if(pointInPoly(dispPoly(pg.panels[i]),x,y))return pg.panels[i];
   return null;
 }
+function itemHit(it,x,y){
+  const b=itemBounds(it), a=-(it.rot||0)*Math.PI/180;
+  const dx=x-it.x,dy=y-it.y;
+  const lx=dx*Math.cos(a)-dy*Math.sin(a), ly=dx*Math.sin(a)+dy*Math.cos(a);
+  return Math.abs(lx)<=b.w/2&&Math.abs(ly)<=b.h/2;
+}
 function itemAt(pg,x,y){
   for(let i=pg.items.length-1;i>=0;i--){
-    const it=pg.items[i];if(!it.visible)continue;
-    const b=itemBounds(it), a=-(it.rot||0)*Math.PI/180;
-    const dx=x-it.x,dy=y-it.y;
-    const lx=dx*Math.cos(a)-dy*Math.sin(a), ly=dx*Math.sin(a)+dy*Math.cos(a);
-    if(Math.abs(lx)<=b.w/2&&Math.abs(ly)<=b.h/2)return it;
+    const it=pg.items[i];
+    if(!it.visible||it.locked)continue;      // ロック中は掴めない（リストからは選べる）
+    if(itemHit(it,x,y))return it;
   }
   return null;
 }
@@ -1414,12 +1485,51 @@ const tPts=new Map();          // pointerId → {x,y}（画面座標）
 let gestureLock=false, pinch=null;
 function cancelGestures(){drag=null;lasso=null;stroke=null;divPreview=null;}
 const PINCH_SETTLE=80, PINCH_SLOP=16;   // 指が落ち着くまでの猶予ms / 効き始める移動量px
+/* iPad: 素材の上で2本指＝その素材の拡大縮小＋移動 ／ 余白で2本指＝視点のズーム＋パン
+   （OBAN と同じ「指を置いた瞬間の中点で対象を決め打ち」。途中で切り替わらないので迷わない） */
+const PINCH_SCALABLE={img:1,text:1,focus:1,stream:1,frame:1,brush:1,white:1};   // tone は除外（網の間隔が変わるとモアレる）
+function pinchTargetAt(mx,my){
+  if(!BOOK||tool!=='sel')return null;
+  const w=s2w(mx*DPR,my*DPR), pg=curPage();
+  const px=w.x-curOx(), py=w.y;
+  const hit=(selItem&&!selItem.locked&&itemHit(selItem,px,py))?selItem
+           :(selMode==='item'?itemAt(pg,px,py):null);
+  if(!hit)return null;
+  if(hit.type==='tone'){toast('トーンはピンチで拡縮しません（網の間隔が変わるとモアレます。W/H で調整）');return null;}
+  return PINCH_SCALABLE[hit.type]?hit:null;
+}
+function pinchBase(it){
+  const b={x:it.x,y:it.y};
+  ['scale','size','r0','r1','w','h','lw'].forEach(k=>{if(typeof it[k]==='number')b[k]=it[k];});
+  if(it.edge)b.edgeW=it.edge.w;
+  if(it.type==='brush'||it.type==='white')
+    b.polys=polysOf(it).map(p=>p.map(q=>({x:q.x,y:q.y,w:q.w})));
+  return b;
+}
+/* 基準（指を置いた瞬間）からの絶対値で書き戻す＝何度動かしてもズレが溜まらない */
+function applyPinchScale(it,b,r,dx,dy){
+  it.x=Math.round(b.x+dx);it.y=Math.round(b.y+dy);
+  const S=(k,mn)=>{if(typeof b[k]==='number')it[k]=Math.max(mn,Math.round(b[k]*r));};
+  if(it.type==='img')it.scale=clamp(b.scale*r,0.02,40);
+  else if(it.type==='text')S('size',6);
+  else if(it.type==='focus'){S('r0',0);S('r1',10);S('lw',1);}
+  else if(it.type==='stream'||it.type==='frame'){S('w',10);S('h',10);S('lw',1);}
+  else if(it.type==='brush'||it.type==='white'){
+    S('lw',1);
+    const all=b.polys.map(pp=>pp.map(q=>({x:q.x*r,y:q.y*r,w:q.w})));
+    if(it.type==='brush')it.pts=all[0];else it.poly=all[0];
+    it.subs=all.slice(1);
+  }
+  if(it.edge&&typeof b.edgeW==='number')it.edge.w=Math.max(1,Math.round(b.edgeW*r));
+}
 function pinchStart(){
   const a=[...tPts.values()];if(a.length<2)return;
   const r=cvs.getBoundingClientRect();
+  const mx=(a[0].x+a[1].x)/2-r.left, my=(a[0].y+a[1].y)/2-r.top;
+  const target=pinchTargetAt(mx,my);
   pinch={d0:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1,
-         mx:(a[0].x+a[1].x)/2-r.left,my:(a[0].y+a[1].y)/2-r.top,
-         z0:view.z,vx:view.x,vy:view.y,on:false,t0:performance.now()};
+         mx:mx,my:my,z0:view.z,vx:view.x,vy:view.y,on:false,t0:performance.now(),
+         item:target,base:target?pinchBase(target):null};
 }
 /* 2本指ピンチ＝ズーム＋パン（指の中点を画面に貼り付けたまま拡縮） */
 function pinchMove(){
@@ -1437,7 +1547,13 @@ function pinchMove(){
     if(Math.abs(d-pinch.d0)<PINCH_SLOP&&Math.hypot(mx-pinch.mx,my-pinch.my)<PINCH_SLOP)return;
   }
   pinch.on=true;
-  const z=clamp(pinch.z0*(d/pinch.d0),0.005,4);
+  const rr=d/pinch.d0;
+  if(pinch.item){                       // 素材の上＝その素材を拡縮＋移動（視点は動かさない）
+    if(selItem!==pinch.item){selItem=pinch.item;selPanel=null;renderItemList();renderItemParams();}
+    applyPinchScale(pinch.item,pinch.base,rr,(mx-pinch.mx)/view.z,(my-pinch.my)/view.z);
+    commitD();return;
+  }
+  const z=clamp(pinch.z0*rr,0.005,4);
   const Cx=cvs.width/(2*DPR), Cy=cvs.height/(2*DPR);
   view.z=z;
   view.x=(mx-Cx)/z-(pinch.mx-Cx)/pinch.z0+pinch.vx;
@@ -1482,7 +1598,9 @@ cvs.addEventListener('pointerdown',ev=>{
   /* 投げ縄ホワイト = 専用ツール（W）／ EDIT の Wクリック、どちらからでも同じ動き */
   if(tool==='white'||(tool==='edit'&&editMode==='white')){
     const k=panelAt(pg,p.x,p.y);
-    lasso={pts:[{x:p.x,y:p.y}],panelId:k?k.id:null,color:tool==='white'?whiteColor:'#FFFFFF'};
+    lasso={pts:[{x:p.x,y:p.y}],panelId:k?k.id:null,
+           color:tool==='white'?gWhiteColor:'#FFFFFF',
+           erase:tool==='white'&&whiteErase};
     drag={t:'lasso'};render();return;
   }
 
@@ -1504,7 +1622,7 @@ cvs.addEventListener('pointerdown',ev=>{
     const k=panelAt(pg,p.x,p.y);
     selPanel=k;                                     // addItem がコマ割当と初期位置に使う
     const nt=addItem('text');
-    nt.x=Math.round(p.x);nt.y=Math.round(p.y);nt.vertical=textVert;
+    nt.x=Math.round(p.x);nt.y=Math.round(p.y);nt.vertical=textVert;nt.color=gTextColor;
     commit();renderItemParams();focusTextArea();
     drag={t:'none'};return;
   }
@@ -1585,7 +1703,10 @@ cvs.addEventListener('pointermove',ev=>{
 function touchEnd(ev){
   if(ev.pointerType!=='touch')return false;
   tPts.delete(ev.pointerId);
-  if(tPts.size<2)pinch=null;
+  if(tPts.size<2){
+    if(pinch&&pinch.on&&pinch.item)commit();   // 素材の拡縮を1手として履歴に積む
+    pinch=null;
+  }
   else if(tPts.size===2)pinchStart();       // 3本→2本に戻ったら、今の指で取り直してピンチ再開
   if(tPts.size)return true;                 // まだ指が残っている
   const was=gestureLock;gestureLock=false;
@@ -1603,19 +1724,19 @@ cvs.addEventListener('pointerup',ev=>{
     return;
   }
   if(drag&&drag.t==='lasso'&&lasso){
-    const pts=lasso.pts, pid=lasso.panelId, col=lasso.color||'#FFFFFF';
+    const pts=lasso.pts, pid=lasso.panelId, col=lasso.color||'#FFFFFF', er=!!lasso.erase;
     lasso=null;drag=null;
     if(pts.length>2&&polyArea(pts)>minArea()){
       const b=polyBounds(pts);
       const pg=curPage();
       const it=Object.assign({id:uid('i_'),type:'white',visible:true,panelId:pid,
-          name:(col==='#FFFFFF'?'WHITE ':'FILL ')+(pg.items.length+1)},
+          name:(er?'ERASE ':col==='#FFFFFF'?'WHITE ':'FILL ')+(pg.items.length+1)},
         JSON.parse(JSON.stringify(defaultsFor('white',PAPER.bas))));
-      it.x=Math.round(b.cx);it.y=Math.round(b.cy);it.color=col;
+      it.x=Math.round(b.cx);it.y=Math.round(b.cy);it.color=col;it.erase=er;
       it.poly=pts.map(q=>({x:q.x-b.cx,y:q.y-b.cy}));
       pg.items.push(it);selItem=it;selPanel=null;
       commit();renderItemList();renderItemParams();renderPanelSec();
-      toast(col==='#FFFFFF'?'ホワイトをかぶせました（◆Items で色や不透明度を変更できます）':'塗りました');
+      toast(er?'囲った中の絵を消しました':(col==='#FFFFFF'?'ホワイトをかぶせました（◆Items で色や不透明度を変更できます）':'塗りました'));
     }else render();
     return;
   }
@@ -1848,18 +1969,52 @@ function startRename(row,it){
   inp.addEventListener('blur',()=>fin(true));
 }
 let rowDrag=null;
+/* 下（背面側）の1つと結合できるか。ペンとホワイトだけ・同じコマ・同じ種類 */
+function mergeTargetOf(it){
+  const pg=curPage(), i=pg.items.indexOf(it);
+  if(i<1)return null;
+  if(it.type!=='brush'&&it.type!=='white')return null;
+  const o=pg.items[i-1];
+  if(!o||o.type!==it.type||o.panelId!==it.panelId)return null;
+  if(!!o.erase!==!!it.erase)return null;                    // 塗りと透明消しは混ぜない
+  return o;
+}
+/* 下の1つと合成（Photoshop の「下のレイヤーと結合」と同じ手ざわり）。
+   形は座標を上の子の原点に揃えて subs へ足す。色・太さは上（選んだ方）に合わせる */
+function mergeDown(it){
+  const pg=curPage(), o=mergeTargetOf(it);
+  if(!o){toast('下に結合できる同じ種類の'+(it.type==='brush'?'ペン':'ホワイト')+'がありません');return;}
+  const shift=p=>p.map(q=>Object.assign({},q,{x:q.x+o.x-it.x,y:q.y+o.y-it.y}));
+  it.subs=(it.subs||[]).concat(polysOf(o).map(shift));
+  pg.items=pg.items.filter(x=>x!==o);
+  selItem=it;
+  commit();renderItemList();renderItemParams();
+  toast('結合しました（形 '+polysOf(it).length+'本）');
+}
 function renderItemList(){
   const pg=curPage(), box=$('#item-list');box.innerHTML='';
   if(!pg.items.length){box.innerHTML='<div class="note">まだ素材がありません。<br>コマを選んでから追加すると、そのコマの中に入ります。</div>';return;}
   /* 表示は前面が上。ドラッグの並べ替えもこの見た目どおりに動かす */
+  let prevPin=null;
   [...pg.items].reverse().forEach(it=>{
-    const row=document.createElement('div');
-    row.className='el-row'+(it===selItem?' sel':'');
     const kIdx=it.panelId?(pg.panels.findIndex(k=>k.id===it.panelId)+1):0;
+    /* コマが変わる所に線を入れる（グループにはしない。どのコマの素材かが目で追えれば十分） */
+    if(prevPin===null||prevPin!==kIdx){
+      const sep=document.createElement('div');sep.className='el-sep';
+      sep.innerHTML='<i></i><span>'+(kIdx?'コマ '+kIdx:'枠の上')+'</span><i></i>';
+      box.appendChild(sep);
+    }
+    prevPin=kIdx;
+    const row=document.createElement('div');
+    row.className='el-row'+(it===selItem?' sel':'')+(it.locked?' lock':'');
+    row.style.borderLeftColor=kIdx?PIN_COLORS[(kIdx-1)%PIN_COLORS.length]:'rgba(255,210,122,.5)';
     row.innerHTML='<span class="el-vis'+(it.visible?'':' off')+'" data-a="vis" title="表示 ON/OFF">'+(it.visible?'◉':'○')+'</span>'
+      +'<span class="el-lk'+(it.locked?' on':'')+'" data-a="lock" title="ロック: キャンバス上で選べなくする（誤って動かさないため）">'+(it.locked?'▪':'▫')+'</span>'
       +'<span class="el-nm" title="Wクリックで名前を変更／つかんで上下に並べ替え">'+esc(it.name)+'</span>'
       +'<span class="el-pin">'+(kIdx?'▣'+kIdx:'上')+'</span>'
       +'<span class="el-ty">'+it.type.toUpperCase()+'</span>'
+      +((it.type==='brush'||it.type==='white')
+         ?'<span class="el-mg'+(mergeTargetOf(it)?'':' off')+'" data-a="merge" title="下の1つと結合（同じコマ・同じ種類のみ）">▼結</span>':'')
       +'<span class="el-ud" data-a="up" title="前面へ">▲</span>'
       +'<span class="el-ud" data-a="dn" title="背面へ">▼</span>'
       +'<span class="el-x" data-a="del" title="この素材を削除">✕</span>';
@@ -1868,6 +2023,9 @@ function renderItemList(){
     row.addEventListener('click',ev=>{
       const a=ev.target.dataset&&ev.target.dataset.a, i=pg.items.indexOf(it);
       if(a==='vis'){it.visible=!it.visible;commit();renderItemList();return;}
+      if(a==='lock'){it.locked=!it.locked;if(it.locked&&selItem===it)selItem=null;
+        commit();renderItemList();renderItemParams();render();return;}
+      if(a==='merge'){mergeDown(it);return;}
       if(a==='up'){if(i<pg.items.length-1){pg.items.splice(i,1);pg.items.splice(i+1,0,it);commit();renderItemList();}return;}
       if(a==='dn'){if(i>0){pg.items.splice(i,1);pg.items.splice(i-1,0,it);commit();renderItemList();}return;}
       if(a==='del'){modalConfirm(it.name+' を削除しますか？',()=>deleteItem(it));return;}
@@ -1876,7 +2034,8 @@ function renderItemList(){
       if(selMode!=='item'){selMode='item';syncToolLabels();}  // リストで選んだら掴める状態にしておく
       renderItemList();renderItemParams();renderPanelSec();render();
     });
-    row.addEventListener('dblclick',ev=>{
+    /* 名前の変更は Wクリック。iPadのダブルタップでも入れるよう共通ヘルパで張る */
+    onDoubleActivate(row,ev=>{
       if(ev.target.dataset&&ev.target.dataset.a)return;
       startRename(row,it);
     });
@@ -1930,6 +2089,11 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function renderItemParams(){
   const box=$('#item-params'), pr=$('#presets');box.innerHTML='';pr.innerHTML='';
   if(!selItem){renderPalette();return;}
+  if(selItem.locked){
+    const w=document.createElement('div');w.className='note';
+    w.innerHTML='▪ <b style="color:var(--gold)">ロック中</b>です。キャンバス上では選べません（リストの錠アイコンで解除）。';
+    box.appendChild(w);
+  }
   const it=selItem;
   /* コマ割当 */
   const pg=curPage();
@@ -2006,9 +2170,36 @@ function renderItemParams(){
     r1.innerHTML='<span class="lb">囲みを塗る</span><button class="btn gold'+(it.fill?' on':'')+'" style="flex:1">'+(it.fill?'塗る':'線だけ')+'</button>';
     r1.querySelector('button').addEventListener('click',()=>{it.fill=!it.fill;commit();renderItemParams();});
     box.appendChild(r1);
-    const r2=document.createElement('div');r2.className='note';
-    r2.innerHTML='太さ・色は<b>次に引く線</b>にも引き継がれます。囲って終わると自動で「塗る」になります。';
+    /* フチ（文字・画像と同じ作り。白フチ＝絵の上の擬音／黒フチ＝白い線の縁取り） */
+    const e=it.edge;
+    const r2=document.createElement('div');r2.className='tr';
+    r2.innerHTML='<span class="lb">フチ</span><button class="btn gold'+(e.on?' on':'')+'" style="flex:1">フチ '+(e.on?'ON':'OFF')+'</button>';
+    r2.querySelector('button').addEventListener('click',()=>{e.on=!e.on;commit();renderItemParams();});
     box.appendChild(r2);
+    const r3=document.createElement('div');r3.className='tr';
+    r3.innerHTML='<span class="lb">フチの太さ</span><input type="range" min="1" max="120" step="1" value="'+e.w+'"'+(e.on?'':' disabled')+'><span class="vv">'+e.w+'</span>';
+    const rg=r3.querySelector('input'),vv=r3.querySelector('.vv');
+    rg.addEventListener('input',()=>{e.w=parseInt(rg.value);vv.textContent=e.w;commitD();});
+    box.appendChild(r3);
+    const r4=document.createElement('div');r4.className='tr';
+    r4.innerHTML='<span class="lb">フチの色</span><button class="btn gold" style="flex:1">'+(e.color==='#FFFFFF'?'白':'黒')+'</button>';
+    r4.querySelector('button').addEventListener('click',()=>{e.color=e.color==='#FFFFFF'?'#000000':'#FFFFFF';commit();renderItemParams();});
+    box.appendChild(r4);
+    const r5=document.createElement('div');r5.className='note';
+    r5.innerHTML='太さ・色は<b>次に引く線</b>にも引き継がれます。囲って終わると自動で「塗る」になります。'
+      +(polysOf(it).length>1?'<br>この線は <b>'+polysOf(it).length+'本</b> を結合したものです。':'');
+    box.appendChild(r5);
+  }
+  if(it.type==='white'){
+    const r1=document.createElement('div');r1.className='tr';
+    r1.innerHTML='<span class="lb">透明消し</span><button class="btn gold'+(it.erase?' on':'')+'" style="flex:1">'+(it.erase?'消す':'塗る')+'</button>';
+    r1.querySelector('button').addEventListener('click',()=>{it.erase=!it.erase;commit();renderItemParams();});
+    box.appendChild(r1);
+    if(polysOf(it).length>1){
+      const r2=document.createElement('div');r2.className='note';
+      r2.innerHTML='<b>'+polysOf(it).length+'本</b>を結合したホワイトです。';
+      box.appendChild(r2);
+    }
   }
   if(it.type==='focus')FOCUS_PRESETS.forEach(([nm,p])=>{
     const c=document.createElement('span');c.className='fp';c.textContent=nm;
@@ -2063,15 +2254,37 @@ function updateCov(){
   if(el&&selItem&&selItem.type==='tone')
     el.textContent=Math.min(100,(Math.PI*Math.pow(selItem.dot/2,2)/Math.pow(selItem.gap,2)*100)).toFixed(0)+'%';
 }
+/* パレットは2役: 素材を選んでいれば その色 ／ 選んでいなければ 道具の「次に置く色」 */
+function toolColorKey(){
+  if(tool==='brush')return 'brush';
+  if(tool==='white')return whiteErase?null:'white';   // 透明消しに色は無い
+  if(tool==='text')return 'text';
+  return null;
+}
+function curToolColor(){const k=toolColorKey();
+  return k==='brush'?gBrushColor:k==='white'?gWhiteColor:k==='text'?gTextColor:null;}
+function setToolColor(col){const k=toolColorKey();
+  if(k==='brush')gBrushColor=col;else if(k==='white')gWhiteColor=col;else if(k==='text')gTextColor=col;
+  syncToolLabels();}
 function renderPalette(){
   const box=$('#palette');box.innerHTML='';
-  if(!selItem||selItem.type==='img')return;
+  const forTool=!selItem&&toolColorKey();
+  if(!forTool&&(!selItem||selItem.type==='img'))return;
+  const cur=forTool?curToolColor():selItem.color;
+  if(forTool){
+    const lb=document.createElement('div');lb.className='note';lb.style.margin='0 0 4px';
+    lb.textContent='次に置く'+(tool==='brush'?'線':tool==='text'?'文字':'ホワイト')+'の色';
+    box.appendChild(lb);
+  }
   MANGA_PAL.forEach(col=>{
-    const sw=document.createElement('span');sw.className='sw'+(selItem.color===col?' sel':'');
+    const sw=document.createElement('span');sw.className='sw'+(cur===col?' sel':'');
     sw.style.background=col;
     sw.addEventListener('click',()=>{
+      if(forTool){setToolColor(col);renderPalette();render();return;}
       selItem.color=col;
       if(selItem.type==='brush')gBrushColor=col;            // 次に引く線にも引き継ぐ
+      if(selItem.type==='white'&&!selItem.erase)gWhiteColor=col;
+      if(selItem.type==='text')gTextColor=col;
       commit();renderPalette();});
     box.appendChild(sw);
   });
@@ -2577,13 +2790,15 @@ const HELP_GROUPS=[
     ['1 / 2 / 3','分割の向き 縦 / 横 / 斜め（既定は斜め）'],
     ['T','<b>文字</b>。置きたい所をクリック→右の欄に打つ。<b>Wクリックで 縦書き⇔横書き</b>'],
     ['B','<b>ブラシ</b>。ベクターの手描き線。<b>Wクリックで 筆圧ON/OFF</b>（既定ON・ペン軸のみ）'],
-    ['W','<b>ホワイト</b>。投げ縄で囲った中を白でかぶせる。<b>Wクリックで 白⇔黒</b>'],
-    ['TAB / ⇄','ツールとパネルの左右入替'],
+    ['W','<b>ホワイト</b>。投げ縄で囲った中をかぶせる。色は下のチップ（既定=白）。<b>長押しで 透明消し</b>'],
+    ['TAB / ⇄','ツールとパネルの左右入替（<b>⇄</b> はレールの一番上）'],
   ]],
   ['文字・ブラシ・ホワイト（新しい3つ）',[
     ['文字','書体は<b>アンチック体</b>（しっぽりアンチック）。縦書きは改行＝次の列（右から左）。<b>白フチ</b>で絵の上でも読める'],
     ['ブラシ','ドラッグで線。<b>描き始めに戻ると「囲った」とみなして中を塗る</b>。太さ・色は次の線にも引き継ぐ'],
-    ['ホワイト','ドラッグで投げ縄。EDITのWクリック（線⇔白）からも同じことができる'],
+    ['ホワイト','ドラッグで投げ縄。EDITのWクリック（線⇔白）からも同じ。<b>長押し＝透明消し</b>（囲った中の絵が消える）'],
+    ['色の選び方','<b>何も選んでいないとき</b>の下の色チップ＝「次に置くものの色」。素材を選んでいるとその素材の色'],
+    ['フチ','文字・ペンの両方に付けられる（白フチ＝絵の上でも読める／黒フチ＝白い線の縁取り）'],
     ['重なり','この3つは<b>いつも一番上</b>。トーン・集中線・流線は<b>乗算</b>なので、下の線画を塗り潰さない'],
   ]],
   ['コマを割る（DIV）',[
@@ -2606,6 +2821,10 @@ const HELP_GROUPS=[
     ['↑ / ↓','リストの素材を順に選択（<b>Shift</b>で先頭／末尾へ）'],
     ['Ctrl+↑ / ↓','<b>選択した素材を前後に動かす</b>（<b>Shift</b>併用で最前面／最背面）＝AE・COMPOSERと同じ'],
     ['つかんで上下','リストの行を直接ドラッグしても並べ替えできる'],
+    ['Wクリック','行の名前を変更（iPadはダブルタップ）'],
+    ['錠アイコン','<b>ロック</b>＝キャンバス上で選べなくする（誤って動かさないため。リストからは選べる）'],
+    ['▼結','<b>下の1つと結合</b>（ペン・ホワイトのみ／同じコマ・同じ種類）。結合後もまとめて動かせる'],
+    ['区切り線','リストは<b>コマごとに線と色帯</b>で仕切ってある（並び順＝重なり順はそのまま）'],
     ['DEL','選択中の素材／コマを削除'],
     ['配置','「コマNの中」＝マスクされて枠の下 ／「上に乗せる」＝枠の上（擬音）'],
     ['境界効果','擬音などのアルファに白フチ。フチONのときだけ太さが効く'],
@@ -2621,7 +2840,7 @@ const HELP_GROUPS=[
   ]],
   ['iPad（他ツールと同じ）',[
     ['1本指','ドラッグ＝コマ選択・分割・投げ縄／余白ドラッグ＝パン'],
-    ['2本指','ピンチ＝ズーム＋パン'],
+    ['2本指','余白＝ズーム＋パン ／ <b>素材の上＝その素材の拡大縮小＋移動</b>（トーンを除く）'],
     ['2本指タップ','UNDO（元に戻す）'],
     ['3本指タップ','REDO（やり直し）'],
     ['—','スライダーは指の当たり判定を広げてあります（見た目より上下に余裕あり）'],
@@ -2667,17 +2886,19 @@ $('#help-ovl').addEventListener('click',e=>{if(e.target===$('#help-ovl'))toggleH
 
 /* ===== 全画面表示（animator と同じ実装。iPhone Safari は非対応なので隠す）===== */
 (function(){
-  const btn=$('#btn-fullscreen'), root=document.documentElement;
+  /* トップバーの ⛶ と、レール上の小さい ⛶ は同じ動きにする（手が近い方を使えるように） */
+  const btns=[$('#btn-fullscreen'),$('#btn-fs2')].filter(Boolean), root=document.documentElement;
+  const btn=btns[0];
   const canFS=!!(root.requestFullscreen||root.webkitRequestFullscreen||document.body.webkitRequestFullscreen);
-  if(!canFS){btn.style.display='none';return;}
+  if(!canFS){btns.forEach(b=>b.style.display='none');return;}
   const isFS=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
   function syncFS(){
     const on=isFS();
-    btn.classList.toggle('on',on);
-    btn.title=on?'全画面を解除（Escでも解除）':'全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）';
+    btns.forEach(b=>{b.classList.toggle('on',on);
+      b.title=on?'全画面を解除（Escでも解除）':'全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）';});
     setTimeout(setupCanvas,120);
   }
-  btn.addEventListener('click',async()=>{
+  const toggle=async()=>{
     try{
       if(isFS()){
         if(document.exitFullscreen)await document.exitFullscreen();
@@ -2688,7 +2909,8 @@ $('#help-ovl').addEventListener('click',e=>{if(e.target===$('#help-ovl'))toggleH
         else if(document.body.webkitRequestFullscreen)document.body.webkitRequestFullscreen();
       }
     }catch(e){}
-  });
+  };
+  btns.forEach(b=>b.addEventListener('click',toggle));
   document.addEventListener('fullscreenchange',syncFS);
   document.addEventListener('webkitfullscreenchange',syncFS);
 })();

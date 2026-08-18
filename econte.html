@@ -3994,8 +3994,42 @@ function gridStrokeTo(cell, cx, cy){
   gStrokeK = strokeScaleFor(cut, col.width, camStartFrame(cut, cell.k));
   strokeSegOn(cut, col, prev, p);
   cut.thumb = null;
+  const first = !g.last;
   g.last = { key, p };
-  refreshGridCells(cell.i, false);                   // 同じカットの別セルにも出る（色帯は pen-up で）
+  // 引いている最中は区間を重ねるだけ（上の previewSegOnCell 参照）。
+  // 兄弟セル（同じカットの A/B）・色帯・正確な合成は gridStrokeUp でまとめて追いつかせる
+  if(state.etool === 'eraser' || first) drawCellSoon(cell);
+  else previewSegOnCell(cell, prev, p);
+}
+/* --- ストローク中の速い見え方（2026-08-18） ---
+   セルを1枚描き直すには plate を丸ごと GPU へ上げ直す必要がある。plate は
+   ベイク×0.4（最大1024×577）まで大きくなったので、**1move あたり 1.6ms** かかっていた
+   （旧「枠ごと512×288」は 0.10ms。実測で16倍の回帰）。
+   引いている最中は **いま引いた1区間だけセルに重ねれば見え方は足りる**ので、
+   plate の描き写しをやめて 0.02ms にする。ペンを離した瞬間に drawCell で
+   ちゃんと合成し直すので、重なりの濃度が僅かに違う程度の近似は残らない。
+   消しゴムは「重ねて」表現できない（下の絵ごと抜けてしまう）ので従来どおり描き直す。 */
+function previewSegOnCell(cell, a, b){
+  const cut = cuts[cell.i], p = cut && cut.plateC;
+  if(!p){ drawCell(cell); return; }
+  const k = plateScale(cut);
+  const src = camSrcRect(cut, camStartFrame(cut, cell.k));
+  const sx = src ? src.sx * k : 0, sy = src ? src.sy * k : 0;
+  const sw = src ? src.sw * k : p.width, sh = src ? src.sh * k : p.height;
+  const fx = cell.cv.width / Math.max(1, sw), fy = cell.cv.height / Math.max(1, sh);
+  const ctx = ctx2d(cell.cv);
+  ctx.save();
+  ctx.globalAlpha = clamp(gPaint.colorAlpha, 0, 1);
+  ctx.globalCompositeOperation = gPaint.colorBlend || 'multiply';
+  ctx.strokeStyle = state.fillColor;
+  ctx.lineWidth = Math.max(0.5, state.brush * gStrokeK * gStrokePress) * fx;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo((a.x - sx) * fx, (a.y - sy) * fy);
+  ctx.lineTo((b.x - sx) * fx + (a.x === b.x && a.y === b.y ? 0.01 : 0), (b.y - sy) * fy);
+  ctx.stroke();
+  ctx.restore();
 }
 function gridStrokeMove(e){
   if(!gGridStroke || e.pointerId !== gGridStroke.id) return;
@@ -4023,6 +4057,7 @@ function gridStrokeUp(e){
                  undo(){ entries.forEach(en => put(en.cut, en.before)); renderGridTouched(entries); },
                  redo(){ entries.forEach(en => put(en.cut, en.after)); renderGridTouched(entries); } });
   entries.forEach(en => refreshRow(cuts.indexOf(en.cut)));
+  entries.forEach(en => refreshGridCells(cuts.indexOf(en.cut), false));   // A/B の兄弟セルをここで一致させる
   gGridRows.forEach(drawRowPalette);
   // **またいだセルを全部「選択中」にする**（2026-08-14）。
   // 濃・描画モードは全体設定になった（SPEC_15 P3-1）が、REF濃度と並べ替えは今も選択単位
@@ -4767,9 +4802,29 @@ function bindTouchEyedrop(cv){
 /* --- paint pointers（EDITキャンバスとTIMELINEプレビューで共用） --- */
 let stroking = false, strokeLast = null, paintCv = null;
 function renderPaintViews(){
-  if(state.view === 'edit' && gEditMode === 'grid'){ refreshGridCells(state.curCut); return; }
+  // 引いている最中は色帯を作らない（1セルごとに getImageData が走るので、線1本ぶんで効いてくる）
+  if(state.view === 'edit' && gEditMode === 'grid'){ refreshGridCells(state.curCut, !stroking); return; }
   if(state.view === 'studio') renderTL();
   else renderEditCanvas();
+}
+/* --- 引いている最中の描き直しは「1フレーム1回」に間引く（2026-08-18） ---
+   ペンは 120〜240Hz で来るが画面は 60Hz しか出ない。毎イベント描き直すと、
+   **見えない描き直しに時間を使ったぶんだけペンが遅れる**（大判カットの線画は
+   1回 2.8〜19.9ms かかるので、これが「描き味が詰まる」の正体）。
+   引き終わり（paintUp / lassoEnd）は従来どおり同期で描き直すので、最終結果は変わらない。
+   ※ lassoPreview は「描き直してから輪郭を重ねる」順序に依存しているので同期のまま。 */
+let gPaintViewT = 0;
+function renderPaintViewsSoon(){
+  if(gPaintViewT) return;
+  gPaintViewT = requestAnimationFrame(() => { gPaintViewT = 0; renderPaintViews(); });
+}
+/* 消しゴムは「重ねて」表現できない（下の絵ごと抜ける）のでセルを描き直すしかない。
+   こちらも1フレーム1回に間引く。 */
+let gCellT = 0, gCellPend = null;
+function drawCellSoon(cell){
+  gCellPend = cell;
+  if(gCellT) return;
+  gCellT = requestAnimationFrame(() => { gCellT = 0; if(gCellPend) drawCell(gCellPend); });
 }
 function paintDown(e, cv){
   if(e.pointerType === 'mouse' && e.button !== 0) return;
@@ -4817,7 +4872,7 @@ function paintMove(e){
   gStrokePress = pressFactor(e);
   strokeSeg(strokeLast, p);
   strokeLast = p;
-  renderPaintViews();
+  renderPaintViewsSoon();   // 60Hzに間引く（引き終わりに paintUp が同期で描き直す）
 }
 function paintUp(){
   if(gLasso){ lassoEnd(); paintCv = null; return; }
@@ -4826,6 +4881,8 @@ function paintUp(){
   stroking = false;
   gStrokePress = 1;
   endPaintUndo();
+  renderPaintViews();                            // 間引いた最後の1回を確実に反映させる
+  if(inGrid()) refreshGridCells(state.curCut);   // ストローク中に省いた色帯をここで作る
   refreshRow(state.curCut);   // 右パネルのサムネを更新
   scheduleSave();
 }
