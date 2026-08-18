@@ -640,7 +640,28 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
     **行間・列間・色帯のON/OFFをそのまま反映**。色帯は GRID と同じ「行に1本」にした
     （以前はセルごとに敷いていて形が違った）
 
-- **未着手は V2-E3 のみ**（フォトバッシュ・SINGLE限定）。他のフェーズは全部入っている
+- **V3-P1: 実装済み（2026-08-18・SPEC_15 P1＋P3-1）** — **カラー層をカット1枚に一本化**。
+  「SINGLEでLineに描いたペイントはT.U.に追従するのに、colorに描いたペイントはフェードで変わる」
+  という観察が出発点。原因は同期漏れではなく **色だけレンズの前（出力枠にベタ置き）に居た**こと。
+
+  | | 変えたこと | 要点（次に触る人向け） |
+  |---|---|---|
+  | 1 | `cut.colors[]`（枠ごと・出力枠512×288）→ **`cut.plateC`（カット1枚・ベイク空間）** | `PLATE_K = 512/1280 = 0.4`／長辺 `PLATE_MAX 1024` で頭打ち。**LRUには載せない**のは旧実装と同じ（上限があるので常駐で持てる） |
+  | 2 | 倍率は必ず **`plateScale(cut)`** を通す | `PLATE_MAX` で頭打ちしたカットは 0.4 ではない（実測 0.392）。生の `PLATE_K` で座標を作ると寄ったカットだけズレる |
+  | 3 | `camSrcRect(cut,f)` を新設 | base / 色 / line の3層が**同じ切り出し矩形**を共有する＝ズレようがない。`drawCamFrame` と `drawCell`（非常駐の控え）が使う |
+  | 4 | `drawPlateLayer(ctx,cut,src,dw,dh)` | `drawBaseLayer` と同じ形。**濃と描画モードはここで1回だけ**掛かる |
+  | 5 | **`remapPlate`** を `rebakeFromCam` に追加 | 旧実装は出力枠固定だったので不要だった。色も紙の上に来た以上、`remapDraw` と同じ載せ替えが要る（**入れ忘れると枠を動かしただけで色がズレる**） |
+  | 6 | ブラシが line と同じ物差しに | `gStrokeK = strokeScaleFor(...)` 一本。GRIDのセルは `camStartFrame(cut,cell.k)` を渡す＝**A枠で描いてもB枠で描いても画面上6px** |
+  | 7 | 濃・描画モードを **全体設定 `gPaint`** へ（P3-1） | `UI_LS` ＋ PROJECT ZIP `meta.paint`。`eachSelSlot` は削除。パネル見出しに「全体設定」と明記 |
+  | 8 | 移行 | `plate` が無く `colors[]` がある記録は**1回だけ**変換。旧 `drawColorPlate()` が SINGLE に出していた絵そのもの（k昇順で重ねる＝後の枠が上）。per-slot の濃は**最頻値**を全体設定に採用し、件数をトーストで出す |
+  | 9 | PROJECT ZIP `ver:3` | `cuts/<id>.plate.png` ＋ `meta.paint`。`ver:2` 以前も同じ変換を通して読める |
+  | 10 | 消えたもの | `colorMixAt` / `drawColorFrame` / `drawColorPlate` / `bakeToColorCoord` / `frameAtBake` / `plateStrokeSeg` / `gPlateMode` / `strokeCoord` / `eachSelSlot` / `paintSnap` の `{all:[…]}` 分岐 / `clearDraw` の `wide` 分岐 |
+
+  **失ったもの（実装前にユーザー合意済み）**: T.U./PAN の途中で色が変わる演出（A枠=暖色→B枠=寒色）。
+  必要ならカットを2つに割る。GRIDで T.U.カットの A/Bセルは「同じ絵の広い版と寄った版」になる。
+
+- **V3 の未着手は P2（フォトバッシュ）と P3-2〜P3-4**（描く先の固定・ブラシ上限の一本化・ラベル）
+- **旧 V2-E3 の `cut.layers[]` は不採用**（SPEC_15 P2）。フォトバッシュは「浮いた選択」方式で作る
   - `cut.layers[]`（最大5・原本Blob＋アフィン変形＋投げ縄マスク＋ブレンド）
     ＋ブラシチップ（**.abrパーサは作らない**・内蔵数種＋透過PNG読み込み）
   - 着手前に **SPEC_13 §9（画面の役割）を必読**。E3 は **SINGLE 専用**で、
