@@ -32,7 +32,8 @@
   **連携は `tdr_exchange`＋`tdr_live` に相乗りするだけで animator/composer/oban の改修ゼロ**・保存はIndexedDB（dataURLのため）
 - `SPEC_10_ECONTE.md` — プリプロツール仕様（cuts[]単一データ・BOARD/SHEET/TIMELINE設計。P0+P1実装済み、P2=animator連携/カラースクリプト）
 - `SPEC_13_ECONTE_V2.md` — ECONTE V2「STUDIO」仕様（1画面統合・BOARD強化・**大判カメラ枠列＋可変ベイク**・MP4書き出し・カラースクリプト・iPad操作。**V2-A〜D3・E1・E2(a〜d) 実装済み（2026-08-09）／残りは E3 フォトバッシュのみ**）。※§5は2026-07に差し替え済み（旧「のりしろ1.2x固定＋カメラプリセット」は廃止）。**画面の役割（STUDIO=プレビュー+コラージュ／EDIT=単票+カラースクリプト一覧）は §9 で確定済み。着手前に §9 を読む**
-- `SPEC_15_ECONTE_V3.md` — **ECONTE V3「ペイントの一本化」。P1＋P3-1 実装済み（2026-08-18）／残りは P2 と P3-2〜P3-4**。
+- `SPEC_15_ECONTE_V3.md` — **ECONTE V3「ペイントの一本化」。P1＋P3-1 実装済み（2026-08-18）／P3-2〜P3-4 は SPEC_16 §5-B として実装済み／残りは P2（フォトバッシュ）だけ**。
+  ⚠ **P1 の `cut.plateC`（カット1枚）・`plateScale`・`plateSize` は SPEC_16 V4 で撤去済み**。以下は経緯として読むこと。
   P1=カラー層を「枠ごと・出力枠512×288」から**カット1枚・ベイク空間（`cut.plateC`）**へ一本化（line と同じ扱い＝T.U./PANに追従。`colorMixAt`/`drawColorFrame`/`drawColorPlate`/`frameAtBake`/`plateStrokeSeg` は削除済み。**座標は必ず `plateScale(cut)` を通す**——`PLATE_MAX` で頭打ちしたカットは 0.4 ではない）／
   P3-1=濃・描画モードは全体設定 `gPaint`（`UI_LS`＋ZIP `meta.paint`）——**P1で色から per-slot 値が消えるので同時にやるしかない**／
   **未着手**: P2=軽いフォトバッシュ（**`cut.layers[]` は不採用**・浮いた選択方式）／P3-2=描く先を画面で切り替えない／P3-3=ブラシ上限を1つに／P3-4=ラベル。
@@ -41,6 +42,19 @@
   `plateSize()`（P1-2 の寸法規則）もラボ側で先に動いていて、**B枠にちょうど512px当たる**ことを数値で確認済み。
   ラボは `calcBakeSize` / `strokeScaleFor` / `drawCamFrame` を econte から転載しているので、
   **P1 でこれらを変えたらラボ側も直す**（`SPACES_LAB/CLAUDE.md` の転載表を見る）
+- `SPEC_16_ECONTE_V4.md` — **ECONTE V4「枠ごとの画」。§1〜§3＋§5-B＋E1＋§5-C(C1〜C4,C7〜C9) 実装済み（2026-08-18）**。
+  画は **枠（`cam[k]`）ごとに1枚**（`cut.fr[k] = {line 1280×720, plate 512×288, rect}`。`cam[]` と1対1・`ensureFr()` を必ず通す）。
+  写真（`baseC`）だけ全枠で共有。パッチは **紙（ベイク空間）の上に `camBakeRect(cut,k)` の位置で置く**ので
+  T.U./PAN に追従する（V3-P1 の土台のまま＝旧V2のフェードには戻らない）。描画の入口は **`drawPatchStack()` 1本**。
+  **§2a は (b)＋入れ子（T.U./T.B.）のときだけ下を隠す**＝`patchHides()`（PANは重ねるだけ）。
+  **GRIDのセル／SHEETサムネ／C.SCRIPT は `drawCellFrame()`＝自分の枠のパッチだけ**（§3-3）。
+  その帰結で「Aセルには描けるが TIMELINE では B が総取りする」領域ができるので、**Aセルに破線で出す**（`drawTakeoverGuide`）。
+  ブラシ補正（旧 `strokeScaleFor`）は**消えた**——パッチが出力等倍なので `brush` px がそのまま出力px＝GRIDでまたいでも同じ太さ。
+  保存は IndexedDB `cut.fr[]` ／ ZIP **`ver:4`**（`cuts/<id>.f<k>.line.png` / `.plate.png`）。ver3・ver2 は読み込み時に変換。
+  **E1**: ペイントUndoは**変更した矩形だけ**（`txBegin`/`txTouch`/`txEnd`）＝12手 → **80手**。EDIT の Undo は1本化（`gColorLog`）。
+  **§5-B**: 描く先/ブラシ上限は画面移動で変えない・**econte だけ FILL 廃止で常時投げ縄**（スキルは触らない意図的逸脱）・
+  ペンはスライダー等を掴まない・パレット縦3行・CUTSは目アイコンのみ。
+  **残り: §5-C の C5（画ブレ）/ C6（イーズAE準拠）/ C10（読み戻し）と §5-D（iPad）**
 - `SPEC_11_COMPOSER_POLISH.md` — COMPOSER磨き込み仕様（**P0〜P7 すべて実装済み**。残タスクなし。P7=出力解像度のアスペクト保持／のりしろ1.2／Zソート／フォルダ書き出し／タイムライン時間軸ズーム）
 - `SPEC_14_TIMELAPSE.md` — ANIMATOR 作画タイムラプス仕様（自動記録・専用ストア tl_shot・リングバッファ・**WORK/CELL 2通りの見せ方**・WebM書き出し。**P0〜P2 すべて実装済み。残タスクなし**（P3=区間トリム等は任意・将来））
 - `SPEC_12_PARALLAX_TAKE_BRIDGE.md` — PARALLAX_LAB×OBAN/COMPOSER **連携ズレ解説機**仕様（TAKE JSONを貼ると同一カメラワークを ①OBAN撮影台／②COMPOSER Zドリー／③COMPOSER SCL で並べて再生。「なぜそのまま繋ぐとズレるか」を見て触って理解する道具）。**実装先は `LP_motion-graphics/PARALLAX_LAB/`**、本リポジトリ側は `planeZoom`/`pf`/`buildComposerJSON` を変えたらSPECの数値表を更新する義務のみ。P0/P1/P2未着手。**2026-08-15 に `planeZoom` 新式・COPY FOR COMPOSER 実装済みを反映して全面改訂**（§1にズレの実測表・§9に数値テストスクリプト）

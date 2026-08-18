@@ -92,7 +92,13 @@ body{
 #btn-tool-move:hover,#btn-tool-cut:hover,#btn-cut-vis:hover,
 #photosel-box .btn:hover{border-color:rgba(184,80,255,.9);color:#E3C2FF}
 #btn-cut-vis.on{background:rgba(139,63,224,.28);border-color:rgba(184,80,255,.75);color:#E3C2FF}
-#btn-cut-vis:not(.on){opacity:.55}
+/* CUT枠の表示は **目のアイコンだけ**（SPEC_16 §5-B6）。OFF は斜線を重ねて出す */
+.eye-only{padding:3px 7px;font-size:13px;line-height:1;position:relative}
+#btn-cut-vis:not(.on){opacity:.6}
+#btn-cut-vis:not(.on)::after{
+  content:'';position:absolute;left:12%;top:48%;width:76%;height:1.5px;
+  background:rgba(255,120,120,.95);transform:rotate(-20deg);pointer-events:none;
+}
 /* 写真を選んだときだけ % の右に出る（未選択のときは1個も出さない＝並びが暴れない） */
 #photosel-box{display:none;align-items:center;gap:6px}
 #photosel-box.on{display:flex}
@@ -300,7 +306,12 @@ body{
   -webkit-user-select:text;user-select:text;
 }
 .hsv-num:focus{outline:none;border-color:var(--border-bright)}
-.palette{display:grid;grid-template-columns:repeat(8,1fr);gap:3px}
+.palette{
+  display:grid;grid-template-columns:repeat(8,1fr);gap:3px;
+  /* **既定は縦3行**（SPEC_16 §5-B5）。48色ぜんぶ縦に積むとサイドパネルが
+     パレットで埋まってしまうので、3行ぶんだけ見せて残りはスクロールに逃がす */
+  overflow-y:auto;overscroll-behavior:contain;
+}
 .pal-cell{aspect-ratio:1;cursor:pointer;border:1px solid rgba(255,255,255,.12)}
 .pal-cell.on{outline:2px solid var(--acid);outline-offset:1px;border-color:transparent}
 .pal-btns{display:flex;gap:4px;margin-top:6px}
@@ -673,7 +684,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
         <button class="btn mode on" id="btn-tool-move" title="写真とCUT枠を動かす (V)">MOVE</button>
         <button class="btn mode" id="btn-tool-cut" title="矩形ドラッグでコマを切り出す (C)">CUT 16:9</button>
         <!-- CUT枠の表示ON/OFF (H)。OFFのあいだは枠を掴めない＝写真だけを気楽に動かせる -->
-        <button class="btn mode on" id="btn-cut-vis" title="CUT枠の表示 ON/OFF (H)。OFFのあいだは枠を選べません">&#128065; CUTS</button>
+        <button class="btn mode on eye-only" id="btn-cut-vis" title="CUT枠の表示 ON/OFF (H)。OFFのあいだは枠を選べません">&#128065;</button>
         <!-- 選択中CUT枠の表示と ＋枠 はここ（旧「CUT 枠列（カメラ）」パネルは撤去した。
              ✎編集は中央の ✎EDIT／✕削除は SHEET行と Delete にあるので、ここには置かない） -->
         <span id="cutsel-box">
@@ -711,7 +722,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
           <div class="etools">
             <div class="etool on" data-tool="pen" title="ペン (B) ／ Wクリックで筆圧">PEN</div>
             <div class="etool" data-tool="eraser" title="消しゴム (E) ／ WクリックでCLEAR">ERASE</div>
-            <div class="etool" data-tool="fill" title="塗りつぶし (G) ／ Wクリックで投げ縄塗り・長押しで投げ縄透明消し">FILL</div>
+            <div class="etool lasso-on" data-tool="fill" title="投げ縄 (G) ／ 長押しで透明消しに切替">LASSO</div>
           </div>
           <span class="tb-div"></span>
           <div class="sld-row">
@@ -874,7 +885,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
         <div class="etools">
           <div class="etool on" data-tool="pen" title="ペン (B) ／ Wクリックで筆圧">PEN</div>
           <div class="etool" data-tool="eraser" title="消しゴム (E) ／ WクリックでCLEAR（この2つで消す操作は足りるので CLEAR DRAW ボタンは置かない）">ERASE</div>
-          <div class="etool" data-tool="fill" title="塗りつぶし (G) ／ Wクリックで投げ縄塗り・長押しで投げ縄透明消し">FILL</div>
+          <div class="etool lasso-on" data-tool="fill" title="投げ縄 (G) ／ 長押しで透明消しに切替">LASSO</div>
         </div>
       </div>
       <div>
@@ -993,13 +1004,18 @@ const HEIC_CDN = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.
 const MUXER_CDN = 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.5/build/mp4-muxer.min.js';
 const JSZIP_CDN = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
 const PROJ_FORMAT = 'ECONTE_PROJECT_v1';
-/* カラー層＝**カット1枚・ベイク空間**（SPEC_15 P1）。line(drawC) とまったく同じ扱い。
-   旧「枠ごと・出力枠512×288」は廃止（SPEC_13 §9b は P1 で無効）。
-   0.4 は「calcBakeSize が一番寄った枠を1280pxにしている」の 0.4 倍
-   ＝**一番寄った枠に色が512px当たる**＝旧 512×288 と同じ色解像度。
-   長辺 PLATE_MAX で頭打ちにするので、LRU に載せなくても持てる（旧実装と同じ扱い）。 */
-const PLATE_K = 512 / CONTE_W;   // = 0.4
-const PLATE_MAX = 1024;          // 長辺の上限（T.U.3倍でも 1024×576 = 2.4MB で止まる）
+/* --- V4「枠ごとの画」（SPEC_16）--------------------------------------------
+   ペイントは **枠（cam[k]）ごとに1枚**。カットが複製されて並んでいるイメージで、
+   写真（REF/baseC）だけが全枠で共有される。
+   パッチは「紙（ベイク空間）の上に cam[k] の位置で置く」ので、T.U./PAN すると
+   一緒に寄る（V3-P1 の土台をそのまま使う＝レンズの前のゲルには戻らない）。
+   **各枠は出力と等倍で足りる**ので、T.U.3倍のカットでも 3840×2160 一枚 →
+   1280×720 × 2枚 ＝ 約1/3 になる（SPEC_16 §2-2）。
+   ブラシの物差しも自明になる: line は出力と等倍なので `brush` px がそのまま出力px。 */
+const PLATE_K = 512 / CONTE_W;                                   // = 0.4（色の解像度）
+const PATCH_W = CONTE_W, PATCH_H = CONTE_H;                      // line ＝ 出力と等倍
+const PLATE_W = Math.round(CONTE_W * PLATE_K);                   // = 512
+const PLATE_H = Math.round(CONTE_H * PLATE_K);                   // = 288
 const BLENDS = [['multiply', '乗算'], ['normal', '通常'], ['lighter', '加算'], ['screen', '発光'], ['overlay', 'オーバーレイ']];
 const $ = sel => document.querySelector(sel);
 
@@ -1021,13 +1037,15 @@ const state = {
   curCut: -1,
   selPhoto: null,
   pressurePen: false,    // PENボタンWクリックで切替（ANIMATOR準拠）
-  fillErase: false,      // FILLボタン長押しで切替＝投げ縄透明消し（ANIMATOR準拠）
-  fillMode: 'flood',     // FILL Wクリックで 'flood'⇔'lasso'（投げ縄塗り）
+  // FILL は econte では**常に投げ縄**（バケツは廃止・SPEC_16 §5-B2）。
+  // 長押しで「投げ縄塗り ⇄ 投げ縄透明消し」の2状態だけ
+  fillErase: false,
   paintTarget: 'draw',   // 'draw'=線画レイヤー / 'color'=カラースクリプト層（V2-E2）
   curFrame: 0,           // 色を編集している枠index（cam[]の何枚目か）
   selCut: null,          // {i,k} 選択中のCUT枠（k = cam[]の枠index）
   showCuts: true,        // BOARDのCUT枠を出すか（H）。OFF中は描画も当たり判定も止める
   editView: { x: 0, y: 0, z: 1 },   // EDITのズーム/パン（z=1 が fit）
+  tlView2: { x: 0, y: 0, z: 1 },    // STUDIO中央プレビューの拡縮/移動（SPEC_16 §5-C1。z=1 が fit）
   tl: { frame: 0, playing: false, loop: true, lastTs: 0, acc: 0 },
   board: { x: -800, y: -450, z: 0.5 }
 };
@@ -1220,8 +1238,10 @@ async function saveAll(){
                       bakeRect: c.bakeRect || null, bakeW: c.bakeW || CONTE_W, bakeH: c.bakeH || CONTE_H,
                       bakeExpand: c.bakeExpand || 1.02, bakeClamp: c.bakeClamp || 1,
                       camLead: camLead(c), camTail: camTail(c),
-                      plate: c.plateBlob || null,     // カット1枚（SPEC_15 P1）。旧 colors[] は書かない
-                      baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null });
+                      // V4: 枠ごとのパッチ（cam[] と同じ並び）。旧 drawBlob / plate は書かない
+                      fr: ensureFr(c).map(f => ({ line: f.lineBlob || null, plate: f.plateBlob || null,
+                                                  rect: f.rect || null })),
+                      baseBlob: c.baseBlob || null });
     }
     await idbClearPut('photos', phItems);
     await idbClearPut('cuts', cutItems);
@@ -1252,49 +1272,59 @@ function migrateCutV2(cut, raw){
   relabelCam(cut);
   return true;
 }
-/* 保存してある plate を今の寸法に載せる。**伸ばして当てる**（bake設定が変わっていても
-   正規化空間では同じ位置に来る＝紙に貼り付いたまま） */
-async function decodePlate(cut, im){
-  const p = getPlate(cut, true);
-  const ctx = ctx2d(p);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(im, 0, 0, p.width, p.height);
-}
-/* --- 旧「枠ごと・出力枠512×288」→ 新「カット1枚・ベイク空間」（SPEC_15 P1-6） ---
-   **これは旧 drawColorPlate() が SINGLE に表示していた絵そのもの**（各枠の色を camRect の
-   位置・大きさでベイク空間に置いて、k の昇順で重ねる）＝見えていたものがそのまま正になる。
-   枠ごとに色を変えていたカットは、後の枠が上に乗った1枚に潰れる（重なりは B が勝つ）。
-   per-slot だった 濃/描画モード は捨てずに拾って、あとで最頻値を全体設定の初期値にする。 */
+/* --- 旧形式 → V4「枠ごとの画」への移行（SPEC_16 §3-4） -----------------------
+   ver3（カット1枚・ベイク空間の drawC / plateC）は **枠の矩形で切り出して**各パッチへ配る。
+   ver2 以前（枠ごと・出力枠512×288 の colors[]）は **そのまま plate パッチに1対1で載る**
+   （V4 で置き場所が枠ごとに戻ったので、V3 で一度潰した形が元に戻る）。
+   どちらも「見えていたものがそのまま正になる」＝黙って絵を変えない。 */
 let gMigAlpha = [], gMigBlend = [];
-async function migratePlate(cut, raw, load){
-  if(!raw || !raw.length) return false;
-  const imgs = [];
-  for(const r of raw){
-    let im = null;
-    if(r && (r.blob || r.file)){ try{ im = await load(r); }catch(e){ im = null; } }
-    imgs.push(im ? { im, alpha: (typeof r.alpha === 'number') ? r.alpha : 1,
-                     blend: r.blend || 'multiply' } : null);
+/* ベイク空間1枚 → 各枠のパッチへ切り分ける */
+async function splitBakeToPatches(cut, blob, kind, load){
+  if(!blob) return false;
+  let im = null;
+  try{ im = await (load ? load(blob) : blobToImage(blob)); }catch(e){ return false; }
+  if(!im) return false;
+  const b = bakeSize(cut);
+  const kx = im.width / Math.max(1, b.w), ky = im.height / Math.max(1, b.h);
+  const s = patchSize(kind);
+  const n = frCount(cut);
+  for(let k = 0; k < n; k++){
+    const r = camBakeRect(cut, k);
+    const c = blankCanvas(s.w, s.h);
+    const cx = ctx2d(c);
+    cx.imageSmoothingEnabled = true;
+    cx.imageSmoothingQuality = 'high';
+    cx.drawImage(im, r.x * kx, r.y * ky, r.w * kx, r.h * ky, 0, 0, s.w, s.h);
+    const f = frAt(cut, k);
+    if(!f) continue;
+    if(kind === 'plate'){ f.plate = c; f.dirtyPlate = true; }
+    else { f.line = c; f.dirtyLine = true; }
   }
-  if(!imgs.some(Boolean)) return false;
-  const p = getPlate(cut, true);
-  const ctx = ctx2d(p);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  const b = bakeSize(cut), br = cut.bakeRect, k = plateScale(cut);
-  imgs.forEach((o, i) => {
-    if(!o) return;
-    let dx = 0, dy = 0, w = p.width, h = p.height;
-    const r = camRect(cut, i);
-    if(r && br){
-      dx = (r.x - br.x) / br.w * b.w * k; dy = (r.y - br.y) / br.h * b.h * k;
-      w  = r.w / br.w * b.w * k;          h  = r.h / br.h * b.h * k;
-    }
-    ctx.drawImage(o.im, dx, dy, w, h);      // 昇順＝後の枠が上（旧 drawColorPlate と同じ重ね順）
-    gMigAlpha.push(o.alpha); gMigBlend.push(o.blend);
-  });
-  cut.dirtyPlate = true;                     // 次の保存で plate として焼き直る
   return true;
+}
+/* ver2 以前の colors[]（枠ごと・出力枠）→ plate パッチへ1対1 */
+async function migrateColorsToPatches(cut, raw, load){
+  if(!raw || !raw.length) return false;
+  let any = false;
+  for(let i = 0; i < raw.length; i++){
+    const r = raw[i];
+    if(!r || !(r.blob || r.file)) continue;
+    let im = null;
+    try{ im = await load(r); }catch(e){ im = null; }
+    if(!im) continue;
+    const f = frAt(cut, i);
+    if(!f) continue;
+    const c = blankCanvas(PLATE_W, PLATE_H);
+    const cx = ctx2d(c);
+    cx.imageSmoothingEnabled = true;
+    cx.imageSmoothingQuality = 'high';
+    cx.drawImage(im, 0, 0, PLATE_W, PLATE_H);
+    f.plate = c; f.dirtyPlate = true;
+    gMigAlpha.push(typeof r.alpha === 'number' ? r.alpha : 1);
+    gMigBlend.push(r.blend || 'multiply');
+    any = true;
+  }
+  return any;
 }
 /* 最頻値（同数なら先に出てきたもの＝先頭カットの値） */
 function modeOf(arr, dflt){
@@ -1308,16 +1338,22 @@ function modeOf(arr, dflt){
 /* 移行で拾った per-slot の 濃/モード を全体設定へ畳む（SPEC_15 P3-1）。黙って潰さない */
 function adoptMigratedPaint(nCuts){
   if(!nCuts) return;
-  gPaint.colorAlpha = clamp(modeOf(gMigAlpha, 1), 0, 1);
-  gPaint.colorBlend = modeOf(gMigBlend, 'multiply');
+  let note = '';
+  // per-slot の 濃/モード を拾えたときだけ全体設定へ畳む。
+  // **拾えていないのに上書きしない**（ver3 からの移行は per-slot 値を持っていないので、
+  // ここで既定に戻すと保存済みの全体設定が黙って消える）
+  if(gMigAlpha.length){
+    gPaint.colorAlpha = clamp(modeOf(gMigAlpha, 1), 0, 1);
+    gPaint.colorBlend = modeOf(gMigBlend, 'multiply');
+    note = '（濃 ' + Math.round(gPaint.colorAlpha * 100) + '% を全体設定に採用）';
+    saveUi();
+  }
   gMigAlpha = []; gMigBlend = [];
-  saveUi();
   syncEditPanels();
-  toast(nCuts + ' カットの色をカット1枚に統合しました（濃 ' +
-        Math.round(gPaint.colorAlpha * 100) + '% を全体設定に採用）');
+  toast(nCuts + ' カットの画を枠ごとに分けました' + note);
 }
 async function loadAll(){
-  let migrated = 0, plateMig = 0;
+  let migrated = 0, patchMig = 0;
   try{
     const phItems = await idbGetAll('photos');
     for(const p of phItems){
@@ -1330,7 +1366,7 @@ async function loadAll(){
     cutItems.sort((a, b) => a.order - b.order);
     for(const c of cutItems){
       // V2-D2: ここではデコードしない（Blobが正・必要になったカットだけ ensureResident する）
-      const cut = { id: c.id, baseC: null, drawC: null, bg: (typeof c.bg === 'number' ? c.bg : 232),
+      const cut = { id: c.id, baseC: null, res: false, bg: (typeof c.bg === 'number' ? c.bg : 232),
                     baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : DEFAULT_BASE_ALPHA),
                     baseOver: !!c.baseOver, lock: !!c.lock,
                     durF: c.durF || FPS * 2, note: c.note || '',
@@ -1338,17 +1374,38 @@ async function loadAll(){
                     bakeW: c.bakeW || CONTE_W, bakeH: c.bakeH || CONTE_H,
                     bakeExpand: c.bakeExpand || 1.02, bakeClamp: c.bakeClamp || 1,
                     camLead: c.camLead | 0, camTail: c.camTail | 0,
-                    plateC: null, plateBlob: c.plate || null,
-                    baseBlob: c.baseBlob || null, drawBlob: c.drawBlob || null,
-                    dirtyBase: false, dirtyDraw: false, dirtyPlate: false, thumb: null };
+                    fr: null, baseBlob: c.baseBlob || null,
+                    dirtyBase: false, thumb: null };
       if(migrateCutV2(cut, c)) migrated++;
-      // カラー層は小さいので **ここで復号して常駐させる**（一覧で待たせないため）
-      if(c.plate){
-        try{ await decodePlate(cut, await blobToImage(c.plate)); }catch(e){}
-      }else{
-        // 旧形式（枠ごと・出力枠512×288）→ カット1枚へ1回だけ変換（SPEC_15 P1-6）
-        const raw = c.colors || (c.colorBlob ? [{ blend: c.colorBlend, alpha: c.colorAlpha, blob: c.colorBlob }] : []);
-        if(await migratePlate(cut, raw, r => blobToImage(r.blob))) plateMig++;
+      ensureFr(cut);
+      if(Array.isArray(c.fr) && c.fr.length){
+        // V4 の記録: 枠ごとのパッチ。**plate だけ先に展開**（LRU対象外＝一覧で待たせない）
+        c.fr.forEach((r, k) => {
+          const f = frAt(cut, k);
+          if(!f || !r) return;
+          f.lineBlob = r.line || null;
+          f.plateBlob = r.plate || null;
+          f.rect = r.rect || (camRect(cut, k) ? { ...camRect(cut, k) } : null);
+        });
+        for(const f of ensureFr(cut)){
+          if(!f.plateBlob) continue;
+          try{
+            const im = await blobToImage(f.plateBlob);
+            f.plate = blankCanvas(PLATE_W, PLATE_H);
+            ctx2d(f.plate).drawImage(im, 0, 0, PLATE_W, PLATE_H);
+          }catch(e){}
+        }
+      }else if(c.plate || c.drawBlob || c.colors || c.colorBlob){
+        // ver3 以前 → 枠ごとのパッチへ1回だけ変換（SPEC_16 §3-4）
+        let hit = false;
+        if(await splitBakeToPatches(cut, c.drawBlob, 'line')) hit = true;
+        if(c.plate){
+          if(await splitBakeToPatches(cut, c.plate, 'plate')) hit = true;
+        }else{
+          const raw = c.colors || (c.colorBlob ? [{ blend: c.colorBlend, alpha: c.colorAlpha, blob: c.colorBlob }] : []);
+          if(await migrateColorsToPatches(cut, raw, r => blobToImage(r.blob))) hit = true;
+        }
+        if(hit){ patchMig++; cut.res = true; }   // 展開済み＝そのまま常駐扱い（次の保存で焼ける）
       }
       cuts.push(cut);
     }
@@ -1372,19 +1429,21 @@ async function loadAll(){
       ]);
       toast(migrated + ' カットを枠列（cam[]）形式に変換しました');
     }
-    adoptMigratedPaint(plateMig);   // 変換件数をトーストで出す（黙って潰さない）
+    adoptMigratedPaint(patchMig);   // 変換件数をトーストで出す（黙って潰さない）
   }catch(e){
     console.error('loadAll failed', e);
   }
 }
 
 /* ---------------- 遅延デコード LRU（SPEC_13 §5d・V2-D2） ----------------
-   **Blob が正**。canvas は「今要るカット」だけ持つ。大判1カットは baseC+drawC で
-   最大66MBあるため、全カット常駐のままでは iPad が落ちる。
-   **`cut.baseC/drawC` を直接触らないこと**。必ず getBase()/getDraw()/ensureResident() 経由。 */
+   **Blob が正**。canvas は「今要るカット」だけ持つ。V4 で line が枠ごと1280×720に
+   なったぶん軽くなったが、baseC は今も最大4K面積なので追い出しは続ける。
+   **`cut.baseC` と `cut.fr[k].line` を直接触らないこと**。必ず getBase()/needLine()/ensureResident() 経由。 */
 const LRU_MAX = 8;
 let gLru = [];                    // 常駐カットの id（新しいほど後ろ＝新しい）
-function isResident(cut){ return !!(cut && cut.drawC); }
+/* 常駐＝**line パッチと baseC が展開済み**（plate は LRU 対象外なので常に手元にある）。
+   V4 で drawC が消えたので、判定は明示フラグにした */
+function isResident(cut){ return !!(cut && cut.res); }
 let gEvictT = 0;
 function scheduleEvict(){
   clearTimeout(gEvictT);
@@ -1397,67 +1456,209 @@ function touchLru(cut){
   gLru.push(cut.id);
   if(gLru.length > LRU_MAX) scheduleEvict();   // 新規作成・アクセスだけでも溜まるので必ず掃く
 }
-function getDraw(cut){ if(isResident(cut)){ touchLru(cut); return cut.drawC; } requestResident(cut); return null; }
-/* --- カラー層（plateC）＝カット1枚・ベイク空間（SPEC_15 P1-2） ---
-   **line(drawC) と同じ場所・同じ物差し**。カメラ枠で切り出して出力枠へ伸ばすので、
-   T.U./PAN すると色も一緒に寄る（旧実装は出力枠にベタ置き＝レンズの前のゲルだった）。
-   drawC と違って **LRU には載せない**（長辺 PLATE_MAX で頭打ちなので常駐で持てる。
-   一覧で待たされないことが最優先）。 */
-function plateSize(cut){
-  const b = bakeSize(cut);
-  let w = Math.round(b.w * PLATE_K), h = Math.round(b.h * PLATE_K);
-  if(w > PLATE_MAX){ h = Math.round(h * PLATE_MAX / w); w = PLATE_MAX; }
-  return { w: Math.max(16, w), h: Math.max(9, h) };
+/* --- 枠ごとのパッチ cut.fr[]（SPEC_16 §3-1）--------------------------------
+   fr[k] は cam[k] と **1対1**（cam の増減と必ずセットで動かす）。
+   - `line`  1280×720（出力と等倍）… LRU 対象。追い出すときに lineBlob へ焼く
+   - `plate`  512×288（出力の0.4倍）… **LRU には載せない**（小さいので常駐。一覧で待たせない）
+   - `rect`  そのパッチの絵が貼り付いている **紙の上の矩形**。cam[k] を動かしたら
+             syncPatchRects() が絵を載せ替えて、ここを合わせ直す */
+function frCount(cut){ return Math.max(1, camCount(cut)); }
+function mkFr(rect){
+  return { line: null, lineBlob: null, dirtyLine: false,
+           plate: null, plateBlob: null, dirtyPlate: false,
+           rect: rect ? { x: rect.x, y: rect.y, w: rect.w, h: rect.h } : null };
 }
-/* ベイク空間 → plate 空間の倍率。**PLATE_MAX で頭打ちした場合は 0.4 ではない**ので、
-   座標も切り出しも必ずこれを通す（実物があるときは実物の寸法を正とする） */
-function plateScale(cut){
-  const b = bakeSize(cut);
-  const p = cut && cut.plateC;
-  return ((p ? p.width : plateSize(cut).w) / Math.max(1, b.w));
+/* cam[] と長さを合わせる（足りない枠は空パッチ。余りは切る）。**必ずここを通す** */
+function ensureFr(cut){
+  if(!cut) return [];
+  if(!Array.isArray(cut.fr)) cut.fr = [];
+  const n = frCount(cut);
+  while(cut.fr.length < n) cut.fr.push(mkFr(camRect(cut, cut.fr.length)));
+  if(cut.fr.length > n) cut.fr.length = n;
+  return cut.fr;
 }
-/* make=true のときだけ無い色を作る（描く経路）。描画経路は null が返る＝色なしとして飛ばす */
-function getPlate(cut, make){
-  if(!cut) return null;
-  const s = plateSize(cut);
-  if(!cut.plateC){
-    if(!make) return null;
-    cut.plateC = blankCanvas(s.w, s.h);
-  }else if(cut.plateC.width !== s.w || cut.plateC.height !== s.h){
-    resizePlate(cut, s);                     // ベイク寸法が変わったら追従（絵は伸ばして載せ替え）
+function frAt(cut, k){
+  const a = ensureFr(cut);
+  if(!a.length) return null;
+  return a[clamp(k | 0, 0, a.length - 1)];
+}
+function patchSize(kind){ return (kind === 'plate') ? { w: PLATE_W, h: PLATE_H } : { w: PATCH_W, h: PATCH_H }; }
+/* ブラシ幅の物差し。**line は出力と等倍**なので 1（＝「6」は出力画面での6px）。
+   枠ごとの補正（旧 strokeScaleFor）はパッチ化で不要になった（SPEC_16 §2-3） */
+function patchK(kind){ return (kind === 'plate') ? PLATE_K : 1; }
+function paintKind(){ return state.paintTarget === 'color' ? 'plate' : 'line'; }
+/* make=true のときだけ作る（描く経路）。描画経路は null＝その枠には何も無い */
+function frLayer(cut, k, kind, make){
+  const f = frAt(cut, k);
+  if(!f) return null;
+  const key = (kind === 'plate') ? 'plate' : 'line';
+  if(!f[key] && make){
+    const s = patchSize(kind);
+    f[key] = blankCanvas(s.w, s.h);
   }
-  return cut.plateC;
+  return f[key];
 }
-/* 寸法だけの載せ替え（正規化空間では同じ位置）。bakeRect が動いたときは remapPlate 側 */
-function resizePlate(cut, s){
-  const t = blankCanvas(s.w, s.h);
+function markPatch(cut, k, kind){
+  const f = frAt(cut, k);
+  if(!f) return;
+  if(kind === 'plate') f.dirtyPlate = true; else f.dirtyLine = true;
+  cut.thumb = null;
+}
+function hasAnyColor(cut){ return !!(cut && (cut.fr || []).some(f => f && f.plate)); }
+/* 枠 k の「紙（ベイク空間）の上での矩形」。パッチはここに置く＝ base と同じ空間 */
+function camBakeRect(cut, k){
+  const b = bakeSize(cut), br = cut && cut.bakeRect, r = camRect(cut, k);
+  if(!r || !br) return { x: 0, y: 0, w: b.w, h: b.h };
+  return { x: (r.x - br.x) / br.w * b.w, y: (r.y - br.y) / br.h * b.h,
+           w: r.w / br.w * b.w,          h: r.h / br.h * b.h };
+}
+/* --- SPEC_16 §2a: 「A の画は B の中でも見えるか」の判定 -----------------------
+   採用は **(b)、ただし後の枠が前の枠と入れ子（T.U./T.B.）のときだけ下を隠す**。
+   入れ子なら継ぎ目が起きないので B のセルが完全にきれいになる。
+   並ぶ（PAN）ときは (a)＝ただ重ねる＝枠の境目で線が切れない。
+   **矩形の包含だけで機械的に決まる**のでユーザーに選ばせる項目にはしない。 */
+function rectContains(a, b){
+  const t = Math.max(1e-6, a.w * 0.002);
+  return a.x <= b.x + t && a.y <= b.y + t && a.x + a.w >= b.x + b.w - t && a.y + a.h >= b.y + b.h - t;
+}
+function patchHides(cut, k){
+  const rk = camRect(cut, k);
+  if(!rk) return false;
+  for(let j = 0; j < k; j++){
+    const rj = camRect(cut, j);
+    if(rj && (rectContains(rj, rk) || rectContains(rk, rj))) return true;
+  }
+  return false;
+}
+/* 紙の上の点 →「そこでいちばん上に見えている枠」。後ろから探す＝重ね順と一致する。
+   どの枠にも入らない点（bakeExpand の余白）は **いちばん広い枠**の持ち物にする */
+function frameAtBake(cut, bx, by){
+  const n = frCount(cut);
+  for(let k = n - 1; k >= 0; k--){
+    const r = camBakeRect(cut, k);
+    if(bx >= r.x && bx <= r.x + r.w && by >= r.y && by <= r.y + r.h) return k;
+  }
+  let best = 0, ba = -1;
+  for(let k = 0; k < n; k++){
+    const r = camBakeRect(cut, k), a = r.w * r.h;
+    if(a > ba){ ba = a; best = k; }
+  }
+  return best;
+}
+/* ベイク空間の点 → パッチ内のピクセル座標 */
+function bakeToPatch(cut, k, p, kind){
+  const r = camBakeRect(cut, k), s = patchSize(kind);
+  return { x: (p.x - r.x) / Math.max(1e-6, r.w) * s.w, y: (p.y - r.y) / Math.max(1e-6, r.h) * s.h };
+}
+/* --- パッチ列を1枚に合成して置く（描画のただ一つの入口） ---------------------
+   src = ベイク空間の切り出し矩形（null＝紙の全面）。only>=0 ならその枠だけ（GRIDのセル）。
+   隠す枠があるときだけ控えのキャンバスを経由する（clearRect を本番の ctx に撃つと
+   下の写真まで抜けるため）。1枚だけ＆隠さないときは直接置く＝いちばん多い経路が最速。 */
+let gPatchScratch = null, gPatchScratchCtx = null;
+function patchScratch(w, h){
+  if(!gPatchScratch){
+    gPatchScratch = document.createElement('canvas');
+    gPatchScratch.width = w; gPatchScratch.height = h;
+    gPatchScratchCtx = gPatchScratch.getContext('2d');   // 読み出さないので willReadFrequently は付けない
+  }else if(gPatchScratch.width !== w || gPatchScratch.height !== h){
+    gPatchScratch.width = w; gPatchScratch.height = h;
+  }else{
+    gPatchScratchCtx.clearRect(0, 0, w, h);
+  }
+  return gPatchScratch;
+}
+function drawPatchStack(ctx, cut, src, dw, dh, kind, only){
+  if(!cut) return false;
+  const alpha = (kind === 'plate') ? clamp(gPaint.colorAlpha, 0, 1) : 1;
+  if(alpha <= 0) return false;
+  const b = bakeSize(cut);
+  const sx = src ? src.sx : 0, sy = src ? src.sy : 0;
+  const sw = src ? src.sw : b.w, sh = src ? src.sh : b.h;
+  const one = (typeof only === 'number' && only >= 0);
+  const list = [];
+  const n = frCount(cut);
+  for(let k = 0; k < n; k++){
+    if(one && k !== only) continue;
+    const p = frLayer(cut, k, kind, false);
+    if(!p) continue;
+    const r = camBakeRect(cut, k);
+    list.push({ p, hide: one ? false : patchHides(cut, k),
+                x: (r.x - sx) / sw * dw, y: (r.y - sy) / sh * dh,
+                w: r.w / sw * dw,        h: r.h / sh * dh });
+  }
+  if(!list.length) return false;
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.globalAlpha = alpha;
+  if(kind === 'plate') ctx.globalCompositeOperation = gPaint.colorBlend || 'multiply';
+  if(list.length === 1 && !list[0].hide){
+    const it = list[0];
+    ctx.drawImage(it.p, it.x, it.y, it.w, it.h);
+  }else{
+    const W = Math.max(1, Math.round(dw)), H = Math.max(1, Math.round(dh));
+    const sc = patchScratch(W, H), sct = gPatchScratchCtx;
+    sct.imageSmoothingEnabled = true;
+    sct.imageSmoothingQuality = 'high';
+    for(const it of list){
+      if(it.hide) sct.clearRect(it.x, it.y, it.w, it.h);
+      sct.drawImage(it.p, it.x, it.y, it.w, it.h);
+    }
+    ctx.drawImage(sc, 0, 0, W, H, 0, 0, dw, dh);
+  }
+  ctx.restore();
+  return true;
+}
+/* cam[k] を動かしたら、その枠のパッチを **紙に貼り付いたまま**載せ替える。
+   これが無いと枠をドラッグしただけで絵が紙からズレる（旧 remapDraw / remapPlate の役目）。
+   rebakeFromCam（枠変更の唯一の関所）から呼ぶので、呼び出し側は何も持ち回らなくてよい。 */
+function remapPatch(c, oldRect, newRect){
+  if(!c) return c;
+  const t = blankCanvas(c.width, c.height);
   const ctx = ctx2d(t);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(cut.plateC, 0, 0, s.w, s.h);
-  cut.plateC = t;
-  cut.dirtyPlate = true;
+  ctx.drawImage(c, 0, 0, c.width, c.height,
+                (oldRect.x - newRect.x) / newRect.w * c.width,
+                (oldRect.y - newRect.y) / newRect.h * c.height,
+                oldRect.w / newRect.w * c.width, oldRect.h / newRect.h * c.height);
+  return t;
 }
-/* bakeRect が動いたら色も紙に貼り付いたまま載せ替える（remapDraw の色版）。
-   これが無いと枠をドラッグしただけで色が紙からズレる（旧実装は出力枠固定だったので不要だった） */
-function remapPlate(cut, oldRect, oldW, oldH){
-  const nr = cut.bakeRect;
-  if(!nr || !oldRect || !cut.plateC) return;
-  if(oldRect.x === nr.x && oldRect.y === nr.y && oldRect.w === nr.w &&
-     oldW === cut.bakeW && oldH === cut.bakeH) return;
-  const s = plateSize(cut);
-  const tmp = blankCanvas(s.w, s.h);
-  const ctx = ctx2d(tmp);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(cut.plateC, 0, 0, cut.plateC.width, cut.plateC.height,
-                (oldRect.x - nr.x) / nr.w * s.w, (oldRect.y - nr.y) / nr.h * s.h,
-                oldRect.w / nr.w * s.w, oldRect.h / nr.h * s.h);
-  cut.plateC = tmp;
-  cut.dirtyPlate = true;
+function syncPatchRects(cut){
+  const fr = ensureFr(cut);
+  for(let k = 0; k < fr.length; k++){
+    const nr = camRect(cut, k);
+    const f = fr[k];
+    if(!nr){ f.rect = null; continue; }
+    const o = f.rect;
+    if(!o){ f.rect = { x: nr.x, y: nr.y, w: nr.w, h: nr.h }; continue; }
+    if(o.x === nr.x && o.y === nr.y && o.w === nr.w && o.h === nr.h) continue;
+    if(f.line){ f.line = remapPatch(f.line, o, nr); f.dirtyLine = true; }
+    if(f.plate){ f.plate = remapPatch(f.plate, o, nr); f.dirtyPlate = true; }
+    f.rect = { x: nr.x, y: nr.y, w: nr.w, h: nr.h };
+  }
 }
-function hasAnyColor(cut){ return !!(cut && cut.plateC); }
+/* 枠を足したときの新しいパッチは「**いま見えていたもの**」で埋める（SPEC_16 §3-4 と同じ原則）。
+   空で挿すと、それまで A に描いてあった絵が B のセルから消えて見える */
+function seedPatch(cut, k){
+  const f = frAt(cut, k);
+  if(!f) return;
+  const src = camSrcRect(cut, camStartFrame(cut, k)) || null;
+  [['line', PATCH_W, PATCH_H], ['plate', PLATE_W, PLATE_H]].forEach(([kind, w, h]) => {
+    const c = blankCanvas(w, h);
+    if(!drawPatchStack(ctx2d(c), cut, src, w, h, kind)) return;
+    if(kind === 'plate'){ f.plate = c; f.dirtyPlate = true; }
+    else { f.line = c; f.dirtyLine = true; }
+  });
+}
 function getBase(cut){ if(isResident(cut)){ touchLru(cut); return cut.baseC; } requestResident(cut); return null; }
+/* line パッチを触りたいときの入口（常駐していなければ読み込みを頼んで false）。
+   plate は LRU に載っていないので、この関門を通す必要が無い＝一覧で待たされない */
+function needLine(cut){
+  if(isResident(cut)){ touchLru(cut); return true; }
+  requestResident(cut);
+  return false;
+}
 /* 常駐させる（非同期）。描く前に必ずこれを await する経路を通す。
    ★ **失敗しても cut.loading を必ず null に戻す**（try/finally）。
    ここを素通りにしていた頃は、途中で1回でも例外が出ると「解決しない Promise」が
@@ -1470,16 +1671,22 @@ function ensureResident(cut){
   cut.loading = (async () => {
     try{
       const s = bakeSize(cut);
-      const drawC = blankCanvas(s.w, s.h);
-      if(cut.drawBlob){
-        try{ const im = await blobToImage(cut.drawBlob); ctx2d(drawC).drawImage(im, 0, 0); }catch(e){}
+      // line パッチは枠ごと（出力と等倍・固定寸法）。無い枠は空で用意する
+      const fr = ensureFr(cut);
+      for(const f of fr){
+        if(f.line) continue;
+        const c = blankCanvas(PATCH_W, PATCH_H);
+        if(f.lineBlob){
+          try{ const im = await blobToImage(f.lineBlob); ctx2d(c).drawImage(im, 0, 0, PATCH_W, PATCH_H); }catch(e){}
+        }
+        f.line = c;
       }
       let baseC = null;
       if(cut.baseBlob){
         baseC = blankCanvas(s.w, s.h);
         try{ const im = await blobToImage(cut.baseBlob); ctx2d(baseC).drawImage(im, 0, 0); }catch(e){}
       }
-      cut.drawC = drawC;
+      cut.res = true;
       cut.baseC = baseC;
       cut.cellCache = null;      // 本物が戻ったので控えは捨てる（以後は本物から描く）
       touchLru(cut);
@@ -1524,13 +1731,10 @@ async function encodeCut(cut){
     cut.baseBlob = cut.baseC ? await canvasToBlob(cut.baseC, cut.baseOpaque ? 'image/jpeg' : 'image/png', 0.85) : null;
     cut.dirtyBase = false;
   }
-  if(cut.dirtyDraw && cut.drawC){
-    cut.drawBlob = await canvasToBlob(cut.drawC, 'image/png');
-    cut.dirtyDraw = false;
-  }
-  if(cut.dirtyPlate && cut.plateC){   // カラー層は常にPNG（drawC と同じ扱い・LRUには乗らない）
-    cut.plateBlob = await canvasToBlob(cut.plateC, 'image/png');
-    cut.dirtyPlate = false;
+  // 枠ごとのパッチ（SPEC_16）。line も plate も常に PNG
+  for(const f of ensureFr(cut)){
+    if(f.dirtyLine && f.line){ f.lineBlob = await canvasToBlob(f.line, 'image/png'); f.dirtyLine = false; }
+    if(f.dirtyPlate && f.plate){ f.plateBlob = await canvasToBlob(f.plate, 'image/png'); f.dirtyPlate = false; }
   }
 }
 async function evictLru(){
@@ -1542,7 +1746,9 @@ async function evictLru(){
     if(keepResident(cut)){ gLru.shift(); gLru.push(id); continue; }   // 保護対象は末尾へ回す
     await encodeCut(cut);
     buildCellCache(cut);      // ★ 追い出す直前に GRID セル用の小さな絵を焼く（下のコメント参照）
-    cut.drawC = null;
+    // **plate は落とさない**（LRU対象外・小さいので常駐。塗った瞬間に出るのが最優先）
+    for(const f of ensureFr(cut)) f.line = null;
+    cut.res = false;
     cut.baseC = null;
     gLru.shift();
   }
@@ -1561,8 +1767,9 @@ function buildCellCache(cut){
   for(let k = 0; k < n; k++){
     const c = blankCanvas(CELL_CACHE_W, CELL_CACHE_H);
     // **色は焼き込まない**（カラー層はLRU対象外＝常に手元にある）。
-    // 焼き込むと、非常駐カットに色を塗った瞬間セルが古い絵のまま止まる
-    try{ drawCamFrame(ctx2d(c), cut, camStartFrame(cut, k), CELL_CACHE_W, CELL_CACHE_H, true); }catch(e){}
+    // 焼き込むと、非常駐カットに色を塗った瞬間セルが古い絵のまま止まる。
+    // セルは自分の枠のパッチだけを出す（SPEC_16 §3-3）ので控えも同じ作りにする
+    try{ drawCellFrame(ctx2d(c), cut, k, CELL_CACHE_W, CELL_CACHE_H, true); }catch(e){}
     arr.push(c);
   }
   cut.cellCache = arr;
@@ -1584,8 +1791,7 @@ function setView(v){
   $('#btn-view-studio').classList.toggle('on', v === 'studio');
   $('#btn-view-edit').classList.toggle('on', v === 'edit');
   if(v === 'studio'){
-    setPaintTarget('draw');   // STUDIOプレビューの直描きは線画（色はEDIT/GRIDの担当）
-    renderSheetPanel(); layoutStudio(); renderStudioSync(true);
+    renderSheetPanel(); layoutStudio(); renderStudioSync(true);   // 描く先は触らない（§5-B1）
   }
   if(v === 'edit'){
     if(gEditMode === 'grid') renderGrid();
@@ -1603,7 +1809,6 @@ function enterEdit(mode){
   if(!cuts.length){ toast('カットがありません'); return false; }
   if(state.view !== 'edit'){
     state.curCut = clamp(gFocusCut >= 0 ? gFocusCut : 0, 0, cuts.length - 1);
-    undoStack = []; redoStack = [];
     ensureResident(cuts[state.curCut]);
   }
   setEditMode(mode || 'grid', true);
@@ -1871,7 +2076,9 @@ function renderBoard(){
       const foc = (i === gFocusCut);   // 現在カット（プレイヘッド位置）だけ色を変える
       const sel = state.selCut && state.selCut.i === i && state.selCut.k === k;
       const lk = !!c.lock;
-      const col = sel ? 'rgba(255,79,168,0.95)' : (foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.9)');
+      // 選択枠は **グレー**（SPEC_16 §5-C9）。配置が決まったあとはほとんど動かさないので、
+      // ピンクで目立たせると「いま作業している所」の読みを奪う。現在カット（水色）を優先させる
+      const col = sel ? 'rgba(205,205,215,0.95)' : (foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.9)');
       boardCtx.save();
       if(lk) boardCtx.setLineDash([7 / b.z, 4 / b.z]);   // ロック中は破線＝掴めないことが見て分かる
       // 下の紙が白いと黄色/水色の線が飛ぶので、**同じ形の暗い線を1段太く先に敷く**（枠自体は黒くしない）
@@ -1921,8 +2128,11 @@ function setCutsVisible(v, quiet){
   state.showCuts = !!v;
   const bt = $('#btn-cut-vis');
   if(bt){
+    // **目のアイコンだけ**で ON/OFF を出す（SPEC_16 §5-B6）。
+    // 文字を足すとモードバーが押し出されて、iPad縦でボタンが折り返す
     bt.classList.toggle('on', state.showCuts);
-    bt.textContent = (state.showCuts ? '\u{1F441} CUTS' : '\u{1F441} CUTS OFF');
+    bt.textContent = '\u{1F441}';
+    bt.title = 'CUT枠の表示: ' + (state.showCuts ? 'ON' : 'OFF') + ' (H)';
   }
   if(!state.showCuts && state.selCut) selectCutFrame(null);
   else { syncBoardPanels(); renderBoard(); }
@@ -2225,18 +2435,34 @@ function setPhotoFilter(key, val, commit){
   renderBoard();
 }
 /* 🔗: ref があれば開く、無ければ現在のクリップを紐づけ（既存スクショの後付け） */
+/* REF リンク: 貼る → 選ぶ → 組み込む → 飛ぶ は実装済み。
+   **差し替え／消す**（SPEC_16 §5-C4）をここに足す。
+   紐づいているときは「飛ぶ／差し替える／外す」を聞く（1ボタンのままにしたいので modalPick）。 */
 function photoRefAction(){
   const p = selPhotoObj();
   if(!p) return;
-  if(p.ref && p.ref.url){ window.open(p.ref.url, '_blank', 'noopener'); return; }
-  if(clipConsume(p)){
-    toast('REF: 「' + (p.ref.title || p.ref.url) + '」を紐づけました');
-    syncBoardPanels();
-    renderBoard();
-    scheduleSave();
-    return;
-  }
-  toast('REF がありません（ref-board 側で →ECONTE、または ⧉ REF で貼り付け）');
+  const linkNew = () => {
+    if(clipConsume(p)){
+      toast('REF: 「' + (p.ref.title || p.ref.url) + '」を紐づけました');
+      syncBoardPanels(); renderBoard(); scheduleSave();
+      return true;
+    }
+    toast('貼り付けたクリップがありません（ref-board 側で →ECONTE、または ⧉ REF で貼り付け）');
+    return false;
+  };
+  if(!(p.ref && p.ref.url)){ linkNew(); return; }
+  modalPick('REF「' + (p.ref.title || p.ref.url) + '」', ['開く', '差し替える', '外す']).then(n => {
+    if(n === 0){ window.open(p.ref.url, '_blank', 'noopener'); return; }
+    if(n === 1){ linkNew(); return; }
+    if(n === 2){
+      const old = p.ref;
+      p.ref = null;
+      pushLog({ type: 'photo-ref', undo(){ p.ref = old; syncBoardPanels(); renderBoard(); },
+                                   redo(){ p.ref = null; syncBoardPanels(); renderBoard(); } });
+      syncBoardPanels(); renderBoard(); scheduleSave();
+      toast('REF を外しました（Ctrl+Z で戻せます）');
+    }
+  });
 }
 /* 選択中オブジェクトに応じてBOARDパネルを出し分ける */
 function syncBoardPanels(){
@@ -2287,10 +2513,12 @@ function addCamFrame(){
   const at = sc.k + 1;
   const wasFix = cam.length === 1;
   cam.splice(at, 0, n);
+  ensureFr(cut).splice(at, 0, mkFr(n));             // 枠とパッチは対（SPEC_16 §3-1）
   if(wasFix) cam[0].dur = cut.durF || FPS * 2;      // FIX の尺をそのまま A→B の尺にする
   else if(!(cam[at - 1].dur > 0)) cam[at - 1].dur = FPS * 2;
   if(!(n.dur > 0) && at < cam.length - 1) n.dur = FPS * 2;
   rebakeFromCam(cut);
+  seedPatch(cut, at);                               // 新しい枠は「いま見えていたもの」で埋める
   const after = snapshotCam(cut);
   pushLog({ type: 'cut-rect',
             undo(){ restoreCam(cut, before); rebakeFromCam(cut); },
@@ -2305,6 +2533,7 @@ function delCamFrame(i, k){
   if(!cut || cut.cam.length <= 1) return;
   const before = snapshotCam(cut);
   cut.cam.splice(k, 1);
+  ensureFr(cut).splice(k, 1);        // その枠の画も一緒に外す（Undoで戻る＝before に控えてある）
   rebakeFromCam(cut);
   const after = snapshotCam(cut);
   pushLog({ type: 'cut-rect',
@@ -2327,11 +2556,17 @@ function setBakeExpand(i, v){
   rebakeFromCam(cut);
   afterCamChange(i);
 }
-/* 色はカット1枚になったので cam と対で動かす必要はない（枠を消しても色は紙に残る）。
-   寸法・位置の追従は rebakeFromCam → remapPlate が受ける */
-function snapshotCam(cut){ return { cam: JSON.parse(JSON.stringify(cut.cam || [])) }; }
+/* **枠とパッチは対で動かす**（SPEC_16 §3-1）。cam だけ戻すと、枠を足して Undo した瞬間に
+   パッチの並びが1つズレて「別の枠の画が出る」になる。
+   fr[] は中身（canvas/Blob）を共有したまま**並びだけ**を控える（コピーは撮らない） */
+function snapshotCam(cut){
+  return { cam: JSON.parse(JSON.stringify(cut.cam || [])), fr: (ensureFr(cut) || []).slice() };
+}
 function snapshotRestore(a){ return JSON.parse(JSON.stringify(a)); }
-function restoreCam(cut, snap){ cut.cam = snapshotRestore(snap.cam); }
+function restoreCam(cut, snap){
+  cut.cam = snapshotRestore(snap.cam);
+  if(snap.fr) cut.fr = snap.fr.slice();
+}
 function afterCamChange(i){
   renderCamList();
   renderBoard();
@@ -2465,7 +2700,7 @@ async function clipPasteJson(){
 }
 
 /* ---------------- プロジェクト入出力 ZIP（SPEC_13 §9f） ----------------
-   中身: project.json ＋ 写真の原本 ＋ 加筆(drawC)。
+   中身: project.json ＋ 写真の原本 ＋ **枠ごとのパッチ**（line / plate）。
    **ベイク(baseC)は入れない** — BOARDから再生成できる派生物で、入れるとファイルが数十MBになる。
    読み込み後に rebakeFromCam() で焼き直す。 */
 let gZipLoad = null;
@@ -2487,8 +2722,8 @@ async function exportProject(){
     toast('プロジェクトをまとめています…');
     await loadJSZip();
     const zip = new window.JSZip();
-    // ver 3 = カラー層がカット1枚（SPEC_15 P1）＋濃/モードが全体設定。ver 2 の colors[] も読める
-    const meta = { format: PROJ_FORMAT, ver: 3, fps: FPS, conteW: CONTE_W, conteH: CONTE_H,
+    // ver 4 = **枠ごとの画**（SPEC_16）。ver 3（カット1枚）/ ver 2（colors[]）も読める
+    const meta = { format: PROJ_FORMAT, ver: 4, fps: FPS, conteW: CONTE_W, conteH: CONTE_H,
                    savedAt: new Date().toISOString(),
                    board: { x: state.board.x, y: state.board.y, z: state.board.z },
                    paint: { colorAlpha: gPaint.colorAlpha, colorBlend: gPaint.colorBlend },
@@ -2503,19 +2738,22 @@ async function exportProject(){
     for(let i = 0; i < cuts.length; i++){
       const c = cuts[i];
       await encodeCut(c);
-      const file = 'cuts/' + c.id + '.draw.png';
-      if(c.drawBlob) zip.file(file, c.drawBlob);
-      const pf = 'cuts/' + c.id + '.plate.png';
-      if(c.plateBlob) zip.file(pf, c.plateBlob);
+      // V4: 枠ごとのパッチ（cuts/<id>.f<k>.line.png / .plate.png）
+      const frMeta = ensureFr(c).map((f, k) => {
+        const lf = 'cuts/' + c.id + '.f' + k + '.line.png';
+        const pf2 = 'cuts/' + c.id + '.f' + k + '.plate.png';
+        if(f.lineBlob) zip.file(lf, f.lineBlob);
+        if(f.plateBlob) zip.file(pf2, f.plateBlob);
+        return { line: f.lineBlob ? lf : null, plate: f.plateBlob ? pf2 : null, rect: f.rect || null };
+      });
       meta.cuts.push({ id: c.id, order: i, bg: c.bg, durF: c.durF, note: c.note,
                        baseAlpha: baseAlphaOf(c), baseOver: !!c.baseOver, lock: !!c.lock,
-                       plateFile: c.plateBlob ? pf : null,
+                       fr: frMeta,
                        cam: (c.cam || []).map(k => ({ k: k.k, x: k.x, y: k.y, w: k.w, h: k.h,
                                                       dur: k.dur | 0, ease: k.ease || 'LINEAR',
                                                       key: !!k.key, keyUser: !!k.keyUser })),
                        bakeRect: c.bakeRect || null, bakeW: c.bakeW || CONTE_W, bakeH: c.bakeH || CONTE_H,
-                       bakeExpand: c.bakeExpand || 1.02, camLead: camLead(c), camTail: camTail(c),
-                       drawFile: c.drawBlob ? file : null });
+                       bakeExpand: c.bakeExpand || 1.02, camLead: camLead(c), camTail: camTail(c) });
     }
     // 音とマーカーも入れる（全消去の前の保存先がこのZIPなので、抜けがあると戻せない）
     if(gAudio && gAudio.blob){
@@ -2559,38 +2797,57 @@ async function importProject(file){
       photos.push({ id: p.id, name: p.name, img, blob, x: p.x, y: p.y, w: p.w, h: p.h,
                     rot: p.rot || 0, filter: normFilter(p.filter), ref: p.ref || null });
     }
-    let plateMig = 0;
+    let patchMig = 0;
     const list = (meta.cuts || []).slice().sort((a, b) => a.order - b.order);
     for(const c of list){
       const bw = c.bakeW || CONTE_W, bh = c.bakeH || CONTE_H;
-      const drawC = blankCanvas(bw, bh);
-      if(c.drawFile && zip.file(c.drawFile)){
-        try{
-          const im = await blobToImage(await zip.file(c.drawFile).async('blob'));
-          ctx2d(drawC).drawImage(im, 0, 0);
-        }catch(e){}
-      }
       const cut = { id: c.id || uid(), cam: c.cam || [], bakeRect: c.bakeRect || null,
                     bakeW: bw, bakeH: bh, bakeExpand: c.bakeExpand || 1.02, bakeClamp: 1,
                     camLead: c.camLead | 0, camTail: c.camTail | 0,
-                    baseC: null, drawC, plateC: null, plateBlob: null, bg: (typeof c.bg === 'number' ? c.bg : 232),
+                    baseC: null, fr: null, res: true, bg: (typeof c.bg === 'number' ? c.bg : 232),
                     baseAlpha: (typeof c.baseAlpha === 'number' ? c.baseAlpha : DEFAULT_BASE_ALPHA),
                     baseOver: !!c.baseOver, lock: !!c.lock,
                     durF: c.durF || FPS * 2, note: c.note || '',
-                    baseBlob: null, drawBlob: null,
-                    dirtyBase: true, dirtyDraw: true, thumb: null };
+                    baseBlob: null, dirtyBase: true, thumb: null };
+      ensureFr(cut);
       cuts.push(cut);
-      rebakeFromCam(cut);   // ベイクは持ち歩かずここで焼き直す（plate も remapPlate で追従する）
-      // 色は rebake のあとに載せる（plateSize は確定した bake 寸法から決まるため）
-      if(c.plateFile && zip.file(c.plateFile)){
-        try{
-          await decodePlate(cut, await blobToImage(await zip.file(c.plateFile).async('blob')));
-          cut.dirtyPlate = true;
-        }catch(e){}
-      }else{
-        // ver 2 以前（枠ごと・出力枠512×288）→ カット1枚へ（SPEC_15 P1-6・IndexedDB側と同じ変換）
-        const raw = c.colors || (c.colorFile ? [{ blend: c.colorBlend, alpha: c.colorAlpha, file: c.colorFile }] : []);
-        if(await migratePlate(cut, raw, async r => blobToImage(await zip.file(r.file).async('blob')))) plateMig++;
+      rebakeFromCam(cut);   // ベイクは持ち歩かずここで焼き直す（パッチは寸法固定なので影響なし）
+      const unzip = async f => blobToImage(await zip.file(f).async('blob'));
+      if(Array.isArray(c.fr) && c.fr.length){                     // ver 4
+        for(let k = 0; k < c.fr.length; k++){
+          const r = c.fr[k], f = frAt(cut, k);
+          if(!r || !f) continue;
+          if(r.rect) f.rect = r.rect;
+          if(r.line && zip.file(r.line)){
+            try{
+              const im = await unzip(r.line);
+              f.line = blankCanvas(PATCH_W, PATCH_H);
+              ctx2d(f.line).drawImage(im, 0, 0, PATCH_W, PATCH_H);
+              f.dirtyLine = true;
+            }catch(e){}
+          }
+          if(r.plate && zip.file(r.plate)){
+            try{
+              const im = await unzip(r.plate);
+              f.plate = blankCanvas(PLATE_W, PLATE_H);
+              ctx2d(f.plate).drawImage(im, 0, 0, PLATE_W, PLATE_H);
+              f.dirtyPlate = true;
+            }catch(e){}
+          }
+        }
+        syncPatchRects(cut);
+      }else{                                                       // ver 3 以前 → 枠ごとへ変換
+        let hit = false;
+        if(c.drawFile && zip.file(c.drawFile)){
+          if(await splitBakeToPatches(cut, c.drawFile, 'line', f => unzip(f))) hit = true;
+        }
+        if(c.plateFile && zip.file(c.plateFile)){
+          if(await splitBakeToPatches(cut, c.plateFile, 'plate', f => unzip(f))) hit = true;
+        }else{
+          const raw = c.colors || (c.colorFile ? [{ blend: c.colorBlend, alpha: c.colorAlpha, file: c.colorFile }] : []);
+          if(await migrateColorsToPatches(cut, raw, async r => unzip(r.file))) hit = true;
+        }
+        if(hit) patchMig++;
       }
     }
     if(meta.board){ state.board.x = meta.board.x; state.board.y = meta.board.y; state.board.z = meta.board.z; }
@@ -2598,7 +2855,7 @@ async function importProject(file){
       if(typeof meta.paint.colorAlpha === 'number') gPaint.colorAlpha = clamp(meta.paint.colorAlpha, 0, 1);
       if(meta.paint.colorBlend) gPaint.colorBlend = meta.paint.colorBlend;
       saveUi();
-    }else adoptMigratedPaint(plateMig);              // ver 2 以前は per-slot の最頻値を採用
+    }else adoptMigratedPaint(patchMig);              // ver 2 以前は per-slot の最頻値を採用
     // 音とマーカー
     clearAudio(true);
     gMarkers = Array.isArray(meta.markers) ? meta.markers.map(n => n | 0) : [];
@@ -2622,9 +2879,10 @@ async function importProject(file){
 
 /* ---------------- BOARD統合Undoログ（animator と同じ一元ログ） ----------------
    gLog = [{type, undo(), redo()}]。STUDIO の Ctrl+Z/Y はこれを叩く。
-   EDIT内は従来どおりカット内 drawC のスナップショット（undoStack/redoStack）のまま。 */
+   EDIT内のペイントは gColorLog（ペイント専用ログ）。ここには混ぜない。 */
 let gLog = [], gLogRedo = [];
-const LOG_MAX = 60, LOG_PAINT_MAX = 8;   // paint は ImageData 2枚 ≒ 7MB/件なので別枠で制限
+// paint は「変更した矩形だけ」になった（SPEC_16 E1）ので別枠の上限も上げてよい
+const LOG_MAX = 60, LOG_PAINT_MAX = 30;
 function pushLog(e){
   gLog.push(e);
   gLogRedo.length = 0;
@@ -2636,14 +2894,17 @@ function pushLog(e){
   }
   if(gLog.length > LOG_MAX) gLog.shift();
 }
-/* --- カラースクリプト（EDIT GRID）専用のUndo ---
-   **統合ログとは絶対に混ぜない**。混ぜると GRID で Ctrl+Z を連打したときに
-   cut-add / photo-add まで遡ってカットや写真が消える（2026-08-02 に実際に消えた）。 */
+/* --- ペイント専用のUndo（EDIT の SINGLE / GRID 両方） ---
+   **統合ログとは絶対に混ぜない**。混ぜると Ctrl+Z を連打したときに
+   cut-add / photo-add まで遡ってカットや写真が消える（2026-08-02 に実際に消えた）。
+   V4（SPEC_16 E1）で1件が「変更した矩形だけ」になったので、**深く持てるようになった**
+   （旧: パッチ丸ごと2枚＝最大4.7MB/件で12手 → 現: ふつうのストロークで数十KB/件）。 */
 let gColorLog = [], gColorRedo = [];
-const COLOR_LOG_MAX = 12;   // 1件が最大数MBなので浅めに持つ
+const COLOR_LOG_MAX = 80;
 function inGrid(){ return state.view === 'edit' && gEditMode === 'grid'; }
+function inPaintView(){ return state.view === 'edit'; }
 function pushPaintLog(e){
-  if(inGrid()){
+  if(inPaintView()){
     gColorLog.push(e);
     gColorRedo.length = 0;
     if(gColorLog.length > COLOR_LOG_MAX) gColorLog.shift();
@@ -2656,7 +2917,7 @@ function logStep(from, to, dir){
   if(!e){ toast(dir === 'undo' ? '元に戻す操作がありません' : 'やり直す操作がありません'); return; }
   (dir === 'undo' ? e.undo : e.redo)();
   to.push(e);
-  if(inGrid()){            // GRIDは色だけなのでBOARD側は触らない
+  if(inPaintView()){       // EDITは画だけなのでBOARD側は触らない
     renderPaintViews();
     updateTotals();
     scheduleSave();
@@ -2793,23 +3054,6 @@ function updateCoverage(cut){
 function invalidateCoverage(){
   cuts.forEach(updateCoverage);
 }
-/* bakeRect が動いたら、加筆(drawC)も新しいベイク空間へ載せ替える
-   （加筆は「紙の上」に描いてあるので、枠を動かしても絵に貼り付いたままにする） */
-function remapDraw(cut, oldRect, oldW, oldH){
-  const nr = cut.bakeRect;
-  if(!nr || !oldRect || !cut.drawC) return;
-  if(oldRect.x === nr.x && oldRect.y === nr.y && oldRect.w === nr.w &&
-     oldW === cut.bakeW && oldH === cut.bakeH) return;
-  const tmp = blankCanvas(cut.bakeW, cut.bakeH);
-  const ctx = ctx2d(tmp);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(cut.drawC, 0, 0, oldW, oldH,
-                (oldRect.x - nr.x) / nr.w * cut.bakeW, (oldRect.y - nr.y) / nr.h * cut.bakeH,
-                oldRect.w / nr.w * cut.bakeW, oldRect.h / nr.h * cut.bakeH);
-  cut.drawC = tmp;
-  cut.dirtyDraw = true;
-}
 function camCorners(r){
   return [{ x: r.x, y: r.y, n: 'nw' }, { x: r.x + r.w, y: r.y, n: 'ne' },
           { x: r.x, y: r.y + r.h, n: 'sw' }, { x: r.x + r.w, y: r.y + r.h, n: 'se' }];
@@ -2867,12 +3111,15 @@ function withResident(cut, fn){
 function rebakeFromCam(cut){
   if(!cut) return;
   if(!isResident(cut)){ withResident(cut, () => rebakeFromCam(cut)); return; }
-  const oldRect = cut.bakeRect, old = bakeSize(cut);
   const nr = calcBakeRect(cut);
   cut.bakeRect = nr;
   relabelCam(cut);
   recalcDur(cut);
   cut.thumb = null;
+  // **パッチは cam[] と1対1**。枠が増減／移動していたらここで必ず合わせる（SPEC_16 §3-1）。
+  // パッチ自体の寸法はベイクに依存しない（出力等倍固定）ので、載せ替えは位置だけ
+  ensureFr(cut);
+  syncPatchRects(cut);
   if(!nr){
     cut.bakeW = CONTE_W; cut.bakeH = CONTE_H;
     cut.baseC = null;
@@ -2884,11 +3131,8 @@ function rebakeFromCam(cut){
   const sz = calcBakeSize(cut);            // V2-D2: カット毎に可変
   cut.bakeW = sz.w; cut.bakeH = sz.h;
   cut.bakeClamp = sz.clamp;
-  remapDraw(cut, oldRect, old.w, old.h);   // 加筆をベイク空間ごと載せ替え（寸法変更もここで吸収）
-  remapPlate(cut, oldRect, old.w, old.h);  // 色も同じ紙の上にあるので同じ載せ替えを通す（SPEC_15 P1）
   cut.baseC = bakeCut(nr, sz.w, sz.h);
   cut.dirtyBase = true;
-  cut.dirtyDraw = true;
   updateCoverage(cut);
   touchLru(cut);
 }
@@ -2936,19 +3180,39 @@ function drawCamFrame(ctx, cut, f, outW, outH, noColor){
   ctx.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
   ctx.fillRect(0, 0, OW, OH);
   const src = camSrcRect(cut, f);
-  const base = getBase(cut), draw = getDraw(cut);
+  const base = getBase(cut);
+  needLine(cut);                             // line パッチが無ければ読み込みを頼む（描画は先へ進む）
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   const over = baseOverOf(cut);
   const putBase = () => { if(base) drawBaseLayer(ctx, cut, base, src, OW, OH); };
   if(!over) putBase();
-  // 色も line とまったく同じ切り出し（＝カメラの後ろ・セルの上）。T.U./PAN すると一緒に寄る
-  if(!noColor) drawPlateLayer(ctx, cut, src, OW, OH);
-  if(draw){
-    if(src) ctx.drawImage(draw, src.sx, src.sy, src.sw, src.sh, 0, 0, OW, OH);
-    else ctx.drawImage(draw, 0, 0, OW, OH);
-  }
+  // 枠ごとのパッチを紙の上に置く（k昇順・入れ子なら下を隠す。SPEC_16 §2a(b) / §3-2）。
+  // 切り出しは base とまったく同じ src なので、T.U./PAN すると一緒に寄る
+  if(!noColor) drawPatchStack(ctx, cut, src, OW, OH, 'plate');
+  drawPatchStack(ctx, cut, src, OW, OH, 'line');
   if(over) putBase();                        // 元絵を加筆の上へ（REF扱い）
+}
+/* --- GRIDセル1枚 ＝ **その枠の画だけ**（SPEC_16 §3-3） --------------------
+   セルは自分の枠のパッチしか描かない。T.U. の B セルに A の太い線が出る
+   （V3-P1 の「大小ペイントが同時に入る」）のはこれで消える。
+   合成した本当の画（B のパッチが A の真ん中に貼ってある状態）は TIMELINE / 中央プレビューに出る。 */
+function drawCellFrame(ctx, cut, k, outW, outH, noColor){
+  const OW = outW || CONTE_W, OH = outH || CONTE_H;
+  const v = cut.bg;
+  ctx.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
+  ctx.fillRect(0, 0, OW, OH);
+  const src = camSrcRect(cut, camStartFrame(cut, k));
+  const base = getBase(cut);
+  needLine(cut);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  const over = baseOverOf(cut);
+  const putBase = () => { if(base) drawBaseLayer(ctx, cut, base, src, OW, OH); };
+  if(!over) putBase();
+  if(!noColor) drawPatchStack(ctx, cut, src, OW, OH, 'plate', k);
+  drawPatchStack(ctx, cut, src, OW, OH, 'line', k);
+  if(over) putBase();
 }
 /* 元の絵（baseC）を1枚だけ描く共通口。**濃度と重ね順はここだけで決まる**（SPEC_13 §3-1 の拡張）。
    src=null ならベイク全面、あればその矩形を切り出して出力枠へ伸ばす。 */
@@ -2970,22 +3234,6 @@ function camSrcRect(cut, f){
   const b = bakeSize(cut);
   return { sx: (r.x - br.x) / br.w * b.w, sy: (r.y - br.y) / br.h * b.h,
            sw: r.w / br.w * b.w,          sh: r.h / br.h * b.h };
-}
-/* 色（plateC）を1枚だけ置く共通口。src は **ベイク空間**の矩形（plate への換算はここで1回だけ）。
-   濃・描画モードは全体設定から1回だけ掛ける（SPEC_15 P1-3 / P3-1）。
-   drawBaseLayer と同じ形にしてあるので、合成順は呼ぶ側の並びだけで読める。 */
-function drawPlateLayer(ctx, cut, src, dw, dh){
-  const p = getPlate(cut);                   // 無い＝色なし。ここでは作らない
-  if(!p) return;
-  const a = clamp(gPaint.colorAlpha, 0, 1);
-  if(a <= 0) return;
-  const k = plateScale(cut);
-  ctx.save();
-  ctx.globalAlpha = a;
-  ctx.globalCompositeOperation = gPaint.colorBlend || 'multiply';
-  if(src) ctx.drawImage(p, src.sx * k, src.sy * k, src.sw * k, src.sh * k, 0, 0, dw, dh);
-  else ctx.drawImage(p, 0, 0, dw, dh);
-  ctx.restore();
 }
 /* 出力座標(0..1280) → ベイク空間座標。枠列カットのプレビューに直接描くときに要る */
 function camToBake(cut, f, x, y){
@@ -3039,9 +3287,9 @@ function insertCut(cut, at){
 function createCutFromRect(src){
   const cut = { id: uid(), cam: [mkCam(src, 0)], bakeRect: { x: src.x, y: src.y, w: src.w, h: src.h },
                 bakeW: CONTE_W, bakeH: CONTE_H, bakeExpand: 1.02,
-                baseC: bakeCut(src, CONTE_W, CONTE_H), drawC: blankCanvas(CONTE_W, CONTE_H), bg: 232,
+                baseC: bakeCut(src, CONTE_W, CONTE_H), fr: [mkFr(src)], res: true, bg: 232,
                 baseAlpha: DEFAULT_BASE_ALPHA,
-                durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: true, dirtyDraw: true, thumb: null };
+                durF: FPS * 2, note: '', baseBlob: null, dirtyBase: true, thumb: null };
   updateCoverage(cut);
   touchLru(cut);
   const at = insertCut(cut, newCutSlot());
@@ -3053,8 +3301,8 @@ function createCutFromRect(src){
 }
 function addEmptyCut(){
   const cut = { id: uid(), cam: [], bakeRect: null, bakeW: CONTE_W, bakeH: CONTE_H, bakeExpand: 1.02,
-                baseC: null, drawC: blankCanvas(CONTE_W, CONTE_H), bg: 232, baseAlpha: DEFAULT_BASE_ALPHA,
-                durF: FPS * 2, note: '', baseBlob: null, drawBlob: null, dirtyBase: false, dirtyDraw: true, thumb: null };
+                baseC: null, fr: [mkFr(null)], res: true, bg: 232, baseAlpha: DEFAULT_BASE_ALPHA,
+                durF: FPS * 2, note: '', baseBlob: null, dirtyBase: false, thumb: null };
   touchLru(cut);
   const at = insertCut(cut, newCutSlot());
   refreshStudio();
@@ -3094,7 +3342,9 @@ function shiftCutRefs(at, d){
   // 添字で持っている選択はここで全部捨てる（残すと必ずズレる）
   if(gSelCells.length) setSelCells([]);
   if(gSelRows.length) setSelRows([]);
-  undoStack = []; redoStack = [];
+  // カットが消えた/挿さったら、そのカットを掴んでいるペイントログも捨てる
+  // （消えたカットに putImageData しても画面には出ない＝Undoが黙って効かなくなる）
+  gColorLog.length = 0; gColorRedo.length = 0;
 }
 function rebakeCut(i){
   const c = cuts[i];
@@ -3119,13 +3369,15 @@ function compositeTo(ctx, cut, w, h){
   const v = cut.bg;
   ctx.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
   ctx.fillRect(0, 0, dw, dh);
-  const base = getBase(cut), draw = getDraw(cut);
+  const base = getBase(cut);
+  needLine(cut);
   // トレース透かし＋重ね順（SPEC_13 §3-1）: 元の絵は drawBaseLayer 経由でしか描かない。
   // ここを通る全部（EDIT/プレビュー/サムネ/書き出し）に効く＝WYSIWYG
   const over = baseOverOf(cut);
   if(base && !over) drawBaseLayer(ctx, cut, base, null, dw, dh);
-  drawPlateLayer(ctx, cut, null, dw, dh);   // ベイク全面＝紙の上の色（line と同じ空間）
-  if(draw) ctx.drawImage(draw, 0, 0, dw, dh);
+  // 紙の全面に、枠ごとのパッチを cam[k] の位置で並べる（SPEC_16 §3-2）
+  drawPatchStack(ctx, cut, null, dw, dh, 'plate');
+  drawPatchStack(ctx, cut, null, dw, dh, 'line');
   if(base && over) drawBaseLayer(ctx, cut, base, null, dw, dh);
 }
 function baseAlphaOf(cut){ return (cut && typeof cut.baseAlpha === 'number') ? clamp(cut.baseAlpha, 0, 1) : DEFAULT_BASE_ALPHA; }
@@ -3189,7 +3441,7 @@ function syncBaseAlphaUI(){
 function cutThumb(cut){
   const c = document.createElement('canvas');
   c.width = CONTE_W; c.height = CONTE_H;
-  drawCamFrame(c.getContext('2d'), cut, 0);   // §5h: CUT単位のサムネは A枠の切り出し
+  drawCellFrame(c.getContext('2d'), cut, 0);   // CUT単位のサムネは **A枠の画**（GRIDのAセルと同じ）
   const t = document.createElement('canvas');
   t.width = 256; t.height = 144;
   t.getContext('2d').drawImage(c, 0, 0, 256, 144);
@@ -3207,7 +3459,7 @@ const THUMB_PLACEHOLDER = (() => {
 })();
 function cutThumbSrc(cut){
   if(cut.thumb) return cut.thumb;
-  if(!isResident(cut) && (cut.drawBlob || cut.baseBlob)){
+  if(!isResident(cut) && (cut.baseBlob || (cut.fr || []).some(f => f && f.lineBlob))){
     ensureResident(cut).then(() => {
       cut.thumb = null;
       refreshRow(cuts.indexOf(cut));
@@ -3560,8 +3812,6 @@ function refreshRow(i){
 /* ---------------- EDIT ---------------- */
 const editCv = $('#edit-cv');
 const editCtx = ctx2d(editCv);
-let undoStack = [], redoStack = [];
-const UNDO_MAX = 10;
 
 /* ---------------- EDIT GRID＝カラースクリプト編集（SPEC_13 §9b） ----------------
    セル ＝ cam[].key が true の枠。**§5h の一覧PNGと同じ単位**なので、
@@ -3735,10 +3985,39 @@ function drawCell(cell){
     // 色だけは焼き込まずに毎回上から重ねる＝塗った瞬間そのまま出る
     // （元絵を「上」にしているカットだけ、非常駐のあいだ色と元絵の前後が入れ替わる。
     //   触れば本物が読み込まれて正しい順に戻るので、控えの割り切りとして許容）
-    drawPlateLayer(ctx, cut, camSrcRect(cut, camStartFrame(cut, cell.k)), cell.cv.width, cell.cv.height);
+    drawPatchStack(ctx, cut, camSrcRect(cut, camStartFrame(cut, cell.k)),
+                   cell.cv.width, cell.cv.height, 'plate', cell.k);
     return;
   }
-  drawCamFrame(ctx, cut, camStartFrame(cut, cell.k), cell.cv.width, cell.cv.height);
+  drawCellFrame(ctx, cut, cell.k, cell.cv.width, cell.cv.height);
+  drawTakeoverGuide(ctx, cut, cell.k, cell.cv.width, cell.cv.height);
+}
+/* --- 「ここは後の枠が総取りする」印（SPEC_16 §2a(b) の副作用への対処） -------------
+   T.U. の A セルは自分のパッチだけを出すので描けるが、**実際の画では B が総取りする**
+   （TIMELINE では B のパッチで置き換わる）。何も出さないと
+   「A セルには描けたのに再生すると消える」に見えるので、その領域を破線で示す。
+   **画そのものには焼かない**（C.SCRIPT / 書き出し / 控えは drawCellFrame だけを通る）。 */
+function drawTakeoverGuide(ctx, cut, k, W, H){
+  const n = frCount(cut);
+  const rk = camRect(cut, k);
+  if(!rk) return;
+  for(let j = k + 1; j < n; j++){
+    const rj = camRect(cut, j);
+    if(!rj || !patchHides(cut, j)) continue;
+    if(!rectContains(rk, rj)) continue;                 // 内側に入る枠だけ（外側なら関係ない）
+    const x = (rj.x - rk.x) / rk.w * W, y = (rj.y - rk.y) / rk.h * H;
+    const w = rj.w / rk.w * W,          h = rj.h / rk.h * H;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,79,168,0.55)';
+    ctx.lineWidth = Math.max(1, W / 420);
+    ctx.setLineDash([Math.max(3, W / 90), Math.max(3, W / 120)]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,79,168,0.75)';
+    ctx.font = 'bold ' + Math.max(8, Math.round(W / 26)) + 'px monospace';
+    ctx.fillText(cut.cam[j].k, x + W / 120, y + W / 22);
+    ctx.restore();
+  }
 }
 function drawRowPalette(rec){
   if(!rec.palCv) return;
@@ -3786,13 +4065,19 @@ function updateCellRes(now){
   if(now) run(); else gResT = setTimeout(run, 160);
 }
 /* 描いたカットのセルだけ描き直す（毎ストロークで全再構築はしない）。
-   色がカット1枚になったので、**同じカットのセルは A も B も一緒に変わる**（SPEC_15 P1-7）。
+   V4 で画が枠ごとになったので、**変わるのは触った枠のセルだけ**（A に描いても B は変わらない）。
+   k を渡さなければそのカットの全セル（REF濃度・BG など枠をまたぐ設定の変更用）。
    pal=false は色帯を省く軽い版（ストローク中に毎回ヒストグラムを取らないため） */
-function refreshGridCells(i, pal){
+function refreshGridCells(i, pal, k){
   const withPal = (pal !== false);
+  const one = (typeof k === 'number');
   gGridRows.forEach(rec => {
     let hit = false;
-    rec.cells.forEach(cell => { if(cell.i === i){ drawCell(cell); hit = true; } });
+    rec.cells.forEach(cell => {
+      if(cell.i !== i) return;
+      if(one && cell.k !== k) return;
+      drawCell(cell); hit = true;
+    });
     if(hit && withPal) drawRowPalette(rec);
   });
 }
@@ -3845,6 +4130,21 @@ function moveSelCuts(d){
   renderGrid();
   setSelCells(colorCells().map(c => c.i + ':' + c.k).filter(k2 => keys.has(k2)));
   scheduleSave();
+}
+/* 選択中のカットを **最上位 / 最下位** へ持っていく（SPEC_16 §5-C7）。
+   moveSelCuts を端に着くまで回すだけ（Undoは1手ずつ積まれるので戻すのも同じ回数）。
+   端に着いたら moveSelCuts が何もせず返るので、その時点で止まる */
+function moveSelCutsEnd(d){
+  const guard = cuts.length + 2;
+  let n = 0, last = '';
+  while(n++ < guard){
+    const sig = gSelCells.join(',') + '|' + state.curCut;
+    moveSelCuts(d);
+    const now = gSelCells.join(',') + '|' + state.curCut;
+    if(now === sig && now === last) break;
+    last = sig;
+  }
+  toast(d < 0 ? '最上位へ移動しました' : '最下位へ移動しました');
 }
 /* --- 拡縮（ホイール＝カーソル位置を保ったままセルの大きさを変える） --- */
 function gridZoom(factor, anchorY){
@@ -3913,7 +4213,6 @@ function gridPaintDown(e, cv){
     // SHEETの行と同じ手つきに統一した。マウス/ペンの Ctrl+クリックと同じ結果になる）
     const add = hasHeldFinger();
     state.curCut = i; state.curFrame = k;
-    undoStack = []; redoStack = [];
     if(add){
       gGridAdding = true;
       gGest = null;
@@ -3928,21 +4227,30 @@ function gridPaintDown(e, cv){
     syncEditPanels();
     return;
   }
-  if(state.curCut !== i || state.curFrame !== k){
-    state.curCut = i;
-    state.curFrame = k;                    // 色は枠ごとなのでどの枠かも覚える
-    undoStack = []; redoStack = [];        // カットまたぎ undo の破損防止
-    setSelCells([i + ':' + k]);
-    syncEditPanels();
+  // **Ctrl / Shift を押している間は選択の操作**（画の上でも効く。2026-08-18）。
+  // キャプションの上でしか効かないと「掴める所を探す」ことになるので、セル全体で受ける。
+  // Alt はスポイトなので触らない
+  if((e.ctrlKey || e.metaKey || e.shiftKey) && !e.altKey){
+    e.preventDefault();
+    cellCaptionClick(e, i, k);
+    return;
   }
+  const key = i + ':' + k;
+  state.curCut = i;
+  state.curFrame = k;                      // 画は枠ごとなのでどの枠かも覚える（SPEC_16）
+  // 選択は**押すたびに合わせ直す**。以前は「別のセルに移ったとき」しか触っていなかったので、
+  // いま居るセルをもう一度押しても選択が入らなかった（選択を外した直後に効いてくる）。
+  // すでに複数選んでいてその中を押したときは**選択を保つ**（一括操作の途中で消えると使えない）
+  if(gSelCells.indexOf(key) < 0) setSelCells([key]);
+  syncEditPanels();
   const cut = cuts[i];
-  if(state.paintTarget === 'draw' && !isResident(cut)){
+  if(paintKind() === 'line' && !isResident(cut)){
     ensureResident(cut).then(() => toast('読み込みました。もう一度なぞってください'));
     return;
   }
-  // ペン/消しゴム＋カラー層のときだけ「コマをまたぐ塗り」経路へ。
-  // FILL/スポイトはセル単位で完結させたいので従来どおり
-  if(state.paintTarget === 'color' && !e.altKey && (state.etool === 'pen' || state.etool === 'eraser')){
+  // ペン/消しゴムは line / color どちらでも「コマをまたぐ塗り」経路へ（V4 でセル＝パッチが
+  // 相似になったので、色だけの特例にする理由が無くなった）。投げ縄/スポイトは paintDown 側
+  if(!e.altKey && (state.etool === 'pen' || state.etool === 'eraser')){
     gridStrokeStart(e, cv);
     return;
   }
@@ -3962,42 +4270,39 @@ function cellAtPoint(cx, cy){
   }
   return null;
 }
-/* セル → 出力枠 → ベイク → plate の2段変換（SPEC_15 P1-5）。
-   色がベイク空間になったので、セルからはカメラを逆に通して紙の上へ戻す必要がある */
-function cellColorCoord(cell, cx, cy){
-  const cut = cuts[cell.i];
+/* セル → そのセルの枠のパッチ座標。V4 でパッチが出力と同じ形になったので、
+   カメラを逆に通す必要が無くなった（**セルとパッチは相似**）＝またぎ塗りが素直になる */
+function cellPatchCoord(cell, cx, cy, kind){
   const r = cell.cv.getBoundingClientRect();
-  const b = camToBake(cut, camStartFrame(cut, cell.k),
-                      (cx - r.left) / r.width * CONTE_W, (cy - r.top) / r.height * CONTE_H);
-  const k = plateScale(cut);
-  return { x: b.x * k, y: b.y * k };
+  const s = patchSize(kind);
+  return { x: (cx - r.left) / r.width * s.w, y: (cy - r.top) / r.height * s.h };
 }
 function gridStrokeStart(e, cv){
   const cell = cellAtPoint(e.clientX, e.clientY);
   if(!cell) return;
   e.preventDefault();
   try{ cv.setPointerCapture(e.pointerId); }catch(err){}
-  gGridStroke = { id: e.pointerId, touched: new Map(), last: null };
+  txBegin();
+  gGridStroke = { id: e.pointerId, kind: paintKind(), touched: new Map(), last: null };
   gridStrokeTo(cell, e.clientX, e.clientY);
 }
 function gridStrokeTo(cell, cx, cy){
   const g = gGridStroke;
   const cut = cuts[cell.i];
-  const col = getPlate(cut, true);
-  const key = String(cell.i);                        // 色はカット1枚（枠ごとではない）
-  if(!g.touched.has(key)){
-    g.touched.set(key, { cut, before: ctx2d(col).getImageData(0, 0, col.width, col.height) });
-  }
-  const p = cellColorCoord(cell, cx, cy);
+  if(!cut) return;
+  if(g.kind === 'line' && !needLine(cut)) return;    // 非常駐カットには線を落とさない
+  const key = cell.i + ':' + cell.k;                 // 画は枠ごと（SPEC_16）
+  if(!g.touched.has(key)) g.touched.set(key, { i: cell.i, k: cell.k, cell });
+  const p = cellPatchCoord(cell, cx, cy, g.kind);
   const prev = (g.last && g.last.key === key) ? g.last.p : p;
-  // ブラシは line と同じ物差し（strokeScaleFor）＝「6」は常に**出力画面での6px**
-  gStrokeK = strokeScaleFor(cut, col.width, camStartFrame(cut, cell.k));
-  strokeSegOn(cut, col, prev, p);
+  // **ブラシ補正は要らない**（パッチが出力と等倍・全セル同じ縮尺）＝またいでも同じ太さ（SPEC_16 §3-3）
+  gStrokeK = patchK(g.kind);
+  strokePatchSeg(cut, cell.k, g.kind, prev, p);
   cut.thumb = null;
   const first = !g.last;
   g.last = { key, p };
-  // 引いている最中は区間を重ねるだけ（上の previewSegOnCell 参照）。
-  // 兄弟セル（同じカットの A/B）・色帯・正確な合成は gridStrokeUp でまとめて追いつかせる
+  // 引いている最中は区間を重ねるだけ（下の previewSegOnCell 参照）。
+  // 色帯・正確な合成は gridStrokeUp でまとめて追いつかせる
   if(state.etool === 'eraser' || first) drawCellSoon(cell);
   else previewSegOnCell(cell, prev, p);
 }
@@ -4010,24 +4315,22 @@ function gridStrokeTo(cell, cx, cy){
    ちゃんと合成し直すので、重なりの濃度が僅かに違う程度の近似は残らない。
    消しゴムは「重ねて」表現できない（下の絵ごと抜けてしまう）ので従来どおり描き直す。 */
 function previewSegOnCell(cell, a, b){
-  const cut = cuts[cell.i], p = cut && cut.plateC;
-  if(!p){ drawCell(cell); return; }
-  const k = plateScale(cut);
-  const src = camSrcRect(cut, camStartFrame(cut, cell.k));
-  const sx = src ? src.sx * k : 0, sy = src ? src.sy * k : 0;
-  const sw = src ? src.sw * k : p.width, sh = src ? src.sh * k : p.height;
-  const fx = cell.cv.width / Math.max(1, sw), fy = cell.cv.height / Math.max(1, sh);
+  const kind = (gGridStroke && gGridStroke.kind) || paintKind();
+  const s = patchSize(kind);
+  const fx = cell.cv.width / s.w, fy = cell.cv.height / s.h;   // パッチとセルは相似（V4）
   const ctx = ctx2d(cell.cv);
   ctx.save();
-  ctx.globalAlpha = clamp(gPaint.colorAlpha, 0, 1);
-  ctx.globalCompositeOperation = gPaint.colorBlend || 'multiply';
+  if(kind === 'plate'){
+    ctx.globalAlpha = clamp(gPaint.colorAlpha, 0, 1);
+    ctx.globalCompositeOperation = gPaint.colorBlend || 'multiply';
+  }
   ctx.strokeStyle = state.fillColor;
   ctx.lineWidth = Math.max(0.5, state.brush * gStrokeK * gStrokePress) * fx;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.moveTo((a.x - sx) * fx, (a.y - sy) * fy);
-  ctx.lineTo((b.x - sx) * fx + (a.x === b.x && a.y === b.y ? 0.01 : 0), (b.y - sy) * fy);
+  ctx.moveTo(a.x * fx, a.y * fy);
+  ctx.lineTo(b.x * fx + (a.x === b.x && a.y === b.y ? 0.01 : 0), b.y * fy);
   ctx.stroke();
   ctx.restore();
 }
@@ -4041,28 +4344,15 @@ function gridStrokeUp(e){
   if(!gGridStroke || (e && e.pointerId !== gGridStroke.id)) return;
   const g = gGridStroke;
   gGridStroke = null;
+  txEnd();                                   // 変更矩形だけを1手にまとめる（SPEC_16 E1）
   if(!g.touched.size) return;
-  const entries = [...g.touched.values()].map(t => {
-    const c = getPlate(t.cut, true);
-    return { cut: t.cut, before: t.before, after: ctx2d(c).getImageData(0, 0, c.width, c.height) };
-  });
-  const put = (cut, data) => {
-    const c = getPlate(cut, true);
-    if(c.width !== data.width || c.height !== data.height) return;
-    ctx2d(c).putImageData(data, 0, 0);
-    cut.dirtyPlate = true;
-    cut.thumb = null;
-  };
-  pushPaintLog({ type: 'paint',
-                 undo(){ entries.forEach(en => put(en.cut, en.before)); renderGridTouched(entries); },
-                 redo(){ entries.forEach(en => put(en.cut, en.after)); renderGridTouched(entries); } });
-  entries.forEach(en => refreshRow(cuts.indexOf(en.cut)));
-  entries.forEach(en => refreshGridCells(cuts.indexOf(en.cut), false));   // A/B の兄弟セルをここで一致させる
+  const touched = [...g.touched.values()];
+  touched.forEach(t => { drawCell(t.cell); refreshRow(t.i); });
   gGridRows.forEach(drawRowPalette);
-  // **またいだセルを全部「選択中」にする**（2026-08-14）。
+  // **またいだコマを全部「選択中」にする**（2026-08-14）。
   // 濃・描画モードは全体設定になった（SPEC_15 P3-1）が、REF濃度と並べ替えは今も選択単位
-  const hit = new Set([...g.touched.values()].map(t => cuts.indexOf(t.cut)));
-  const sel = colorCells().map(c => c.i + ':' + c.k).filter(k => hit.has(+k.split(':')[0]));
+  const hit = new Set(touched.map(t => t.i + ':' + t.k));
+  const sel = colorCells().map(c => c.i + ':' + c.k).filter(k => hit.has(k));
   if(sel.length > 1){
     setSelCells(sel);
     syncEditPanels();
@@ -4070,13 +4360,8 @@ function gridStrokeUp(e){
   }
   scheduleSave();
 }
-function renderGridTouched(entries){
-  if(gEditMode !== 'grid') return;
-  entries.forEach(en => refreshGridCells(cuts.indexOf(en.cut)));
-}
 function setEditMode(m, quiet){
   gEditMode = m;
-  undoStack = []; redoStack = [];   // カット別スタックは SINGLE 専用なのでモード切替で捨てる
   // SINGLE は1カットしか見えないので、GRIDで選んだ複数セルは持ち越さない
   // （持ち越すと 濃/モードが見えていないコマにも効いてしまう）
   if(m === 'single' && gSelCells.length) setSelCells([]);
@@ -4084,8 +4369,9 @@ function setEditMode(m, quiet){
   $('#view-edit').classList.toggle('grid', m === 'grid');   // 上部バーの表示コントロール切替
   $('#btn-mode-single').classList.toggle('on', m === 'single');
   $('#btn-mode-grid').classList.toggle('on', m === 'grid');
-  // GRIDは色を、SINGLEは線画を既定の描き先にする（手で切り替えも可）
-  setPaintTarget(m === 'grid' ? 'color' : 'draw');
+  // **描く先は画面移動で変えない**（SPEC_16 §5-B1）。
+  // 以前はここで GRID=color / SINGLE=line に付け替えていたので、
+  // 「色を塗るつもりで単票に入ったら線画になっていた」が起きていた
   if(quiet) return;                     // 表示は呼び出し側（setView）に任せる
   if(m === 'grid') renderGrid();
   else { sizeEditCanvas(cuts[state.curCut]); fitEditCanvas(); renderEditCanvas(); }
@@ -4109,14 +4395,15 @@ function syncEditPanels(){
     });
   }
   // 濃・描画モードは **この絵コンテ全体のトーン**（SPEC_15 P3-1）。カットが無くても触れる
-  if(cut) state.curFrame = clamp(state.curFrame | 0, 0, Math.max(0, camCount(cut) - 1));
+  if(cut) state.curFrame = clamp(state.curFrame | 0, 0, Math.max(0, frCount(cut) - 1));
   sel.disabled = false;
   $('#color-alpha').disabled = false;
   const colorBtn = document.querySelector('.etool[data-target="color"]');
   if(colorBtn){
-    colorBtn.classList.remove('off');   // SINGLE でも GRID でも同じ1枚を塗る
-    colorBtn.title = 'カラースクリプト層（カット1枚・line と同じ紙の上）／ERASE をWクリックで消える';
+    colorBtn.classList.remove('off');   // SINGLE でも GRID でも同じパッチを塗る
+    colorBtn.title = 'カラースクリプト層（**枠ごと**・line と同じ枠の上）／ERASE をWクリックで消える';
   }
+  measurePalettes();   // EDITサイドが出た直後はここが最初の「測れる」機会（§5-B5）
   sel.value = gPaint.colorBlend;
   const a = Math.round(clamp(gPaint.colorAlpha, 0, 1) * 100);
   if(document.activeElement !== $('#color-alpha')) $('#color-alpha').value = a;
@@ -4185,6 +4472,34 @@ function editZoomAt(clientX, clientY, factor){
   v.z = nz;
   applyEditView();
 }
+/* --- ホイール押下ドラッグ＝手のひら（SPEC_16 §5-C1〜C3） ---------------------
+   BOARD はもともと Alt / 中ボタンで動く。同じ手つきを **STUDIOプレビュー / SINGLE /
+   GRIDの余白** にも入れる（「どこでも中ボタンで動かせる」で覚えることを1つにする）。
+   ペンのバレルボタンはブラシサイズ（右ボタン）なので、ここは中ボタン専用にする。 */
+function bindMiddlePan(el, get, set, after){
+  let d = null;
+  el.addEventListener('pointerdown', e => {
+    if(e.button !== 1) return;                       // ホイール押下のみ
+    e.preventDefault();
+    try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    const o = get();
+    d = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ox: o.x, oy: o.y };
+    el.classList.add('panning');
+  });
+  el.addEventListener('pointermove', e => {
+    if(!d || e.pointerId !== d.id) return;
+    e.preventDefault();
+    set(d.ox + (e.clientX - d.sx), d.oy + (e.clientY - d.sy));
+    if(after) after();
+  });
+  const end = e => {
+    if(!d || (e && e.pointerId !== d.id)) return;
+    d = null;
+    el.classList.remove('panning');
+  };
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => el.addEventListener(ev, end));
+  el.addEventListener('auxclick', e => { if(e.button === 1) e.preventDefault(); });
+}
 function renderEditCanvas(){
   const cut = cuts[state.curCut];
   if(!cut) return;
@@ -4192,7 +4507,7 @@ function renderEditCanvas(){
   drawCamGuide(editCtx, cut);
 }
 /* 枠列カットは「どこが画面に入るか」が見えないと描けないので、EDIT表示にだけ枠を重ねる。
-   editCv は表示用キャンバスなので drawC は汚れない（floodFill/スポイトは別経路） */
+   editCv は表示用キャンバスなのでパッチは汚れない（投げ縄/スポイトは別経路） */
 function drawCamGuide(ctx, cut){
   if(!isCamCut(cut) || !cut.bakeRect) return;
   const br = cut.bakeRect, b = bakeSize(cut);
@@ -4228,7 +4543,6 @@ function openEdit(i){
   pause();
   i = clamp(i, 0, cuts.length - 1);
   state.curCut = i;
-  undoStack = []; redoStack = [];   // カットをまたぐundo破損防止（寸法も変わり得る）
   const cut = cuts[i];
   ensureResident(cut);              // V2-D2: 編集対象は必ず常駐させる
   $('#edit-cut-label').textContent = 'C' + (i + 1) + (isCamCut(cut) ? ' ' + cut.cam.map(c => c.k).join('→') : '');
@@ -4252,8 +4566,10 @@ function updateSwatch(){
   });
   if(!gHsvDriving) syncHsvFromColor();   // パレット/スポイト側から色が変わったらHSVも追従
 }
-/* 色は面で塗るので上限を大きく取る（数値は出力1280px基準） */
-function brushMax(){ return state.paintTarget === 'color' ? 300 : 64; }
+/* **ブラシ上限は1つ**（SPEC_16 §5-B1）。line / color で上限が変わると、
+   描く先を切り替えただけで太さが黙って丸められる。数値はどちらも出力1280px基準 */
+const BRUSH_MAX = 300;
+function brushMax(){ return BRUSH_MAX; }
 function setBrush(v){
   state.brush = clamp(Math.round(v), 1, brushMax());
   ['#brush-size', '#tl-brush'].forEach(id => {
@@ -4262,16 +4578,19 @@ function setBrush(v){
   });
   ['#brush-size-val', '#tl-brush-val'].forEach(id => { const el = $(id); if(el) el.textContent = state.brush; });
 }
+/* 紙の地色。**複数選んでいればまとめて効く**（SPEC_16 §5-C8）＝REF濃度と同じ手つき。
+   GRIDで何枚か選んで BG GRAY を押す、が1回で済む */
 function setCutBg(v){
-  const cut = cuts[state.curCut];
-  if(!cut) return;
-  cut.bg = clamp(Math.round(v), 0, 255);
-  cut.thumb = null;
-  $('#bg-slider').value = cut.bg;
-  $('#bg-val').textContent = cut.bg;
+  const val = clamp(Math.round(v), 0, 255);
+  const list = eachBaseCut(cut => { cut.bg = val; cut.thumb = null; });
+  if(!list.length) return;
+  $('#bg-slider').value = val;
+  $('#bg-val').textContent = val;
+  if(inGrid()) list.forEach(i => refreshGridCells(i));
   renderPaintViews();
-  refreshRow(state.curCut);
+  list.forEach(i => refreshRow(i));
   scheduleSave();
+  if(list.length > 1) toast(list.length + ' カットの地色を ' + val + ' にしました');
 }
 /* キャンバス自身の内部解像度で返す（editCv=ベイク寸法 / tlCv=出力1280×720。V2-D2） */
 function toCanvasCoord(clientX, clientY, cv){
@@ -4296,104 +4615,103 @@ function toBakeCoord(clientX, clientY, cv){
   }
   return p;   // editCv はベイク空間そのもの
 }
-/* 画面座標 → 塗る先の座標。色も **ベイク空間を経由するだけ**になった（SPEC_15 P1-4）。
-   枠ごとの特例（旧 bakeToColorCoord）は消滅。line と color の違いは最後の倍率1つだけ */
-function paintCoord(clientX, clientY, cv){
-  const b = toBakeCoord(clientX, clientY, cv);
-  if(state.paintTarget !== 'color') return b;
-  const k = plateScale(cuts[state.curCut]);
-  return { x: b.x * k, y: b.y * k };
+/* --- 塗る先はどの枠か（SPEC_16 §3-2） -------------------------------------
+   V4 では画が枠ごとなので、座標は **ベイク空間（紙の上）まで戻して、そこで枠を決める**。
+   決め方は「その点でいちばん上に見えている枠」＝ frameAtBake（重ね順と一致する）。
+   区間が枠をまたぐときは **両方のパッチに引く**ので、継ぎ目で線が切れない。 */
+/* --- ペイントの Undo ＝ **変更した矩形だけ**を持つ（SPEC_16 E1） --------------
+   旧実装はレイヤー1枚まるごとの ImageData を before/after で持っていたので、
+   1件が最大 4.7MB＝12手しか積めなかった（GRIDで Ctrl+Z が12回で止まる、の正体）。
+   引いている間は「触ったパッチの控え」を1枚だけ取り、離すときに
+   **実際に変わった矩形だけ**を切り出して持つので、桁で深く積める。 */
+const UNDO_PAD = 3;
+let gTx = null;
+function txBegin(){
+  if(gTx) txEnd();
+  gTx = new Map();
 }
-/* ペイント先: 'draw'=線画レイヤー（ベイク寸法） / 'color'=カラー層（ベイク×0.4・カット1枚） */
-function paintCanvas(cut){
-  return state.paintTarget === 'color' ? getPlate(cut, true) : getDraw(cut);
+/* x0..y1 は **パッチ内のピクセル座標**（呼ぶ側で線幅ぶん膨らませてある） */
+function txTouch(cut, k, kind, x0, y0, x1, y1){
+  if(!gTx || !cut) return;
+  const c = frLayer(cut, k, kind, true);
+  if(!c) return;
+  const key = cut.id + ':' + k + ':' + kind;
+  let e = gTx.get(key);
+  if(!e){
+    const snap = document.createElement('canvas');
+    snap.width = c.width; snap.height = c.height;
+    snap.getContext('2d').drawImage(c, 0, 0);
+    e = { cut, k, kind, snap, x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 };
+    gTx.set(key, e);
+  }
+  e.x0 = Math.min(e.x0, x0); e.y0 = Math.min(e.y0, y0);
+  e.x1 = Math.max(e.x1, x1); e.y1 = Math.max(e.y1, y1);
 }
-function markPainted(cut){
-  if(state.paintTarget === 'color') cut.dirtyPlate = true;
-  else cut.dirtyDraw = true;
-  cut.thumb = null;
+function txTouchAll(cut, k, kind){
+  const c = frLayer(cut, k, kind, true);
+  if(c) txTouch(cut, k, kind, 0, 0, c.width, c.height);
 }
-/* undo/redo は「そのレイヤーの実寸」で撮る。CONTE_W/H で撮ると別寸法のカットで静かに壊れる。
-   色も1枚になったので line と同じ1枚撮り（枠ぶんまとめ撮りは要らなくなった） */
-function paintSnap(cut){
-  const c = paintCanvas(cut);
-  if(!c) return null;
-  return { t: state.paintTarget, data: ctx2d(c).getImageData(0, 0, c.width, c.height) };
-}
-function pushUndo(){
-  const cut = cuts[state.curCut];
-  if(!cut) return;
-  const snap = paintSnap(cut);
-  if(!snap) return;
-  undoStack.push(snap);
-  if(undoStack.length > UNDO_MAX) undoStack.shift();
-  redoStack.length = 0;
-}
-/* ペイントのundo: EDIT内は従来のカット別スタック、STUDIOでは統合ログの paint エントリ。
-   カット参照をクロージャに閉じ込めるので、カットをまたいでも壊れない。 */
-let gPaintBefore = null;
-/* カット別スタックを使うのは **EDITのSINGLEだけ**。
-   GRIDは1ストロークで複数カットに書ける（コマまたぎ塗り）ので統合ログに乗せる */
-function useCutStack(){ return state.view === 'edit' && gEditMode === 'single'; }
-function beginPaintUndo(){
-  if(useCutStack()){ pushUndo(); gPaintBefore = null; return; }
-  const cut = cuts[state.curCut];
-  if(!cut) return;
-  const snap = paintSnap(cut);
-  if(snap) gPaintBefore = { cut, before: snap };
-}
-function applySnap(cut, snap){
-  if(!snap) return;
-  const c = (snap.t === 'color') ? getPlate(cut, true) : getDraw(cut);
-  if(!c || c.width !== snap.data.width || c.height !== snap.data.height) return;   // 寸法違いは当てない
-  ctx2d(c).putImageData(snap.data, 0, 0);
-  if(snap.t === 'color') cut.dirtyPlate = true;
-  else cut.dirtyDraw = true;
-  cut.thumb = null;
-}
-function endPaintUndo(){
-  if(!gPaintBefore) return;
-  const cut = gPaintBefore.cut, before = gPaintBefore.before;
-  gPaintBefore = null;
-  const after = paintSnap(cut);
-  if(!after) return;
+function txEnd(){
+  const tx = gTx;
+  gTx = null;
+  if(!tx || !tx.size) return;
+  const items = [];
+  tx.forEach(e => {
+    const c = frLayer(e.cut, e.k, e.kind, false);
+    if(!c || e.x1 < e.x0) return;
+    const x = clamp(Math.floor(e.x0) - UNDO_PAD, 0, c.width - 1);
+    const y = clamp(Math.floor(e.y0) - UNDO_PAD, 0, c.height - 1);
+    const w = clamp(Math.ceil(e.x1) + UNDO_PAD, x + 1, c.width) - x;
+    const h = clamp(Math.ceil(e.y1) + UNDO_PAD, y + 1, c.height) - y;
+    if(w <= 0 || h <= 0) return;
+    try{
+      const before = e.snap.getContext('2d', { willReadFrequently: true }).getImageData(x, y, w, h);
+      const after = ctx2d(c).getImageData(x, y, w, h);
+      items.push({ cut: e.cut, k: e.k, kind: e.kind, x, y, before, after });
+    }catch(err){}
+  });
+  if(!items.length) return;
+  const put = (it, data) => {
+    const c = frLayer(it.cut, it.k, it.kind, true);
+    if(!c) return;
+    ctx2d(c).putImageData(data, it.x, it.y);
+    markPatch(it.cut, it.k, it.kind);
+  };
+  const after = () => {
+    const seen = new Set();
+    items.forEach(it => {
+      const i = cuts.indexOf(it.cut);
+      if(i < 0) return;
+      if(inGrid()) refreshGridCells(i, true, it.k);
+      if(!seen.has(i)){ seen.add(i); refreshRow(i); }
+    });
+    if(!inGrid()) renderPaintViews();
+  };
   pushPaintLog({ type: 'paint',
-                 undo(){ applySnap(cut, before); }, redo(){ applySnap(cut, after); } });
+                 undo(){ items.forEach(it => put(it, it.before)); after(); },
+                 redo(){ items.forEach(it => put(it, it.after)); after(); } });
 }
-function doUndo(){
-  const cut = cuts[state.curCut];
-  if(!cut) return;
-  if(!undoStack.length){ undoClearBase(); return; }   // 描いた履歴が無いときだけ CLEAR BASE を戻す
-  const snap = paintSnap(cut);
-  if(!snap) return;
-  redoStack.push(snap);
-  applySnap(cut, undoStack.pop());
-  renderPaintViews();
-  refreshRow(state.curCut);
-  scheduleSave();
-}
-function doRedo(){
-  const cut = cuts[state.curCut];
-  if(!cut || !redoStack.length) return;
-  const snap = paintSnap(cut);
-  if(!snap) return;
-  undoStack.push(snap);
-  applySnap(cut, redoStack.pop());
-  renderPaintViews();
-  refreshRow(state.curCut);
-  scheduleSave();
-}
-/* 色も line と同じ1枚になったので、行き先を区間ごとに決める仕掛け
-   （旧 gPlateMode / plateStrokeSeg / strokeCoord）はまるごと不要になった */
+/* 旧 API 名のまま残す（呼び出し側の読みを変えないため） */
+function beginPaintUndo(){ txBegin(); }
+function endPaintUndo(){ txEnd(); }
+/* --- 1区間引く。a/b は **ベイク空間（紙の上）** の座標（SPEC_16 §3-2） -------
+   両端が別の枠に落ちるときは **両方のパッチに引く**（キャンバスの外は自動で切れる）＝
+   枠をまたいでも継ぎ目で線が切れない。V2-G3 の「またいだ区間だけ両方の層に引く」の V4 版。 */
 function strokeSeg(a, b){
   const cut = cuts[state.curCut];
   if(!cut) return;
-  strokeSegOn(cut, paintCanvas(cut), a, b);
+  const kind = paintKind();
+  const ka = frameAtBake(cut, a.x, a.y), kb = frameAtBake(cut, b.x, b.y);
+  strokePatchSegBake(cut, ka, kind, a, b);
+  if(kb !== ka) strokePatchSegBake(cut, kb, kind, a, b);
 }
-/* --- ブラシ幅の基準（SPEC_13 §9b） ---
-   ブラシの数値は **出力枠(1280px)基準** で解釈する。
-   T.U./PAN で枠がベイクの一部しか使っていないカットでも、画面上の太さが揃うようにするため。
-   （素直に「レイヤーのpx」にすると、寄った枠のカットだけ急に太く見える） */
+function strokePatchSegBake(cut, k, kind, a, b){
+  strokePatchSeg(cut, k, kind, bakeToPatch(cut, k, a, kind), bakeToPatch(cut, k, b, kind));
+}
+/* --- ブラシ幅の基準（SPEC_16 §2-3） ---
+   V4 で **各枠のパッチが出力と等倍**（line=1280px / plate=その0.4倍）になったので、
+   枠ごと・カットごとの補正（旧 strokeScaleFor）が要らなくなった。
+   `brush` の数値はどの枠でもそのまま出力px＝GRIDでまたいで塗っても同じ太さ。 */
 let gStrokeK = 1, gStrokePress = 1;
 /* 筆圧（ペン軸のみ・PENツール時だけ）。0でも消えないよう下限を持たせる */
 function pressFactor(e){
@@ -4402,24 +4720,19 @@ function pressFactor(e){
   const p = (typeof e.pressure === 'number' && e.pressure > 0) ? e.pressure : 0.5;
   return 0.2 + 0.8 * p;
 }
-function strokeScaleFor(cut, targetW, frame){
-  if(!cut) return 1;
-  let frac = 1;
-  if(isCamCut(cut) && cut.bakeRect){
-    const r = camAt(cut, frame || 0);
-    frac = r.w / cut.bakeRect.w;
-  }
-  return Math.max(0.02, frac * targetW / CONTE_W);
-}
-/* 対象キャンバスを明示して1セグメント描く（GRIDのコマまたぎ塗りが使う） */
-function strokeSegOn(cut, d, a, b){
-  if(!cut || !d) return;
+/* 枠 k のパッチに1区間引く。a/b は **パッチ内のピクセル座標** */
+function strokePatchSeg(cut, k, kind, a, b){
+  const d = frLayer(cut, k, kind, true);
+  if(!d) return;
+  const lw = Math.max(0.5, state.brush * gStrokeK * gStrokePress);
+  const pad = lw / 2 + 1;
+  txTouch(cut, k, kind, Math.min(a.x, b.x) - pad, Math.min(a.y, b.y) - pad,
+                        Math.max(a.x, b.x) + pad, Math.max(a.y, b.y) + pad);
   const ctx = ctx2d(d);
   ctx.save();
   if(state.etool === 'eraser') ctx.globalCompositeOperation = 'destination-out';
   ctx.strokeStyle = state.fillColor;
-  // 出力1280px基準 → このレイヤーのpxへ。筆圧ペンONのときは筆圧で細らせる
-  ctx.lineWidth = Math.max(0.5, state.brush * gStrokeK * gStrokePress);
+  ctx.lineWidth = lw;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
@@ -4427,47 +4740,7 @@ function strokeSegOn(cut, d, a, b){
   ctx.lineTo(b.x + (a.x === b.x && a.y === b.y ? 0.01 : 0), b.y);
   ctx.stroke();
   ctx.restore();
-  markPainted(cut);
-}
-function floodFill(cx, cy){
-  const cut = cuts[state.curCut];
-  if(!cut) return;
-  const draw = paintCanvas(cut);
-  if(!draw) return;
-  const W = draw.width, H = draw.height;   // ★ CONTE_W/H ではなく「塗る先のレイヤー」の実寸
-  cx = Math.floor(cx); cy = Math.floor(cy);
-  if(cx < 0 || cy < 0 || cx >= W || cy >= H) return;
-  const comp = blankCanvas(W, H);
-  const cctx = ctx2d(comp);
-  compositeTo(cctx, cut, W, H);   // 判定元は「見えている合成」をレイヤー寸法に合わせて作る
-  const src = cctx.getImageData(0, 0, W, H).data;
-  const dctx = ctx2d(draw);
-  const di = dctx.getImageData(0, 0, W, H);
-  const dd = di.data;
-  const fc = hexToRgb(state.fillColor);
-  const erase = !!state.fillErase;   // FILLボタン長押しで投げ縄透明消し（ANIMATOR準拠）
-  const t0 = (cy * W + cx) * 4;
-  const tr = src[t0], tg = src[t0 + 1], tb = src[t0 + 2];
-  const TOL = 2600;
-  const visited = new Uint8Array(W * H);
-  const stack = [cy * W + cx];
-  while(stack.length){
-    const p = stack.pop();
-    if(visited[p]) continue;
-    visited[p] = 1;
-    const o = p * 4;
-    const dr = src[o] - tr, dg = src[o + 1] - tg, db2 = src[o + 2] - tb;
-    if(dr * dr + dg * dg + db2 * db2 > TOL) continue;
-    if(erase){ dd[o] = 0; dd[o + 1] = 0; dd[o + 2] = 0; dd[o + 3] = 0; }
-    else { dd[o] = fc.r; dd[o + 1] = fc.g; dd[o + 2] = fc.b; dd[o + 3] = 255; }
-    const px = p % W, py = (p / W) | 0;
-    if(px > 0) stack.push(p - 1);
-    if(px < W - 1) stack.push(p + 1);
-    if(py > 0) stack.push(p - W);
-    if(py < H - 1) stack.push(p + W);
-  }
-  dctx.putImageData(di, 0, 0);
-  markPainted(cut);
+  markPatch(cut, k, kind);
 }
 
 /* --- 投げ縄塗り（正準: animator の lassoFillPolygon）---
@@ -4509,57 +4782,125 @@ function lassoFillPolygon(ctx, W, H, pts, hex, erase){
   }
   ctx.putImageData(img, minX, minY);
 }
-/* 投げ縄の頂点収集とプレビュー。t=塗る先の座標 / s=表示キャンバス上の座標 */
+/* --- 投げ縄の頂点収集とプレビュー（V4: 画面座標で持つ） -----------------------
+   画が枠ごとになったので「塗る先の座標」を1つに決められない。**画面座標で溜めておいて、
+   離した瞬間に触れている枠ぶんだけ座標を作り直して落とす**＝1本の投げ縄が
+   枠（GRIDならセル）をまたいで塗れる（SPEC_16 §5-C8「選択に関係なくまたいで塗る」）。 */
 let gLasso = null;
 function lassoBegin(e, cv){
   const cut = cuts[state.curCut];
-  const target = cut ? paintCanvas(cut) : null;
-  if(!target) return false;
+  if(!cut) return false;
+  if(paintKind() === 'line' && !needLine(cut)){
+    toast('読み込みました。もう一度なぞってください');
+    return false;
+  }
   try{ cv.setPointerCapture(e.pointerId); }catch(err){}
-  gLasso = { cv, cut, target, pts: [], scr: [] };
+  gLasso = { cv, cut, grid: !!(cv.classList && cv.classList.contains('gc-cv')), scr: [] };
   lassoAdd(e.clientX, e.clientY);
   return true;
 }
 function lassoAdd(cx, cy){
   if(!gLasso) return;
-  const t = paintCoord(cx, cy, gLasso.cv);
-  const r = gLasso.cv.getBoundingClientRect();
-  const s = { x: (cx - r.left) / r.width * gLasso.cv.width, y: (cy - r.top) / r.height * gLasso.cv.height };
-  const last = gLasso.pts[gLasso.pts.length - 1];
-  if(last && Math.hypot(t.x - last.x, t.y - last.y) < 1) return;
-  gLasso.pts.push(t);
-  gLasso.scr.push(s);
+  const last = gLasso.scr[gLasso.scr.length - 1];
+  if(last && Math.hypot(cx - last.cx, cy - last.cy) < 2) return;
+  gLasso.scr.push({ cx, cy });
   lassoPreview();
+}
+/* 画面座標の多角形 → そのキャンバス内部座標（輪郭のプレビュー用） */
+function lassoScreenPts(cv){
+  const r = cv.getBoundingClientRect();
+  return gLasso.scr.map(p => ({ x: (p.cx - r.left) / r.width * cv.width,
+                                y: (p.cy - r.top) / r.height * cv.height }));
 }
 function lassoPreview(){
   if(!gLasso || gLasso.scr.length < 2) return;
-  renderPaintViews();                       // 下地を描き直してから輪郭を重ねる（表示のみ）
+  if(gLasso.grid) drawCell(lassoCellOf(gLasso.cv));   // 下地を戻してから輪郭を重ねる（表示のみ）
+  else renderPaintViews();
   const ctx = ctx2d(gLasso.cv);
+  const pts = lassoScreenPts(gLasso.cv);
   ctx.save();
   ctx.strokeStyle = 'rgba(255,79,168,0.95)';
   ctx.lineWidth = Math.max(1, gLasso.cv.width / 400);
   ctx.setLineDash([8, 5]);
   ctx.beginPath();
-  ctx.moveTo(gLasso.scr[0].x, gLasso.scr[0].y);
-  for(let i = 1; i < gLasso.scr.length; i++) ctx.lineTo(gLasso.scr[i].x, gLasso.scr[i].y);
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for(let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
   ctx.closePath();
   ctx.stroke();
   ctx.restore();
+}
+function lassoCellOf(cv){
+  for(const rec of gGridRows) for(const cell of rec.cells) if(cell.cv === cv) return cell;
+  return null;
+}
+/* 画面座標の多角形 → 枠 k のパッチ座標。GRIDはセルの矩形から、
+   それ以外はキャンバス→ベイク→パッチの順に通す（どちらも「見えている場所」に落ちる）。
+   ★ **投げ縄の実体 g は引数で受け取る**。lassoEnd は先に gLasso を null にするので、
+     ここでグローバルを見ると必ず落ちる（2026-08-18 に踏んだ） */
+function lassoPtsFor(g, cut, k, kind, cellRect){
+  if(cellRect){
+    const s = patchSize(kind);
+    return g.scr.map(p => ({ x: (p.cx - cellRect.left) / cellRect.width * s.w,
+                             y: (p.cy - cellRect.top) / cellRect.height * s.h }));
+  }
+  return g.scr.map(p => bakeToPatch(cut, k, toBakeCoord(p.cx, p.cy, g.cv), kind));
 }
 function lassoEnd(){
   if(!gLasso) return;
   const g = gLasso;
   gLasso = null;
-  if(g.pts.length >= 3){
-    beginPaintUndo();
-    lassoFillPolygon(ctx2d(g.target), g.target.width, g.target.height,
-                     g.pts, state.fillColor, !!state.fillErase);
-    markPainted(g.cut);
-    endPaintUndo();
-    refreshRow(cuts.indexOf(g.cut));
-    scheduleSave();
+  if(g.scr.length < 3){ renderPaintViews(); return; }
+  const kind = paintKind();
+  const erase = !!state.fillErase;
+  // 落とす先の一覧を作る。GRID＝多角形の外接矩形に重なるセル全部（選択とは無関係）／
+  // それ以外＝多角形に重なる枠ぶん
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  g.scr.forEach(p => { x0 = Math.min(x0, p.cx); y0 = Math.min(y0, p.cy);
+                       x1 = Math.max(x1, p.cx); y1 = Math.max(y1, p.cy); });
+  const targets = [];
+  if(g.grid){
+    gGridRows.forEach(rec => rec.cells.forEach(cell => {
+      const r = cell.cv.getBoundingClientRect();
+      if(r.right < x0 || r.left > x1 || r.bottom < y0 || r.top > y1) return;
+      const cut = cuts[cell.i];
+      if(!cut) return;
+      if(kind === 'line' && !isResident(cut)){ requestResident(cut); return; }
+      targets.push({ cut, k: cell.k, cell, rect: r });
+    }));
+  }else{
+    const cut = g.cut;
+    const n = frCount(cut);
+    const bpts = g.scr.map(p => toBakeCoord(p.cx, p.cy, g.cv));
+    let bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9;
+    bpts.forEach(p => { bx0 = Math.min(bx0, p.x); by0 = Math.min(by0, p.y);
+                        bx1 = Math.max(bx1, p.x); by1 = Math.max(by1, p.y); });
+    for(let k = 0; k < n; k++){
+      const r = camBakeRect(cut, k);
+      if(r.x + r.w < bx0 || r.x > bx1 || r.y + r.h < by0 || r.y > by1) continue;
+      targets.push({ cut, k, cell: null, rect: null });
+    }
   }
-  renderPaintViews();
+  if(!targets.length){ renderPaintViews(); return; }
+  txBegin();
+  const rows = new Set();
+  targets.forEach(t => {
+    const c = frLayer(t.cut, t.k, kind, true);
+    if(!c) return;
+    const pts = lassoPtsFor(g, t.cut, t.k, kind, t.rect);
+    let px0 = 1e9, py0 = 1e9, px1 = -1e9, py1 = -1e9;   // Undoは多角形の外接矩形だけ（E1）
+    pts.forEach(q => { px0 = Math.min(px0, q.x); py0 = Math.min(py0, q.y);
+                       px1 = Math.max(px1, q.x); py1 = Math.max(py1, q.y); });
+    txTouch(t.cut, t.k, kind, px0, py0, px1, py1);
+    lassoFillPolygon(ctx2d(c), c.width, c.height, pts, state.fillColor, erase);
+    markPatch(t.cut, t.k, kind);
+    rows.add(cuts.indexOf(t.cut));
+    if(t.cell) drawCell(t.cell);
+  });
+  txEnd();
+  rows.forEach(i => { if(i >= 0) refreshRow(i); });
+  if(g.grid) gGridRows.forEach(drawRowPalette);
+  else renderPaintViews();
+  scheduleSave();
 }
 
 /* --- palette (canon: animator-color-palette skill) --- */
@@ -4591,6 +4932,20 @@ function selectPalSlot(i){
   // animator-color-palette スキルの正準（選択で塗りツールへ切替）からの意図的な逸脱。
   // 絵コンテはペンで描きながら色だけ拾う頻度が高いため。
 }
+/* パレットの既定の高さ＝**縦3行**（SPEC_16 §5-B5）。セルは aspect-ratio:1 なので
+   実寸は幅から決まる。1個目を測ってから max-height を当てる（列数を変えても崩れない） */
+const PAL_ROWS = 3;
+function fitPaletteRows(palEl){
+  const first = palEl.firstElementChild;
+  if(!first) return;
+  const h = first.getBoundingClientRect().height;
+  if(h <= 0) return;                       // まだ隠れている＝測れない。出たときに measurePalettes が拾う
+  palEl.style.maxHeight = Math.round(h * PAL_ROWS + 3 * (PAL_ROWS - 1) + 2) + 'px';
+}
+/* パネルが開いた/幅が変わったタイミングで測り直す（隠れている間は幅0で測れないため） */
+function measurePalettes(){
+  ['#palette', '#tl-palette'].forEach(pid => { const el = $(pid); if(el) fitPaletteRows(el); });
+}
 function renderPalette(){
   ['#palette', '#tl-palette'].forEach(pid => {
     const palEl = $(pid);
@@ -4604,6 +4959,8 @@ function renderPalette(){
       cell.addEventListener('click', () => selectPalSlot(i));
       palEl.appendChild(cell);
     });
+    fitPaletteRows(palEl);
+    requestAnimationFrame(() => fitPaletteRows(palEl));   // 初回は幅が確定していないことがある
   });
 }
 /* --- HSVスライダー式ピッカー（SPEC_13 §9e） ---
@@ -4705,23 +5062,24 @@ function renderHsv(){
     });
   });
 }
-/* cx,cy は **ベイク空間**。上から drawC → colorC → baseC の順に不透明な画素を探す */
+/* cx,cy は **ベイク空間**。上に見えている枠のパッチ（line → plate）→ baseC の順に探す */
 function sampleCompositeColor(cx, cy){
   const cut = cuts[state.curCut];
   if(!cut) return null;
-  const draw = getDraw(cut);
-  if(!draw) return null;
-  const bx = Math.floor(cx), by = Math.floor(cy);
-  if(bx < 0 || by < 0 || bx >= draw.width || by >= draw.height) return null;
-  const probes = [[ctx2d(draw), bx, by]];
-  const plate = cut.plateC;                           // 色も同じベイク空間なので倍率1つで届く
-  if(plate){
-    const k = plateScale(cut);
-    const px = Math.floor(cx * k), py = Math.floor(cy * k);
-    if(px >= 0 && py >= 0 && px < plate.width && py < plate.height) probes.push([ctx2d(plate), px, py]);
-  }
+  const b = bakeSize(cut);
+  if(cx < 0 || cy < 0 || cx >= b.w || cy >= b.h) return null;
+  // V4: 上に見えている枠のパッチから拾う（重ね順と一致＝見たままの色が取れる）
+  const k = frameAtBake(cut, cx, cy);
+  const probes = [];
+  [['line', PATCH_W, PATCH_H], ['plate', PLATE_W, PLATE_H]].forEach(([kind]) => {
+    const c = frLayer(cut, k, kind, false);
+    if(!c) return;
+    const q = bakeToPatch(cut, k, { x: cx, y: cy }, kind);
+    const x = Math.floor(q.x), y = Math.floor(q.y);
+    if(x >= 0 && y >= 0 && x < c.width && y < c.height) probes.push([ctx2d(c), x, y]);
+  });
   const base = getBase(cut);
-  if(base) probes.push([ctx2d(base), bx, by]);
+  if(base) probes.push([ctx2d(base), Math.floor(cx), Math.floor(cy)]);
   for(const [c, x, y] of probes){
     try{
       const d = c.getImageData(x, y, 1, 1).data;
@@ -4833,34 +5191,22 @@ function paintDown(e, cv){
   e.preventDefault();
   try{ cv.setPointerCapture(e.pointerId); }catch(err){}   // 合成イベントでは投げるので握りつぶす
   paintCv = cv;
-  {   // ブラシ幅の基準（tlCvは今のカメラ位置、EDITはA枠）。
-      // **line も color も同じ strokeScaleFor**（SPEC_15 P1-4）＝「6」は常に出力画面での6px。
-      // 塗る先を作らずに幅だけ知りたいので、canvas ではなく寸法から取る
-    const cut = cuts[state.curCut];
-    const ca = (cv === tlCv) ? cutIndexAt(state.tl.frame) : null;
-    const tw = cut ? ((state.paintTarget === 'color') ? plateSize(cut).w : bakeSize(cut).w) : 0;
-    gStrokeK = tw ? strokeScaleFor(cut, tw, ca ? ca.local : 0) : 1;
-  }
+  // V4: パッチが出力と等倍なので、ブラシの補正は kind だけで決まる（SPEC_16 §2-3）
+  gStrokeK = patchK(paintKind());
   if(e.altKey){                       // EYEツールは廃止。Alt+クリックでスポイト（ANIMATOR準拠）
     eyedropAt(e.clientX, e.clientY, cv);
     return;
   }
-  if(state.etool === 'fill'){
-    const p = paintCoord(e.clientX, e.clientY, cv);
-    if(state.fillMode === 'lasso'){ lassoBegin(e, cv); return; }   // 囲って一括塗り
-    beginPaintUndo();
-    floodFill(p.x, p.y);
-    const cut = cuts[state.curCut];
-    if(cut) cut.dirtyDraw = true;
-    endPaintUndo();
-    renderPaintViews();
-    refreshRow(state.curCut);
-    scheduleSave();
+  // FILL は econte では**常に投げ縄**（バケツは廃止。SPEC_16 §5-B2）
+  if(state.etool === 'fill'){ lassoBegin(e, cv); return; }
+  const cut = cuts[state.curCut];
+  if(paintKind() === 'line' && cut && !needLine(cut)){
+    toast('読み込みました。もう一度なぞってください');
     return;
   }
   beginPaintUndo();
   stroking = true;
-  strokeLast = paintCoord(e.clientX, e.clientY, cv);
+  strokeLast = toBakeCoord(e.clientX, e.clientY, cv);
   gStrokePress = pressFactor(e);
   strokeSeg(strokeLast, strokeLast);
   renderPaintViews();
@@ -4868,7 +5214,7 @@ function paintDown(e, cv){
 function paintMove(e){
   if(gLasso){ lassoAdd(e.clientX, e.clientY); return; }
   if(!stroking || !paintCv) return;
-  const p = paintCoord(e.clientX, e.clientY, paintCv);
+  const p = toBakeCoord(e.clientX, e.clientY, paintCv);
   gStrokePress = pressFactor(e);
   strokeSeg(strokeLast, p);
   strokeLast = p;
@@ -4919,18 +5265,40 @@ function undoClearBase(){
   toast('元の絵を戻しました');
   return true;
 }
+/* ERASE のWクリック＝いま見えているぶんを消す。
+   GRID は **選択しているコマぶん全部**（SPEC_16 §5-C8「ERASE Wクリック全消し」）、
+   SINGLE / STUDIO は **そのカットの全枠**（1枚の紙として見えているぶん） */
 function clearDraw(){
   const cut = cuts[state.curCut];
   if(!cut) return;
-  // 色もカット1枚なので分岐は要らない（SINGLE も GRID も「見えているものが消える」で一致）
-  const d = paintCanvas(cut);   // 今のペイント先（線画 or 色）だけを消す
-  if(!d) return;
-  beginPaintUndo();             // ★ pushUndo 直呼びだとGRIDで戻せない（行き先が違う）
-  ctx2d(d).clearRect(0, 0, d.width, d.height);
-  markPainted(cut);
+  const kind = paintKind();
+  const targets = [];
+  if(inGrid()){
+    const sel = selCellsResolved();
+    const list = sel.length ? sel : [{ i: state.curCut, k: state.curFrame | 0 }];
+    list.forEach(c => { if(cuts[c.i]) targets.push({ cut: cuts[c.i], k: c.k }); });
+  }else{
+    for(let k = 0; k < frCount(cut); k++) targets.push({ cut, k });
+  }
+  if(kind === 'line' && targets.some(t => !isResident(t.cut))){
+    targets.forEach(t => requestResident(t.cut));
+    toast('読み込んでいます。もう一度どうぞ');
+    return;
+  }
+  beginPaintUndo();
+  const rows = new Set();
+  targets.forEach(t => {
+    const d = frLayer(t.cut, t.k, kind, false);
+    if(!d) return;
+    txTouchAll(t.cut, t.k, kind);
+    ctx2d(d).clearRect(0, 0, d.width, d.height);
+    markPatch(t.cut, t.k, kind);
+    rows.add(cuts.indexOf(t.cut));
+  });
   endPaintUndo();
+  if(inGrid()) rows.forEach(i => { if(i >= 0) refreshGridCells(i); });
   renderPaintViews();
-  refreshRow(state.curCut);
+  rows.forEach(i => { if(i >= 0) refreshRow(i); });
   scheduleSave();
 }
 
@@ -4974,11 +5342,36 @@ function cutIndexAt(f){
   return { i: last, local: cuts[last].durF - 1, start: acc - cuts[last].durF };
 }
 function cutStartFrame(i){ let acc = 0; for(let k = 0; k < i; k++) acc += cuts[k].durF; return acc; }
+/* 中央プレビューは fit を土台に、その上へ拡縮(z)と移動(x,y)を掛ける（§5-C1）。
+   toCanvasCoord は getBoundingClientRect ベースなので、**塗り座標は触らなくて済む** */
+let gTlFit = 1;
 function fitTLCanvas(){
   const st = $('#tl-stage');
   const s = Math.min((st.clientWidth - 24) / CONTE_W, (st.clientHeight - 24) / CONTE_H);
-  tlCv.style.width = Math.max(80, CONTE_W * s) + 'px';
-  tlCv.style.height = Math.max(45, CONTE_H * s) + 'px';
+  gTlFit = Math.max(0.01, s);
+  applyTlView();
+}
+function applyTlView(){
+  const v = state.tlView2;
+  tlCv.style.width = Math.max(80, CONTE_W * gTlFit * v.z) + 'px';
+  tlCv.style.height = Math.max(45, CONTE_H * gTlFit * v.z) + 'px';
+  tlCv.style.transform = 'translate(' + Math.round(v.x) + 'px,' + Math.round(v.y) + 'px)';
+}
+function tlZoomView(clientX, clientY, factor){
+  const v = state.tlView2;
+  const nz = clamp(v.z * factor, 0.25, 12);
+  const k = nz / v.z;
+  if(Math.abs(k - 1) < 1e-6) return;
+  const st = $('#tl-stage').getBoundingClientRect();
+  const cx = st.left + st.width / 2 + v.x, cy = st.top + st.height / 2 + v.y;
+  v.x += (clientX - cx) * (1 - k);
+  v.y += (clientY - cy) * (1 - k);
+  v.z = nz;
+  applyTlView();
+}
+function tlViewReset(){
+  state.tlView2 = { x: 0, y: 0, z: 1 };
+  applyTlView();
 }
 function renderTL(){
   const T = totalFrames();
@@ -5218,14 +5611,18 @@ function layoutCamKeys(){
      - 帯の両端に来た◆は数px内側に寄せる（半分見切れて掴めないのを防ぐ）
      どちらも表示だけの調整。camKeyMove は掴んだ位置からの相対差分で計算するので影響しない。 */
   const big = !!gUi.uiBig;
-  const KEY_GAP = big ? 22 : 16, KEY_TOP = big ? 0 : 1, KEY_ROW_H = big ? 17 : 13;
-  let lastX = -1e9, lastRow = 1;
+  const KEY_TOP = big ? 0 : 1;
+  /* ◆はぜんぶ1行に置く（2026-08-18）。
+     もともと B（カット尻）と次のカットの A（カット頭）が**同じコマ**に来て完全に重なるので
+     段違いにしていたが、スクラブで詰めるたびに行が増えて画面が跳ねた。
+     **ぶつかる側（カット尻）を1コマ内側に置く**ことで、そもそも同じコマに来なくする。
+     ・カット尻 ＝ そのカットの**最後のコマ**（＝次のカットの頭の1つ手前）に置く
+     ・**次のカットの頭は動かさない**（頭の位置が正であってほしいのはこちら）
+     表示だけの調整で、camKeyMove は掴んだ位置からの相対差分で計算するので操作に影響しない。 */
+  const edgeMax = Math.max(7, aw - 7);
   const placeKey = (d, x) => {
-    const px = clamp(x, 7, Math.max(7, aw - 7));
-    const row = (px - lastX < KEY_GAP) ? (1 - lastRow) : 0;
-    lastX = px; lastRow = row;
-    d.style.left = px + 'px';
-    d.style.top = (KEY_TOP + row * KEY_ROW_H) + 'px';
+    d.style.left = clamp(x, 7, edgeMax) + 'px';
+    d.style.top = KEY_TOP + 'px';
   };
   cuts.forEach((c, i) => {
     const start = cutStartFrame(i);
@@ -5253,8 +5650,11 @@ function layoutCamKeys(){
       seg.addEventListener('click', ev => { ev.stopPropagation(); openEaseMenu(ev, i, k); });
       box.appendChild(seg);
     }
+    const lastF = start + Math.max(0, c.durF - 1);   // このカットの最後のコマ
     for(let k = 0; k < n; k++){           // ◆キー
-      const f = start + camStartFrame(c, k);
+      // 尻の◆だけ「最後のコマ」に寄せる（次のカットの頭と同じコマに来ないように）
+      const f = (k === n - 1) ? Math.min(start + camStartFrame(c, k), lastF)
+                              : start + camStartFrame(c, k);
       const d = document.createElement('div');
       const edge = (k === 0 || k === n - 1);
       d.className = 'tl-key' + (edge ? ' edge' : '') +
@@ -5375,7 +5775,8 @@ function closeEaseMenu(){ const m = $('#ease-menu'); if(m) m.remove(); }
 function clipDragMove(ev){
   if(!gClipDrag) return;
   const g = gClipDrag;
-  const nd = clamp(Math.round(g.origDur + (ev.clientX - g.startX) / pxPerFrame()), 2, FPS * 600);
+  // 下限は **1コマ**（数値入力は1コマまで通るのに、ドラッグだけ2コマで止まっていた）
+  const nd = clamp(Math.round(g.origDur + (ev.clientX - g.startX) / pxPerFrame()), 1, FPS * 600);
   if(nd !== cuts[g.i].durF){
     setCutSpan(g.i, nd);
     liveClipWidths();
@@ -5636,11 +6037,20 @@ function setAudioOffset(f, quiet){
   if(state.tl.playing) syncAudio(true);
   if(!quiet) scheduleSave();
 }
+/* --- ペンは「描く道具」に振り切る（SPEC_16 §5-B4 / §5-D6） -------------------
+   ペンで出来るのは **ペイントと投げ縄選択**、それに枠の微調整とキー操作だけ。
+   パラメータのスクラブ（スライダー・ペイン幅・帯の高さ・音のずらし）は**指とマウス専用**にする。
+   ペン先で UI を掴むと、描こうとしたときに画面のほうが動いてしまうため。 */
+function penUiBlocked(e){
+  if(!e || e.pointerType !== 'pen') return false;
+  toast('ペンは描く専用です（この操作は指かマウスで）');
+  return true;
+}
 /* 「ずらし」を数値入力ではなくスクラブで合わせる（AEでコマ数を測って打つ運用も残す）。
    1コマ＝タイムラインの1コマぶんの幅にしてあるので、波形を見ながら合わせられる */
 let gOffDrag = null;
 function offsetScrubDown(e){
-  if(!gAudio) return;
+  if(!gAudio || penUiBlocked(e)) return;
   e.preventDefault();
   const el = $('#audio-offset-scrub');
   try{ el.setPointerCapture(e.pointerId); }catch(err){}
@@ -6066,7 +6476,7 @@ async function exportColorScript(){
         ctx.fillStyle = 'rgba(255,210,122,0.55)';
         ctx.fillRect(x, y, Math.max(3, Math.round(nf / maxF * CW)), 2);
       }
-      drawCamFrame(cctx, cut, camStartFrame(cut, ce.k), CW, CH);
+      drawCellFrame(cctx, cut, ce.k, CW, CH);   // §5h: 一覧PNGは GRID のセルと同じ単位＝同じ画
       ctx.drawImage(cell, x, y + BAR);
       ctx.fillStyle = 'rgba(255,79,168,0.95)';   // キャプション
       ctx.font = 'bold 15px monospace';
@@ -6104,7 +6514,7 @@ function tlPaintDown(e){
   pause();
   const ca = cutIndexAt(state.tl.frame);
   if(!ca) return;
-  if(state.curCut !== ca.i){ state.curCut = ca.i; undoStack = []; redoStack = []; }
+  state.curCut = ca.i;
   const cut = cuts[ca.i];
   if(!isResident(cut)){ ensureResident(cut).then(() => toast('読み込みました。もう一度なぞってください')); return; }
   paintDown(e, tlCv);
@@ -6228,6 +6638,7 @@ function bindSplit(el, which){
     layoutStudio();
   };
   el.addEventListener('pointerdown', e => {
+    if(penUiBlocked(e)) return;             // §5-B4: ペインの幅はペンで動かさない
     e.preventDefault();
     try{ el.setPointerCapture(e.pointerId); }catch(err){}
     gSplit = { which, id: e.pointerId };
@@ -6272,6 +6683,7 @@ function bindTlResize(){
     layoutStudio();
   };
   el.addEventListener('pointerdown', e => {
+    if(penUiBlocked(e)) return;             // §5-B4: 高さの調整もペンでは掴ませない
     e.preventDefault();
     try{ el.setPointerCapture(e.pointerId); }catch(err){}
     drag = { id: e.pointerId, y0: e.clientY, h0: $('#tl-strip').getBoundingClientRect().height };
@@ -6311,6 +6723,7 @@ function bindCurResize(){
     if(state.view === 'studio') layoutStudio();
   };
   el.addEventListener('pointerdown', e => {
+    if(penUiBlocked(e)) return;             // §5-B4: 高さの調整もペンでは掴ませない
     e.preventDefault();
     try{ el.setPointerCapture(e.pointerId); }catch(err){}
     drag = { id: e.pointerId, y0: e.clientY, h0: $('#cur-note').getBoundingClientRect().height };
@@ -6385,7 +6798,6 @@ async function wipeAll(){
   gLru.length = 0;
   gLog.length = 0; gLogRedo.length = 0;
   gColorLog.length = 0; gColorRedo.length = 0;
-  undoStack = []; redoStack = [];
   setSelCells([]);
   state.selPhoto = null; state.selCut = null;
   state.curCut = -1; state.curFrame = 0; state.tl.frame = 0;
@@ -6541,11 +6953,20 @@ function tapUp(e){
   if(n === 2){ undoActive(); toast('UNDO（2本指）'); }
   else { redoActive(); toast('REDO（3本指）'); }
 }
-/* EDIT内はカット別スタック、STUDIOは統合ログ（キーボードと同じ振り分け） */
-/* Undoの行き先は3つに分かれる:
-   EDIT SINGLE = カット別スタック / EDIT GRID = カラー専用ログ / STUDIO = 統合ログ */
-function undoActive(){ if(useCutStack()) doUndo(); else if(inGrid()) colorUndo(); else logUndo(); }
-function redoActive(){ if(useCutStack()) doRedo(); else if(inGrid()) colorRedo(); else logRedo(); }
+/* Undoの行き先は2つ: **EDIT（SINGLE/GRID）＝ペイント専用ログ / STUDIO＝統合ログ**。
+   V4 でカット別スナップショット（旧 undoStack）は廃止し、EDIT は1本にまとめた
+   （SINGLEとGRIDで戻り方が違う理由がもう無い。どちらも「枠のパッチの矩形」を戻す）。 */
+function undoActive(){
+  if(inPaintView()){
+    // CLEAR BASE は専用スロットなので、画に戻すものが無いときだけそちらを見る。
+    // これが無いと「EDITで元の絵を捨てたら二度と戻せない」になる（2026-08-18 報告）
+    if(!gColorLog.length && undoClearBase()) return;
+    colorUndo();
+    return;
+  }
+  logUndo();
+}
+function redoActive(){ if(inPaintView()) colorRedo(); else logRedo(); }
 
 /* ---------------- ANIMATOR準拠のブラシ操作（正準: animator.html） ----------------
    Wクリック / 長押し / 右ドラッグ の判定は animator と同じ数値にしてある。 */
@@ -6796,9 +7217,11 @@ function onKey(e){
     return;
   }
   // GRID: Ctrl+↑/↓ = 選択中セルのカットをまとめて並べ替え
+  //       Ctrl+Shift+↑/↓ = **最上位 / 最下位へ**（SPEC_16 §5-C7）
   if(inGrid() && (e.ctrlKey || e.metaKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown')){
     e.preventDefault();
-    moveSelCuts(e.key === 'ArrowUp' ? -1 : 1);
+    const d = (e.key === 'ArrowUp') ? -1 : 1;
+    if(e.shiftKey) moveSelCutsEnd(d); else moveSelCuts(d);
     return;
   }
   // 画面切替（1/2/3/4/X）は **STUDIO / EDIT の両方**で効かせるので studio ブロックの外で先に見る
@@ -6816,12 +7239,13 @@ function onKey(e){
   }
   if(state.view === 'studio'){
     // Ctrl+↑/↓ = 現在カットを並べ替え（SHEET行ドラッグと同じ操作）
+    // Ctrl+Shift+↑/↓ = **最上位 / 最下位へ**（SPEC_16 §5-C7）
     if((e.ctrlKey || e.metaKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown')){
       e.preventDefault();
       const d = (e.key === 'ArrowUp') ? -1 : 1;
       if(gFocusCut >= 0){
-        const to = gFocusCut + d;
-        if(to >= 0 && to < cuts.length){
+        const to = e.shiftKey ? (d < 0 ? 0 : cuts.length - 1) : gFocusCut + d;
+        if(to !== gFocusCut && to >= 0 && to < cuts.length){
           moveCutTo(gFocusCut, to);
           seek(cutStartFrame(to));
         }
@@ -7039,34 +7463,37 @@ function wire(){
     clearDraw();
     toast(state.paintTarget === 'color' ? '色を消しました' : '加筆を消しました');
   }));
-  // FILL Wクリック = 投げ縄塗り（ANIMATOR準拠）／FILL 長押し = 投げ縄透明消し
+  // --- FILL は econte だけの意図的な逸脱（SPEC_16 §5-B2 / §5-B3）------------
+  // **初めから投げ縄塗り。Wクリックの切替は無し**（ラフとスピード優先の道具なので、
+  // バケツを持たない＝迷う状態を1つ減らす）。長押しで「塗り ⇄ 透明消し」の2状態だけ。
+  // ANIMATOR は animator-brush-ops スキルの正準のまま（あちらは変えない）
   const syncFillUI = () => {
     document.querySelectorAll('.etool[data-tool="fill"]').forEach(b => {
-      b.classList.toggle('lasso-on', state.fillMode === 'lasso');
-      b.classList.toggle('fe-on', state.fillErase);
-      b.textContent = state.fillMode === 'lasso'
-        ? (state.fillErase ? 'L-DEL' : 'LASSO') : 'FILL';
-      b.title = '塗りつぶし (G)：' + (state.fillMode === 'lasso'
-                  ? (state.fillErase ? '投げ縄透明消し' : '投げ縄') : 'バケツ')
-              + ' ／ Wクリックで投げ縄塗り・長押しで投げ縄透明消し';
+      b.classList.add('lasso-on');                       // 常に投げ縄なので点きっぱなし
+      b.classList.toggle('fe-on', state.fillErase);      // 透明消しのときだけ赤く（§5-B3）
+      b.textContent = state.fillErase ? 'L-DEL' : 'LASSO';
+      b.title = '投げ縄 (G)：' + (state.fillErase ? '透明消し' : '塗り')
+              + ' ／ 長押しで切替（バケツはありません）';
     });
   };
-  document.querySelectorAll('.etool[data-tool="fill"]').forEach(el => onDoubleActivate(el, () => {
-    const lassoFill = (state.fillMode === 'lasso' && !state.fillErase);
-    if(lassoFill){ state.fillMode = 'flood'; }        // もう一度Wクリックでバケツへ
-    else { state.fillMode = 'lasso'; state.fillErase = false; }
-    setETool('fill');
-    syncFillUI();
-    toast('塗りつぶし: ' + (state.fillMode === 'lasso' ? '投げ縄' : 'バケツ'));
-  }));
   document.querySelectorAll('.etool[data-tool="fill"]').forEach(el => onLongPress(el, () => {
-    const lassoErase = (state.fillMode === 'lasso' && state.fillErase);
-    if(lassoErase){ state.fillMode = 'flood'; state.fillErase = false; }  // 長押しでバケツへ
-    else { state.fillMode = 'lasso'; state.fillErase = true; }
+    state.fillErase = !state.fillErase;
     setETool('fill');
     syncFillUI();
-    toast('塗りつぶし: ' + (state.fillErase ? '投げ縄 透明消し' : 'バケツ'));
+    toast('投げ縄: ' + (state.fillErase ? '透明消し' : '塗り'));
   }));
+  syncFillUI();
+  // §5-B4: **スライダーのスクラブはペンで受けない**（描こうとして値が動く事故を止める）。
+  // ボタンや入力欄は塞がない（塞ぐとペンだけでは何も操作できなくなる）
+  document.addEventListener('pointerdown', e => {
+    if(e.pointerType !== 'pen') return;
+    const t = e.target;
+    if(t && t.tagName === 'INPUT' && t.type === 'range'){
+      e.preventDefault();
+      e.stopPropagation();
+      toast('スライダーは指かマウスで（ペンは描く専用）');
+    }
+  }, true);
   // 右ドラッグでブラシサイズ（描画面すべて）
   [editCv, tlCv].forEach(bindSizeDrag);
   window.addEventListener('pointermove', sizeDragMove);
@@ -7101,6 +7528,32 @@ function wire(){
     e.preventDefault();
     editZoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015));
   }, { passive: false });
+  // §5-C2: SINGLE もホイール押下ドラッグで動かせるようにする（今まで出来なかった）
+  bindMiddlePan($('#edit-stage'),
+                () => state.editView,
+                (x, y) => { state.editView.x = x; state.editView.y = y; },
+                applyEditView);
+  // §5-C3: GRID の余白もホイール押下ドラッグで手のひら移動（縦スクロール＋横スクロール）
+  {
+    const g = $('#edit-grid');
+    bindMiddlePan(g,
+                  () => ({ x: -g.scrollLeft, y: -g.scrollTop }),
+                  (x, y) => { g.scrollLeft = -x; g.scrollTop = -y; },
+                  () => updateCellRes());
+  }
+  // §5-C1: STUDIO中央プレビューのホイール拡縮／ホイール押下ドラッグ移動／Wクリックで戻す
+  {
+    const st = $('#tl-stage');
+    st.addEventListener('wheel', e => {
+      e.preventDefault();
+      tlZoomView(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015));
+    }, { passive: false });
+    bindMiddlePan(st,
+                  () => state.tlView2,
+                  (x, y) => { state.tlView2.x = x; state.tlView2.y = y; },
+                  applyTlView);
+    st.addEventListener('dblclick', e => { if(e.target === st) tlViewReset(); });
+  }
   // TIMELINE帯
   $('#btn-play').addEventListener('click', togglePlay);
   $('#btn-tl-first').addEventListener('click', () => { pause(); seek(0); });
@@ -7270,6 +7723,7 @@ function wire(){
   const relayout = () => {
     applyTlHeight();   // 画面が低くなったら帯の上限も下がる
     applyCurHeight();
+    measurePalettes();  // パレットは幅で1セルの大きさが変わる（§5-B5 の縦3行を保つ）
     if($('#help-ovl').classList.contains('on')) fitHelpBody();
     if(state.view === 'studio') layoutStudio();
     else if(gEditMode === 'grid') renderGrid();
@@ -7298,6 +7752,7 @@ async function init(){
   updateTotals();
   invalidateCoverage();
   syncBoardPanels();
+  setCutsVisible(state.showCuts, true);   // 目アイコンの見た目と title を初期化（§5-B6）
   setView('studio');
   if(!photos.length && !cuts.length){
     toast('紙のネーム/ラフの写真をD&D または IMPORT で読み込んでください');
@@ -7323,30 +7778,34 @@ window.__ECONTE__ = {
   fitEditCanvas, undoActive, redoActive, cancelGestures,
   camCount, camRect, setCamRect, camLabel, hitCutFrame, hitCutHandle, selectCutFrame, rebakeFromCam,
   get lru(){ return { list: gLru.slice(), resident: cuts.filter(isResident).length, pending: gResidentPending }; },
-  ensureResident, isResident, getBase, getDraw, evictLru, encodeCut, bakeSize, calcBakeSize,
+  ensureResident, isResident, getBase, needLine, evictLru, encodeCut, bakeSize, calcBakeSize,
   updateCoverage, invalidateCoverage, sizeEditCanvas, prefetchAround, withResident, rowLabel,
   camAt, drawCamFrame, camToBake, calcBakeRect, recalcDur, isCamCut, addCamFrame, delCamFrame,
   setCamDur, setBakeExpand, renderCamList, camStartFrame, relabelCam, easeT, migrateCutV2, drawCamGuide,
   clipSet, clipClear, clipConsume, clipPasteJson, renderClipBar, logUndo, logRedo, isHeic, decodeHeic,
   exportProject, importProject, toggleHelp, renderHelp, rowDragMove, rowDragUp,
   get editMode(){ return gEditMode; },
-  getPlate, plateSize, plateScale, remapPlate, resizePlate, decodePlate, migratePlate,
-  hasAnyColor, camSrcRect, drawPlateLayer, refreshAllColor, modeOf, adoptMigratedPaint,
+  // V4「枠ごとの画」（SPEC_16）
+  frCount, ensureFr, frAt, frLayer, mkFr, patchSize, patchK, paintKind, markPatch,
+  camBakeRect, patchHides, rectContains, frameAtBake, bakeToPatch, drawPatchStack,
+  remapPatch, syncPatchRects, seedPatch, splitBakeToPatches, migrateColorsToPatches,
+  hasAnyColor, camSrcRect, drawCellFrame, refreshAllColor, modeOf, adoptMigratedPaint,
   get paint(){ return { colorAlpha: gPaint.colorAlpha, colorBlend: gPaint.colorBlend }; },
   setColorBlend, setColorAlpha,
-  setSelCells, selCellsResolved, cellCaptionClick, moveSelCuts,
+  setSelCells, selCellsResolved, cellCaptionClick, moveSelCuts, moveSelCutsEnd,
+  bindMiddlePan, tlZoomView, tlViewReset, applyTlView, measurePalettes, drawTakeoverGuide, penUiBlocked,
   get selCells(){ return gSelCells.slice(); },
-  strokeScaleFor, brushMax, isTextEntry, inGrid, pushPaintLog, colorUndo, colorRedo,
+  brushMax, isTextEntry, inGrid, inPaintView, pushPaintLog, colorUndo, colorRedo,
   onDoubleActivate, onLongPress, bindSizeDrag, sizeDragMove, sizeDragEnd, pressFactor,
   lassoFillPolygon, lassoBegin, lassoAdd, lassoEnd, lassoPreview,
   get colorLog(){ return { undo: gColorLog.length, redo: gColorRedo.length }; },
   setEditMode, setPaintTarget, renderGrid, refreshGridCells, colorCells, cellSub, cellFrames,
   extractPalette, drawRowPalette, drawCell, updateCellRes, gridZoom, gridFit, gridCellW,
-  gridTouchDown, gridTouchMove, gridTouchUp, strokeSegOn,
-  gridStrokeStart, gridStrokeMove, gridStrokeUp, cellAtPoint, cellColorCoord, renderGridTouched,
+  gridTouchDown, gridTouchMove, gridTouchUp, strokePatchSeg, strokeSeg, strokeSegBakeK: strokePatchSegBake,
+  gridStrokeStart, gridStrokeMove, gridStrokeUp, cellAtPoint, cellPatchCoord,
   get gridRows(){ return gGridRows; }, get gridZoomLevel(){ return gGridZoom; },
-  paintCanvas, paintSnap, applySnap, syncEditPanels, toBakeCoord, useCutStack,
-  fmtDur, parseDur, floodFill, sampleCompositeColor, saveAll, boardFit, updateTotals,
+  syncEditPanels, toBakeCoord, txBegin, txTouch, txTouchAll, txEnd,
+  fmtDur, parseDur, sampleCompositeColor, saveAll, boardFit, updateTotals,
   totalFrames, cutIndexAt, cutStartFrame, seek, play, pause, togglePlay, seekCut, toggleLoop,
   layoutTL, renderTL, fitTLCanvas, exportVideo, finishExport, cancelExport, loadKeymap,
   renderOutputFrame, burnMode, burnLabel, exportColorScript, exportRecord, exportMP4,
