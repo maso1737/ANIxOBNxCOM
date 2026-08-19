@@ -886,6 +886,9 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
           <div class="etool on" data-tool="pen" title="ペン (B) ／ Wクリックで筆圧">PEN</div>
           <div class="etool" data-tool="eraser" title="消しゴム (E) ／ WクリックでCLEAR（この2つで消す操作は足りるので CLEAR DRAW ボタンは置かない）">ERASE</div>
           <div class="etool lasso-on" data-tool="fill" title="投げ縄 (G) ／ 長押しで透明消しに切替">LASSO</div>
+          <!-- SPEC_15 P2: 軽いフォトバッシュ＝「浮いた選択」。**SINGLE 限定**なので
+               GRID では .off でグレーアウトする（syncSelToolUI）。STUDIOのミニツールには置かない -->
+          <div class="etool" data-tool="sel" title="選択 (A)：投げ縄で囲うと持ち上がる／SINGLE 限定&#10;Ctrl+ドラッグ=コピー ／ Shift+ドラッグ=REF（写真）からコピー&#10;Enter か枠の外=確定 ／ Esc=取り消し">SEL</div>
         </div>
       </div>
       <div>
@@ -1031,7 +1034,7 @@ const PALETTE_48 = [
 const state = {
   view: 'studio',        // studio | edit（V2-Aで2ビューに統合）
   tool: 'move',          // BOARD: move | cut
-  etool: 'pen',          // EDIT: pen | eraser | fill | eyedrop
+  etool: 'pen',          // EDIT: pen | eraser | fill | sel（sel＝浮いた選択・SINGLE限定）
   fillColor: '#000000',
   brush: 6,
   curCut: -1,
@@ -1567,9 +1570,12 @@ function patchScratch(w, h){
   }
   return gPatchScratch;
 }
-function drawPatchStack(ctx, cut, src, dw, dh, kind, only){
+/* raw=true のときは **濃/描画モードを掛けない素の画素**で出す。
+   フォトバッシュ（浮いた選択）が color を持ち上げるときだけ使う＝同じ層へ戻すので
+   往復して色が濃くならない。表示経路は必ず raw なしで呼ぶこと。 */
+function drawPatchStack(ctx, cut, src, dw, dh, kind, only, raw){
   if(!cut) return false;
-  const alpha = (kind === 'plate') ? clamp(gPaint.colorAlpha, 0, 1) : 1;
+  const alpha = (kind === 'plate' && !raw) ? clamp(gPaint.colorAlpha, 0, 1) : 1;
   if(alpha <= 0) return false;
   const b = bakeSize(cut);
   const sx = src ? src.sx : 0, sy = src ? src.sy : 0;
@@ -1591,7 +1597,7 @@ function drawPatchStack(ctx, cut, src, dw, dh, kind, only){
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.globalAlpha = alpha;
-  if(kind === 'plate') ctx.globalCompositeOperation = gPaint.colorBlend || 'multiply';
+  if(kind === 'plate' && !raw) ctx.globalCompositeOperation = gPaint.colorBlend || 'multiply';
   if(list.length === 1 && !list[0].hide){
     const it = list[0];
     ctx.drawImage(it.p, it.x, it.y, it.w, it.h);
@@ -1785,6 +1791,7 @@ function prefetchAround(i){
 /* ---------------- view switching（STUDIO / EDIT） ---------------- */
 function setView(v){
   if(v !== 'studio') pause();   // 再生の取り残し防止（TIMELINE帯はSTUDIOにしかない）
+  if(gFloat) floatCommit(true); // 浮いた選択を持ったまま画面を移らない（SPEC_15 P2-3）
   state.view = v;
   $('#view-studio').classList.toggle('on', v === 'studio');
   $('#view-edit').classList.toggle('on', v === 'edit');
@@ -1798,6 +1805,7 @@ function setView(v){
     else { sizeEditCanvas(cuts[state.curCut]); fitEditCanvas(); renderEditCanvas(); }
     syncEditPanels();
   }
+  syncSelToolUI();
 }
 function layoutStudio(){
   resizeBoard(); renderBoard();
@@ -4361,6 +4369,7 @@ function gridStrokeUp(e){
   scheduleSave();
 }
 function setEditMode(m, quiet){
+  if(gFloat) floatCommit(true);   // 画面を移ったら確定（浮いたまま見えない所へ行かせない）
   gEditMode = m;
   // SINGLE は1カットしか見えないので、GRIDで選んだ複数セルは持ち越さない
   // （持ち越すと 濃/モードが見えていないコマにも効いてしまう）
@@ -4372,6 +4381,7 @@ function setEditMode(m, quiet){
   // **描く先は画面移動で変えない**（SPEC_16 §5-B1）。
   // 以前はここで GRID=color / SINGLE=line に付け替えていたので、
   // 「色を塗るつもりで単票に入ったら線画になっていた」が起きていた
+  syncSelToolUI();                      // SEL は SINGLE のときだけ押せる
   if(quiet) return;                     // 表示は呼び出し側（setView）に任せる
   if(m === 'grid') renderGrid();
   else { sizeEditCanvas(cuts[state.curCut]); fitEditCanvas(); renderEditCanvas(); }
@@ -4505,6 +4515,8 @@ function renderEditCanvas(){
   if(!cut) return;
   compositeTo(editCtx, cut);   // EDITはベイク空間（＝紙のまま）を編集する
   drawCamGuide(editCtx, cut);
+  // 浮いた選択は **ここでしか描かない**＝確定するまでサムネ・GRID・書き出しには存在しない
+  if(gFloat && gFloat.cut === cut) drawFloatOverlay(editCtx, gFloat);
 }
 /* 枠列カットは「どこが画面に入るか」が見えないと描けないので、EDIT表示にだけ枠を重ねる。
    editCv は表示用キャンバスなのでパッチは汚れない（投げ縄/スポイトは別経路） */
@@ -4540,6 +4552,7 @@ function drawCamGuide(ctx, cut){
 }
 function openEdit(i){
   if(!cuts.length) return;
+  if(gFloat) floatCommit(true);   // **curCut を動かす前に**確定する（別カットへ焼かないため）
   pause();
   i = clamp(i, 0, cuts.length - 1);
   state.curCut = i;
@@ -4555,6 +4568,7 @@ function openEdit(i){
   setView('edit');
 }
 function setETool(t){
+  if(gFloat && t !== 'sel') floatCommit();   // ツールを変えたら確定（SPEC_15 P2-3）
   state.etool = t;
   // [data-tool] に限定する（描く先ボタン [data-target] を巻き込まないため）
   document.querySelectorAll('.etool[data-tool]').forEach(el => el.classList.toggle('on', el.dataset.tool === t));
@@ -4691,6 +4705,23 @@ function txEnd(){
                  undo(){ items.forEach(it => put(it, it.before)); after(); },
                  redo(){ items.forEach(it => put(it, it.after)); after(); } });
 }
+/* 撮った控えをそのまま戻して、その回の変更を **ログに積まずに** 捨てる。
+   浮いた選択の Esc（取り消し）専用。控えはパッチ丸ごと1枚なので、
+   **控えを取ってから他の経路で同じパッチを触っていないこと**が前提
+   （浮いている間はペイントを塞いであるので成立する）。 */
+function txAbort(tx){
+  if(!tx || !tx.size) return;
+  tx.forEach(e => {
+    const c = frLayer(e.cut, e.k, e.kind, false);
+    if(!c) return;
+    const ctx = ctx2d(c);
+    ctx.save();
+    ctx.globalCompositeOperation = 'copy';   // 透明も含めて丸ごと差し替える
+    ctx.drawImage(e.snap, 0, 0);
+    ctx.restore();
+    markPatch(e.cut, e.k, e.kind);
+  });
+}
 /* 旧 API 名のまま残す（呼び出し側の読みを変えないため） */
 function beginPaintUndo(){ txBegin(); }
 function endPaintUndo(){ txEnd(); }
@@ -4787,15 +4818,19 @@ function lassoFillPolygon(ctx, W, H, pts, hex, erase){
    離した瞬間に触れている枠ぶんだけ座標を作り直して落とす**＝1本の投げ縄が
    枠（GRIDならセル）をまたいで塗れる（SPEC_16 §5-C8「選択に関係なくまたいで塗る」）。 */
 let gLasso = null;
-function lassoBegin(e, cv){
+/* sel = 浮いた選択（SPEC_15 P2）。同じ投げ縄の頂点収集を使い、**離したときの行き先だけ**
+   変える（塗る → 持ち上げる）。mode = {src:'line'|'color'|'base', copy:bool} */
+function lassoBegin(e, cv, sel){
   const cut = cuts[state.curCut];
   if(!cut) return false;
-  if(paintKind() === 'line' && !needLine(cut)){
+  // SEL は base / line どちらも読み込み済みでないと持ち上げられないので、色でも常駐を要求する
+  if((sel || paintKind() === 'line') && !needLine(cut)){
     toast('読み込みました。もう一度なぞってください');
     return false;
   }
   try{ cv.setPointerCapture(e.pointerId); }catch(err){}
-  gLasso = { cv, cut, grid: !!(cv.classList && cv.classList.contains('gc-cv')), scr: [] };
+  gLasso = { cv, cut, grid: !!(cv.classList && cv.classList.contains('gc-cv')), scr: [],
+             sel: !!sel, mode: sel || null };
   lassoAdd(e.clientX, e.clientY);
   return true;
 }
@@ -4850,6 +4885,7 @@ function lassoEnd(){
   const g = gLasso;
   gLasso = null;
   if(g.scr.length < 3){ renderPaintViews(); return; }
+  if(g.sel){ floatLift(g); return; }        // SEL＝塗らずに持ち上げる（SPEC_15 P2）
   const kind = paintKind();
   const erase = !!state.fillErase;
   // 落とす先の一覧を作る。GRID＝多角形の外接矩形に重なるセル全部（選択とは無関係）／
@@ -4901,6 +4937,256 @@ function lassoEnd(){
   if(g.grid) gGridRows.forEach(drawRowPalette);
   else renderPaintViews();
   scheduleSave();
+}
+
+/* ============ 軽いフォトバッシュ＝「浮いた選択」（SPEC_15 P2・V4対応） ============
+   Photoshop で投げ縄→ドラッグしたときの手触り。**同時に1枚だけ・保存しない**ので
+   LRU も保存フォーマットも触らずに済む（V2-E3 の cut.layers[] を採らなかった理由）。
+
+   ★ V4（枠ごとのパッチ）に合わせた読み替え —— SPEC_15 は plateC/drawC（カット1枚）
+     前提で書かれているので、次の2点だけ V4 の形にしてある:
+     ① 中身は **紙（ベイク空間）の1枚**として持ち上げ、確定時に
+        **重なる枠ぶん全部のパッチへ落とす**。これは投げ縄塗り（lassoEnd）と同じ配り方＝
+        面で効く操作の振る舞いがツール間でそろう
+     ② **焼き込み先は「持ち上げた層」**（line→line / color→color）。
+        SPEC_15 P2-4 は「色を持ち上げても line へ焼く」だったが、それは plate が
+        カット1枚だった V3 の話。V4 で plate も line と同じ枠ごとのパッチになったので、
+        color を line に落とすとカラースクリプト（色帯・C.SCRIPT）から絵が消えてしまう。
+        **戻す層を変えたいときは floatKindOf() の1行**。
+   ★ 動かさない安全弁（SPEC_15 P2-4 のまま）:
+     - **BASE（REF）からはコピーしか取れない**。元に穴を開けない＝⟳（再ベイク）がいつでも安全
+     - 浮いている絵は renderEditCanvas でしか描かない＝**サムネ・GRID・書き出しには出ない**
+     - Undo は「持ち上げ（切り取り）＋確定（貼り付け）」を **1手にまとめる**（tx を開いたまま持つ） */
+const FLOAT_HANDLE_PX = 9;                                             // ハンドルの一辺（画面px固定）
+const FL_HANDLES = [[0,0],[0.5,0],[1,0],[1,0.5],[1,1],[0.5,1],[0,1],[0,0.5]];
+let gFloat = null;
+// { cut, kind:'line'|'plate', src:'line'|'color'|'base', copy,
+//   cv,                        中身（マスク済み・bbox寸法・ベイク空間の画素）
+//   x,y,w,h,                   いまの配置（ベイク空間）
+//   ox,oy,ow,oh,               持ち上げた時の配置（表示用）
+//   tx,                        開いたままの Undo トランザクション
+//   drag }
+function inSingle(){ return state.view === 'edit' && gEditMode === 'single'; }
+function floatKindOf(src){ return src === 'color' ? 'plate' : 'line'; }   // BASE は line へ（元に穴を開けない）
+/* いま押されている修飾キーから「どこから・切るかコピーか」を決める */
+function floatModeFrom(e){
+  const src = e.shiftKey ? 'base' : (state.paintTarget === 'color' ? 'color' : 'line');
+  return { src, copy: !!(e.ctrlKey || e.metaKey) || src === 'base' };
+}
+/* 持ち上げ元を「紙の1枚」として作る。plate は raw＝濃/モードを掛けない素の画素 */
+function floatSourcePaper(cut, src){
+  const b = bakeSize(cut);
+  const c = blankCanvas(b.w, b.h);
+  const ctx = ctx2d(c);
+  if(src === 'base'){
+    const base = getBase(cut);
+    if(!base) return null;
+    ctx.drawImage(base, 0, 0, b.w, b.h);        // REFの濃度は掛けない（見えている薄さでなく元の絵を取る）
+    return c;
+  }
+  if(!drawPatchStack(ctx, cut, null, b.w, b.h, floatKindOf(src), -1, true)) return null;
+  return c;
+}
+/* ベイク空間の矩形に重なる枠を回す（投げ縄塗りの targets と同じ選び方） */
+function floatEachFrame(cut, x0, y0, x1, y1, fn){
+  const n = frCount(cut);
+  for(let k = 0; k < n; k++){
+    const r = camBakeRect(cut, k);
+    if(r.x + r.w < x0 || r.x > x1 || r.y + r.h < y0 || r.y > y1) continue;
+    fn(k);
+  }
+}
+/* 透明しか無い選択を持ち上げない（空の枠が出て「効いていない」に見えるのを防ぐ）。
+   縮小してから見るので大きい範囲でも軽い（細線も縮小で平均化されて alpha が残る） */
+function canvasHasInk(c){
+  const w = Math.max(1, Math.min(64, c.width)), h = Math.max(1, Math.min(64, c.height));
+  const t = blankCanvas(w, h);
+  const tc = ctx2d(t);
+  tc.imageSmoothingEnabled = true;
+  tc.drawImage(c, 0, 0, w, h);
+  const d = tc.getImageData(0, 0, w, h).data;
+  for(let i = 3; i < d.length; i += 4) if(d[i] > 2) return true;
+  return false;
+}
+/* 投げ縄が閉じた → 中身を切り出して浮かせる */
+function floatLift(g){
+  const cut = g.cut, mode = g.mode || { src: 'line', copy: false };
+  const b = bakeSize(cut);
+  const pts = g.scr.map(p => toBakeCoord(p.cx, p.cy, g.cv));
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  pts.forEach(p => { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y);
+                     x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); });
+  x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0));
+  x1 = Math.min(b.w, Math.ceil(x1)); y1 = Math.min(b.h, Math.ceil(y1));
+  const w = x1 - x0, h = y1 - y0;
+  const bail = msg => { if(msg) toast(msg); renderPaintViews(); };
+  if(w < 2 || h < 2) return bail(null);
+  if(w * h > MAX_AREA / 2) return bail('範囲が大きすぎます');
+  const paper = floatSourcePaper(cut, mode.src);
+  if(!paper) return bail(mode.src === 'base' ? '元の絵がありません' : '持ち上げるものがありません');
+  // 中身＝紙から bbox を切り出して、多角形でマスクする（縁はアンチエイリアスされる）
+  const cv = blankCanvas(w, h);
+  const cx = ctx2d(cv);
+  cx.imageSmoothingEnabled = true;
+  cx.drawImage(paper, x0, y0, w, h, 0, 0, w, h);
+  cx.globalCompositeOperation = 'destination-in';
+  cx.beginPath();
+  cx.moveTo(pts[0].x - x0, pts[0].y - y0);
+  for(let i = 1; i < pts.length; i++) cx.lineTo(pts[i].x - x0, pts[i].y - y0);
+  cx.closePath();
+  cx.fill();
+  cx.globalCompositeOperation = 'source-over';
+  if(!canvasHasInk(cv)) return bail('選んだ範囲に画がありません');
+  const kind = floatKindOf(mode.src);
+  // ---- 持ち上げ = ここから確定/取り消しまで tx を開いたまま持つ（1手にまとめるため）
+  txBegin();
+  if(!mode.copy){                                  // 切り取り（BASE は copy 固定なのでここへ来ない）
+    floatEachFrame(cut, x0, y0, x1, y1, k => {
+      const c = frLayer(cut, k, kind, true);
+      if(!c) return;
+      const pp = pts.map(p => bakeToPatch(cut, k, p, kind));
+      let px0 = 1e9, py0 = 1e9, px1 = -1e9, py1 = -1e9;
+      pp.forEach(q => { px0 = Math.min(px0, q.x); py0 = Math.min(py0, q.y);
+                        px1 = Math.max(px1, q.x); py1 = Math.max(py1, q.y); });
+      txTouch(cut, k, kind, px0, py0, px1, py1);
+      lassoFillPolygon(ctx2d(c), c.width, c.height, pp, '#000000', true);
+      markPatch(cut, k, kind);
+    });
+  }
+  const tx = gTx;
+  gTx = null;                    // 浮いている間、他の経路が触っても壊されないよう外へ退避する
+  gFloat = { cut, kind, src: mode.src, copy: !!mode.copy, cv,
+             x: x0, y: y0, w, h, ox: x0, oy: y0, ow: w, oh: h, tx, drag: null };
+  renderPaintViews();
+  const i = cuts.indexOf(cut);
+  if(i >= 0) refreshRow(i);
+  toast((mode.src === 'base' ? 'REFからコピー' : (mode.copy ? 'コピー' : '切り取り'))
+        + '：ドラッグで移動・隅で拡縮（Shiftで自由）／Enterで確定・Escで取り消し');
+}
+/* ベイクpx → 画面px の倍率。ハンドルと枠線を **ズームしても同じ太さ**に保つのに使う */
+function floatScreenK(){ return Math.max(1e-6, gEditFit * state.editView.z); }
+function floatHitTest(bx, by){
+  const g = gFloat;
+  if(!g) return null;
+  const hp = (FLOAT_HANDLE_PX * 0.75 + 3) / floatScreenK();     // 当たりは見た目より少し広く
+  for(let i = 0; i < FL_HANDLES.length; i++){
+    const hx = g.x + g.w * FL_HANDLES[i][0], hy = g.y + g.h * FL_HANDLES[i][1];
+    if(Math.abs(bx - hx) <= hp && Math.abs(by - hy) <= hp) return { type: 'scale', i };
+  }
+  if(bx >= g.x && bx <= g.x + g.w && by >= g.y && by <= g.y + g.h) return { type: 'move' };
+  return null;
+}
+function floatDragStart(hit, b){
+  if(!gFloat) return;
+  gFloat.drag = { type: hit.type, i: hit.i, sx: b.x, sy: b.y,
+                  x: gFloat.x, y: gFloat.y, w: gFloat.w, h: gFloat.h };
+}
+/* 隅＝既定で縦横比維持（Shiftで自由）／辺＝その軸だけ。回転は入れない（SPEC_15 P2-3） */
+function floatDragMove(b, shift){
+  const g = gFloat;
+  if(!g || !g.drag) return;
+  const d = g.drag;
+  if(d.type === 'move'){ g.x = d.x + (b.x - d.sx); g.y = d.y + (b.y - d.sy); return; }
+  const hx = FL_HANDLES[d.i][0], hy = FL_HANDLES[d.i][1];
+  const ax = d.x + d.w * (1 - hx), ay = d.y + d.h * (1 - hy);   // アンカー＝反対側
+  let nw = d.w, nh = d.h;
+  if(hx !== 0.5) nw = Math.max(4, Math.abs(b.x - ax));
+  if(hy !== 0.5) nh = Math.max(4, Math.abs(b.y - ay));
+  if(hx !== 0.5 && hy !== 0.5 && !shift){
+    const kx = nw / d.w, ky = nh / d.h;
+    const s = Math.max(0.02, Math.abs(kx - 1) > Math.abs(ky - 1) ? kx : ky);
+    nw = d.w * s; nh = d.h * s;
+  }
+  g.w = nw; g.h = nh;
+  g.x = (hx === 0) ? ax - nw : (hx === 1 ? ax : d.x);
+  g.y = (hy === 0) ? ay - nh : (hy === 1 ? ay : d.y);
+}
+/* 浮いている絵と変形枠。**renderEditCanvas からしか呼ばない**＝
+   compositeTo（サムネ・GRID・書き出し）には一切出ない（SPEC_15 P2-5） */
+function drawFloatOverlay(ctx, g){
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  if(g.kind === 'plate'){                       // 色は見えているとおりに（濃/モードを掛けて）出す
+    ctx.globalAlpha = clamp(gPaint.colorAlpha, 0, 1);
+    ctx.globalCompositeOperation = gPaint.colorBlend || 'multiply';
+  }
+  ctx.drawImage(g.cv, g.x, g.y, g.w, g.h);
+  ctx.restore();
+  const k = floatScreenK(), hs = FLOAT_HANDLE_PX / k;
+  ctx.save();
+  ctx.lineWidth = 1.5 / k;
+  ctx.strokeStyle = 'rgba(255,79,168,0.95)';
+  ctx.setLineDash([8 / k, 5 / k]);
+  ctx.strokeRect(g.x, g.y, g.w, g.h);
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,79,168,0.95)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.lineWidth = 1 / k;
+  FL_HANDLES.forEach(([hx, hy]) => {
+    const x = g.x + g.w * hx - hs / 2, y = g.y + g.h * hy - hs / 2;
+    ctx.fillRect(x, y, hs, hs);
+    ctx.strokeRect(x, y, hs, hs);
+  });
+  ctx.restore();
+}
+function floatAfter(cut){
+  const i = cuts.indexOf(cut);
+  renderPaintViews();
+  if(i >= 0){ refreshRow(i); if(inGrid()) refreshGridCells(i); }
+}
+/* 確定＝重なる枠ぶん全部のパッチへ落とす（投げ縄塗りと同じ配り方）。
+   持ち上げ時に開いた tx をここで閉じるので、**Ctrl+Z 1回で持ち上げる前に戻る** */
+function floatCommit(silent){
+  const g = gFloat;
+  if(!g) return false;
+  gFloat = null;
+  if(cuts.indexOf(g.cut) < 0){ gTx = null; return true; }   // カットごと消えていたら黙って捨てる
+  const cut = g.cut, x1 = g.x + g.w, y1 = g.y + g.h;
+  gTx = g.tx;
+  floatEachFrame(cut, g.x, g.y, x1, y1, k => {
+    const c = frLayer(cut, k, g.kind, true);
+    if(!c) return;
+    const a = bakeToPatch(cut, k, { x: g.x, y: g.y }, g.kind);
+    const q = bakeToPatch(cut, k, { x: x1, y: y1 }, g.kind);
+    txTouch(cut, k, g.kind, Math.min(a.x, q.x) - 1, Math.min(a.y, q.y) - 1,
+                            Math.max(a.x, q.x) + 1, Math.max(a.y, q.y) + 1);
+    const ctx = ctx2d(c);
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(g.cv, a.x, a.y, q.x - a.x, q.y - a.y);
+    ctx.restore();
+    markPatch(cut, k, g.kind);
+  });
+  txEnd();
+  floatAfter(cut);
+  scheduleSave();
+  if(!silent) toast('確定しました（Ctrl+Z で持ち上げる前に戻ります）');
+  return true;
+}
+/* 取り消し＝控えを戻して**ログに積まない**（何もしなかったことにする） */
+function floatCancel(){
+  const g = gFloat;
+  if(!g) return false;
+  gFloat = null;
+  gTx = null;
+  txAbort(g.tx);
+  floatAfter(g.cut);
+  scheduleSave();
+  toast('取り消しました');
+  return true;
+}
+/* SEL は SINGLE 限定（SPEC_15 P2 / SPEC_13 §9）。GRID では押せないようグレーにする。
+   ★ **SEL を持ったまま SINGLE を出たら PEN に戻す**。戻さないと「ボタンはグレー・
+     でも選ばれているのは SEL」になり、なぞっても何も起きない＝バグか仕様か悩ませる */
+function syncSelToolUI(){
+  const on = inSingle();
+  document.querySelectorAll('.etool[data-tool="sel"]').forEach(el => el.classList.toggle('off', !on));
+  if(!on && state.etool === 'sel'){
+    setETool('pen');
+    toast('SEL は SINGLE 専用なので PEN に戻しました');
+  }
 }
 
 /* --- palette (canon: animator-color-palette skill) --- */
@@ -5197,6 +5483,23 @@ function paintDown(e, cv){
     eyedropAt(e.clientX, e.clientY, cv);
     return;
   }
+  // --- 浮いた選択が居るあいだは、まずそちらの操作として読む（SPEC_15 P2-3）---
+  if(gFloat){
+    if(cv === editCv && gFloat.cut === cuts[state.curCut]){
+      const b = toCanvasCoord(e.clientX, e.clientY, cv);
+      const hit = floatHitTest(b.x, b.y);
+      if(hit){ floatDragStart(hit, b); return; }
+      floatCommit();          // 枠の外をクリック＝確定（その場では描き始めない）
+      return;
+    }
+    floatCommit(true);        // 別の面（GRIDのセル等）を触ったら黙って確定してから通常処理へ
+  }
+  // SEL＝投げ縄で持ち上げ。**SINGLE 限定**（GRIDに重い変形UIを持ち込まない）
+  if(state.etool === 'sel'){
+    if(cv !== editCv || !inSingle()){ toast('SEL（浮いた選択）は SINGLE だけで使えます'); return; }
+    lassoBegin(e, cv, floatModeFrom(e));
+    return;
+  }
   // FILL は econte では**常に投げ縄**（バケツは廃止。SPEC_16 §5-B2）
   if(state.etool === 'fill'){ lassoBegin(e, cv); return; }
   const cut = cuts[state.curCut];
@@ -5212,6 +5515,11 @@ function paintDown(e, cv){
   renderPaintViews();
 }
 function paintMove(e){
+  if(gFloat && gFloat.drag){
+    floatDragMove(toCanvasCoord(e.clientX, e.clientY, paintCv || editCv), e.shiftKey);
+    renderPaintViewsSoon();   // 紙が大判だと合成が重いので60Hzに間引く（離したとき同期で描き直す）
+    return;
+  }
   if(gLasso){ lassoAdd(e.clientX, e.clientY); return; }
   if(!stroking || !paintCv) return;
   const p = toBakeCoord(e.clientX, e.clientY, paintCv);
@@ -5221,6 +5529,7 @@ function paintMove(e){
   renderPaintViewsSoon();   // 60Hzに間引く（引き終わりに paintUp が同期で描き直す）
 }
 function paintUp(){
+  if(gFloat && gFloat.drag){ gFloat.drag = null; paintCv = null; renderPaintViews(); return; }
   if(gLasso){ lassoEnd(); paintCv = null; return; }
   paintCv = null;
   if(!stroking) return;
@@ -7046,13 +7355,23 @@ function bindDoubleTap(el, fn){
 const HELP_GROUPS = [
   { t: 'TRANSPORT / 表示（STUDIO）', rows: 'keymap' },   // SHORTCUT_ACTIONS から自動生成＝再割当も反映される
   { t: 'PAINT（ANIMATOR準拠）', rows: [
-    ['B', 'ペン'], ['E', '消しゴム'], ['G', '塗りつぶし'],
+    ['B', 'ペン'], ['E', '消しゴム'], ['G', '投げ縄（バケツはありません）'], ['A', 'SEL＝浮いた選択（SINGLE限定）'],
     ['[ / ]', 'ブラシを細く／太く'], ['右ドラッグ', 'ブラシサイズ（右=太く/左=細く）'],
     ['Alt+クリック', 'スポイト'], ['色帯をクリック', 'その色を拾う'],
     ['PEN をWクリック', '筆圧ペン ON/OFF'], ['ERASE をWクリック', '今の描く先をCLEAR'],
-    ['FILL をWクリック', '投げ縄塗り ⇔ バケツ'],
-    ['FILL を長押し', '投げ縄透明消し ⇔ バケツ（囲った所を消す）'], ['Tab', 'TOOLパネルを左右入替'],
+    ['LASSO を長押し', '投げ縄の 塗り ⇔ 透明消し（囲った所を消す）'], ['Tab', 'TOOLパネルを左右入替'],
     ['Ctrl+Z', 'UNDO'], ['Ctrl+Shift+Z', 'REDO（Ctrl+Y も可）']
+  ] },
+  { t: 'SEL＝浮いた選択（軽いフォトバッシュ・SINGLE限定）', rows: [
+    ['A → 投げ縄で囲う', '囲った中身が持ち上がる（今の「描く先」の層から切り取り）'],
+    ['Ctrl+ドラッグで囲う', 'コピーで持ち上げ（元は残る）'],
+    ['Shift+ドラッグで囲う', 'REF（写真）からコピー。**元の絵には穴を開けません**'],
+    ['枠の中をドラッグ', '移動'], ['隅のハンドル', '拡大縮小（既定は縦横比維持・Shiftで自由）'],
+    ['Enter / 枠の外をクリック', '確定（Ctrl+Z 1回で持ち上げる前に戻ります）'],
+    ['Esc', '取り消し（元の位置へ戻す）'],
+    ['焼き込み先', 'line から持ち上げたら line ／ color なら color ／ REF からは line'],
+    ['浮いている間', 'サムネ・GRID・書き出しには出ません（確定するまで存在しない）'],
+    ['回転', 'ありません（要望が出たら足します）']
   ] },
   { t: 'SHEETパネル', rows: [
     ['S', 'パネルの開閉'],
@@ -7205,6 +7524,11 @@ function onKey(e){
     return;
   }
   if(e.key === '?' || (e.key === '/' && e.shiftKey)){ e.preventDefault(); toggleHelp(true); return; }
+  // 浮いた選択（SPEC_15 P2-3）: Enter=確定 / Esc=取り消し。**他の何よりも先に見る**
+  if(gFloat){
+    if(e.key === 'Escape'){ e.preventDefault(); floatCancel(); return; }
+    if(e.key === 'Enter'){ e.preventDefault(); floatCommit(); return; }
+  }
   // STUDIO は統合ログ（写真・枠・ペイントを一列）、EDIT内は従来のカット別スタック
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
     e.preventDefault();
@@ -7286,6 +7610,11 @@ function onKey(e){
   if(k === 'b') setETool('pen');
   else if(k === 'e') setETool('eraser');
   else if(k === 'g') setETool('fill');
+  // SEL は SINGLE 限定。他の画面では黙って切り替えず、なぜ効かないかを言う
+  else if(k === 'a'){
+    if(inSingle()) setETool('sel');
+    else toast('SEL（浮いた選択）は SINGLE だけで使えます');
+  }
   else if(k === '['){ setBrush(state.brush - Math.max(1, Math.round(state.brush * 0.2))); }
   else if(k === ']'){ setBrush(state.brush + Math.max(1, Math.round(state.brush * 0.2))); }
 }
@@ -7798,6 +8127,14 @@ window.__ECONTE__ = {
   brushMax, isTextEntry, inGrid, inPaintView, pushPaintLog, colorUndo, colorRedo,
   onDoubleActivate, onLongPress, bindSizeDrag, sizeDragMove, sizeDragEnd, pressFactor,
   lassoFillPolygon, lassoBegin, lassoAdd, lassoEnd, lassoPreview,
+  // 浮いた選択＝軽いフォトバッシュ（SPEC_15 P2）
+  floatLift, floatCommit, floatCancel, floatHitTest, floatDragStart, floatDragMove,
+  floatModeFrom, floatKindOf, floatSourcePaper, floatEachFrame, canvasHasInk,
+  inSingle, syncSelToolUI, txAbort,
+  get float(){ return gFloat ? { src: gFloat.src, kind: gFloat.kind, copy: gFloat.copy,
+                                 x: gFloat.x, y: gFloat.y, w: gFloat.w, h: gFloat.h,
+                                 ox: gFloat.ox, oy: gFloat.oy, ow: gFloat.ow, oh: gFloat.oh,
+                                 cut: cuts.indexOf(gFloat.cut) } : null; },
   get colorLog(){ return { undo: gColorLog.length, redo: gColorRedo.length }; },
   setEditMode, setPaintTarget, renderGrid, refreshGridCells, colorCells, cellSub, cellFrames,
   extractPalette, drawRowPalette, drawCell, updateCellRes, gridZoom, gridFit, gridCellW,
