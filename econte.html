@@ -1048,6 +1048,7 @@ const state = {
   // FILL は econte では**常に投げ縄**（バケツは廃止・SPEC_16 §5-B2）。
   // 長押しで「投げ縄塗り ⇄ 投げ縄透明消し」の2状態だけ
   fillErase: false,
+  selWarp: false,        // SEL のWクリックで WARP（3×3の格子変形）ON/OFF。UI_LS に覚える
   paintTarget: 'draw',   // 'draw'=線画レイヤー / 'color'=カラースクリプト層（V2-E2）
   curFrame: 0,           // 色を編集している枠index（cam[]の何枚目か）
   selCut: null,          // {i,k} 選択中のCUT枠（k = cam[]の枠index）
@@ -4996,26 +4997,39 @@ function lassoEnd(){
      ① 中身は **紙（ベイク空間）の1枚**として持ち上げ、確定時に
         **重なる枠ぶん全部のパッチへ落とす**。これは投げ縄塗り（lassoEnd）と同じ配り方＝
         面で効く操作の振る舞いがツール間でそろう
-     ② **焼き込み先は「持ち上げた層」**（line→line / color→color）。
+     ② **焼き込み先はつねに「いまの描く先」**（`floatKindNow()`）。
         SPEC_15 P2-4 は「色を持ち上げても line へ焼く」だったが、それは plate が
-        カット1枚だった V3 の話。V4 で plate も line と同じ枠ごとのパッチになったので、
-        color を line に落とすとカラースクリプト（色帯・C.SCRIPT）から絵が消えてしまう。
-        **戻す層を変えたいときは floatKindOf() の1行**。
+        カット1枚だった V3 の話。V4 で plate も枠ごとのパッチになったので、
+        **持ち上げ元＝Shiftなら REF・それ以外は描く先／焼き込み先＝描く先** の1行に統一した。
+        おかげで「color のとき Shift で REF を切り貼り」も「line で持ち上げて color に落とす」も
+        同じ規則で通る（2026-08-19 ユーザー質問への答え）。
    ★ 動かさない安全弁（SPEC_15 P2-4 のまま）:
      - **BASE（REF）からはコピーしか取れない**。元に穴を開けない＝⟳（再ベイク）がいつでも安全
      - 浮いている絵は renderEditCanvas でしか描かない＝**サムネ・GRID・書き出しには出ない**
-     - Undo は「持ち上げ（切り取り）＋確定（貼り付け）」を **1手にまとめる**（tx を開いたまま持つ） */
-const FLOAT_HANDLE_PX = 9;                                             // ハンドルの一辺（画面px固定）
+     - Undo は「持ち上げ（切り取り）＋確定（貼り付け）」を **1手にまとめる**（tx を開いたまま持つ）
+
+   ★ 形の持ち方（2026-08-19 に回転・自由変形・WARP を追加したときの要）
+     `x,y,w,h` … 回転前の「箱」（ベイク空間）
+     `rot`     … 箱の中心まわりの回転
+     `warp`    … null | 制御点の **箱ローカル正規化座標** `{u,v}` を wn×wn 個（row-major）
+                 wn=2 … `Ctrl`＋隅 の自由変形（**射影変換**で貼る＝台形が台形に見える）
+                 wn=3/4 … WARP（SEL をWクリック）。**Catmull-Rom** で滑らかに貼る
+     **warp を箱ローカルで持つのが肝**。ワールド座標で持つと、箱を動かす/回す/拡縮するたびに
+     制御点を全部作り直すことになる。ローカルなら「箱を動かせば絵も付いてくる」が自動で成り立つ。 */
+const FLOAT_HANDLE_PX = 9;      // ハンドルの一辺（画面px固定）
+const FL_ROT_PX = 42;           // 隅の外側この幅が回転リング（画面px）。ペンで掴むので少し広め
+const FL_WARP_N = 4;            // WARP の制御点は 4×4（＝3×3 マス）
 const FL_HANDLES = [[0,0],[0.5,0],[1,0],[1,0.5],[1,1],[0.5,1],[0,1],[0,0.5]];
+/* 回転カーソル（↻）。PSと同じで「隅の外側にホバーしたら回る」ことを形で見せる */
+const FL_ROT_CURSOR = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'><g fill='none' stroke='white' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6.5 13a6.5 6.5 0 1 1 2.6 5.2'/><path d='M5 8.4 6.6 13l4.6-1.1'/></g><g fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6.5 13a6.5 6.5 0 1 1 2.6 5.2'/><path d='M5 8.4 6.6 13l4.6-1.1'/></g></svg>\") 13 13, crosshair";
 let gFloat = null;
-// { cut, kind:'line'|'plate', src:'line'|'color'|'base', copy,
-//   cv,                        中身（マスク済み・bbox寸法・ベイク空間の画素）
-//   x,y,w,h,                   いまの配置（ベイク空間）
-//   ox,oy,ow,oh,               持ち上げた時の配置（表示用）
-//   tx,                        開いたままの Undo トランザクション
-//   drag }
 function inSingle(){ return state.view === 'edit' && gEditMode === 'single'; }
-function floatKindOf(src){ return src === 'color' ? 'plate' : 'line'; }   // BASE は line へ（元に穴を開けない）
+/* 焼き込み先は **いまの描く先**。浮かせたまま line/color を押し替えれば行き先が変わる */
+function floatKindNow(){ return paintKind(); }
+function floatLayerLabel(g){
+  const k = floatKindNow() === 'plate' ? 'color' : 'line';
+  return (g && g.src === 'base') ? ('REF → ' + k) : k;
+}
 /* いま押されている修飾キーから「どこから・切るかコピーか」を決める */
 function floatModeFrom(e){
   const src = e.shiftKey ? 'base' : (state.paintTarget === 'color' ? 'color' : 'line');
@@ -5032,7 +5046,7 @@ function floatSourcePaper(cut, src){
     ctx.drawImage(base, 0, 0, b.w, b.h);        // REFの濃度は掛けない（見えている薄さでなく元の絵を取る）
     return c;
   }
-  if(!drawPatchStack(ctx, cut, null, b.w, b.h, floatKindOf(src), -1, true)) return null;
+  if(!drawPatchStack(ctx, cut, null, b.w, b.h, src === 'color' ? 'plate' : 'line', -1, true)) return null;
   return c;
 }
 /* ベイク空間の矩形に重なる枠を回す（投げ縄塗りの targets と同じ選び方） */
@@ -5056,7 +5070,178 @@ function canvasHasInk(c){
   for(let i = 3; i < d.length; i += 4) if(d[i] > 2) return true;
   return false;
 }
-/* 投げ縄が閉じた → 中身を切り出して浮かせる */
+
+/* --- 形（箱＋回転＋warp）------------------------------------------------- */
+function flAxes(g){                       // 箱の単位ベクトル（ex=横 / ey=縦）
+  const c = Math.cos(g.rot || 0), s = Math.sin(g.rot || 0);
+  return { ex: { x: c, y: s }, ey: { x: -s, y: c } };
+}
+function flCenterWorld(g){ return { x: g.x + g.w / 2, y: g.y + g.h / 2 }; }
+/* 箱ローカル (u,v) → ベイク空間 */
+function flBox(g, u, v){
+  const c = Math.cos(g.rot || 0), s = Math.sin(g.rot || 0);
+  const lx = (u - 0.5) * g.w, ly = (v - 0.5) * g.h;
+  return { x: g.x + g.w / 2 + lx * c - ly * s, y: g.y + g.h / 2 + lx * s + ly * c };
+}
+/* ベイク空間 → 箱ローカル (u,v)（flBox の逆） */
+function flToLocal(g, p){
+  const c = Math.cos(g.rot || 0), s = Math.sin(g.rot || 0);
+  const dx = p.x - (g.x + g.w / 2), dy = p.y - (g.y + g.h / 2);
+  return { u: (dx * c + dy * s) / Math.max(1e-6, g.w) + 0.5,
+           v: (-dx * s + dy * c) / Math.max(1e-6, g.h) + 0.5 };
+}
+/* wn=2 の自由変形は **射影変換**（bilinear だと台形が台形に見えない）。
+   単位正方形 → 4隅。係数はキャッシュする（1サンプルごとに解くと 169回×毎フレームになる） */
+function flHomo(g){
+  if(g._h) return g._h;
+  const W = g.warp, P0 = W[0], P1 = W[1], P3 = W[2], P2 = W[3];   // 0=TL 1=TR 2=BL 3=BR
+  const dx1 = P1.u - P2.u, dy1 = P1.v - P2.v, dx2 = P3.u - P2.u, dy2 = P3.v - P2.v;
+  const sx = P0.u - P1.u + P2.u - P3.u, sy = P0.v - P1.v + P2.v - P3.v;
+  const den = dx1 * dy2 - dx2 * dy1;
+  let gg = 0, hh = 0;
+  if((Math.abs(sx) > 1e-9 || Math.abs(sy) > 1e-9) && Math.abs(den) > 1e-9){
+    gg = (sx * dy2 - dx2 * sy) / den;
+    hh = (dx1 * sy - sx * dy1) / den;
+  }
+  g._h = { a: P1.u - P0.u + gg * P1.u, b: P3.u - P0.u + hh * P3.u, c: P0.u,
+           d: P1.v - P0.v + gg * P1.v, e: P3.v - P0.v + hh * P3.v, f: P0.v, g: gg, h: hh };
+  return g._h;
+}
+/* 等間隔の値列を通る Catmull-Rom。**端は接線を外挿**するので4点でも素直に通る */
+function flCr1(vals, t){
+  const n = vals.length;
+  if(n < 2) return vals[0] || 0;
+  if(n === 2) return vals[0] + (vals[1] - vals[0]) * t;
+  const s = clamp(t, 0, 1) * (n - 1);
+  const i = Math.min(n - 2, Math.floor(s)), f = s - i;
+  const at = k => (k < 0) ? 2 * vals[0] - vals[1] : (k > n - 1 ? 2 * vals[n - 1] - vals[n - 2] : vals[k]);
+  const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+  return 0.5 * (2 * p1 + (-p0 + p2) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f
+                + (-p0 + 3 * p1 - 3 * p2 + p3) * f * f * f);
+}
+/* 制御点の格子 → ローカル (u,v) の写像 */
+function flLocalWarp(g, u, v){
+  if(!g.warp) return { u, v };
+  if(g.wn === 2){
+    const m = flHomo(g);
+    const w = m.g * u + m.h * v + 1;
+    const iw = Math.abs(w) < 1e-9 ? 1e9 : 1 / w;
+    return { u: (m.a * u + m.b * v + m.c) * iw, v: (m.d * u + m.e * v + m.f) * iw };
+  }
+  const n = g.wn, ru = [], rv = [];
+  for(let i = 0; i < n; i++){
+    const ro = [], rw = [];
+    for(let j = 0; j < n; j++){ ro.push(g.warp[i * n + j].u); rw.push(g.warp[i * n + j].v); }
+    ru.push(flCr1(ro, u)); rv.push(flCr1(rw, u));
+  }
+  return { u: flCr1(ru, v), v: flCr1(rv, v) };
+}
+/* 正規化 (u,v) → ベイク空間（warp を通してから箱を通す） */
+function flMap(g, u, v){
+  const l = flLocalWarp(g, u, v);
+  return flBox(g, l.u, l.v);
+}
+/* 制御点が無ければ作る／粗ければ細かくする。**箱ローカルなので作り直しても形が保たれる** */
+function flEnsureWarp(g, n){
+  if(g.warp && g.wn >= n) return;
+  const old = g.warp ? (u, v) => flLocalWarp(g, u, v) : (u, v) => ({ u, v });
+  const pts = [];
+  for(let i = 0; i < n; i++) for(let j = 0; j < n; j++) pts.push(old(j / (n - 1), i / (n - 1)));
+  g.warp = pts; g.wn = n; g._h = null;
+}
+function flCornerIndex(g, hx, hy){
+  const n = g.wn;
+  return (hy === 0 ? 0 : n - 1) * n + (hx === 0 ? 0 : n - 1);
+}
+/* 形の外周（サンプリングした多角形）。当たり判定と外接矩形の両方で使う */
+function flOutline(g, seg){
+  const s = seg || 8, pts = [];
+  for(let i = 0; i < s; i++) pts.push(flMap(g, i / s, 0));
+  for(let i = 0; i < s; i++) pts.push(flMap(g, 1, i / s));
+  for(let i = 0; i < s; i++) pts.push(flMap(g, 1 - i / s, 1));
+  for(let i = 0; i < s; i++) pts.push(flMap(g, 0, 1 - i / s));
+  return pts;
+}
+function flShapeBBox(g){
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  const add = p => { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y);
+                     x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); };
+  for(let i = 0; i <= 8; i++) for(let j = 0; j <= 8; j++) add(flMap(g, j / 8, i / 8));
+  return { x0, y0, x1, y1 };
+}
+function flInside(g, bx, by){
+  const p = flOutline(g, 8);
+  let hit = false;
+  for(let i = 0, j = p.length - 1; i < p.length; j = i++){
+    if((p[i].y > by) !== (p[j].y > by) &&
+       bx < (p[j].x - p[i].x) * (by - p[i].y) / (p[j].y - p[i].y) + p[i].x) hit = !hit;
+  }
+  return hit;
+}
+
+/* --- 貼り付け（回転・射影・WARP を1本で）---------------------------------
+   `to` は「ベイク空間の点 → 描き先の点」。**表示は恒等・パッチへの焼き込みは bakeToPatch**
+   を渡すだけで、同じ形が同じ場所に出る。 */
+function flDrawTri(ctx, img, s, d){
+  const den = s[0].x * (s[2].y - s[1].y) + s[1].x * (s[0].y - s[2].y) + s[2].x * (s[1].y - s[0].y);
+  if(Math.abs(den) < 1e-9) return;
+  const m11 = (d[0].x * (s[2].y - s[1].y) + d[1].x * (s[0].y - s[2].y) + d[2].x * (s[1].y - s[0].y)) / den;
+  const m12 = (d[0].y * (s[2].y - s[1].y) + d[1].y * (s[0].y - s[2].y) + d[2].y * (s[1].y - s[0].y)) / den;
+  const m21 = (d[0].x * (s[1].x - s[2].x) + d[1].x * (s[2].x - s[0].x) + d[2].x * (s[0].x - s[1].x)) / den;
+  const m22 = (d[0].y * (s[1].x - s[2].x) + d[1].y * (s[2].x - s[0].x) + d[2].y * (s[0].x - s[1].x)) / den;
+  const dx = (d[0].x * (s[2].x * s[1].y - s[1].x * s[2].y) + d[1].x * (s[0].x * s[2].y - s[2].x * s[0].y)
+            + d[2].x * (s[1].x * s[0].y - s[0].x * s[1].y)) / den;
+  const dy = (d[0].y * (s[2].x * s[1].y - s[1].x * s[2].y) + d[1].y * (s[0].x * s[2].y - s[2].x * s[0].y)
+            + d[2].y * (s[1].x * s[0].y - s[0].x * s[1].y)) / den;
+  // 継ぎ目（三角形の境目に出る髪の毛のような線）を隠すため、重心から 0.4px ぶん膨らませて切り抜く
+  const cx = (d[0].x + d[1].x + d[2].x) / 3, cy = (d[0].y + d[1].y + d[2].y) / 3;
+  ctx.save();
+  ctx.beginPath();
+  for(let i = 0; i < 3; i++){
+    const vx = d[i].x - cx, vy = d[i].y - cy, len = Math.hypot(vx, vy) || 1;
+    const x = d[i].x + vx / len * 0.45, y = d[i].y + vy / len * 0.45;
+    if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.clip();
+  ctx.transform(m11, m12, m21, m22, dx, dy);
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
+}
+function flDrawMesh(ctx, img, map, sub){
+  const P = [];
+  for(let i = 0; i <= sub; i++){
+    const row = [];
+    for(let j = 0; j <= sub; j++) row.push(map(j / sub, i / sub));
+    P.push(row);
+  }
+  const W = img.width, H = img.height;
+  for(let i = 0; i < sub; i++) for(let j = 0; j < sub; j++){
+    const u0 = j / sub * W, u1 = (j + 1) / sub * W, v0 = i / sub * H, v1 = (i + 1) / sub * H;
+    const s00 = { x: u0, y: v0 }, s10 = { x: u1, y: v0 }, s11 = { x: u1, y: v1 }, s01 = { x: u0, y: v1 };
+    flDrawTri(ctx, img, [s00, s10, s11], [P[i][j], P[i][j + 1], P[i + 1][j + 1]]);
+    flDrawTri(ctx, img, [s00, s11, s01], [P[i][j], P[i + 1][j + 1], P[i + 1][j]]);
+  }
+}
+function flPaint(ctx, g, to){
+  const map = (u, v) => to(flMap(g, u, v));
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  if(!g.warp){
+    // 変形なし（移動・拡縮・回転だけ）＝**アフィンなので行列1回**。いちばん多い経路が最速
+    const p0 = map(0, 0), p1 = map(1, 0), p3 = map(0, 1);
+    const W = g.cv.width, H = g.cv.height;
+    ctx.transform((p1.x - p0.x) / W, (p1.y - p0.y) / W,
+                  (p3.x - p0.x) / H, (p3.y - p0.y) / H, p0.x, p0.y);
+    ctx.drawImage(g.cv, 0, 0);
+  }else{
+    flDrawMesh(ctx, g.cv, map, g.wn === 2 ? 10 : 14);
+  }
+  ctx.restore();
+}
+
+/* --- 持ち上げ ------------------------------------------------------------- */
 function floatLift(g){
   const cut = g.cut, mode = g.mode || { src: 'line', copy: false };
   const b = bakeSize(cut);
@@ -5085,7 +5270,7 @@ function floatLift(g){
   cx.fill();
   cx.globalCompositeOperation = 'source-over';
   if(!canvasHasInk(cv)) return bail('選んだ範囲に画がありません');
-  const kind = floatKindOf(mode.src);
+  const kind = mode.src === 'color' ? 'plate' : 'line';   // **抜く先は持ち上げ元の層**
   // ---- 持ち上げ = ここから確定/取り消しまで tx を開いたまま持つ（1手にまとめるため）
   txBegin();
   if(!mode.copy){                                  // 切り取り（BASE は copy 固定なのでここへ来ない）
@@ -5103,81 +5288,206 @@ function floatLift(g){
   }
   const tx = gTx;
   gTx = null;                    // 浮いている間、他の経路が触っても壊されないよう外へ退避する
-  gFloat = { cut, kind, src: mode.src, copy: !!mode.copy, cv,
-             x: x0, y: y0, w, h, ox: x0, oy: y0, ow: w, oh: h, tx, drag: null };
+  gFloat = { cut, src: mode.src, copy: !!mode.copy, cv,
+             x: x0, y: y0, w, h, rot: 0, warp: null, wn: 0, _h: null,
+             ox: x0, oy: y0, ow: w, oh: h, tx, drag: null };
+  if(state.selWarp) flEnsureWarp(gFloat, FL_WARP_N);
   renderPaintViews();
   const i = cuts.indexOf(cut);
   if(i >= 0) refreshRow(i);
   toast((mode.src === 'base' ? 'REFからコピー' : (mode.copy ? 'コピー' : '切り取り'))
-        + '：ドラッグで移動・隅で拡縮（Shiftで自由）／Enterで確定・Escで取り消し');
+        + '：隅=拡縮（Shiftで比率維持）／Ctrl+隅=自由変形／隅の外=回転／Enter確定・Esc取消');
 }
+
+/* --- 当たり判定・ドラッグ -------------------------------------------------- */
 /* ベイクpx → 画面px の倍率。ハンドルと枠線を **ズームしても同じ太さ**に保つのに使う */
 function floatScreenK(){ return Math.max(1e-6, gEditFit * state.editView.z); }
 function floatHitTest(bx, by){
   const g = gFloat;
   if(!g) return null;
-  const hp = (FLOAT_HANDLE_PX * 0.75 + 3) / floatScreenK();     // 当たりは見た目より少し広く
-  for(let i = 0; i < FL_HANDLES.length; i++){
-    const hx = g.x + g.w * FL_HANDLES[i][0], hy = g.y + g.h * FL_HANDLES[i][1];
-    if(Math.abs(bx - hx) <= hp && Math.abs(by - hy) <= hp) return { type: 'scale', i };
+  const k = floatScreenK(), hp = (FLOAT_HANDLE_PX * 0.75 + 3) / k;
+  // ① WARP の制御点（内側の点は WARP 編集中だけ。隅は箱ハンドルに譲る）
+  if(g.warp && g.wn > 2 && state.selWarp){
+    const n = g.wn;
+    for(let i = 0; i < n * n; i++){
+      const r = (i / n) | 0, c = i % n;
+      if((r === 0 || r === n - 1) && (c === 0 || c === n - 1)) continue;   // 隅は②で拾う
+      const p = flBox(g, g.warp[i].u, g.warp[i].v);
+      if(Math.abs(bx - p.x) <= hp && Math.abs(by - p.y) <= hp) return { type: 'warp', i };
+    }
   }
-  if(bx >= g.x && bx <= g.x + g.w && by >= g.y && by <= g.y + g.h) return { type: 'move' };
+  // ② 箱のハンドル（形に沿った位置に出す＝変形しても手が付いてくる）
+  for(let i = 0; i < FL_HANDLES.length; i++){
+    const p = flMap(g, FL_HANDLES[i][0], FL_HANDLES[i][1]);
+    if(Math.abs(bx - p.x) <= hp && Math.abs(by - p.y) <= hp) return { type: 'scale', i };
+  }
+  if(flInside(g, bx, by)) return { type: 'move' };
+  // ③ 隅の**外側**リング = 回転（PS と同じ。ここを広げすぎると「外をクリック＝確定」が押せなくなる）
+  const rp = FL_ROT_PX / k;
+  for(const [hx, hy] of [[0, 0], [1, 0], [1, 1], [0, 1]]){
+    const p = flMap(g, hx, hy);
+    if(Math.hypot(bx - p.x, by - p.y) <= rp) return { type: 'rotate' };
+  }
   return null;
 }
-function floatDragStart(hit, b){
-  if(!gFloat) return;
-  gFloat.drag = { type: hit.type, i: hit.i, sx: b.x, sy: b.y,
-                  x: gFloat.x, y: gFloat.y, w: gFloat.w, h: gFloat.h };
+function floatDragStart(hit, b, e){
+  const g = gFloat;
+  if(!g) return;
+  if(hit.type === 'warp'){ g.drag = { type: 'warp', i: hit.i }; return; }
+  if(hit.type === 'rotate'){
+    const c = flCenterWorld(g);
+    g.drag = { type: 'rotate', a0: Math.atan2(b.y - c.y, b.x - c.x), rot0: g.rot };
+    return;
+  }
+  if(hit.type === 'scale'){
+    const hx = FL_HANDLES[hit.i][0], hy = FL_HANDLES[hit.i][1];
+    // Ctrl＋隅 = **その隅だけ動かす**（バウンディングボックスの端を引っ張る自由変形）
+    if(e && (e.ctrlKey || e.metaKey) && hx !== 0.5 && hy !== 0.5){
+      flEnsureWarp(g, 2);
+      g.drag = { type: 'warp', i: flCornerIndex(g, hx, hy) };
+      return;
+    }
+    const qa = flLocalWarp(g, 1 - hx, 1 - hy);   // アンカー（反対側）のローカル位置
+    const qh = flLocalWarp(g, hx, hy);           // 掴んだ手のローカル位置
+    g.drag = { type: 'scale', hx, hy, qa, A: flBox(g, qa.u, qa.v),
+               du: qh.u - qa.u, dv: qh.v - qa.v, w: g.w, h: g.h };
+    return;
+  }
+  g.drag = { type: 'move', sx: b.x, sy: b.y, x: g.x, y: g.y };
 }
-/* 隅＝既定で縦横比維持（Shiftで自由）／辺＝その軸だけ。回転は入れない（SPEC_15 P2-3） */
+/* ★ Shift = **縦横比維持**（2026-08-19 に既定と入れ替えた。PSと同じ手癖にするため） */
 function floatDragMove(b, shift){
   const g = gFloat;
   if(!g || !g.drag) return;
   const d = g.drag;
   if(d.type === 'move'){ g.x = d.x + (b.x - d.sx); g.y = d.y + (b.y - d.sy); return; }
-  const hx = FL_HANDLES[d.i][0], hy = FL_HANDLES[d.i][1];
-  const ax = d.x + d.w * (1 - hx), ay = d.y + d.h * (1 - hy);   // アンカー＝反対側
-  let nw = d.w, nh = d.h;
-  if(hx !== 0.5) nw = Math.max(4, Math.abs(b.x - ax));
-  if(hy !== 0.5) nh = Math.max(4, Math.abs(b.y - ay));
-  if(hx !== 0.5 && hy !== 0.5 && !shift){
-    const kx = nw / d.w, ky = nh / d.h;
-    const s = Math.max(0.02, Math.abs(kx - 1) > Math.abs(ky - 1) ? kx : ky);
-    nw = d.w * s; nh = d.h * s;
+  if(d.type === 'warp'){
+    const l = flToLocal(g, b);
+    g.warp[d.i] = { u: l.u, v: l.v };
+    g._h = null;
+    return;
   }
-  g.w = nw; g.h = nh;
-  g.x = (hx === 0) ? ax - nw : (hx === 1 ? ax : d.x);
-  g.y = (hy === 0) ? ay - nh : (hy === 1 ? ay : d.y);
+  if(d.type === 'rotate'){
+    const c = flCenterWorld(g);
+    let a = Math.atan2(b.y - c.y, b.x - c.x) - d.a0 + d.rot0;
+    if(shift) a = Math.round(a / (Math.PI / 12)) * (Math.PI / 12);   // Shiftで15°刻み
+    g.rot = a;
+    return;
+  }
+  // 拡縮: **アンカー（反対側の隅）をワールドで固定したまま** 箱の w/h を決める。
+  // warp が入っていてもアンカー/手のローカル位置を通すので、変形したまま素直に拡縮できる
+  const ax = flAxes(g);
+  const dx = b.x - d.A.x, dy = b.y - d.A.y;
+  const pu = dx * ax.ex.x + dy * ax.ex.y, pv = dx * ax.ey.x + dy * ax.ey.y;
+  let w = d.w, h = d.h;
+  if(Math.abs(d.du) > 1e-6) w = Math.max(4, Math.abs(pu / d.du));
+  if(Math.abs(d.dv) > 1e-6) h = Math.max(4, Math.abs(pv / d.dv));
+  if(shift && Math.abs(d.du) > 1e-6 && Math.abs(d.dv) > 1e-6){
+    const kx = w / d.w, ky = h / d.h;
+    const s = Math.max(0.02, Math.abs(kx - 1) > Math.abs(ky - 1) ? kx : ky);
+    w = d.w * s; h = d.h * s;
+  }
+  const cx = d.A.x - ax.ex.x * ((d.qa.u - 0.5) * w) - ax.ey.x * ((d.qa.v - 0.5) * h);
+  const cy = d.A.y - ax.ex.y * ((d.qa.u - 0.5) * w) - ax.ey.y * ((d.qa.v - 0.5) * h);
+  g.w = w; g.h = h; g.x = cx - w / 2; g.y = cy - h / 2;
 }
+/* ホバー中のカーソル。**回転できる場所は ↻ で見せる**（PS と同じで、説明が要らなくなる） */
+function floatCursorFor(hit){
+  if(!hit) return '';
+  if(hit.type === 'move') return 'move';
+  if(hit.type === 'warp') return 'crosshair';
+  if(hit.type === 'rotate') return FL_ROT_CURSOR;
+  // 拡縮は**回転を含めた実際の向き**で矢印を選ぶ（回した後に斜めの矢印が合わないと気持ち悪い）
+  const g = gFloat, c = flCenterWorld(g);
+  const p = flMap(g, FL_HANDLES[hit.i][0], FL_HANDLES[hit.i][1]);
+  const a = (Math.atan2(p.y - c.y, p.x - c.x) * 180 / Math.PI + 360) % 180;
+  if(a < 22.5 || a >= 157.5) return 'ew-resize';
+  if(a < 67.5) return 'nwse-resize';
+  if(a < 112.5) return 'ns-resize';
+  return 'nesw-resize';
+}
+function floatHover(e, cv){
+  if(!gFloat || cv !== editCv || gFloat.drag) return false;
+  const b = toCanvasCoord(e.clientX, e.clientY, cv);
+  cv.style.cursor = floatCursorFor(floatHitTest(b.x, b.y));
+  return true;
+}
+
+/* --- 表示 ----------------------------------------------------------------- */
 /* 浮いている絵と変形枠。**renderEditCanvas からしか呼ばない**＝
    compositeTo（サムネ・GRID・書き出し）には一切出ない（SPEC_15 P2-5） */
 function drawFloatOverlay(ctx, g){
+  const kind = floatKindNow();
   ctx.save();
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  if(g.kind === 'plate'){                       // 色は見えているとおりに（濃/モードを掛けて）出す
+  if(kind === 'plate'){                       // 色は見えているとおりに（濃/モードを掛けて）出す
     ctx.globalAlpha = clamp(gPaint.colorAlpha, 0, 1);
     ctx.globalCompositeOperation = gPaint.colorBlend || 'multiply';
   }
-  ctx.drawImage(g.cv, g.x, g.y, g.w, g.h);
+  flPaint(ctx, g, p => p);
   ctx.restore();
   const k = floatScreenK(), hs = FLOAT_HANDLE_PX / k;
   ctx.save();
+  // 外周（変形していれば曲がった形をそのままなぞる）
+  const out = flOutline(g, 16);
   ctx.lineWidth = 1.5 / k;
   ctx.strokeStyle = 'rgba(255,79,168,0.95)';
   ctx.setLineDash([8 / k, 5 / k]);
-  ctx.strokeRect(g.x, g.y, g.w, g.h);
+  ctx.beginPath();
+  ctx.moveTo(out[0].x, out[0].y);
+  for(let i = 1; i < out.length; i++) ctx.lineTo(out[i].x, out[i].y);
+  ctx.closePath();
+  ctx.stroke();
   ctx.setLineDash([]);
+  // WARP の格子（3×3マス）
+  if(g.warp && g.wn > 2 && state.selWarp){
+    ctx.strokeStyle = 'rgba(90,233,255,0.55)';
+    ctx.lineWidth = 1 / k;
+    for(let a = 1; a < g.wn - 1; a++){
+      for(const dir of [0, 1]){
+        ctx.beginPath();
+        for(let t = 0; t <= 24; t++){
+          const u = dir ? t / 24 : a / (g.wn - 1), v = dir ? a / (g.wn - 1) : t / 24;
+          const p = flMap(g, u, v);
+          if(t === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = 'rgba(90,233,255,0.95)';
+    for(let i = 0; i < g.wn * g.wn; i++){
+      const r = (i / g.wn) | 0, c = i % g.wn;
+      if((r === 0 || r === g.wn - 1) && (c === 0 || c === g.wn - 1)) continue;
+      const p = flBox(g, g.warp[i].u, g.warp[i].v);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, hs * 0.42, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // 箱ハンドル
   ctx.fillStyle = 'rgba(255,79,168,0.95)';
   ctx.strokeStyle = 'rgba(0,0,0,0.85)';
   ctx.lineWidth = 1 / k;
   FL_HANDLES.forEach(([hx, hy]) => {
-    const x = g.x + g.w * hx - hs / 2, y = g.y + g.h * hy - hs / 2;
-    ctx.fillRect(x, y, hs, hs);
-    ctx.strokeRect(x, y, hs, hs);
+    const p = flMap(g, hx, hy);
+    ctx.fillRect(p.x - hs / 2, p.y - hs / 2, hs, hs);
+    ctx.strokeRect(p.x - hs / 2, p.y - hs / 2, hs, hs);
   });
+  // **行き先の層を出す**（line ⇄ color を押し替えると焼き込み先が変わるので、見えないと迷う）
+  const lp = flMap(g, 0, 0);
+  const fs = 11 / k;
+  ctx.font = 'bold ' + fs.toFixed(2) + 'px monospace';
+  ctx.textBaseline = 'bottom';
+  const label = floatLayerLabel(g) + (g.warp ? (g.wn > 2 ? ' / WARP' : ' / 自由変形') : '')
+              + (g.rot ? ' / ' + Math.round(g.rot * 180 / Math.PI) + '°' : '');
+  const tw = ctx.measureText(label).width;
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(lp.x, lp.y - fs * 1.7, tw + fs * 0.6, fs * 1.5);
+  ctx.fillStyle = 'rgba(255,210,122,0.98)';
+  ctx.fillText(label, lp.x + fs * 0.3, lp.y - fs * 0.35);
   ctx.restore();
 }
+
+/* --- 確定・取り消し -------------------------------------------------------- */
 function floatAfter(cut){
   const i = cuts.indexOf(cut);
   renderPaintViews();
@@ -5189,23 +5499,19 @@ function floatCommit(silent){
   const g = gFloat;
   if(!g) return false;
   gFloat = null;
+  if(editCv) editCv.style.cursor = '';
   if(cuts.indexOf(g.cut) < 0){ gTx = null; return true; }   // カットごと消えていたら黙って捨てる
-  const cut = g.cut, x1 = g.x + g.w, y1 = g.y + g.h;
+  const cut = g.cut, kind = floatKindNow(), bb = flShapeBBox(g);
   gTx = g.tx;
-  floatEachFrame(cut, g.x, g.y, x1, y1, k => {
-    const c = frLayer(cut, k, g.kind, true);
+  floatEachFrame(cut, bb.x0, bb.y0, bb.x1, bb.y1, k => {
+    const c = frLayer(cut, k, kind, true);
     if(!c) return;
-    const a = bakeToPatch(cut, k, { x: g.x, y: g.y }, g.kind);
-    const q = bakeToPatch(cut, k, { x: x1, y: y1 }, g.kind);
-    txTouch(cut, k, g.kind, Math.min(a.x, q.x) - 1, Math.min(a.y, q.y) - 1,
-                            Math.max(a.x, q.x) + 1, Math.max(a.y, q.y) + 1);
-    const ctx = ctx2d(c);
-    ctx.save();
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(g.cv, a.x, a.y, q.x - a.x, q.y - a.y);
-    ctx.restore();
-    markPatch(cut, k, g.kind);
+    const to = p => bakeToPatch(cut, k, p, kind);
+    const a = to({ x: bb.x0, y: bb.y0 }), q = to({ x: bb.x1, y: bb.y1 });
+    txTouch(cut, k, kind, Math.min(a.x, q.x) - 1, Math.min(a.y, q.y) - 1,
+                          Math.max(a.x, q.x) + 1, Math.max(a.y, q.y) + 1);
+    flPaint(ctx2d(c), g, to);
+    markPatch(cut, k, kind);
   });
   txEnd();
   floatAfter(cut);
@@ -5219,6 +5525,7 @@ function floatCancel(){
   if(!g) return false;
   gFloat = null;
   gTx = null;
+  if(editCv) editCv.style.cursor = '';
   txAbort(g.tx);
   floatAfter(g.cut);
   scheduleSave();
@@ -5227,14 +5534,33 @@ function floatCancel(){
 }
 /* SEL は SINGLE 限定（SPEC_15 P2 / SPEC_13 §9）。GRID では押せないようグレーにする。
    ★ **SEL を持ったまま SINGLE を出たら PEN に戻す**。戻さないと「ボタンはグレー・
-     でも選ばれているのは SEL」になり、なぞっても何も起きない＝バグか仕様か悩ませる */
+     でも選ばれているのは SEL」になり、なぞっても何も起きない＝バグか仕様か悩ませる。
+   Wクリックで WARP のON/OFF（LASSO / L-DEL と同じ手つき・SPEC_16 §5-B3）。 */
 function syncSelToolUI(){
   const on = inSingle();
-  document.querySelectorAll('.etool[data-tool="sel"]').forEach(el => el.classList.toggle('off', !on));
+  document.querySelectorAll('.etool[data-tool="sel"]').forEach(el => {
+    el.classList.toggle('off', !on);
+    el.classList.toggle('fe-on', !!state.selWarp);
+    el.textContent = state.selWarp ? 'WARP' : 'SEL';
+    el.title = '選択 (A)：投げ縄で囲うと持ち上がる／SINGLE 限定'
+             + '\nCtrl+ドラッグ=コピー ／ Shift+ドラッグ=REF（写真）からコピー'
+             + '\n隅=拡縮（Shiftで比率維持）／Ctrl+隅=自由変形／隅の外=回転'
+             + '\nWクリックで WARP（3×3）: ' + (state.selWarp ? 'ON' : 'OFF')
+             + '\nEnter か枠の外=確定 ／ Esc=取り消し';
+  });
   if(!on && state.etool === 'sel'){
     setETool('pen');
     toast('SEL は SINGLE 専用なので PEN に戻しました');
   }
+}
+function toggleSelWarp(){
+  state.selWarp = !state.selWarp;
+  if(state.selWarp && gFloat) flEnsureWarp(gFloat, FL_WARP_N);
+  syncSelToolUI();
+  saveUi();
+  if(gFloat) renderPaintViews();
+  toast('WARP（3×3）: ' + (state.selWarp ? 'ON' : 'OFF')
+        + (state.selWarp ? '（格子の点をドラッグ）' : '（形はそのまま残ります）'));
 }
 
 /* --- palette (canon: animator-color-palette skill) --- */
@@ -5536,7 +5862,7 @@ function paintDown(e, cv){
     if(cv === editCv && gFloat.cut === cuts[state.curCut]){
       const b = toCanvasCoord(e.clientX, e.clientY, cv);
       const hit = floatHitTest(b.x, b.y);
-      if(hit){ floatDragStart(hit, b); return; }
+      if(hit){ floatDragStart(hit, b, e); return; }
       floatCommit();          // 枠の外をクリック＝確定（その場では描き始めない）
       return;
     }
@@ -6935,6 +7261,7 @@ function loadUi(){
     if(typeof o.tools === 'boolean') gUi.tools = o.tools;
     if(typeof o.curH === 'number') gUi.curH = clamp(o.curH, CUR_H_MIN, CUR_H_MAX);
     if(typeof o.uiBig === 'boolean') gUi.uiBig = o.uiBig;
+    if(typeof o.selWarp === 'boolean') state.selWarp = o.selWarp;
     if(o.paint){                                   // 濃/描画モードは全体設定（SPEC_15 P3-1）
       if(typeof o.paint.colorAlpha === 'number') gPaint.colorAlpha = clamp(o.paint.colorAlpha, 0, 1);
       if(o.paint.colorBlend) gPaint.colorBlend = o.paint.colorBlend;
@@ -6946,7 +7273,8 @@ function loadUi(){
   }
 }
 function saveUi(){
-  try{ localStorage.setItem(UI_LS, JSON.stringify(Object.assign({}, gUi, { paint: gPaint }))); }catch(e){}
+  try{ localStorage.setItem(UI_LS, JSON.stringify(
+        Object.assign({}, gUi, { paint: gPaint, selWarp: state.selWarp }))); }catch(e){}
 }
 function applyUi(){
   const right = gUi.side === 'right';
@@ -7414,12 +7742,15 @@ const HELP_GROUPS = [
     ['A → 投げ縄で囲う', '囲った中身が持ち上がる（今の「描く先」の層から切り取り）'],
     ['Ctrl+ドラッグで囲う', 'コピーで持ち上げ（元は残る）'],
     ['Shift+ドラッグで囲う', 'REF（写真）からコピー。**元の絵には穴を開けません**'],
-    ['枠の中をドラッグ', '移動'], ['隅のハンドル', '拡大縮小（既定は縦横比維持・Shiftで自由）'],
+    ['枠の中をドラッグ', '移動'],
+    ['隅・辺のハンドル', '拡大縮小（自由）'], ['Shift+ハンドル', '縦横比を保って拡大縮小'],
+    ['隅の外側にホバー', '↻ が出たらドラッグで回転（Shiftで15°刻み）'],
+    ['Ctrl+隅をドラッグ', '自由変形（その隅だけ動く／台形は台形に見えます）'],
+    ['SEL をWクリック', 'WARP（3×3の格子）ON/OFF。OFFにしても形は残ります'],
     ['Enter / 枠の外をクリック', '確定（Ctrl+Z 1回で持ち上げる前に戻ります）'],
     ['Esc', '取り消し（元の位置へ戻す）'],
-    ['焼き込み先', 'line から持ち上げたら line ／ color なら color ／ REF からは line'],
-    ['浮いている間', 'サムネ・GRID・書き出しには出ません（確定するまで存在しない）'],
-    ['回転', 'ありません（要望が出たら足します）']
+    ['焼き込み先', '**いまの描く先**。浮かせたまま line / color を押し替えると行き先が変わります'],
+    ['浮いている間', 'サムネ・GRID・書き出しには出ません（確定するまで存在しない）']
   ] },
   { t: 'SHEETパネル', rows: [
     ['S', 'パネルの開閉'],
@@ -7855,10 +8186,14 @@ function wire(){
               + ' ／ 長押しで切替（バケツはありません）';
     });
   };
+  // SEL のWクリック = WARP（3×3の格子変形）ON/OFF。
+  // **OFF にしても形はそのまま残す**（点が消えるだけ）。消えたら作業が飛ぶので
+  document.querySelectorAll('.etool[data-tool="sel"]').forEach(el => onDoubleActivate(el, toggleSelWarp));
   document.querySelectorAll('.etool[data-tool="fill"]').forEach(el => onLongPress(el, () => {
     state.fillErase = !state.fillErase;
     setETool('fill');
     syncFillUI();
+  syncSelToolUI();     // SEL/WARP のラベルと有効・無効を最初から合わせる
     toast('投げ縄: ' + (state.fillErase ? '透明消し' : '塗り'));
   }));
   syncFillUI();
@@ -7893,6 +8228,8 @@ function wire(){
   });
   editCv.addEventListener('pointermove', e => {
     if(e.pointerType === 'touch'){ editTouchMove(e); return; }
+    // 浮いた選択が居るときは、掴む前に**カーソルで手を教える**（回転は ↻ で分かる）
+    if(gFloat && !gFloat.drag && !gLasso && !stroking){ floatHover(e, editCv); return; }
     paintMove(e);
   });
   editCv.addEventListener('pointerup', e => {
@@ -8179,10 +8516,15 @@ window.__ECONTE__ = {
   lassoFillPolygon, lassoBegin, lassoAdd, lassoEnd, lassoPreview,
   // 浮いた選択＝軽いフォトバッシュ（SPEC_15 P2）
   floatLift, floatCommit, floatCancel, floatHitTest, floatDragStart, floatDragMove,
-  floatModeFrom, floatKindOf, floatSourcePaper, floatEachFrame, canvasHasInk,
-  inSingle, syncSelToolUI, txAbort,
-  get float(){ return gFloat ? { src: gFloat.src, kind: gFloat.kind, copy: gFloat.copy,
+  floatModeFrom, floatKindNow, floatLayerLabel, floatSourcePaper, floatEachFrame, canvasHasInk,
+  floatCursorFor, floatHover, inSingle, syncSelToolUI, toggleSelWarp, txAbort,
+  // 形（箱＋回転＋warp）— 回転/自由変形/WARP の検証用
+  flBox, flToLocal, flAxes, flCenterWorld, flMap, flLocalWarp, flEnsureWarp, flCornerIndex,
+  flOutline, flShapeBBox, flInside, flHomo, flCr1, flDrawTri, flDrawMesh, flPaint,
+  get float(){ return gFloat ? { src: gFloat.src, kind: floatKindNow(), copy: gFloat.copy,
                                  x: gFloat.x, y: gFloat.y, w: gFloat.w, h: gFloat.h,
+                                 rot: gFloat.rot, wn: gFloat.wn,
+                                 warp: gFloat.warp ? gFloat.warp.map(q => ({ u: q.u, v: q.v })) : null,
                                  ox: gFloat.ox, oy: gFloat.oy, ow: gFloat.ow, oh: gFloat.oh,
                                  cut: cuts.indexOf(gFloat.cut) } : null; },
   get colorLog(){ return { undo: gColorLog.length, redo: gColorRedo.length }; },

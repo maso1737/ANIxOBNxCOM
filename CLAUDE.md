@@ -36,10 +36,12 @@
   ⚠ **P1 の `cut.plateC`（カット1枚）・`plateScale`・`plateSize` は SPEC_16 V4 で撤去済み**。以下は経緯として読むこと。
   P1=カラー層を「枠ごと・出力枠512×288」から**カット1枚・ベイク空間（`cut.plateC`）**へ一本化（line と同じ扱い＝T.U./PANに追従。`colorMixAt`/`drawColorFrame`/`drawColorPlate`/`frameAtBake`/`plateStrokeSeg` は削除済み。**座標は必ず `plateScale(cut)` を通す**——`PLATE_MAX` で頭打ちしたカットは 0.4 ではない）／
   P3-1=濃・描画モードは全体設定 `gPaint`（`UI_LS`＋ZIP `meta.paint`）——**P1で色から per-slot 値が消えるので同時にやるしかない**／
-  P2=軽いフォトバッシュ＝**「浮いた選択」**（**`cut.layers[]` は不採用**）。SEL(`A`)で投げ縄→持ち上げ→移動/拡縮→Enter確定・Esc取消。
+  P2=軽いフォトバッシュ＝**「浮いた選択」**（**`cut.layers[]` は不採用**）。SEL(`A`)で投げ縄→持ち上げ→変形→Enter確定・Esc取消。
   **SINGLE 限定**（他画面ではグレー＋PENに戻す）。中身は紙の1枚として持ち上げ、確定は**重なる枠ぶん全部のパッチへ**（投げ縄塗りと同じ配り方）。
-  **焼き込み先は持ち上げた層**（line→line / color→color / REF→line。SPEC_15 P2-4 からの意図的な変更＝**P2-6** に理由）。
-  **保存形式もLRUも触っていない**。持ち上げ＋確定で Undo 1手（`txAbort` で Esc はログを汚さない）。回転は無し。
+  **持ち上げ元＝Shiftなら REF・それ以外は描く先／焼き込み先＝つねに描く先**（`floatKindNow`。SPEC_15 P2-4 からの意図的な変更＝**P2-6**）。
+  **変形は 箱 + rot + warp。warp の制御点は箱ローカルの正規化 `{u,v}`**（P2-7。ワールドで持つと箱を触るたび作り直しになる）。
+  隅=拡縮／Shift=比率維持／隅の外=回転（↻カーソル）／`Ctrl`+隅=射影変換／SEL Wクリック=WARP 3×3（Catmull-Rom）。
+  **保存形式もLRUも触っていない**。持ち上げ＋確定で Undo 1手（`txAbort` で Esc はログを汚さない）。メッシュ化してもプレビューは重くならない（実測）。
   戻り先タグ `econte-v2-g3`。**P1 の設計レビューは実物で先に見られる** → `LP_motion-graphics/TOOL_MECHANICS/SPACES_LAB/spaces-lab.html`
   （実装済み 2026-08-18・port 8141）。色の置き場所を「レンズ前 ⇄ セル上」で切り替えて、**寄りながら色が変わる／色が寄る**を同じ動きで見比べられる。
   `plateSize()`（P1-2 の寸法規則）もラボ側で先に動いていて、**B枠にちょうど512px当たる**ことを数値で確認済み。
@@ -73,8 +75,8 @@
 > ⚠ **`.claude/` は `.gitignore` 済み＝スキルは git に乗らない。**
 > 2台目PCへは手動コピーが要る（`_Claude/SKILL/` に配布パッケージを置く運用）。
 
-GitHub: https://github.com/maso1737/animation-paint
-Pages: https://maso1737.github.io/animation-paint/
+GitHub: https://github.com/maso1737/ANIxOBNxCOM
+Pages: https://maso1737.github.io/ANIxOBNxCOM/
 
 ## 残タスク・予定タスク一覧（Claude Artifact）
 
