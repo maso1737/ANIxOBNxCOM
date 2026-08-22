@@ -112,8 +112,10 @@ const BC_NAME = 'refboard_live';       // 同一オリジンなら即時（tdr_l
 - STUDIO の BOARD 上部に細い帯: `CLIP: ライン調整 — 次に貼る画像に付けます [解除]`（クリップがある時だけ）
 - ペースト/インポートで写真が増えたら、その写真に `ref` を入れて棚を空にする（`clip-used` を送る）。
   **複数枚を一度に貼った場合は先頭1枚だけ**に付ける
-- 選択中の写真パネルに **🔗**: `ref` があれば `window.open(ref.url)`、無ければ現在のクリップを紐づけ
-  （＝既存スクショの後付けもここで済む）
+- 選択中の写真パネルに **🔗 / ⇄ / ✕**（2026-08-22 に modalPick から分解。**1クリック＝1動作**）:
+  - **🔗** … `ref` があれば `window.open(ref.url)`、無ければ現在のクリップを紐づけ（既存スクショの後付け）
+  - **⇄** … 今のクリップに差し替え　**✕** … 外す（`pushLog` で Ctrl+Z 可）
+  - ⇄ / ✕ は `ref` 付きのときだけ出す（`#photosel-box.has-ref`）。**無い操作は見せない**
 - `ref` 付きの写真は BOARD 上で角に小さいマーカー（`--ice`）を描く。`renderBoard()` に数行
 
 #### 前提（重要）
@@ -121,9 +123,36 @@ const BC_NAME = 'refboard_live';       // 同一オリジンなら即時（tdr_l
 `BroadcastChannel` / `localStorage` の共有は**同一オリジンのときだけ**成立する。
 ルート CLAUDE.md の運用どおり `python -m http.server 8000` をルートで立て、
 `localhost:8000/Tools/ref-board/…` と `localhost:8000/ANIxOBNxCOM/econte.html` で開けば成立する。
-file:// 直開きでは繋がらないので、**フォールバックとして「クリップJSONを貼り付け」**を用意する
-（ref-board 側の帯にある **⧉** が同じ JSON をクリップボードへ出す。econte 側は
-IMPORT メニューあたりに `{v,ts,item}` を受け取る入口を1つ置けばよい）。
+file:// 直開きや **GitHub Pages の econte × ローカルの ref-board** では繋がらないので、
+下の §2-1a-2（URL経路）が本命のフォールバック。手貼り用に `⏻ REF`（`clipPasteJson`）も残す
+（ref-board 側の帯にある **⧉** が同じ JSON をクリップボードへ出す）。
+
+### 2-1a-2. 別オリジン経路（`?refclip=` ＋ `postMessage`）— 2026-08-22 実装済み
+
+**実運用は「ref-board はローカル / econte は GitHub Pages」**で、ここは同一オリジンにならない。
+そこで ref-board の **→ECONTE** を「クリップして econte を開く」1クリックに統合した。
+ユーザー手順は **→ECONTE → 写真を選ぶ → 🔗** の3手で終わる（旧: ⧉→タブ切替→⏻REF→貼付→OK→…）。
+
+送信側（`Tools/ref-board/ref-board.html` の `sendToEconte()`）:
+
+1. `setClip(it)`（従来どおり localStorage + BroadcastChannel。同一オリジン運用はこのまま効く）
+2. クリップJSONを**黙って**クリップボードにも入れる（⏻ REF 手貼りの保険。トーストは出さない）
+3. 生きた窓ハンドル `gEconteWin` があれば `postMessage({type:'refclip',v:1,ts,item},'*')` ＋ `focus()`
+   — **econte を再読込させない**ため。無ければ `window.open(url+'?refclip='+b64u(JSON),'econte')`
+
+- `b64u()` は **base64url(UTF-8)**（`TextEncoder`→`btoa`→`+/=`置換）。title/memo が日本語なので `btoa` 直打ち不可
+- URL 上限 `URL_MAX=1800`。超えるときは **memo だけ 400→120→0 と削る**（`refId`/`url`/`tags` は落とさない）
+- 行き先は `localStorage['refboard.econte.v1']`（☰メニューで変更可）。既定は Pages の `econte.html`
+
+受信側（`econte.html`）:
+
+- `clipFromQuery()` … 起動時に `?refclip=` を読んで `clipSet(d,true)`。読んだら
+  **`history.replaceState` でクエリを消す**（再読込で同じ REF が二度乗るのを防ぐ）。
+  `localStorage[LS_CLIP]` より**優先**する（今まさに飛んできた1件だから）
+- `window.addEventListener('message')` … `{type:'refclip',v:1,item:{url}}` の形だけ受ける。
+  ここに載るのは「次に 🔗 で付ける候補」だけで**押すのは必ずユーザー**なので送信元オリジンは限定しない。
+  形が合わないものは黙って捨てる
+- `unb64u()` は `b64u()` の対。壊れた文字列は `null` を返して**例外を投げない**
 2. **HEIC読み込み**（PC）: accept に `.heic,.heif` 追加。まず `createImageBitmap(file)` を試し
    （iPad/新Safariはネイティブで通る）、失敗したら **heic2any をCDNから遅延ロード**して
    JPEG Blobへ変換（単一HTML方針の例外はCDNのみ＝JSZipと同じ扱い）

@@ -104,6 +104,9 @@ body{
 #photosel-box.on{display:flex}
 #btn-photo-gray.on{background:rgba(139,63,224,.35);border-color:rgba(184,80,255,.85);color:#F4E8FF}
 #btn-photo-ref.mode{border-color:rgba(90,233,255,.75);color:var(--ice)}
+/* ⇄ 差し替え / ✕ 外す は REF が付いている写真のときだけ出す（1クリック＝1動作。プルダウンを挟まない） */
+.btn.refsub{display:none;padding:3px 6px;color:var(--ice);border-color:rgba(90,233,255,.4)}
+#photosel-box.has-ref .btn.refsub{display:inline-block}
 #btn-tool-move.on{
   background:linear-gradient(135deg,#8B3FE0,#5B2A9E);border-color:transparent;color:#F4E8FF;
   box-shadow:0 0 14px rgba(139,63,224,.5);
@@ -701,6 +704,8 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
           <button class="btn" id="btn-photo-rot" title="90°回転">&#8634; 90&deg;</button>
           <button class="btn mode" id="btn-photo-gray" title="モノクロ化">GRAY</button>
           <button class="btn" id="btn-photo-ref" title="REF BOARDの元リンクを開く／クリップがあれば紐づけ">&#128279;</button>
+          <button class="btn refsub" id="btn-photo-ref-swap" title="REF を今のクリップに差し替える">&#8646;</button>
+          <button class="btn refsub" id="btn-photo-ref-off" title="REF を外す（Ctrl+Z で戻せます）">&#10005;</button>
           <button class="btn" id="btn-photo-del" title="この写真をボードから削除（Ctrl+Z で戻せます）">DEL</button>
           <span id="photo-ref-tx"></span>
         </span>
@@ -2442,35 +2447,38 @@ function setPhotoFilter(key, val, commit){
   syncBoardPanels();
   renderBoard();
 }
-/* 🔗: ref があれば開く、無ければ現在のクリップを紐づけ（既存スクショの後付け） */
-/* REF リンク: 貼る → 選ぶ → 組み込む → 飛ぶ は実装済み。
-   **差し替え／消す**（SPEC_16 §5-C4）をここに足す。
-   紐づいているときは「飛ぶ／差し替える／外す」を聞く（1ボタンのままにしたいので modalPick）。 */
+/* REF リンク: 貼る → 選ぶ → 組み込む → 飛ぶ。差し替え／消す（SPEC_16 §5-C4）も込み。
+   **3つとも1クリックで終わらせる**ため modalPick は挟まない（2026-08-22）:
+     🔗 = REF があれば開く / 無ければ今のクリップを紐づけ
+     ⇄ = 今のクリップに差し替え   ✕ = 外す（どちらも REF 付きのときだけ出る） */
+function photoRefLink(p){
+  if(clipConsume(p)){
+    toast('REF: 「' + (p.ref.title || p.ref.url) + '」を紐づけました');
+    syncBoardPanels(); renderBoard(); scheduleSave();
+    return true;
+  }
+  toast('貼り付けたクリップがありません（ref-board 側で →ECONTE、または ⏻ REF で貼り付け）');
+  return false;
+}
 function photoRefAction(){
   const p = selPhotoObj();
   if(!p) return;
-  const linkNew = () => {
-    if(clipConsume(p)){
-      toast('REF: 「' + (p.ref.title || p.ref.url) + '」を紐づけました');
-      syncBoardPanels(); renderBoard(); scheduleSave();
-      return true;
-    }
-    toast('貼り付けたクリップがありません（ref-board 側で →ECONTE、または ⧉ REF で貼り付け）');
-    return false;
-  };
-  if(!(p.ref && p.ref.url)){ linkNew(); return; }
-  modalPick('REF「' + (p.ref.title || p.ref.url) + '」', ['開く', '差し替える', '外す']).then(n => {
-    if(n === 0){ window.open(p.ref.url, '_blank', 'noopener'); return; }
-    if(n === 1){ linkNew(); return; }
-    if(n === 2){
-      const old = p.ref;
-      p.ref = null;
-      pushLog({ type: 'photo-ref', undo(){ p.ref = old; syncBoardPanels(); renderBoard(); },
-                                   redo(){ p.ref = null; syncBoardPanels(); renderBoard(); } });
-      syncBoardPanels(); renderBoard(); scheduleSave();
-      toast('REF を外しました（Ctrl+Z で戻せます）');
-    }
-  });
+  if(p.ref && p.ref.url){ window.open(p.ref.url, '_blank', 'noopener'); return; }
+  photoRefLink(p);
+}
+function photoRefSwap(){
+  const p = selPhotoObj();
+  if(p) photoRefLink(p);
+}
+function photoRefOff(){
+  const p = selPhotoObj();
+  if(!p || !p.ref) return;
+  const old = p.ref;
+  p.ref = null;
+  pushLog({ type: 'photo-ref', undo(){ p.ref = old; syncBoardPanels(); renderBoard(); },
+                               redo(){ p.ref = null; syncBoardPanels(); renderBoard(); } });
+  syncBoardPanels(); renderBoard(); scheduleSave();
+  toast('REF を外しました（Ctrl+Z で戻せます）');
 }
 /* 選択中オブジェクトに応じてBOARDパネルを出し分ける */
 function syncBoardPanels(){
@@ -2485,6 +2493,8 @@ function syncBoardPanels(){
     $('#btn-photo-gray').classList.toggle('on', f.gray);
     $('#photo-ref-tx').textContent = p.ref ? ('REF: ' + (p.ref.title || p.ref.url)) : '';
     $('#btn-photo-ref').classList.toggle('mode', !!p.ref);
+    $('#btn-photo-ref').title = p.ref ? 'REF の元リンクを開く' : 'クリップ中の REF をこの写真に紐づける';
+    $('#photosel-box').classList.toggle('has-ref', !!p.ref);
   }
   renderCamList();
 }
@@ -2626,8 +2636,37 @@ function renderClipBar(){
   $('#studio-board').classList.toggle('has-clip', on);
   if(on) $('#clip-tx').textContent = 'REF: ' + (gClip.item.title || gClip.item.url) + ' — 次に貼る画像に付けます';
 }
-function initClipBridge(){
+/* base64url(UTF-8) を戻す。ref-board 側 b64u() の対。壊れた文字列は null（例外を投げない） */
+function unb64u(t){
   try{
+    const b64 = t.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64 + '==='.slice((b64.length + 3) % 4));
+    const u8 = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(u8);
+  }catch(e){ return null; }
+}
+/* ?refclip= を読む。**別オリジンの ref-board から来る唯一の自動経路**（SPEC_13 §2-1a-2）。
+   読んだら URL から消す（再読込で同じ REF がもう一度乗るのを防ぐ）。 */
+function clipFromQuery(){
+  let t = null;
+  try{ t = new URLSearchParams(location.search).get('refclip'); }catch(e){}
+  if(!t) return false;
+  try{
+    history.replaceState(null, '', location.pathname + location.hash);
+  }catch(e){}
+  const json = unb64u(t);
+  if(!json) return false;
+  try{
+    const d = JSON.parse(json);
+    if(d && d.v === 1 && d.item && d.item.url){ clipSet(d, true); return true; }
+  }catch(e){}
+  return false;
+}
+function initClipBridge(){
+  // ?refclip= が最優先（今まさに ref-board から飛んできた1件）
+  const fromUrl = clipFromQuery();
+  if(!fromUrl) try{
     const raw = localStorage.getItem(LS_CLIP);   // 後から econte を開いた場合の受け皿
     if(raw){
       const d = JSON.parse(raw);
@@ -2636,6 +2675,15 @@ function initClipBridge(){
     }
   }catch(e){}
   renderClipBar();
+  /* 別オリジンの ref-board から window.open() で開かれた場合、その窓ハンドル越しに
+     postMessage が飛んでくる（2回目以降は econte を再読込させないため）。
+     ここに載るのは「次に 🔗 で付ける候補」だけで、押すのは必ずユーザーなので
+     送信元オリジンは限定しない。形が合わないものは黙って捨てる。 */
+  window.addEventListener('message', e => {
+    const d = e.data;
+    if(!d || d.v !== 1 || d.type !== 'refclip' || !d.item || !d.item.url) return;
+    clipSet(d);
+  });
   if(typeof BroadcastChannel === 'undefined') return;
   try{ gBC = new BroadcastChannel(BC_NAME); }catch(e){ gBC = null; return; }
   gBC.onmessage = e => {
@@ -7650,6 +7698,8 @@ function wire(){
   $('#btn-photo-del').addEventListener('click', deleteSelPhoto);
   $('#btn-photo-rot').addEventListener('click', () => rotatePhoto(-90));   // ボタンの字形(↺)に合わせて反時計回り
   $('#btn-photo-ref').addEventListener('click', photoRefAction);
+  $('#btn-photo-ref-swap').addEventListener('click', photoRefSwap);
+  $('#btn-photo-ref-off').addEventListener('click', photoRefOff);
   $('#btn-photo-gray').addEventListener('click', () => {
     const p = selPhotoObj();
     if(!p) return;
