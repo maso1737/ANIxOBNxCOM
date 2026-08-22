@@ -841,8 +841,10 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
 <div class="view" id="view-edit">
   <div id="edit-top">
     <!-- ◀STUDIO は最上部メニューの STUDIO と重複するので置かない -->
-    <button class="btn mode on" id="btn-mode-single" title="1カットを全面で加筆 (3)">SINGLE</button>
-    <button class="btn mode" id="btn-mode-grid" title="一覧でカラースクリプトを描く (4) ／ X で STUDIO と行き来">GRID</button>
+    <!-- 並びは **GRID → SINGLE**（EDITはGRIDから入って1枚を詰めに行く、という手順どおり）。
+         数字ショートカットも 3=GRID / 4=SINGLE で同じ並び -->
+    <button class="btn mode" id="btn-mode-grid" title="一覧でカラースクリプトを描く (3) ／ X で STUDIO と行き来">GRID</button>
+    <button class="btn mode on" id="btn-mode-single" title="1カットを全面で加筆 (4)">SINGLE</button>
     <button class="btn" id="btn-cut-prev">&#9664;</button>
     <span id="edit-cut-label">C1</span>
     <button class="btn" id="btn-cut-next">&#9654;</button>
@@ -7209,8 +7211,9 @@ const KEYMAP_LS = 'econte_keymap_v1';
 const SHORTCUT_ACTIONS = [
   { id: 'viewStudio', label: 'STUDIO へ',           def: '1', global: true, run: () => setView('studio') },
   { id: 'viewEdit',   label: 'EDIT へ（GRID）',     def: '2', global: true, run: () => enterEdit('grid') },
-  { id: 'modeSingle', label: 'EDIT: SINGLE',        def: '3', global: true, run: () => gotoEditMode('single') },
-  { id: 'modeGrid',   label: 'EDIT: GRID',          def: '4', global: true, run: () => gotoEditMode('grid') },
+  // 3=GRID / 4=SINGLE。**ボタンの左右の並びと同じ順**にしてある（2026-08-19 に入れ替えた）
+  { id: 'modeGrid',   label: 'EDIT: GRID',          def: '3', global: true, run: () => gotoEditMode('grid') },
+  { id: 'modeSingle', label: 'EDIT: SINGLE',        def: '4', global: true, run: () => gotoEditMode('single') },
   { id: 'swapView',   label: 'STUDIO ⇄ GRID 入替',  def: 'X', global: true, run: () => swapStudioGrid() },
   { id: 'play',      label: '再生 / 停止',          def: 'Space',      prevent: true, run: () => togglePlay() },
   { id: 'prevFrame', label: '1コマ戻る (Shift=10)', def: 'ArrowLeft',  prevent: true, run: e => { pause(); seek(state.tl.frame - (e && e.shiftKey ? 10 : 1)); } },
@@ -7811,8 +7814,9 @@ const HELP_GROUPS = [
     ['SHEETの ⟳', 'BOARDの写真から元の絵を焼き直す']
   ] },
   { t: 'EDIT', rows: [
-    ['SINGLE', '1カットを大きく詰める（line も color も描ける）'],
-    ['GRID', '一覧でカラースクリプト（コマをまたいで塗れる）'],
+    ['GRID', '一覧でカラースクリプト（コマをまたいで塗れる）。EDITはここから入る'],
+    ['SINGLE', '1カットを大きく詰める（line も color も描ける。SELもここだけ）'],
+    ['解像度', 'GRIDでもSINGLEでも**同じ**（どちらも line 1280×720 / color 512×288 に書く）。GRIDは手の精度と見え方が粗いだけ'],
     ['枠が2つ以上のカット', '色の行き先は **塗った場所**で決まる（A/Bのチップは無し）。またいで引けば両方に乗る'],
     ['ホイール', 'カーソル中心ズーム'], ['1本指ドラッグ', 'パン'], ['2本指', 'ピンチ拡縮＋パン'],
     ['F', 'ズーム/パンをリセット（GRIDは既定の大きさへ）']
