@@ -163,6 +163,16 @@ body{
 .sld-k{color:var(--grey);font-size:9px;min-width:14px}
 #photo-ref-tx{color:var(--ice);font-size:9px;font-family:var(--jp);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:120px}
 #cutframe-label{font-family:var(--bank);font-size:12px;letter-spacing:.1em;color:var(--acid)}
+/* 「余」＝焼く範囲の余白（枠バー内）。枠が1つのカットでは効かないのでグレー＋条件を出す */
+#cam-expand-label{display:flex;align-items:center;gap:4px;font-family:var(--jp);font-size:9px;color:var(--grey)}
+/* ★touch-action:none — 枠バーは横スクロールで逃がす作りなので、
+   これが無いと指でつまんだときにスライダーではなくバーが流れる */
+#cam-expand-label input[type=range]{width:56px;accent-color:var(--acid);touch-action:none}
+#cam-expand-label.off{opacity:.32}
+#cam-expand-label.off input{pointer-events:none}
+#cam-expand-val{color:var(--gold);font-size:9px;min-width:26px;text-align:right}
+body.ui-big #cam-expand-label{font-size:11px}
+body.ui-big #cam-expand-label input[type=range]{width:78px}
 /* ---------- STUDIO 中央: プレビュー＋現在カット編集 ---------- */
 #studio-center{flex:1;display:flex;flex-direction:column;min-width:0}
 #cur-box{
@@ -531,7 +541,12 @@ body{
 }
 .tl-key.edge::after{background:var(--ice)}
 .tl-key.on::after{background:var(--acid);box-shadow:0 0 8px rgba(255,79,168,.9)}
-.tl-key.fix{cursor:default}
+/* FIXカットの◆は **飾り**（枠が1つ＝動かす所が無い）。
+   ★当たり判定を持たせない（2026-08-24）。持たせていたせいで、
+     T.U./PAN の B（カット尻）と次のカットの FIX◆ が 4px しか離れず、
+     後から積まれる FIX 側が上に乗って **B の Wクリックを全部食っていた**。
+   説明が要るときは、下の #tl-keys 側の title（帯ごと）で足りる */
+.tl-key.fix{cursor:default;pointer-events:none}
 .tl-key.fix::after{opacity:.35}
 /* --- ◆の形でイーズが分かる（COMPOSER の .tl-kf-d と同じ語彙・SPEC_16 §5-C6） ---
    菱形＝等速 ／ 角丸＝効き中 ／ 丸＝効き最大 ／ グレーの四角＝タメ。
@@ -654,12 +669,10 @@ body{
 }
 #help-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex:none;flex-wrap:wrap}
 #help-head .t{font-family:var(--bank);font-size:13px;letter-spacing:.24em;color:var(--acid)}
-#ui-big-label,#cam-expand-label{
+#ui-big-label{
   display:flex;align-items:center;gap:5px;font-family:var(--jp);font-size:10px;color:var(--grey);cursor:pointer;
 }
 #ui-big-label input{accent-color:var(--acid)}
-#cam-expand-label input[type=range]{width:74px;accent-color:var(--acid)}
-#cam-expand-label.off{opacity:.35;pointer-events:none}
 #btn-wipe-all{border-color:rgba(255,79,168,.5);color:var(--acid)}
 #help-body{
   --hs:1;
@@ -781,6 +794,14 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
           <span id="cutframe-label">C1</span>
           <button class="btn" id="btn-cam-add" title="枠を追加（B枠＝T.U./PANの行き先）">＋枠</button>
           <button class="btn mode" id="btn-cam-shake" title="画ブレ（このカット全体。頭→尻で強さを変えられます）">&#8767;</button>
+          <!-- 「余」＝焼く範囲の余白。**効くのは BOARD の破線の枠**なので、
+               SETTINGS（BOARDを覆うモーダル）ではなくここに置く（2026-08-24）。
+               枠が1つのカットでは効かない（出力と1:1で焼く）のでグレーにする -->
+          <label id="cam-expand-label" title="焼く範囲の余白（BOARDの破線＝実際に写真から焼き取る範囲）&#10;枠が2つ以上（T.U./PAN）のカットにだけ効きます">
+            <span class="sld-k">余</span>
+            <input type="range" id="cam-expand" min="100" max="150" value="102">
+            <span class="sld-val" id="cam-expand-val">1.02</span>
+          </label>
         </span>
         <span class="tb-div"></span>
         <span id="zoom-label" title="全体が入る表示は F キー">50%</span>
@@ -1068,11 +1089,6 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
       <span class="t">SETTINGS ／ SHORTCUTS</span>
       <label id="ui-big-label" title="ボタン・スライダーを大きくする（iPadで指が当たりやすい）">
         <input type="checkbox" id="chk-ui-big"> 大きいUI
-      </label>
-      <label id="cam-expand-label" title="ベイク範囲の余白。枠ぎりぎりが不安なとき（選択中のCUT枠に効きます）">
-        <span class="sld-k">余</span>
-        <input type="range" id="cam-expand" min="100" max="150" value="102">
-        <span class="sld-val" id="cam-expand-val">1.02</span>
       </label>
       <span style="flex:1"></span>
       <button class="btn" id="btn-wipe-all" title="写真・カット・音をすべて消す（先に ⇩ PROJ で保存してください）">全消去</button>
@@ -2177,6 +2193,31 @@ function renderBoard(){
       boardCtx.strokeRect(p.x, p.y, p.w, p.h);
     }
   }
+  // 焼く範囲（bakeRect）＝実際に写真から焼き取る矩形。**「余」を動かすとここが伸び縮みする**。
+  // 枠が2つ以上のカットを選んでいるときだけ出す（FIXは枠そのもの＝二重線になるだけなので出さない）
+  if(state.showCuts && state.selCut){
+    const sc = cuts[state.selCut.i];
+    if(sc && sc.bakeRect && camCount(sc) >= 2){
+      const br = sc.bakeRect;
+      boardCtx.save();
+      boardCtx.setLineDash([10 / b.z, 6 / b.z]);
+      boardCtx.strokeStyle = 'rgba(7,3,15,0.5)';
+      boardCtx.lineWidth = 3 / b.z;
+      boardCtx.strokeRect(br.x, br.y, br.w, br.h);
+      boardCtx.strokeStyle = 'rgba(184,80,255,0.75)';
+      boardCtx.lineWidth = 1.5 / b.z;
+      boardCtx.strokeRect(br.x, br.y, br.w, br.h);
+      boardCtx.setLineDash([]);
+      const tx = '焼く範囲 ' + (sc.bakeExpand || 1.02).toFixed(2);
+      boardCtx.font = (12 / b.z) + 'px monospace';
+      const pad = 4 / b.z, bh = 18 / b.z;
+      boardCtx.fillStyle = 'rgba(7,3,15,0.82)';
+      boardCtx.fillRect(br.x, br.y + br.h - bh, boardCtx.measureText(tx).width + pad * 2, bh);
+      boardCtx.fillStyle = 'rgba(200,139,255,0.95)';
+      boardCtx.fillText(tx, br.x + pad, br.y + br.h - 5 / b.z);
+      boardCtx.restore();
+    }
+  }
   // 素材はみ出し警告（SPEC_13 §5e）: 注目カットの bakeRect のうち写真が無い所を赤ハッチ
   const warnCut = state.showCuts ? cuts[state.selCut ? state.selCut.i : gFocusCut] : null;
   if(warnCut && warnCut.covGrid && warnCut.uncov > 0 && warnCut.bakeRect){
@@ -2839,10 +2880,17 @@ function renderCamList(){
   syncShakeBtn();
   const lab = $('#cam-expand-label');
   if(lab){
-    lab.classList.toggle('off', !cut);
+    // **枠が1つ（FIX）のカットでは効かない**（calcBakeRect が e=1 に落とす＝出力と1:1で焼く）。
+    // 効かないものを触らせない＝「動かないのはバグか仕様か」で悩ませない（動作チェック表の掟）
+    const live = !!cut && camCount(cut) >= 2;
+    lab.classList.toggle('off', !live);
+    lab.title = live
+      ? '焼く範囲の余白（BOARDの破線＝実際に写真から焼き取る範囲）\n上げるほど外側まで焼くので、寄り切ったときの端が安全になります'
+      : (cut ? 'このカットは枠が1つ（FIX）なので効きません。＋枠 で T.U./PAN にすると触れます'
+             : 'BOARDでCUT枠を選ぶと触れます');
     const ex = Math.round(((cut && cut.bakeExpand) || 1.02) * 100);
     $('#cam-expand').value = ex;
-    $('#cam-expand-val').textContent = (ex / 100).toFixed(2);
+    $('#cam-expand-val').textContent = live ? (ex / 100).toFixed(2) : '—';
   }
 }
 /* --- 画ブレの設定ポップ（SPEC_16 §5-C5） -----------------------------------
@@ -6990,6 +7038,8 @@ function layoutTL(){
 function layoutCamKeys(){
   const box = $('#tl-keys');
   box.innerHTML = '';        // ★必ず作り直す（ドラッグ中に毎回呼ぶので、消さないと積み上がる）
+  box.title = '◆ドラッグ＝動き出し／止まりの位置　◆Wクリック（Ctrl+クリックでも）＝そのキーの緩急'
+            + '\n薄い◆は枠が1つのカット（＋枠 で T.U./PAN にすると動かせます）';
   const aw = tlWidthPx();
   const T = totalFrames();
   if(!T) return;
@@ -7020,8 +7070,7 @@ function layoutCamKeys(){
     if(n < 2){
       // FIXカットは動かす所が無いので、頭に薄い◆だけ出す（行が空だと何の行か分からなくなる）
       const d = document.createElement('div');
-      d.className = 'tl-key fix';
-      d.title = 'C' + (i + 1) + ': 枠が1つ（＋枠 で T.U./PAN になります）';
+      d.className = 'tl-key fix';   // 飾り（pointer-events:none。title は #tl-keys 側に集約）
       placeKey(d, X(start));
       box.appendChild(d);
       return;
@@ -7068,6 +7117,11 @@ function layoutCamKeys(){
 let gKeyDrag = null;
 let gTlPan = null;                // ホイール押しドラッグ中の TIMELINE 横スクロール
 let gKeyTap = null;               // ◆のWクリック判定（前回離した位置と時刻）
+/* ◆のWクリック窓は **ツールのWタップ（DTAP_MS=550）より広い 900ms**。
+   ◆の単クリックは「そのキーへ頭出し」＝2回押しても無害なので、
+   取りこぼすより広く取ったほうが良い（「ゆっくり2回」でも開く）。
+   距離も◆の当たり箱（24×15）より広めに見る */
+const KEY_DTAP_MS = 900, KEY_DTAP_PX = 40;
 function camKeyDown(ev, i, k, el){
   ev.stopPropagation(); ev.preventDefault();
   const cut = cuts[i];
@@ -7131,8 +7185,8 @@ function camKeyUp(ev){
     if(!ev) return;
     const t = ev.timeStamp || performance.now();
     const dbl = gKeyTap && gKeyTap.i === g.i && gKeyTap.k === g.k &&
-                (t - gKeyTap.t) < DTAP_MS &&
-                Math.hypot(ev.clientX - gKeyTap.x, ev.clientY - gKeyTap.y) < DTAP_PX;
+                (t - gKeyTap.t) < KEY_DTAP_MS &&
+                Math.hypot(ev.clientX - gKeyTap.x, ev.clientY - gKeyTap.y) < KEY_DTAP_PX;
     gKeyTap = dbl ? null : { i: g.i, k: g.k, t, x: ev.clientX, y: ev.clientY };
     if(dbl || ev.ctrlKey || ev.metaKey){ openKeyEaseMenu(ev, g.i, g.k); return; }
     const cut = cuts[g.i];                       // 単クリック＝そのキーへ頭出し（COMPOSER と同じ）
@@ -8653,6 +8707,12 @@ const HELP_GROUPS = [
     ['↑ / ↓', '前/次のカットを選ぶ'], ['上下ドラッグ', 'カットの並べ替え'],
     ['Ctrl+↑ / ↓', '現在カットを上へ／下へ移動']
   ] },
+  { t: 'GRID（一覧で選ぶ）', rows: [
+    ['Ctrl+A', 'すべてのコマを選択'], ['Ctrl+D', '選択を解除'],
+    ['キャプションをクリック', 'そのコマを選択（Shift=範囲 ／ Ctrl=足し引き）'],
+    ['Ctrl+↑ / ↓', '選択中のカットをまとめて並べ替え（Ctrl+Shift=最上位／最下位へ）'],
+    ['選択中に効くもの', 'REFの濃度・並べ替え（濃・描画モードは絵コンテ全体の設定）']
+  ] },
   { t: 'BOARD（考える場）', rows: [
     ['V / C', 'MOVE ／ CUT 16:9（上のバーと同じ）'],
     ['写真の読み込み', 'D&D ／ + IMPORT ／ Ctrl+V（BOARDに紙として置く）'],
@@ -8666,6 +8726,7 @@ const HELP_GROUPS = [
     ['CUT でドラッグ', '矩形で絵コンテのコマ化（16:9）'],
     ['＋枠', 'B枠を足す＝T.U./PAN になる（尺は枠ごと＝次の枠までのコマ数）'],
     ['∿ ブレ', '画ブレ（そのカット全体）。頭→尻で強さが変わる＝強めていく／弱めてブレがなくなる'],
+    ['余', '焼く範囲の余白（紫の破線）。寄り切ったときの端を安全にする。枠が1つのカットでは効きません'],
     ['SHEETの 🔒 / L', 'そのカットをBOARDで掴めなくする（SHEETで複数選択中はまとめて）'],
     ['Ctrl+L', 'すべてのカットのロックを解除'],
     ['Delete', '選択中の枠（カット）／写真を削除']
@@ -8735,7 +8796,7 @@ const HELP_GROUPS = [
   { t: 'メモ', rows: [
     ['⇩ PROJ', '写真・枠・加筆・色・音・マーカーを1つのZIPに（全消去の前にこれ）'],
     ['キーの再割当', 'localStorage econte_keymap_v1 を直接編集（アプリ内UIはありません）'],
-    ['余（このバー）', 'ベイク範囲の余白。BOARDで枠を選ぶと触れます'],
+    ['余（BOARDの枠バー）', '焼く範囲の余白。BOARDの**紫の破線**が伸び縮みします（枠が2つ以上のカットだけ）'],
     ['⚠ 素材不足', '枠の中に写真が無い所がある印。BOARDで赤ハッチが出ます']
   ] }
 ];
@@ -8836,6 +8897,26 @@ function onKey(e){
     unlockAllCuts();
     return;
   }
+  // GRID: Ctrl+A = 全選択 ／ Ctrl+D = 解除（AE・Photoshop と同じ）
+  if(inGrid() && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey){
+    const kk = e.key.toLowerCase();
+    if(kk === 'a'){
+      e.preventDefault();
+      const all = colorCells().map(c => c.i + ':' + c.k);
+      setSelCells(all);
+      syncEditPanels();
+      toast(all.length + ' コマを全選択（REF・濃・並べ替えはまとめて効きます）');
+      return;
+    }
+    if(kk === 'd'){
+      e.preventDefault();
+      const had = gSelCells.length;
+      setSelCells([]);
+      syncEditPanels();
+      toast(had ? '選択を解除しました' : '選択しているコマはありません');
+      return;
+    }
+  }
   // GRID: Ctrl+↑/↓ = 選択中セルのカットをまとめて並べ替え
   //       Ctrl+Shift+↑/↓ = **最上位 / 最下位へ**（SPEC_16 §5-C7）
   if(inGrid() && (e.ctrlKey || e.metaKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown')){
@@ -8902,7 +8983,10 @@ function onKey(e){
     if(gEditMode === 'grid') gridFit(); else editFit();
     return;
   }
-  const k = e.key.toLowerCase();   // ペイント系は STUDIO / EDIT 両方で有効
+  // ペイント系は STUDIO / EDIT 両方で有効。**修飾キー付きは除く**
+  // （Ctrl+A が黙って SEL に切り替わっていた。2026-08-24 に GRID の Ctrl+A を足して露見）
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
   if(k === 'b') setETool('pen');
   else if(k === 'e') setETool('eraser');
   else if(k === 'g') setETool('fill');
@@ -8982,6 +9066,16 @@ function wire(){
   }, true);
   $('#cam-expand').addEventListener('input', e => {
     $('#cam-expand-val').textContent = (+e.target.value / 100).toFixed(2);
+    // ★ドラッグ中も BOARD の破線を追従させる（焼き直しは重いので change まで待つが、
+    //   「動かしても何も変わらない」に見えるのがいちばん困る）
+    const sc = state.selCut, cut = sc && cuts[sc.i];
+    if(cut && camCount(cut) >= 2){
+      const keep = cut.bakeExpand;
+      cut.bakeExpand = +e.target.value / 100;
+      cut.bakeRect = calcBakeRect(cut);
+      renderBoard();
+      cut.bakeExpand = keep;              // 確定は change 側（setBakeExpand）に任せる
+    }
   });
   $('#cam-expand').addEventListener('change', e => {
     if(state.selCut) setBakeExpand(state.selCut.i, +e.target.value / 100);
