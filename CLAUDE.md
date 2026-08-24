@@ -49,7 +49,7 @@
   **P1 でこれらを変えたらラボ側も直す**（`SPACES_LAB/CLAUDE.md` の転載表を見る）
 - `SPEC_17_INPUT_GRAMMAR.md` — **操作文法の統一（INPUT GRAMMAR）**。ツールキーの押し方（単押し/2連打/長押し/Shift/バネ）と
   投げ縄の囲い方（ドラッグ=フリーハンド / クリック=多角形）の共通文法。**正準は `animator.html`**。
-  **実装済み: animator（§2-2）／econte（§2-2b・差分つき）。残り: manga-plate / oban-builder**
+  **実装済み: animator（§2-2）／econte（§2-2b・差分つき）／manga-plate（§2-2c・差分つき）。残り: oban-builder のみ**
 - `SPEC_16_ECONTE_V4.md` — **ECONTE V4「枠ごとの画」。§1〜§3＋§5-B＋E1＋§5-C(C1〜C10) 実装済み（2026-08-18〜19）。残りは §5-D（iPad）だけ**。
   画は **枠（`cam[k]`）ごとに1枚**（`cut.fr[k] = {line 1280×720, plate 512×288, rect}`。`cam[]` と1対1・`ensureFr()` を必ず通す）。
   写真（`baseC`）だけ全枠で共有。パッチは **紙（ベイク空間）の上に `camBakeRect(cut,k)` の位置で置く**ので
@@ -100,10 +100,6 @@
   `stageToast()` を追加（ステージが2つあるので class で持ち、出ているほうへ）。
   ★ボタンとキーは**同じ関数**を呼ぶ（`wire()` の無名ハンドラをトップレベルへ出した）。
   **残り: §5-D（iPad）だけ**
-- `SPEC_17_INPUT_GRAMMAR.md` — **操作文法の統一**（ツールキーの 単押し/2連打/長押し/Shift+/バネ式・投げ縄の多角形とEsc取消・切替の告知）。
-  **ANIMATOR のみ実装済み（2026-08-24）／econte・manga-plate・oban は未着手**。
-  いま各ツールにバラバラにある「Wクリックのボタン切替」（manga-plate の コマ⇔素材・線⇔ホワイト 等）を
-  追ってここへ揃える。**キー名ではなくアクションidに紐づける**のが要点
 - `SPEC_11_COMPOSER_POLISH.md` — COMPOSER磨き込み仕様（**P0〜P7 すべて実装済み**。残タスクなし。P7=出力解像度のアスペクト保持／のりしろ1.2／Zソート／フォルダ書き出し／タイムライン時間軸ズーム）
 - `SPEC_14_TIMELAPSE.md` — ANIMATOR 作画タイムラプス仕様（自動記録・専用ストア tl_shot・リングバッファ・**WORK/CELL 2通りの見せ方**・WebM書き出し。**P0〜P2 すべて実装済み。残タスクなし**（P3=区間トリム等は任意・将来））
 - `SPEC_12_PARALLAX_TAKE_BRIDGE.md` — PARALLAX_LAB×OBAN/COMPOSER **連携ズレ解説機**仕様（TAKE JSONを貼ると同一カメラワークを ①OBAN撮影台／②COMPOSER Zドリー／③COMPOSER SCL で並べて再生。「なぜそのまま繋ぐとズレるか」を見て触って理解する道具）。**実装先は `LP_motion-graphics/PARALLAX_LAB/`**、本リポジトリ側は `planeZoom`/`pf`/`buildComposerJSON` を変えたらSPECの数値表を更新する義務のみ。P0/P1/P2未着手。**2026-08-15 に `planeZoom` 新式・COPY FOR COMPOSER 実装済みを反映して全面改訂**（§1にズレの実測表・§9に数値テストスクリプト）
