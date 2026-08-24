@@ -1993,7 +1993,6 @@ function setItemCell(it,i){
   edgeCache.clear();toneCache.clear();
   commit();renderItemParams();
 }
-function deleteItem(it){deleteItems([it]);}
 function deleteItems(list){
   const pg=curPage(), set=new Set(list);
   pg.items=pg.items.filter(o=>!set.has(o));
