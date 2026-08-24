@@ -104,9 +104,32 @@ body{
 #photosel-box.on{display:flex}
 #btn-photo-gray.on{background:rgba(139,63,224,.35);border-color:rgba(184,80,255,.85);color:#F4E8FF}
 #btn-photo-ref.mode{border-color:rgba(90,233,255,.75);color:var(--ice)}
-/* ⇄ 差し替え / ✕ 外す は REF が付いている写真のときだけ出す（1クリック＝1動作。プルダウンを挟まない） */
+/* ⇄ 差し替え / 🔗̸ 解除 は REF が付いている写真のときだけ出す（1クリック＝1動作。プルダウンを挟まない） */
 .btn.refsub{display:none;padding:3px 6px;color:var(--ice);border-color:rgba(90,233,255,.4)}
 #photosel-box.has-ref .btn.refsub{display:inline-block}
+/* REF BOARD 連携の3つは **写真そのものを変える GRAY とは別の用途**（2026-08-24）。
+   小さく・破線の囲みで一段落とし、押し間違いの筋を断つ */
+.refgrp{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:1px 4px;border:1px dashed rgba(90,233,255,.28);
+}
+.refgrp-k{
+  font-family:var(--bank);font-size:7px;letter-spacing:.14em;
+  color:rgba(90,233,255,.5);margin-right:1px;
+}
+.refgrp .btn{padding:1px 4px;font-size:8px;line-height:1.15}
+/* 「解除」は **🔗 に斜線**（✕だと「画像を消す」と読み違える）。#btn-cut-vis の斜線と同じ作り */
+.btn.unlink{position:relative;color:rgba(255,150,150,.95);border-color:rgba(255,150,150,.38)}
+.btn.unlink:hover{border-color:rgba(255,150,150,.85);color:#FFC7C7}
+/* 指で触る端末にだけ出すもの（Delete キーが無い環境の逃げ道） */
+.touch-only{display:none}
+@media (pointer: coarse){ .touch-only{display:inline-block} span.tb-div.touch-only{display:inline-block} }
+.btn.danger{color:rgba(255,120,120,.95);border-color:rgba(255,120,120,.35)}
+.btn.danger:hover{border-color:rgba(255,120,120,.9);color:#FFC7C7}
+.btn.unlink::after{
+  content:'';position:absolute;left:12%;top:48%;width:76%;height:1.5px;
+  background:rgba(255,120,120,.98);transform:rotate(-35deg);pointer-events:none;
+}
 #btn-tool-move.on{
   background:linear-gradient(135deg,#8B3FE0,#5B2A9E);border-color:transparent;color:#F4E8FF;
   box-shadow:0 0 14px rgba(139,63,224,.5);
@@ -115,6 +138,13 @@ body{
   background:linear-gradient(135deg,#D79BFF,#A75BF0);border-color:transparent;color:#1B0733;
   box-shadow:0 0 14px rgba(215,155,255,.5);
 }
+/* 書き出し中の「■＝もう一度押すと止まる」表示（2026-08-24） */
+.btn.busy{
+  border-color:rgba(255,79,168,.9);color:var(--acid);
+  background:rgba(255,79,168,.14);
+  animation:busyPulse 1.1s ease-in-out infinite;
+}
+@keyframes busyPulse{50%{background:rgba(255,79,168,.03)}}
 .tb-div{width:1px;height:16px;background:var(--border);margin:0 3px}
 #board-lock-tx{color:var(--gold);font-size:9px;letter-spacing:.08em}
 #studio-board.has-clip #board-topbar{top:26px}
@@ -281,14 +311,17 @@ body{
 }
 .etool.off{opacity:.35;pointer-events:none}
 .etool{position:relative}
-.etool.pp-on::after{                 /* 筆圧ペンON */
-  content:'';position:absolute;right:2px;top:2px;width:5px;height:5px;background:var(--gold);
+.etool.pp-on::after{                 /* 筆圧ペンON（ANIMATOR と同じ金の丸・右上） */
+  content:'';position:absolute;right:3px;top:3px;width:6px;height:6px;border-radius:50%;
+  background:var(--gold);box-shadow:0 0 5px rgba(255,210,122,.9);
 }
-.etool.lasso-on::before{             /* 投げ縄塗り */
-  content:'';position:absolute;left:2px;top:2px;width:5px;height:5px;background:var(--acid);
+.etool.lasso-on::before{             /* 投げ縄塗り（ANIMATOR と同じ紫の丸・左上） */
+  content:'';position:absolute;left:3px;top:3px;width:6px;height:6px;border-radius:50%;
+  background:#B98CFF;box-shadow:0 0 5px rgba(185,140,255,.9);
 }
-.etool.fe-on{                        /* 透明消し（FILL 長押し＝投げ縄透明消し） */
-  outline:1px dashed rgba(255,210,122,.9);outline-offset:-3px;
+.etool.fe-on::after{                 /* 透明消し（ANIMATOR と同じ水色の丸・右上） */
+  content:'';position:absolute;right:3px;top:3px;width:6px;height:6px;border-radius:50%;
+  background:#5AE9FF;box-shadow:0 0 5px rgba(90,233,255,.9);
 }
 #grid-sel{color:var(--acid);font-family:var(--mono);font-size:9px}
 .sld-row{display:flex;align-items:center;gap:8px}
@@ -317,9 +350,10 @@ body{
 .hsv-num:focus{outline:none;border-color:var(--border-bright)}
 .palette{
   display:grid;grid-template-columns:repeat(8,1fr);gap:3px;
-  /* **既定は縦3行**（SPEC_16 §5-B5）。48色ぜんぶ縦に積むとサイドパネルが
-     パレットで埋まってしまうので、3行ぶんだけ見せて残りはスクロールに逃がす */
-  overflow-y:auto;overscroll-behavior:contain;
+  /* **スクロールしない**（2026-08-24。旧 SPEC_16 §5-B5 の「縦3行＋スクロール」は撤回）。
+     ＋で足した色が畳まれた先に隠れてしまい、「増やしたのに出てこない」と読めてしまうため。
+     色が増えたぶんだけ下へ伸ばして、パレットは常に全部が見えている状態にする */
+  overflow:visible;
 }
 .pal-cell{aspect-ratio:1;cursor:pointer;border:1px solid rgba(255,255,255,.12)}
 .pal-cell.on{outline:2px solid var(--acid);outline-offset:1px;border-color:transparent}
@@ -395,6 +429,9 @@ body{
 #tl-minitools .sld-row input[type=range]{width:74px;flex:none}
 #tl-minitools .sld-val{min-width:26px;font-size:9px}
 #tl-minitools .btn{padding:4px 9px;font-size:8px}
+/* ツールバーを畳むアイコン（PENの手前）。文字の HIDE より場所が動かない */
+.btn.mini-x{padding:3px 6px !important;font-size:11px;line-height:1;color:var(--grey);flex:none}
+.btn.mini-x:hover{color:var(--acid);border-color:var(--border-bright)}
 #tl-mini-swatch{width:26px;height:18px;border:1px solid var(--border);flex:none}
 #btn-tl-tools{position:absolute;left:10px;top:10px;z-index:6}
 #btn-tl-tools.right{left:auto;right:10px}
@@ -469,6 +506,7 @@ body{
 #burnin-label{color:var(--grey);font-size:10px;font-family:var(--jp);display:flex;align-items:center;gap:5px;cursor:pointer}
 #burnin-mode{background:var(--black);border:1px solid var(--border);color:var(--gold);font-family:var(--mono);font-size:9px;padding:3px 2px}
 #tl-strip{position:relative;height:66px;touch-action:none;-webkit-user-select:none;user-select:none;margin-bottom:6px}
+#tl-strip.panning{cursor:grabbing}
 #tl-ruler-cv{position:absolute;left:0;top:0;width:100%;height:18px;display:block}
 #tl-clips{position:absolute;left:0;top:18px;right:0;bottom:var(--keyh,26px)}
 /* カメラキー行（◆＝枠の位置 / 区間バー＝イーズ）。高さは --keyh で帯の高さに追従させる */
@@ -692,9 +730,9 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
   <span class="title">E<b>CONTE</b></span>
   <button class="btn mode on" id="btn-view-studio" title="STUDIO (1) ／ X で GRID と行き来">STUDIO</button>
   <button class="btn mode" id="btn-view-edit" title="加筆EDIT＝GRIDで開く (2) ／ X で STUDIO と行き来">EDIT</button>
-  <button class="btn ex" id="btn-import">+ IMPORT</button>
+  <button class="btn ex" id="btn-import" title="写真をBOARDに紙として置く（考える場に散らす。1枚が1カットになるわけではありません）">&#9654; IMPORT</button>
   <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none;">
-  <button class="btn ex" id="btn-import-cuts" title="画像を1枚＝1カット（16:9）として取り込む。書き出したカラースクリプトPNGは自動で格子に分けます。SHEETへドラッグ＆ドロップでも同じ（BOARDへ落とすと今までどおり写真）"><span class="lb-w">+ カット</span><span class="lb-n">+&#9707;</span></button>
+  <button class="btn ex" id="btn-import-cuts" title="&#9654; C.SCRIPT ＝ 画像を1枚＝1カット（16:9）として取り込む（&#9654; IMPORT はBOARDに写真を置くだけ、こちらはカットが増えます）。&#8681; C.SCRIPT で書き出したPNGは自動で格子に分けます。SHEETへドラッグ＆ドロップでも同じ（BOARDへ落とすと今までどおり写真）"><span class="lb-w">&#9654; C.SCRIPT</span><span class="lb-n">&#9654;&#9707;</span></button>
   <input type="file" id="cutimg-input" accept="image/*,.heic,.heif" multiple style="display:none;">
   <button class="btn" id="btn-clip-paste" title="REF BOARD の内容を貼り付けて次の写真に紐づける（クリップJSON / ボード全体JSON / Markdown / URL のどれでも可）">&#9187; REF</button>
   <input type="file" id="proj-file-input" accept=".zip,application/zip" style="display:none;">
@@ -753,11 +791,22 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
           <span class="tb-div"></span>
           <button class="btn" id="btn-photo-rot" title="90°回転">&#8634; 90&deg;</button>
           <button class="btn mode" id="btn-photo-gray" title="モノクロ化">GRAY</button>
-          <button class="btn" id="btn-photo-ref" title="REF BOARDの元リンクを開く／クリップがあれば紐づけ">&#128279;</button>
-          <button class="btn refsub" id="btn-photo-ref-swap" title="REF を今のクリップに差し替える">&#8646;</button>
-          <button class="btn refsub" id="btn-photo-ref-off" title="REF を外す（Ctrl+Z で戻せます）">&#10005;</button>
-          <button class="btn" id="btn-photo-del" title="この写真をボードから削除（Ctrl+Z で戻せます）">DEL</button>
+          <!-- REF BOARD 連携の3つ。**隣の GRAY（写真そのものを変える）とは用途が違う**ので、
+               小さく・破線の囲みでひとまとまりにして切り分ける（2026-08-24）。
+               写真の削除（旧 DEL）はここに置かない ＝ 🔗 の並びと取り違えて消す事故があったため。
+               削除は Delete キー（選択中の写真／枠）に一本化した -->
+          <span class="refgrp" title="REF BOARD 連携（この写真とボードの元ネタを結ぶ／画そのものは変わりません）">
+            <span class="refgrp-k">REF</span>
+            <button class="btn" id="btn-photo-ref" title="REF BOARDの元リンクを開く／クリップがあれば紐づけ">&#128279;</button>
+            <button class="btn refsub" id="btn-photo-ref-swap" title="REF を今のクリップに差し替える">&#8646;</button>
+            <button class="btn refsub unlink" id="btn-photo-ref-off" title="REF のリンクを解除（写真は消えません。Ctrl+Z で戻せます）">&#128279;</button>
+          </span>
           <span id="photo-ref-tx"></span>
+          <!-- 写真の削除は Delete キーに一本化した（旧 DEL は 🔗 の隣で押し間違えていた）。
+               ただし **指で触る端末には Delete が無い** ので、その場合だけ 🗑 を出す。
+               🔗 の一群からは区切りを挟んで離してある -->
+          <span class="tb-div touch-only"></span>
+          <button class="btn danger touch-only" id="btn-photo-del" title="この写真をボードから削除（Ctrl+Z で戻せます）">&#128465;</button>
         </span>
         <span style="flex:1"></span>
         <span id="board-lock-tx" title="ロック中のカットはBOARDで選べません（SHEETの 🔒 で解除）"></span>
@@ -774,6 +823,9 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
         <!-- 横並び1行のミニツール。HSB/パレットは置かない（Alt＝スポイト・指は長押しでスポイト）。
              左右入替は Tab。既定は隠し（gUi.tools）＝絵を隠さない -->
         <div id="tl-minitools" class="hidden">
+          <!-- 隠すボタンは **PEN の先頭にアイコンで**（2026-08-24）。
+               右端の「HIDE」は行の長さで位置が毎回変わり、押す場所を探すことになっていた -->
+          <button class="btn mini-x" id="btn-tl-tools-hide" title="ツールバーを隠す（✎ TOOLS で戻る）">&#10005;</button>
           <div class="etools">
             <div class="etool on" data-tool="pen" title="ペン (B) ／ Wクリックで筆圧">PEN</div>
             <div class="etool" data-tool="eraser" title="消しゴム (E) ／ WクリックでCLEAR">ERASE</div>
@@ -795,8 +847,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
             <div class="etool on" data-baseover="0" title="元の絵を加筆の下に敷く">REF DOWN</div>
             <div class="etool" data-baseover="1" title="元の絵を加筆の上に重ねる（REF扱い）">REF UP</div>
           </div>
-          <div id="tl-mini-swatch" title="現在色（Alt+クリック／指の長押しでスポイト）"></div>
-          <button class="btn" id="btn-tl-tools-hide" title="ツールバーを隠す（✎ TOOLS で戻る）">HIDE</button>
+          <div id="tl-mini-swatch" title="現在色（絵の上は Alt+クリック／指の長押しでスポイト）&#10;クリック＝画面のどこからでも色を拾う（Chrome 系のみ）"></div>
         </div>
         <button class="btn" id="btn-tl-tools" title="ペイントツールを表示" style="display:none;padding:4px 8px;font-size:8px">✎ TOOLS</button>
       </div>
@@ -852,7 +903,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
       <button class="btn mode on" id="btn-loop" title="ループ切替 (L)">LOOP</button>
       <span style="flex:1"></span>
       <span id="tl-zoom-tx" title="Alt+ホイールで時間軸を拡大縮小 ／ ダブルクリックで全体へ">全体</span>
-      <span id="tl-hint">帯クリック=seek ／ クリップ右端=尺 ／ Wクリック=加筆EDIT ／ ◆クリック=そのキーの緩急・ドラッグ=動き出し/止まりの位置 ／ 区間クリック=まとめて緩急 ／ Alt+ホイール=拡大</span>
+      <span id="tl-hint">帯クリック=seek ／ クリップ右端=尺 ／ Wクリック=加筆EDIT ／ ◆Wクリック=そのキーの緩急・ドラッグ=動き出し/止まりの位置 ／ 区間クリック=まとめて緩急 ／ Alt+ホイール=拡大・ホイール押しドラッグ=左右</span>
     </div>
     <div id="tl-strip">
       <canvas id="tl-ruler-cv"></canvas>
@@ -946,6 +997,9 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
           <!-- SPEC_15 P2: 軽いフォトバッシュ＝「浮いた選択」。**SINGLE 限定**なので
                GRID では .off でグレーアウトする（syncSelToolUI）。STUDIOのミニツールには置かない -->
           <div class="etool" data-tool="sel" title="選択 (A)：投げ縄で囲うと持ち上がる／SINGLE 限定&#10;Ctrl+ドラッグ=コピー ／ Shift+ドラッグ=REF（写真）からコピー&#10;Enter か枠の外=確定 ／ Esc=取り消し">SEL</div>
+          <!-- 持ち上げた選択を別カットへ運ぶ（SEL の続きの操作なので隣に置く） -->
+          <div class="etool" id="btn-sel-copy" title="COPY (Ctrl+C)：浮かせている選択を、いまの形のままひかえる">COPY</div>
+          <div class="etool" id="btn-sel-paste" title="PASTE (Ctrl+V)：ひかえた選択を、いま開いているカットの中央へ置く（SINGLE 限定）">PASTE</div>
         </div>
       </div>
       <div>
@@ -978,7 +1032,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
       </div>
       <div>
         <div class="pnl-t">COLOR / PALETTE</div>
-        <div id="color-swatch" title="現在色（スポイトで選択スロットに上書き）"></div>
+        <div id="color-swatch" title="現在色（スポイトで選択スロットに上書き）&#10;クリック＝画面のどこからでも色を拾う（ブラウザの外も可・Chrome / Edge のみ）"></div>
         <div id="hsv-box" style="margin-top:6px;"></div>
         <div class="palette" id="palette" style="margin-top:6px;"></div>
         <div class="pal-btns">
@@ -2117,7 +2171,8 @@ function renderBoard(){
       boardCtx.fillRect(p.x + p.w - m - 4 / b.z, p.y + 4 / b.z, m, m);
     }
     if(p.id === state.selPhoto){
-      boardCtx.strokeStyle = '#5AE9FF';
+      // 写真の選択枠は **グレー**（CUT枠の水色と取り違えないため。2026-08-24）
+      boardCtx.strokeStyle = 'rgba(205,205,215,0.95)';
       boardCtx.lineWidth = 2 / b.z;
       boardCtx.strokeRect(p.x, p.y, p.w, p.h);
     }
@@ -2146,9 +2201,9 @@ function renderBoard(){
       const foc = (i === gFocusCut);   // 現在カット（プレイヘッド位置）だけ色を変える
       const sel = state.selCut && state.selCut.i === i && state.selCut.k === k;
       const lk = !!c.lock;
-      // 選択枠は **グレー**（SPEC_16 §5-C9）。配置が決まったあとはほとんど動かさないので、
-      // ピンクで目立たせると「いま作業している所」の読みを奪う。現在カット（水色）を優先させる
-      const col = sel ? 'rgba(205,205,215,0.95)' : (foc ? 'rgba(90,233,255,0.95)' : 'rgba(255,210,122,0.9)');
+      // 選択枠は **水色**（2026-08-24）。グレーは下の写真の選択に譲った＝
+      // 「いま掴めるのは枠か写真か」が色だけで分かる。現在カット（薄い水色）とは太さと角ハンドルで分ける
+      const col = sel ? 'rgba(150,248,255,1)' : (foc ? 'rgba(90,233,255,0.78)' : 'rgba(255,210,122,0.9)');
       boardCtx.save();
       if(lk) boardCtx.setLineDash([7 / b.z, 4 / b.z]);   // ロック中は破線＝掴めないことが見て分かる
       // 下の紙が白いと黄色/水色の線が飛ぶので、**同じ形の暗い線を1段太く先に敷く**（枠自体は黒くしない）
@@ -2275,10 +2330,12 @@ function bDown(e){
                   before: { x: r.x, y: r.y, w: r.w, h: r.h } };
       }else{
         const p = hitPhoto(bp.x, bp.y);
-        // 枠を選んでいる最中に写真へ触っても **その場では動かさない**（選択を切り替えるだけ）。
+        // **選ばれていない写真は、その一触りでは動かさない**（選択を切り替えるだけ）。
         // 枠を合わせているときに下の写真をうっかりズラす事故がこれで消える。
-        // もう一度触れば（＝意図して選び直した状態で）ふつうに動かせる
-        const guard = !!state.selCut && !!p;
+        // もう一度触れば（＝意図して選び直した状態で）ふつうに動かせる。
+        // 2026-08-24: 旧「枠を選んでいるときだけ」から **常に**へ広げた
+        //   ——枠を選んでいない状態でも下の写真を掴んでしまう事故が残っていたため
+        const guard = !!p && (!!state.selCut || p.id !== state.selPhoto);
         if(state.selCut) selectCutFrame(null);
         if(p){
           state.selPhoto = p.id;
@@ -2292,7 +2349,10 @@ function bDown(e){
       }
     }
   }else{
-    bDrag = { mode: 'pan', sx: e.clientX, sy: e.clientY, bx: state.board.x, by: state.board.y };
+    // Alt / 中ボタンのパン。**Alt で動かさずに離したらスポイト**（2026-08-24）＝
+    // MOVE 画面でも写真から直に色が拾える。ドラッグすればこれまでどおりパン
+    bDrag = { mode: 'pan', sx: e.clientX, sy: e.clientY, bx: state.board.x, by: state.board.y,
+              eye: !!(e.altKey && e.button !== 1) };
   }
   renderBoard();
 }
@@ -2373,6 +2433,12 @@ function bUp(e){
                 redo(){ setCamRect(cut, sel.k, n); rebakeFromCam(cut); } });
       afterCamChange(sel.i);
     }
+  }
+  if(bDrag && bDrag.mode === 'pan' && bDrag.eye &&
+     Math.hypot(e.clientX - bDrag.sx, e.clientY - bDrag.sy) < 5){
+    // BOARD は「写真をそのまま描いたキャンバス」なので、見えている画素がそのまま拾える
+    if(eyedropView(e.clientX, e.clientY, boardCv)) toast('スポイト ' + state.fillColor);
+    else toast('ここには画がありません（写真の上で Alt+クリック）');
   }
   bDrag = null;
   renderBoard();
@@ -4351,6 +4417,36 @@ function toggleCutLock(i){
   scheduleSave();
   toast('C' + (i + 1) + ' を' + (cut.lock ? 'ロックしました（BOARDで動かせません）' : 'ロック解除しました'));
 }
+/* L キーの行き先。SHEETで複数選んでいればそれ全部、無ければ現在カット（プレイヘッド位置）。
+   BOARDで枠を選んでいるときはその枠のカット＝**手が触っているものが必ず対象になる** */
+function lockTargets(){
+  if(gSelRows && gSelRows.length) return gSelRows.slice();
+  if(state.selCut) return [state.selCut.i];
+  if(gFocusCut >= 0) return [gFocusCut];
+  return [];
+}
+function toggleLockHere(){
+  const ix = lockTargets().filter(i => cuts[i]);
+  if(!ix.length){ toast('ロックするカットがありません'); return; }
+  // まとめて触るときは **1つでも解いてあれば全部ロック**（バラバラのまま反転させない）
+  const to = ix.some(i => !cuts[i].lock);
+  ix.forEach(i => {
+    cuts[i].lock = to;
+    if(to && state.selCut && state.selCut.i === i) selectCutFrame(null);
+    refreshRow(i);
+  });
+  syncBoardPanels(); renderBoard(); updateLockHud(); scheduleSave();
+  toast(ix.length === 1 ? ('C' + (ix[0] + 1) + ' を' + (to ? 'ロックしました（BOARDで動かせません）' : 'ロック解除しました'))
+                        : (ix.length + ' カットを' + (to ? 'ロックしました' : 'ロック解除しました')));
+}
+/* Ctrl+L ＝ 全ロック解除（「どれが掛かっているか分からない」を1手で片づける） */
+function unlockAllCuts(){
+  const n = cuts.filter(c => c.lock).length;
+  if(!n){ toast('ロック中のカットはありません'); return; }
+  cuts.forEach((c, i) => { if(c.lock){ c.lock = false; refreshRow(i); } });
+  syncBoardPanels(); renderBoard(); updateLockHud(); scheduleSave();
+  toast(n + ' カットのロックを解除しました');
+}
 function updateLockHud(){
   const n = cuts.filter(c => c.lock).length;
   const el = $('#board-lock-tx');
@@ -5010,7 +5106,6 @@ function syncEditPanels(){
     colorBtn.classList.remove('off');   // SINGLE でも GRID でも同じパッチを塗る
     colorBtn.title = 'カラースクリプト層（**枠ごと**・line と同じ枠の上）／ERASE をWクリックで消える';
   }
-  measurePalettes();   // EDITサイドが出た直後はここが最初の「測れる」機会（§5-B5）
   sel.value = gPaint.colorBlend;
   const a = Math.round(clamp(gPaint.colorAlpha, 0, 1) * 100);
   if(document.activeElement !== $('#color-alpha')) $('#color-alpha').value = a;
@@ -5170,11 +5265,34 @@ function setETool(t){
   // [data-tool] に限定する（描く先ボタン [data-target] を巻き込まないため）
   document.querySelectorAll('.etool[data-tool]').forEach(el => el.classList.toggle('on', el.dataset.tool === t));
 }
+/* --- 画面全体スポイト（EyeDropper API） -----------------------------------
+   Chrome / Edge にはブラウザの外まで拾えるスポイトがある（Safari・iPad には無い）。
+   絵の上の Alt+クリックとは別入口にして、**現在色スウォッチのクリック**に割り当てた。
+   ★ユーザー操作から直接呼ぶ必要がある（setTimeout 越しだと弾かれる） */
+let gEyeBound = false;
+function screenEyedrop(){
+  if(!window.EyeDropper){
+    toast('この環境では画面全体スポイトが使えません（Chrome / Edge のみ。絵の上なら Alt+クリック）');
+    return;
+  }
+  new EyeDropper().open()
+    .then(r => { if(r && r.sRGBHex){ takeColor(r.sRGBHex); toast('スポイト ' + r.sRGBHex); } })
+    .catch(() => {});   // Esc で閉じただけ＝黙って戻る
+}
 function updateSwatch(){
   ['#color-swatch', '#tl-mini-swatch'].forEach(id => {
     const el = $(id);
     if(el) el.style.background = state.fillColor;
   });
+  if(window.EyeDropper && !gEyeBound){
+    gEyeBound = true;
+    ['#color-swatch', '#tl-mini-swatch'].forEach(id => {
+      const el = $(id);
+      if(!el) return;
+      el.style.cursor = 'crosshair';
+      el.addEventListener('click', screenEyedrop);
+    });
+  }
   if(!gHsvDriving) syncHsvFromColor();   // パレット/スポイト側から色が変わったらHSVも追従
 }
 /* **ブラシ上限は1つ**（SPEC_16 §5-B1）。line / color で上限が変わると、
@@ -5842,6 +5960,7 @@ function floatLift(g){
              x: x0, y: y0, w, h, rot: 0, warp: null, wn: 0, _h: null,
              ox: x0, oy: y0, ow: w, oh: h, tx, drag: null };
   if(state.selWarp) flEnsureWarp(gFloat, FL_WARP_N);
+  syncSelToolUI();
   renderPaintViews();
   const i = cuts.indexOf(cut);
   if(i >= 0) refreshRow(i);
@@ -6039,6 +6158,7 @@ function drawFloatOverlay(ctx, g){
 
 /* --- 確定・取り消し -------------------------------------------------------- */
 function floatAfter(cut){
+  syncSelToolUI();          // COPY は「浮いている間だけ」押せる
   const i = cuts.indexOf(cut);
   renderPaintViews();
   if(i >= 0){ refreshRow(i); if(inGrid()) refreshGridCells(i); }
@@ -6082,12 +6202,65 @@ function floatCancel(){
   toast('取り消しました');
   return true;
 }
+/* --- SEL のコピー／ペースト（2026-08-24） --------------------------------
+   **浮いたまま持ち出す**のではなく、いま見えている形（拡縮・回転・WARP を効かせた姿）を
+   1枚の紙に焼いてから控える。こうしておくと貼り先で変形をやり直せるし、
+   カットごとにベイク寸法が違っても素直に置ける。
+   置き場所は紙（ベイク空間）の中央。そこから箱ハンドルでいつもどおり動かす。 */
+let gSelClip = null;
+function selCopy(){
+  const g = gFloat;
+  if(!g){ toast('SEL で囲って持ち上げてから COPY（Ctrl+C）'); return; }
+  const bb = flShapeBBox(g);
+  const w = Math.max(1, Math.round(bb.x1 - bb.x0)), h = Math.max(1, Math.round(bb.y1 - bb.y0));
+  if(w * h > MAX_AREA / 2){ toast('範囲が大きすぎます'); return; }
+  const cv = blankCanvas(w, h);
+  flPaint(ctx2d(cv), g, q => ({ x: q.x - bb.x0, y: q.y - bb.y0 }));
+  gSelClip = { cv, w, h, src: g.src };
+  syncSelToolUI();
+  toast('コピーしました（' + w + '×' + h + '）— 別のカットを SINGLE で開いて Ctrl+V');
+}
+function selPaste(){
+  if(!gSelClip){ toast('コピーした選択がありません（SEL で囲って Ctrl+C）'); return; }
+  if(!inSingle()){ toast('ペーストは SINGLE でだけできます（4 キー）'); return; }
+  const cut = cuts[state.curCut];
+  if(!cut){ toast('カットがありません'); return; }
+  if(cut.lock){ toast('このカットはロック中です（SHEETの 🔒 か Ctrl+L で解除）'); return; }
+  if(gFloat) floatCommit(true);        // 浮いたままにしない（持ち出す前に必ず紙へ落とす）
+  const b = bakeSize(cut);
+  // 貼り先の紙より大きいときだけ縮める（等倍で入るならそのまま＝画素を触らない）
+  const k = Math.min(1, b.w / gSelClip.w, b.h / gSelClip.h);
+  const w = Math.max(2, Math.round(gSelClip.w * k)), h = Math.max(2, Math.round(gSelClip.h * k));
+  const cv = blankCanvas(w, h);
+  const cx = ctx2d(cv);
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = 'high';
+  cx.drawImage(gSelClip.cv, 0, 0, w, h);
+  const x = Math.round((b.w - w) / 2), y = Math.round((b.h - h) / 2);
+  txBegin();
+  const tx = gTx;
+  gTx = null;                          // 浮いている間は退避（floatLift と同じ持ち方）
+  // copy:true ＝ 元から切り取るものが無い（貼り付けなので抜き跡を作らない）
+  gFloat = { cut, src: (state.paintTarget === 'color' ? 'color' : 'line'), copy: true, cv,
+             x, y, w, h, rot: 0, warp: null, wn: 0, _h: null,
+             ox: x, oy: y, ow: w, oh: h, tx, drag: null };
+  if(state.selWarp) flEnsureWarp(gFloat, FL_WARP_N);
+  setETool('sel');
+  renderPaintViews();
+  const i = cuts.indexOf(cut);
+  if(i >= 0) refreshRow(i);
+  toast('ペーストしました：隅=拡縮／Ctrl+隅=自由変形／隅の外=回転／Enter確定・Esc取消'
+        + '（焼き込み先は ' + (paintKind() === 'plate' ? 'color' : 'line') + '）');
+}
 /* SEL は SINGLE 限定（SPEC_15 P2 / SPEC_13 §9）。GRID では押せないようグレーにする。
    ★ **SEL を持ったまま SINGLE を出たら PEN に戻す**。戻さないと「ボタンはグレー・
      でも選ばれているのは SEL」になり、なぞっても何も起きない＝バグか仕様か悩ませる。
    Wクリックで WARP のON/OFF（LASSO / L-DEL と同じ手つき・SPEC_16 §5-B3）。 */
 function syncSelToolUI(){
   const on = inSingle();
+  const cp = $('#btn-sel-copy'), pa = $('#btn-sel-paste');
+  if(cp) cp.classList.toggle('off', !(on && gFloat));
+  if(pa) pa.classList.toggle('off', !(on && gSelClip));
   document.querySelectorAll('.etool[data-tool="sel"]').forEach(el => {
     el.classList.toggle('off', !on);
     el.classList.toggle('fe-on', !!state.selWarp);
@@ -6142,20 +6315,6 @@ function selectPalSlot(i){
   // animator-color-palette スキルの正準（選択で塗りツールへ切替）からの意図的な逸脱。
   // 絵コンテはペンで描きながら色だけ拾う頻度が高いため。
 }
-/* パレットの既定の高さ＝**縦3行**（SPEC_16 §5-B5）。セルは aspect-ratio:1 なので
-   実寸は幅から決まる。1個目を測ってから max-height を当てる（列数を変えても崩れない） */
-const PAL_ROWS = 3;
-function fitPaletteRows(palEl){
-  const first = palEl.firstElementChild;
-  if(!first) return;
-  const h = first.getBoundingClientRect().height;
-  if(h <= 0) return;                       // まだ隠れている＝測れない。出たときに measurePalettes が拾う
-  palEl.style.maxHeight = Math.round(h * PAL_ROWS + 3 * (PAL_ROWS - 1) + 2) + 'px';
-}
-/* パネルが開いた/幅が変わったタイミングで測り直す（隠れている間は幅0で測れないため） */
-function measurePalettes(){
-  ['#palette', '#tl-palette'].forEach(pid => { const el = $(pid); if(el) fitPaletteRows(el); });
-}
 function renderPalette(){
   ['#palette', '#tl-palette'].forEach(pid => {
     const palEl = $(pid);
@@ -6169,8 +6328,6 @@ function renderPalette(){
       cell.addEventListener('click', () => selectPalSlot(i));
       palEl.appendChild(cell);
     });
-    fitPaletteRows(palEl);
-    requestAnimationFrame(() => fitPaletteRows(palEl));   // 初回は幅が確定していないことがある
   });
 }
 /* --- HSVスライダー式ピッカー（SPEC_13 §9e） ---
@@ -6879,7 +7036,7 @@ function layoutCamKeys(){
       seg.style.background = info.c;
       seg.textContent = (X(b) - X(a) > 34) ? (c.cam[k].k + '→' + c.cam[k + 1].k + ' ' + info.s) : info.s;
       seg.title = 'C' + (i + 1) + ' ' + c.cam[k].k + '→' + c.cam[k + 1].k +
-                  '：' + info.t + '（クリックで区間まるごと／◆をクリックでそのキーだけ）';
+                  '：' + info.t + '（クリックで区間まるごと／◆をWクリックでそのキーだけ）';
       seg.addEventListener('click', ev => { ev.stopPropagation(); openEaseMenu(ev, i, k); });
       box.appendChild(seg);
     }
@@ -6898,7 +7055,7 @@ function layoutCamKeys(){
                     (state.selCut && state.selCut.i === i && state.selCut.k === k ? ' on' : '');
       d.dataset.k = kf.k;
       d.title = 'C' + (i + 1) + '-' + kf.k + '：' + (f - start) + 'f  ' + keyEaseLabel(c.cam, k) +
-                '\nクリック＝このキーの緩急を選ぶ' +
+                '\nWクリック（Ctrl+クリックでも）＝このキーの緩急を選ぶ' +
                 (k === 0 ? '／右へドラッグ＝動き出しを遅らせる'
                          : (k === n - 1 ? '／左へドラッグ＝早く止める' : '／ドラッグで前後の配分'));
       d.addEventListener('pointerdown', ev => camKeyDown(ev, i, k, d));
@@ -6909,6 +7066,8 @@ function layoutCamKeys(){
 }
 /* ◆のドラッグ。durF を保ったまま lead / dur / tail を付け替える */
 let gKeyDrag = null;
+let gTlPan = null;                // ホイール押しドラッグ中の TIMELINE 横スクロール
+let gKeyTap = null;               // ◆のWクリック判定（前回離した位置と時刻）
 function camKeyDown(ev, i, k, el){
   ev.stopPropagation(); ev.preventDefault();
   const cut = cuts[i];
@@ -6963,9 +7122,24 @@ function camKeyUp(ev){
   const g = gKeyDrag;
   if(!g || (ev && ev.pointerId !== g.id)) return;
   gKeyDrag = null;
-  // **動かさずに離した＝クリック** → そのキーの緩急メニュー（SPEC_16 §5-C6）。
-  // ドラッグ（尺の配分）とは離した時点で切り分ける＝同じ◆に2つの役目を持たせられる
-  if(!g.moved){ if(ev) openKeyEaseMenu(ev, g.i, g.k); return; }
+  // **動かさずに離した＝クリック**。ドラッグ（尺の配分）とは離した時点で切り分ける。
+  // 2026-08-24: 緩急の入口を **Wクリック（と Ctrl+クリック）** に移して COMPOSER と揃えた
+  //   （composer.html の ◆ は単クリック＝選択＋頭出し／Ctrl+クリック・dblclick＝イーズ）。
+  //   pointerdown で preventDefault しているのでネイティブ dblclick は当てにできない
+  //   ＝ここで時刻と距離を見て自前で「2回目」を判定する（指・ペン・マウスすべて同じ経路）
+  if(!g.moved){
+    if(!ev) return;
+    const t = ev.timeStamp || performance.now();
+    const dbl = gKeyTap && gKeyTap.i === g.i && gKeyTap.k === g.k &&
+                (t - gKeyTap.t) < DTAP_MS &&
+                Math.hypot(ev.clientX - gKeyTap.x, ev.clientY - gKeyTap.y) < DTAP_PX;
+    gKeyTap = dbl ? null : { i: g.i, k: g.k, t, x: ev.clientX, y: ev.clientY };
+    if(dbl || ev.ctrlKey || ev.metaKey){ openKeyEaseMenu(ev, g.i, g.k); return; }
+    const cut = cuts[g.i];                       // 単クリック＝そのキーへ頭出し（COMPOSER と同じ）
+    if(cut) seek(clamp(cutStartFrame(g.i) + camStartFrame(cut, g.k),
+                       cutStartFrame(g.i), cutStartFrame(g.i) + Math.max(0, cut.durF - 1)));
+    return;
+  }
   const cut = cuts[g.i];
   const after = { lead: camLead(cut), tail: camTail(cut), durs: cut.cam.map(c => c.dur | 0) };
   const put = s => {
@@ -7631,7 +7805,7 @@ async function exportMP4(){
   // 音を先に作る（失敗しても映像だけで続行する＝書き出しごと落とさない）
   let ab = null;
   if(gAudio){
-    $('#btn-export').textContent = 'MP4 音を準備…';
+    $('#btn-export').textContent = '■ MP4 音を準備…';
     try{
       const r = await renderAudioForExport(T);
       if(r && await canEncodeAac(r.sampleRate, r.numberOfChannels)) ab = r;
@@ -7665,7 +7839,7 @@ async function exportMP4(){
     enc.encode(vf, { keyFrame: f % (FPS * 2) === 0 });
     vf.close();
     if(f % 12 === 0){
-      $('#btn-export').textContent = 'MP4 ' + Math.round(f / T * 100) + '%';
+      $('#btn-export').textContent = '■ MP4 ' + Math.round(f / T * 100) + '%';
       await new Promise(r => setTimeout(r, 0));    // UIを固めない
     }
   }
@@ -7673,7 +7847,7 @@ async function exportMP4(){
   enc.close();
   // --- 音を流し込む（fastStart:'in-memory' なので映像の後にまとめて足してよい） ---
   if(ab && !gExportAbort){
-    $('#btn-export').textContent = 'MP4 音 0%';
+    $('#btn-export').textContent = '■ MP4 音 0%';
     const aenc = new AudioEncoder({
       output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
       error: e => { throw e; }
@@ -7696,7 +7870,7 @@ async function exportMP4(){
       aenc.encode(adata);
       adata.close();
       if((off / CH_LEN) % 40 === 0){
-        $('#btn-export').textContent = 'MP4 音 ' + Math.round(off / total * 100) + '%';
+        $('#btn-export').textContent = '■ MP4 音 ' + Math.round(off / total * 100) + '%';
         await new Promise(r => setTimeout(r, 0));
       }
     }
@@ -7717,7 +7891,9 @@ async function exportVideo(){
   if(await canWebCodecs()){
     gExporting = true; gExportAbort = false;
     $('#btn-export').disabled = false;             // 中断できるように押せるまま
-    $('#btn-export').textContent = 'MP4 0%';
+    $('#btn-export').classList.add('busy');
+    $('#btn-export').title = 'もう一度押すと中断します（Space でも中断）';
+    $('#btn-export').textContent = '■ MP4 0%';
     try{
       const blob = await exportMP4();
       if(blob){
@@ -7730,13 +7906,12 @@ async function exportVideo(){
       console.error('exportMP4 failed', e);
       toast('MP4書き出しに失敗: ' + (e.message || e) + ' → 録画方式に切替えます');
       gExporting = false;
-      $('#btn-export').textContent = 'EXPORT VIDEO';
+      resetExportBtn();
       exportRecord();
       return;
     }
     gExporting = false;
-    $('#btn-export').disabled = false;
-    $('#btn-export').textContent = 'EXPORT VIDEO';
+    resetExportBtn();
     return;
   }
   exportRecord();
@@ -7769,16 +7944,25 @@ function exportRecord(){
   gRec.ondataavailable = e => { if(e.data && e.data.size) gRecChunks.push(e.data); };
   gRec.onstop = saveExportBlob;
   gExporting = true;
-  $('#btn-export').disabled = true;
-  $('#btn-export').textContent = 'REC…（実時間・Spaceで中断）';
+  $('#btn-export').disabled = false;               // ★押せるまま＝もう一度押すと中断
+  $('#btn-export').classList.add('busy');
+  $('#btn-export').title = 'もう一度押すと中断します（Space でも中断）';
+  $('#btn-export').textContent = '■ REC…（実時間）';
   gRec.start(250);
   play();
+}
+function resetExportBtn(){
+  const b = $('#btn-export');
+  if(!b) return;
+  b.disabled = false;
+  b.classList.remove('busy');
+  b.textContent = 'EXPORT VIDEO';
+  b.title = 'MP4で書き出し（読み込んだ音も入ります。WebCodecs対応なら非実時間・未対応なら実時間録画）';
 }
 function finishExport(){
   if(!gExporting && !(gRec && gRec.state === 'recording')) return;
   gExporting = false;
-  $('#btn-export').disabled = false;
-  $('#btn-export').textContent = 'EXPORT VIDEO';
+  resetExportBtn();
   if(gRec && gRec.state !== 'inactive') gRec.stop();
 }
 function cancelExport(){
@@ -7806,7 +7990,11 @@ function gridColsNow(){
   const n = gGridRows.length ? Math.max(...gGridRows.map(r => r.cells.length)) : 0;
   return clamp(n || 4, 1, 8);
 }
+let gCsBusy = false;
 async function exportColorScript(){
+  // **もう一度押す＝中断**（動画と同じ手つき。カット数が多いと数十秒かかるため）
+  if(gCsBusy){ gExportAbort = true; toast('中断します…'); return; }
+  if(gExporting){ toast('動画の書き出し中です'); return; }
   const cells = colorCells();
   if(!cells.length){ toast('カットがありません'); return; }
   const showPal = !!($('#chk-grid-pal') && $('#chk-grid-pal').checked);
@@ -7832,7 +8020,20 @@ async function exportColorScript(){
   const maxF = Math.max(1, ...cells.map(ce => cellFrames(cuts[ce.i], ce.k)));
   const rowW = COLS * CW + (COLS - 1) * GAP;
   let y = MG + 46;
+  const csBtn = $('#btn-export-cs');
+  gCsBusy = true; gExportAbort = false;
+  csBtn.classList.add('busy');
+  csBtn.title = 'もう一度押すと中断します';
+  const csDone = () => {
+    gCsBusy = false;
+    csBtn.classList.remove('busy');
+    csBtn.innerHTML = '&#8681; C.SCRIPT';
+    csBtn.title = 'カラースクリプト一覧をPNGで書き出し（枠単位・4列）';
+  };
   for(let s = 0; s < cells.length; s += COLS){
+    if(gExportAbort){ csDone(); toast('書き出しを中断しました'); return; }
+    csBtn.textContent = '■ C.SCRIPT ' + Math.round(s / cells.length * 100) + '%';
+    await new Promise(r => setTimeout(r, 0));   // ここでUIに息を継がせる＝中断ボタンが押せる
     const row = cells.slice(s, s + COLS);
     const pals = [];
     for(let c = 0; c < row.length; c++){
@@ -7868,7 +8069,9 @@ async function exportColorScript(){
     }
     y += BAR + CH + CAP + PAL + ROWGAP;
   }
+  if(gExportAbort){ csDone(); toast('書き出しを中断しました'); return; }
   const blob = await canvasToBlob(out, 'image/png');
+  csDone();
   downloadBlob(blob, stampName('econte_colorscript', 'png'));
   toast('カラースクリプトを書き出しました（' + COLS + '列・' + W + '×' + H + '・' + Math.round(blob.size / 1024) + 'KB）');
 }
@@ -7888,7 +8091,7 @@ function tlPaintDown(e){
   paintDown(e, tlCv);
 }
 /* --- ショートカット（composer-timeline-kit 準拠・TIMELINEビューで有効） --- */
-const KEYMAP_LS = 'econte_keymap_v1';
+const KEYMAP_LS = 'econte_keymap_v2';   // v2: L を LOOP から SHEETロックへ移した（2026-08-24）
 /* `global:true` は **STUDIO / EDIT のどちらでも効く**（画面切替そのものなので）。
    印の無いものは従来どおり STUDIO でだけ効く。 */
 const SHORTCUT_ACTIONS = [
@@ -7905,7 +8108,9 @@ const SHORTCUT_ACTIONS = [
   { id: 'last',      label: '末尾',                 def: 'End',        prevent: true, run: () => { pause(); seek(totalFrames() - 1); } },
   { id: 'prevCut',   label: '前のカット頭',         def: 'J',          run: () => seekCut(-1) },
   { id: 'nextCut',   label: '次のカット頭',         def: 'K',          run: () => seekCut(1) },
-  { id: 'loop',      label: 'ループ切替',           def: 'L',          run: () => toggleLoop() },
+  // LOOP は常時ONで足りるのでキーは割り当てない（既定 ''）。ボタンはそのまま残す
+  { id: 'loop',      label: 'ループ切替',           def: '',           run: () => toggleLoop() },
+  { id: 'lockCut',   label: 'カットのロック切替（Ctrl+L=全解除）', def: 'L', run: () => toggleLockHere() },
   { id: 'sheet',     label: 'SHEETパネル 開閉',     def: 'S',          run: () => toggleSheetPanel() },
   { id: 'toolMove',  label: 'BOARD: MOVE',          def: 'V',          run: () => setBoardTool('move') },
   { id: 'toolCut',   label: 'BOARD: CUT 16:9',      def: 'C',          run: () => setBoardTool('cut') },
@@ -8419,7 +8624,9 @@ const HELP_GROUPS = [
   { t: 'PAINT（ANIMATOR準拠）', rows: [
     ['B', 'ペン'], ['E', '消しゴム'], ['G', '投げ縄（バケツはありません）'], ['A', 'SEL＝浮いた選択（SINGLE限定）'],
     ['[ / ]', 'ブラシを細く／太く'], ['右ドラッグ', 'ブラシサイズ（右=太く/左=細く）'],
-    ['Alt+クリック', 'スポイト'], ['色帯をクリック', 'その色を拾う'],
+    ['Alt+クリック', 'スポイト（BOARDの MOVE 画面でも効きます。Alt+ドラッグはパンのまま）'],
+    ['現在色をクリック', '画面のどこからでも色を拾う（ブラウザの外も可・Chrome / Edge のみ）'],
+    ['色帯をクリック', 'その色を拾う'],
     ['PEN をWクリック', '筆圧ペン ON/OFF'], ['ERASE をWクリック', '今の描く先をCLEAR'],
     ['LASSO を長押し', '投げ縄の 塗り ⇔ 透明消し（囲った所を消す）'], ['Tab', 'TOOLパネルを左右入替'],
     ['Ctrl+Z', 'UNDO'], ['Ctrl+Shift+Z', 'REDO（Ctrl+Y も可）']
@@ -8435,6 +8642,8 @@ const HELP_GROUPS = [
     ['SEL をWクリック', 'WARP（3×3の格子）ON/OFF。OFFにしても形は残ります'],
     ['Enter / 枠の外をクリック', '確定（Ctrl+Z 1回で持ち上げる前に戻ります）'],
     ['Esc', '取り消し（元の位置へ戻す）'],
+    ['Ctrl+C / COPY', '浮かせている選択を、いまの形（拡縮・回転・WARP込み）でひかえる'],
+    ['Ctrl+V / PASTE', 'ひかえた選択を、いま開いているカットの中央へ置く（別カットへ運べます）'],
     ['焼き込み先', '**いまの描く先**。浮かせたまま line / color を押し替えると行き先が変わります'],
     ['浮いている間', 'サムネ・GRID・書き出しには出ません（確定するまで存在しない）']
   ] },
@@ -8457,7 +8666,8 @@ const HELP_GROUPS = [
     ['CUT でドラッグ', '矩形で絵コンテのコマ化（16:9）'],
     ['＋枠', 'B枠を足す＝T.U./PAN になる（尺は枠ごと＝次の枠までのコマ数）'],
     ['∿ ブレ', '画ブレ（そのカット全体）。頭→尻で強さが変わる＝強めていく／弱めてブレがなくなる'],
-    ['SHEETの 🔒', 'そのカットをBOARDで掴めなくする'],
+    ['SHEETの 🔒 / L', 'そのカットをBOARDで掴めなくする（SHEETで複数選択中はまとめて）'],
+    ['Ctrl+L', 'すべてのカットのロックを解除'],
     ['Delete', '選択中の枠（カット）／写真を削除']
   ] },
   { t: 'TIMELINE', rows: [
@@ -8465,10 +8675,12 @@ const HELP_GROUPS = [
     ['カット境目をドラッグ', '尺を変更（境目の近くはスクラブより優先）'],
     ['クリップをWクリック', '加筆EDITへ'],
     ['◆ をドラッグ', '動き出し／止まりの位置（PAN・T.U.）'],
-    ['◆ をクリック', 'そのキーの緩急（入＝減速 / 出＝加速 / タメ）。AE と同じ持ち方'],
+    ['◆ をクリック', 'そのキーへ頭出し（COMPOSER と同じ）'],
+    ['◆ をWクリック', 'そのキーの緩急（入＝減速 / 出＝加速 / タメ）。Ctrl+クリックでも同じ'],
     ['◆ の形', '菱形=緩急なし ／ 角丸=中 ／ 丸=最大 ／ 灰の四角=タメ（COMPOSER と同じ）'],
     ['区間バーをクリック', '区間まるごとに現場の名前をはめる（クイックPAN・フェアリング等）'],
     ['Alt+ホイール', '時間軸を拡大縮小'], ['ホイール', '拡大中の横スクロール'],
+    ['ホイール押しドラッグ', '拡大中の横スクロール（BOARD の手のひらと同じ手つき）'],
     ['「全体」をクリック', '拡大をリセット'],
     ['帯の上端をドラッグ', 'TIMELINEの高さ（Wクリックで既定へ）'],
     ['FRAME / TIME', 'クリックで直接入力してその位置へ']
@@ -8537,7 +8749,7 @@ function renderHelp(){
     h.textContent = g.t;
     box.appendChild(h);
     const rows = (g.rows === 'keymap')
-      ? SHORTCUT_ACTIONS.map(a => [gKeymap[a.id] || a.def, a.label])
+      ? SHORTCUT_ACTIONS.map(a => [gKeymap[a.id] || a.def, a.label]).filter(r => r[0])
       : g.rows;
     rows.forEach(([k, d]) => {
       const r = document.createElement('div');
@@ -8609,6 +8821,19 @@ function onKey(e){
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){
     e.preventDefault();
     redoActive();
+    return;
+  }
+  // SEL のコピー／ペースト。**EDIT でだけ**見る（STUDIO の Ctrl+V は写真のペースト）
+  if(state.view === 'edit' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey){
+    const kk = e.key.toLowerCase();
+    // 使える状況のときだけ横取りする（浮いていないのに Ctrl+C を潰さない）
+    if(kk === 'c' && gFloat){ e.preventDefault(); selCopy(); return; }
+    if(kk === 'v' && gSelClip){ e.preventDefault(); selPaste(); return; }
+  }
+  // Ctrl+L ＝ 全ロック解除（L 単押し＝いまのカットのロック切替 と対で覚える）
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l' && !e.shiftKey){
+    e.preventDefault();
+    unlockAllCuts();
     return;
   }
   // GRID: Ctrl+↑/↓ = 選択中セルのカットをまとめて並べ替え
@@ -8995,12 +9220,28 @@ function wire(){
   $('#btn-tl-nextcut').addEventListener('click', () => seekCut(1));
   $('#btn-loop').addEventListener('click', toggleLoop);
   $('#burnin-mode').addEventListener('change', renderTL);
-  $('#btn-export').addEventListener('click', exportVideo);
+  // **書き出し中にもう一度押す＝中断**（PC / iPad 共通・2026-08-24）。
+  // 旧: WebCodecs経路は押せるのに exportVideo が黙って return、
+  //     実時間録画は disabled で押せない ＝ どちらも「止める手」が無かった
+  $('#btn-export').addEventListener('click', () => {
+    if(gExporting){ cancelExport(); return; }
+    exportVideo();
+  });
   $('#btn-export-cs').addEventListener('click', exportColorScript);
   const strip = $('#tl-strip');
   // setPointerCapture は使わない（クリップの dblclick=EDIT を殺さないため）。
   // 追従は window の move/up で拾う（gScrub フラグで判定）。
   strip.addEventListener('pointerdown', e => {
+    // ホイール押しドラッグ＝拡大中の横スクロール（BOARD/プレビューの手のひらと同じ手つき）。
+    // **スクラブより先に見る**（中ボタンでプレイヘッドを飛ばさない）
+    if(e.button === 1){
+      e.preventDefault();
+      if(!tlZoomed()){ toast('Alt+ホイールで拡大してから、ホイール押しドラッグで左右に動かせます'); return; }
+      try{ strip.setPointerCapture(e.pointerId); }catch(err){}
+      gTlPan = { id: e.pointerId, sx: e.clientX, start: tlStart() };
+      strip.classList.add('panning');
+      return;
+    }
     if(gClipDrag || gKeyDrag) return;
     if(e.target.classList.contains('tl-clip-h')) return;  // 尺ハンドルはスクラブしない
     if(e.target.closest && e.target.closest('#tl-keys')) return;   // ◆と区間バーもスクラブしない
@@ -9015,8 +9256,22 @@ function wire(){
     gScrub = true;
     stripSeek(e);
   });
-  window.addEventListener('pointermove', e => { if(gScrub && !gClipDrag && !gKeyDrag) stripSeek(e); });
-  window.addEventListener('pointerup', () => { gScrub = false; });
+  window.addEventListener('pointermove', e => {
+    if(gTlPan && e.pointerId === gTlPan.id){
+      e.preventDefault();
+      state.tlView.start = clamp(Math.round(gTlPan.start - (e.clientX - gTlPan.sx) / pxPerFrame()), 0,
+                                 Math.max(0, totalFrames() - tlSpan()));
+      layoutTL(); renderTL();
+      return;
+    }
+    if(gScrub && !gClipDrag && !gKeyDrag) stripSeek(e);
+  });
+  window.addEventListener('pointerup', e => {
+    if(gTlPan && (!e || e.pointerId === gTlPan.id)){ gTlPan = null; strip.classList.remove('panning'); }
+    gScrub = false;
+  });
+  window.addEventListener('pointercancel', () => { if(gTlPan){ gTlPan = null; strip.classList.remove('panning'); } });
+  strip.addEventListener('auxclick', e => { if(e.button === 1) e.preventDefault(); });
   // 尺ドラッグは帯からも始まる（ハンドル側の setPointerCapture でも window までは届く）
   window.addEventListener('pointermove', clipDragMove);
   window.addEventListener('pointerup', clipDragEnd);
@@ -9089,6 +9344,8 @@ function wire(){
   }, { passive: false });
   // TIMELINE ミニツールバー（既定は隠し。開閉は gUi.tools に覚える）
   $('#tl-brush').addEventListener('input', e => setBrush(+e.target.value));
+  $('#btn-sel-copy').addEventListener('click', selCopy);
+  $('#btn-sel-paste').addEventListener('click', selPaste);
   $('#btn-tl-tools-hide').addEventListener('click', () => { gUi.tools = false; applyUi(); saveUi(); });
   $('#btn-tl-tools').addEventListener('click', () => { gUi.tools = true; applyUi(); saveUi(); });
   tlCv.addEventListener('pointerdown', tlPaintDown);
@@ -9158,7 +9415,6 @@ function wire(){
   const relayout = () => {
     applyTlHeight();   // 画面が低くなったら帯の上限も下がる
     applyCurHeight();
-    measurePalettes();  // パレットは幅で1セルの大きさが変わる（§5-B5 の縦3行を保つ）
     if($('#help-ovl').classList.contains('on')) fitHelpBody();
     if(state.view === 'studio') layoutStudio();
     else if(gEditMode === 'grid') renderGrid();
@@ -9234,7 +9490,7 @@ window.__ECONTE__ = {
   get paint(){ return { colorAlpha: gPaint.colorAlpha, colorBlend: gPaint.colorBlend }; },
   setColorBlend, setColorAlpha,
   setSelCells, selCellsResolved, cellCaptionClick, moveSelCuts, moveSelCutsEnd,
-  bindMiddlePan, tlZoomView, tlViewReset, applyTlView, measurePalettes, drawTakeoverGuide, penUiBlocked,
+  bindMiddlePan, tlZoomView, tlViewReset, applyTlView, drawTakeoverGuide, penUiBlocked,
   get selCells(){ return gSelCells.slice(); },
   brushMax, isTextEntry, inGrid, inPaintView, pushPaintLog, colorUndo, colorRedo,
   onDoubleActivate, onLongPress, bindSizeDrag, sizeDragMove, sizeDragEnd, pressFactor,
