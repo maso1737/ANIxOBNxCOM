@@ -371,7 +371,8 @@ body.ui-big #cam-expand-label input[type=range]{width:78px}
 .pal-btns .btn{padding:4px 8px;font-size:10px}
 .bg-presets{display:flex;gap:4px;margin-top:5px}
 #edit-stage{
-  flex:1;display:flex;align-items:center;justify-content:center;min-width:0;overflow:hidden;
+  /* position:relative は .stage-toast の錨（2026-08-24・SPEC_17 §2-4） */
+  flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-width:0;overflow:hidden;
   background:radial-gradient(ellipse 60% 60% at 50% 40%,rgba(184,80,255,0.07),transparent 70%);
 }
 #edit-cv{background:#888;box-shadow:0 0 30px rgba(0,0,0,.6);touch-action:none;cursor:crosshair;flex:none}
@@ -515,6 +516,17 @@ body.ui-big #cam-expand-label input[type=range]{width:78px}
 #tl-time{color:var(--gold);font-size:11px;letter-spacing:.08em}
 #burnin-label{color:var(--grey);font-size:10px;font-family:var(--jp);display:flex;align-items:center;gap:5px;cursor:pointer}
 #burnin-mode{background:var(--black);border:1px solid var(--border);color:var(--gold);font-family:var(--mono);font-size:9px;padding:3px 2px}
+/* モード切替の一瞬の告知（SPEC_17 §2-4。キー操作はボタンが視界の外なので、
+   これが無いと効いたか分からない）。見た目は ANIMATOR の #stage-toast と同じ。
+   econte はステージが2つあるので class で持ち、出ているほうへ出す */
+.stage-toast{
+  position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  padding:5px 12px;
+  background:rgba(10,4,24,.86);border:1px solid rgba(255,79,168,.45);
+  color:var(--acid);font-family:var(--jp);font-size:10px;letter-spacing:.16em;white-space:nowrap;
+  pointer-events:none;z-index:30;opacity:0;transition:opacity .18s;
+}
+.stage-toast.show{opacity:1}
 #tl-strip{position:relative;height:66px;touch-action:none;-webkit-user-select:none;user-select:none;margin-bottom:6px}
 #tl-strip.panning{cursor:grabbing}
 #tl-ruler-cv{position:absolute;left:0;top:0;width:100%;height:18px;display:block}
@@ -840,6 +852,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
     <div id="studio-center">
       <div id="tl-stage">
         <canvas id="tl-cv" width="1280" height="720"></canvas>
+        <div class="stage-toast"></div>
         <div id="tl-empty">カットがありません（BOARDで矩形ドラッグ、または右パネルで空コマ追加）</div>
         <!-- 横並び1行のミニツール。HSB/パレットは置かない（Alt＝スポイト・指は長押しでスポイト）。
              左右入替は Tab。既定は隠し（gUi.tools）＝絵を隠さない -->
@@ -1078,7 +1091,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
       </div>
       <!-- HISTORY（UNDO/REDO ボタン）は置かない。Ctrl+Z / 2本指タップ=UNDO・3本指タップ=REDO で足りる -->
     </div>
-    <div id="edit-stage"><canvas id="edit-cv" width="1280" height="720"></canvas></div>
+    <div id="edit-stage"><canvas id="edit-cv" width="1280" height="720"></canvas><div class="stage-toast"></div></div>
     <div id="edit-grid"><div id="grid-wrap"></div><div id="grid-empty">カットがありません</div></div>
   </div>
 </div>
@@ -1263,6 +1276,18 @@ function stampName(base, ext){
 
 /* ---------------- toast / modal ---------------- */
 let toastTimer = 0;
+/* ステージ上部の短い告知（SPEC_17 §2-4）。**モード切替は原則すべてここを通す**。
+   ステージが見えていないとき（設定モーダル等）は素直に下の toast へ落とす。 */
+let gStageToastT = null;
+function stageToast(msg){
+  const host = (state.view === 'edit') ? $('#edit-stage') : $('#tl-stage');
+  const el = host && host.querySelector('.stage-toast');
+  if(!el || !host.offsetParent){ toast(msg); return; }
+  el.textContent = msg;
+  el.classList.add('show');
+  if(gStageToastT) clearTimeout(gStageToastT);
+  gStageToastT = setTimeout(() => { el.classList.remove('show'); gStageToastT = null; }, 900);
+}
 function toast(msg){
   const t = $('#toast');
   t.textContent = msg;
@@ -4657,6 +4682,7 @@ function renderGrid(){
       cv.width = GC_MIN_RES; cv.height = Math.round(GC_MIN_RES * 9 / 16);
       cv.dataset.ci = ce.i; cv.dataset.ck = ce.k;
       cv.addEventListener('pointerdown', e => gridPaintDown(e, cv));
+      cv.addEventListener('dblclick', e => { if(gLasso && gLasso.poly){ e.preventDefault(); lassoEnd(); } });
       cv.addEventListener('pointermove', paintMove);
       cv.addEventListener('pointerup', paintUp);
       cv.addEventListener('pointercancel', paintUp);
@@ -5307,7 +5333,42 @@ function openEdit(i){
   setEditMode('single', true);   // ✎/ダブルクリックで開いたら必ず単票表示
   setView('edit');
 }
+/* --- ボタン／キーで共有するモード切替（SPEC_17 §2-2 の econte 版） -----------
+   ★ここに書いたものを **ボタン（Wクリック/長押し）とキー（2連打/長押し/Shift）の両方**が呼ぶ。
+     どちらか一方にしか無い挙動を作らない。 */
+function togglePressurePen(){
+  state.pressurePen = !state.pressurePen;
+  document.querySelectorAll('.etool[data-tool="pen"]').forEach(b => b.classList.toggle('pp-on', state.pressurePen));
+  stageToast('筆圧ペン ' + (state.pressurePen ? 'ON' : 'OFF'));
+}
+function eraseClearHere(){
+  setETool('eraser');
+  clearDraw();
+  stageToast(state.paintTarget === 'color' ? '色を消しました' : '加筆を消しました');
+}
+/* --- FILL は econte だけの意図的な逸脱（SPEC_16 §5-B2 / §5-B3）------------
+   **初めから投げ縄。バケツは持たない**（ラフとスピード優先の道具なので、迷う状態を1つ減らす）。
+   ＝ANIMATOR の「2連打＝投げ縄塗り ⇔ バケツ」に当たる相手が居ないので、
+     **G の2連打には何も割り当てない**。塗り ⇄ 透明消しは 長押し と Shift+G（SPEC_17 §3）。
+   ANIMATOR は animator-brush-ops スキルの正準のまま（あちらは変えない）。 */
+function applyFillModeUI(){
+  document.querySelectorAll('.etool[data-tool="fill"]').forEach(b => {
+    b.classList.add('lasso-on');                       // 常に投げ縄なので点きっぱなし
+    b.classList.toggle('fe-on', state.fillErase);      // 透明消しのときだけ水色の丸（§5-E）
+    b.textContent = state.fillErase ? 'L-DEL' : 'LASSO';
+    b.title = '投げ縄 (G)：' + (state.fillErase ? '透明消し' : '塗り')
+            + '\n長押し／G長押し／Shift+G で 塗り ⇄ 透明消し（バケツはありません）'
+            + '\nドラッグで囲う＝フリーハンド ／ クリックで始める＝多角形（Enterで確定・Escで取消）';
+  });
+}
+function fillToggleLassoErase(){
+  state.fillErase = !state.fillErase;
+  setETool('fill');
+  applyFillModeUI();
+  stageToast('投げ縄 ' + (state.fillErase ? '透明消し' : '塗り'));
+}
 function setETool(t){
+  if(gLasso && gLasso.poly) lassoCancel();   // 囲い途中はツールを変えたら捨てる（SPEC_17 §2-3）
   if(gFloat && t !== 'sel') floatCommit();   // ツールを変えたら確定（SPEC_15 P2-3）
   state.etool = t;
   // [data-tool] に限定する（描く先ボタン [data-target] を巻き込まないため）
@@ -5585,6 +5646,42 @@ function lassoFillPolygon(ctx, W, H, pts, hex, erase){
 let gLasso = null;
 /* sel = 浮いた選択（SPEC_15 P2）。同じ投げ縄の頂点収集を使い、**離したときの行き先だけ**
    変える（塗る → 持ち上げる）。mode = {src:'line'|'color'|'base', copy:bool} */
+/* --- 囲い方は2通り（SPEC_17 §2-3。正準は animator.html） --------------------
+   ドラッグで始める … フリーハンド。離した所で確定（従来）
+   クリックで始める … 多角形。クリックのたびに頂点、次の一辺はラバーバンドで見せる
+   確定は Enter / 始点をクリック / Wクリック の3通り。Esc でいつでも捨てられる。
+   ★Alt+クリックは使わない（スポイトの正準割り当てと衝突する）。
+     「クリックで始めたら多角形」なら修飾キーが1つも要らない。 */
+const LASSO_DRAG_PX = 6;    // これ以上動いたら「ドラッグ」＝フリーハンド確定
+const LASSO_CLOSE_PX = 14;  // 始点に吸い付いて閉じる距離（画面px）
+function lassoPolyBegin(){
+  if(!gLasso) return;
+  gLasso.poly = true;
+  gLasso.hover = null;
+  lassoPreview();
+  stageToast('多角形 投げ縄：クリックで頂点／Enterで確定');
+}
+function lassoPolyClick(cx, cy){
+  if(!gLasso) return;
+  const first = gLasso.scr[0];
+  // 始点との距離は**画面px**で測る（ズームしても指の感覚が変わらない）
+  if(first && gLasso.scr.length >= 3 && Math.hypot(cx - first.cx, cy - first.cy) < LASSO_CLOSE_PX){
+    lassoEnd();
+    return;
+  }
+  const last = gLasso.scr[gLasso.scr.length - 1];
+  if(last && Math.hypot(cx - last.cx, cy - last.cy) < 2) return;   // Wクリックの2発目を重ねない
+  gLasso.scr.push({ cx, cy });
+  lassoPreview();
+}
+/* 塗らずに捨てる（Esc / ツール切替 / 別の面へ移った）。**Undoも積まない** */
+function lassoCancel(){
+  if(!gLasso) return;
+  const poly = gLasso.poly;
+  gLasso = null;
+  renderPaintViews();
+  if(poly) stageToast('投げ縄 取消');
+}
 function lassoBegin(e, cv, sel){
   const cut = cuts[state.curCut];
   if(!cut) return false;
@@ -5595,7 +5692,9 @@ function lassoBegin(e, cv, sel){
   }
   try{ cv.setPointerCapture(e.pointerId); }catch(err){}
   gLasso = { cv, cut, grid: !!(cv.classList && cv.classList.contains('gc-cv')), scr: [],
-             sel: !!sel, mode: sel || null };
+             sel: !!sel, mode: sel || null,
+             poly: false, moved: false, hover: null,
+             down: { cx: e.clientX, cy: e.clientY } };
   lassoAdd(e.clientX, e.clientY);
   return true;
 }
@@ -5606,27 +5705,42 @@ function lassoAdd(cx, cy){
   gLasso.scr.push({ cx, cy });
   lassoPreview();
 }
-/* 画面座標の多角形 → そのキャンバス内部座標（輪郭のプレビュー用） */
-function lassoScreenPts(cv){
-  const r = cv.getBoundingClientRect();
-  return gLasso.scr.map(p => ({ x: (p.cx - r.left) / r.width * cv.width,
-                                y: (p.cy - r.top) / r.height * cv.height }));
-}
 function lassoPreview(){
-  if(!gLasso || gLasso.scr.length < 2) return;
+  // 多角形は1点目から見せる（打った印が出ないと「入ったのか」が分からない）
+  if(!gLasso || gLasso.scr.length < (gLasso.poly ? 1 : 2)) return;
   if(gLasso.grid) drawCell(lassoCellOf(gLasso.cv));   // 下地を戻してから輪郭を重ねる（表示のみ）
   else renderPaintViews();
   const ctx = ctx2d(gLasso.cv);
-  const pts = lassoScreenPts(gLasso.cv);
+  const cv = gLasso.cv, r = cv.getBoundingClientRect();
+  const toCv = q => ({ x: (q.cx - r.left) / r.width * cv.width,
+                       y: (q.cy - r.top) / r.height * cv.height });
+  const pts = gLasso.scr.map(toCv);
+  const lw = Math.max(1, cv.width / 400);
   ctx.save();
   ctx.strokeStyle = 'rgba(255,79,168,0.95)';
-  ctx.lineWidth = Math.max(1, gLasso.cv.width / 400);
+  ctx.lineWidth = lw;
+  ctx.lineJoin = 'round';
   ctx.setLineDash([8, 5]);
   ctx.beginPath();
   ctx.moveTo(pts[0].x, pts[0].y);
   for(let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-  ctx.closePath();
+  if(gLasso.poly && gLasso.hover){                       // 次の一辺（ラバーバンド）
+    const h = toCv(gLasso.hover);
+    ctx.lineTo(h.x, h.y);
+  }
+  ctx.closePath();                                       // 始点へ繋いで「囲い」を明示
   ctx.stroke();
+  if(gLasso.poly){
+    // 打った頂点を点で見せる。**始点だけ大きく**＝「ここを押せば閉じる」
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,79,168,0.95)';
+    const rad = Math.max(2, lw * 2.2);
+    pts.forEach((q, i) => {
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, i === 0 ? rad * 1.8 : rad, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
   ctx.restore();
 }
 function lassoCellOf(cv){
@@ -6612,6 +6726,11 @@ function paintDown(e, cv){
     eyedropAt(e.clientX, e.clientY, cv);
     return;
   }
+  // --- 多角形の投げ縄が進行中なら、まず頂点を打つ（SPEC_17 §2-3）---
+  if(gLasso && gLasso.poly){
+    if(cv === gLasso.cv){ lassoPolyClick(e.clientX, e.clientY); return; }
+    lassoCancel();                    // 別の面（別セル等）へ移ったら捨てて、ふつうの処理へ
+  }
   // --- 浮いた選択が居るあいだは、まずそちらの操作として読む（SPEC_15 P2-3）---
   if(gFloat){
     if(cv === editCv && gFloat.cut === cuts[state.curCut]){
@@ -6649,7 +6768,20 @@ function paintMove(e){
     renderPaintViewsSoon();   // 紙が大判だと合成が重いので60Hzに間引く（離したとき同期で描き直す）
     return;
   }
-  if(gLasso){ lassoAdd(e.clientX, e.clientY); return; }
+  if(gLasso){
+    if(gLasso.poly){                  // 押していなくても次の一辺を引いて見せる
+      gLasso.hover = { cx: e.clientX, cy: e.clientY };
+      lassoPreview();
+      return;
+    }
+    // 押した所から少しでも動いたら「ドラッグ」＝フリーハンド確定
+    if(!gLasso.moved && gLasso.down &&
+       Math.hypot(e.clientX - gLasso.down.cx, e.clientY - gLasso.down.cy) > LASSO_DRAG_PX){
+      gLasso.moved = true;
+    }
+    lassoAdd(e.clientX, e.clientY);
+    return;
+  }
   if(!stroking || !paintCv) return;
   const p = toBakeCoord(e.clientX, e.clientY, paintCv);
   gStrokePress = pressFactor(e);
@@ -6659,7 +6791,12 @@ function paintMove(e){
 }
 function paintUp(){
   if(gFloat && gFloat.drag){ gFloat.drag = null; paintCv = null; renderPaintViews(); return; }
-  if(gLasso){ lassoEnd(); paintCv = null; return; }
+  if(gLasso){
+    if(gLasso.poly){ paintCv = null; return; }        // 多角形モード中の離しは無視
+    // 動かさずに離した＝クリックで始めた → 多角形モードへ（塗らない・持ち上げない）
+    if(!gLasso.moved){ lassoPolyBegin(); paintCv = null; return; }
+    lassoEnd(); paintCv = null; return;
+  }
   paintCv = null;
   if(!stroking) return;
   stroking = false;
@@ -8676,13 +8813,21 @@ function bindDoubleTap(el, fn){
 const HELP_GROUPS = [
   { t: 'TRANSPORT / 表示（STUDIO）', rows: 'keymap' },   // SHORTCUT_ACTIONS から自動生成＝再割当も反映される
   { t: 'PAINT（ANIMATOR準拠）', rows: [
-    ['B', 'ペン'], ['E', '消しゴム'], ['G', '投げ縄（バケツはありません）'], ['A', 'SEL＝浮いた選択（SINGLE限定）'],
+    ['B / P', 'ペン（P は ANIMATOR 合わせ）'], ['E', '消しゴム'],
+    ['G', '投げ縄（バケツはありません）'], ['A', 'SEL＝浮いた選択（SINGLE限定）'],
+    ['キーの2連打', 'そのツールのボタンをWクリックしたのと同じ（B/P=筆圧・E=いまの描く先をCLEAR・A=WARP）'],
+    ['G 長押し / Shift+G', '投げ縄の 塗り ⇄ 透明消し（Gの2連打には何も割り当てていません）'],
+    ['キーを押しっぱなし→離す', '押している間だけそのツール／離すと元へ戻る（B/P・E・G）'],
     ['[ / ]', 'ブラシを細く／太く'], ['右ドラッグ', 'ブラシサイズ（右=太く/左=細く）'],
     ['Alt+クリック', 'スポイト（BOARDの MOVE 画面でも効きます。Alt+ドラッグはパンのまま）'],
     ['現在色をクリック', '画面のどこからでも色を拾う（ブラウザの外も可・Chrome / Edge のみ）'],
     ['色帯をクリック', 'その色を拾う'],
     ['PEN をWクリック', '筆圧ペン ON/OFF'], ['ERASE をWクリック', '今の描く先をCLEAR'],
-    ['LASSO を長押し', '投げ縄の 塗り ⇔ 透明消し（囲った所を消す）'], ['Tab', 'TOOLパネルを左右入替'],
+    ['LASSO を長押し', '投げ縄の 塗り ⇔ 透明消し（囲った所を消す）'],
+    ['ドラッグで囲う', 'フリーハンド。離した所で確定'],
+    ['クリックで始める', '多角形。クリックのたびに頂点／Enter・始点クリック・Wクリックで確定'],
+    ['Esc', '囲いを捨てる（塗らない・Undoも積まない）'],
+    ['Tab', 'TOOLパネルを左右入替'],
     ['Ctrl+Z', 'UNDO'], ['Ctrl+Shift+Z', 'REDO（Ctrl+Y も可）']
   ] },
   { t: 'SEL＝浮いた選択（軽いフォトバッシュ・SINGLE限定）', rows: [
@@ -8846,6 +8991,85 @@ function toggleHelp(force){
   if(on) renderHelp();
 }
 
+/* ---------------- ツールキーの押し方（SPEC_17 §2-1・正準は animator.html） ----
+   単押し   … そのツールを選択（従来どおり。**遅らせない**）
+   2連打    … そのツールボタンの Wクリックと同じ
+   長押し   … そのツールボタンの長押しと同じ
+   Shift+   … 長押しと同じ動作へ待ち時間ゼロで直行
+   押しっぱなし→離す … 押している間だけそのツール／離すと元へ戻る（バネ）
+
+   ★econte のペイントキーは再割当できない（B/E/G/A 固定）ので、
+     表はキー名ではなく **ツールid** で持ち、キー→id の対応表を別に置く。
+     再割当を入れるときは PAINT_KEYS を keymap 参照に差し替えるだけで済む。 */
+const KEY_DBL_MS = 320;     // 2連打とみなす間隔（ANIMATOR と同値）
+const KEY_HOLD_MS = 500;    // 長押し成立（ボタンの onLongPress と同じ）
+const KEY_SPRING_MS = 250;  // これ以上押し続けてから離すと、元のツールへ戻る
+/* ★`P` は ANIMATOR 側の PEN キー。econte は昔から `B` なので **両方効かせる**
+   （手が覚え直しにならないのが SPEC_17 の目的なので、片方を取り上げない）。
+   `P` は econte の他のショートカットと衝突していない */
+const PAINT_KEYS = { b: 'pen', p: 'pen', e: 'eraser', g: 'fill', a: 'sel' };
+const KEY_GESTURES = {
+  // fill: ★econte は **FILL廃止で常時投げ縄**（SPEC_16 §5-B2）＝ANIMATOR の
+  //   「2連打＝投げ縄塗り ⇔ バケツ」に当たる相手が居ない。**dbl は持たせない**
+  //   （空振りする押し方を作らない）。塗り ⇄ 透明消しは長押しと Shift+G。
+  fill:   { hold: fillToggleLassoErase, shift: fillToggleLassoErase, spring: true },
+  pen:    { dbl: togglePressurePen, spring: true },
+  // ★ANIMATOR は erase に dbl を登録しない（あちらのボタンが click の時刻差で
+  //   全消去を見ているので二重発火するため）。econte のボタンは onDoubleActivate
+  //   ＝ネイティブ dblclick なので、キー2連打では発火しない＝ここに置いてよい。
+  eraser: { dbl: eraseClearHere, spring: true },
+  sel:    { dbl: toggleSelWarp },
+};
+let gKeyGestId = '', gKeyGestT = 0, gKeyGestTimer = null;
+let gSpringKey = '', gSpringFrom = '', gSpringT = 0;
+function keyGestureClearTimer(){
+  if(gKeyGestTimer){ clearTimeout(gKeyGestTimer); gKeyGestTimer = null; }
+}
+/* 単押しの中身（ツール選択）。SEL だけ SINGLE 限定の言い訳を持つ */
+function paintKeyRun(id){
+  if(id === 'sel' && !inSingle()){ toast('SEL（浮いた選択）は SINGLE だけで使えます'); return; }
+  setETool(id);
+}
+function keyGestureDown(id, e){
+  const g = KEY_GESTURES[id];
+  if(!g){ paintKeyRun(id); return; }
+  if(e.repeat) return;                 // ★オートリピートを連打・再実行にしない
+  if(e.shiftKey && g.shift){ keyGestureClearTimer(); gKeyGestT = 0; g.shift(); return; }
+  const now = performance.now();
+  const dbl = (gKeyGestId === id) && (now - gKeyGestT < KEY_DBL_MS);
+  keyGestureClearTimer();
+  gKeyGestId = id; gKeyGestT = now;
+  if(dbl && g.dbl){
+    gKeyGestT = 0;                     // 3連打が2連打の続きにならないように
+    g.dbl();
+    return;
+  }
+  if(g.spring){ gSpringKey = id; gSpringFrom = state.etool; gSpringT = now; }
+  paintKeyRun(id);                     // 単押し＝従来の動作（**遅らせない**）
+  if(g.hold){
+    gKeyGestTimer = setTimeout(() => {
+      gKeyGestTimer = null;
+      gKeyGestT = 0;                   // 長押し成立後は2連打扱いしない
+      g.hold();
+    }, KEY_HOLD_MS);
+  }
+}
+/* 離したとき: 長押しタイマーを消す＋バネ式の戻り */
+function keyGestureUp(e){
+  keyGestureClearTimer();
+  const id = e && PAINT_KEYS[(e.key || '').toLowerCase()];
+  if(!gSpringKey || !id || id !== gSpringKey) return;
+  const held = performance.now() - gSpringT;
+  const from = gSpringFrom;
+  gSpringKey = ''; gSpringFrom = '';
+  // 短く押しただけ＝ふつうのツール切替として残す。長く押していたら戻す
+  if(held >= KEY_SPRING_MS && from && from !== state.etool){
+    setETool(from);
+    stageToast(from.toUpperCase() + ' へ戻りました');
+  }
+}
+function keyGestureReset(){ keyGestureClearTimer(); gSpringKey = ''; gSpringFrom = ''; }
+
 /* ---------------- keyboard ---------------- */
 /* 文字入力中かどうか。**range/checkbox/select は「入力中」に含めない** —
    ブラシスライダーを触った直後に Ctrl+Z が効かなくなる原因になるため（2026-08-02 の不具合） */
@@ -8868,7 +9092,13 @@ function onKey(e){
     return;
   }
   if(e.key === '?' || (e.key === '/' && e.shiftKey)){ e.preventDefault(); toggleHelp(true); return; }
-  // 浮いた選択（SPEC_15 P2-3）: Enter=確定 / Esc=取り消し。**他の何よりも先に見る**
+  // 多角形の投げ縄が進行中なら **何よりも先**（SPEC_17 §2-3）。
+  // Enter=確定 / Esc=捨てる（塗らない・Undoも積まない）
+  if(gLasso && gLasso.poly){
+    if(e.key === 'Escape'){ e.preventDefault(); lassoCancel(); return; }
+    if(e.key === 'Enter'){ e.preventDefault(); lassoEnd(); return; }
+  }
+  // 浮いた選択（SPEC_15 P2-3）: Enter=確定 / Esc=取り消し
   if(gFloat){
     if(e.key === 'Escape'){ e.preventDefault(); floatCancel(); return; }
     if(e.key === 'Enter'){ e.preventDefault(); floatCommit(); return; }
@@ -8985,17 +9215,13 @@ function onKey(e){
   }
   // ペイント系は STUDIO / EDIT 両方で有効。**修飾キー付きは除く**
   // （Ctrl+A が黙って SEL に切り替わっていた。2026-08-24 に GRID の Ctrl+A を足して露見）
+  // ただし Shift は通す ＝ Shift+G（投げ縄透明消しへ直行）が死なないように（SPEC_17 §2-1）
   if(e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
-  if(k === 'b') setETool('pen');
-  else if(k === 'e') setETool('eraser');
-  else if(k === 'g') setETool('fill');
-  // SEL は SINGLE 限定。他の画面では黙って切り替えず、なぜ効かないかを言う
-  else if(k === 'a'){
-    if(inSingle()) setETool('sel');
-    else toast('SEL（浮いた選択）は SINGLE だけで使えます');
-  }
-  else if(k === '['){ setBrush(state.brush - Math.max(1, Math.round(state.brush * 0.2))); }
+  const tool = PAINT_KEYS[k];
+  if(tool){ keyGestureDown(tool, e); return; }
+  if(e.shiftKey) return;                    // 以下は Shift 無しのときだけ
+  if(k === '['){ setBrush(state.brush - Math.max(1, Math.round(state.brush * 0.2))); }
   else if(k === ']'){ setBrush(state.brush + Math.max(1, Math.round(state.brush * 0.2))); }
 }
 
@@ -9198,41 +9424,15 @@ function wire(){
   document.querySelectorAll('.etool[data-baseover]').forEach(el => {
     el.addEventListener('click', () => setBaseOver(el.dataset.baseover === '1'));
   });
-  // ANIMATOR準拠: PEN Wクリック=筆圧 / ERASE Wクリック=CLEAR / FILL Wクリック=投げ縄塗り・長押し=投げ縄透明消し
-  document.querySelectorAll('.etool[data-tool="pen"]').forEach(el => onDoubleActivate(el, () => {
-    state.pressurePen = !state.pressurePen;
-    document.querySelectorAll('.etool[data-tool="pen"]').forEach(b => b.classList.toggle('pp-on', state.pressurePen));
-    toast('筆圧ペン: ' + (state.pressurePen ? 'ON' : 'OFF'));
-  }));
-  document.querySelectorAll('.etool[data-tool="eraser"]').forEach(el => onDoubleActivate(el, () => {
-    setETool('eraser');
-    clearDraw();
-    toast(state.paintTarget === 'color' ? '色を消しました' : '加筆を消しました');
-  }));
-  // --- FILL は econte だけの意図的な逸脱（SPEC_16 §5-B2 / §5-B3）------------
-  // **初めから投げ縄塗り。Wクリックの切替は無し**（ラフとスピード優先の道具なので、
-  // バケツを持たない＝迷う状態を1つ減らす）。長押しで「塗り ⇄ 透明消し」の2状態だけ。
-  // ANIMATOR は animator-brush-ops スキルの正準のまま（あちらは変えない）
-  const syncFillUI = () => {
-    document.querySelectorAll('.etool[data-tool="fill"]').forEach(b => {
-      b.classList.add('lasso-on');                       // 常に投げ縄なので点きっぱなし
-      b.classList.toggle('fe-on', state.fillErase);      // 透明消しのときだけ赤く（§5-B3）
-      b.textContent = state.fillErase ? 'L-DEL' : 'LASSO';
-      b.title = '投げ縄 (G)：' + (state.fillErase ? '透明消し' : '塗り')
-              + ' ／ 長押しで切替（バケツはありません）';
-    });
-  };
+  // ANIMATOR準拠（SPEC_17）: ボタンの Wクリック / 長押しは **キー側と同じ関数**を呼ぶ
+  document.querySelectorAll('.etool[data-tool="pen"]').forEach(el => onDoubleActivate(el, togglePressurePen));
+  document.querySelectorAll('.etool[data-tool="eraser"]').forEach(el => onDoubleActivate(el, eraseClearHere));
   // SEL のWクリック = WARP（3×3の格子変形）ON/OFF。
   // **OFF にしても形はそのまま残す**（点が消えるだけ）。消えたら作業が飛ぶので
   document.querySelectorAll('.etool[data-tool="sel"]').forEach(el => onDoubleActivate(el, toggleSelWarp));
-  document.querySelectorAll('.etool[data-tool="fill"]').forEach(el => onLongPress(el, () => {
-    state.fillErase = !state.fillErase;
-    setETool('fill');
-    syncFillUI();
+  document.querySelectorAll('.etool[data-tool="fill"]').forEach(el => onLongPress(el, fillToggleLassoErase));
+  applyFillModeUI();
   syncSelToolUI();     // SEL/WARP のラベルと有効・無効を最初から合わせる
-    toast('投げ縄: ' + (state.fillErase ? '透明消し' : '塗り'));
-  }));
-  syncFillUI();
   // §5-B4: **スライダーのスクラブはペンで受けない**（描こうとして値が動く事故を止める）。
   // ボタンや入力欄は塞がない（塞ぐとペンだけでは何も操作できなくなる）
   document.addEventListener('pointerdown', e => {
@@ -9276,6 +9476,10 @@ function wire(){
     if(e.pointerType === 'touch'){ editTouchUp(e); return; }
     paintUp();
   });
+  // 多角形モード中の Wクリック → その場で確定（Enterと同じ・SPEC_17 §2-3）
+  [editCv, tlCv].forEach(cv => cv.addEventListener('dblclick', e => {
+    if(gLasso && gLasso.poly){ e.preventDefault(); lassoEnd(); }
+  }));
   $('#edit-stage').addEventListener('wheel', e => {
     e.preventDefault();
     editZoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015));
@@ -9501,6 +9705,8 @@ function wire(){
   window.addEventListener('pointercancel', tapUp, true);
   // keyboard
   window.addEventListener('keydown', onKey);
+  window.addEventListener('keyup', keyGestureUp);      // 長押しタイマー消し＋バネの戻り
+  window.addEventListener('blur', keyGestureReset);
   // カーソル位置を覚えておく（@ でどのペインを最大化するかの判定に使う）
   window.addEventListener('pointermove', e => { gPointer.x = e.clientX; gPointer.y = e.clientY; }, true);
   // 指の長押しスポイト（EDIT / STUDIOプレビュー。GRIDセルは renderGrid 側で張る）
