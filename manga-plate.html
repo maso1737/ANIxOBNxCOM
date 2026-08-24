@@ -41,7 +41,6 @@ body.swap #side{border-right:1px solid rgba(255,210,122,.18);border-left:0}
 /* ---- topbar ---- */
 #topbar{grid-area:top;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--panel-2);
   border-bottom:1px solid rgba(255,210,122,.18);font-size:10px;letter-spacing:.3em;text-transform:uppercase}
-#topbar .t-id{color:var(--gold);white-space:nowrap}
 #topbar .t-title{font-family:var(--disp);font-style:italic;font-weight:900;font-size:19px;letter-spacing:.06em;white-space:nowrap;
   background:linear-gradient(120deg,#FFE9B0,#FFD27A 26%,#FF4FA8 62%,#B58EFF 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
 #topbar .t-sp{flex:1}
@@ -53,7 +52,6 @@ body.swap #side{border-right:1px solid rgba(255,210,122,.18);border-left:0}
 #topbar .btn .sm{display:none}
 /* 幅が足りないときは、左の識別表示 → ラベル短縮 の順に畳む。ボタン自体は最後まで残す
    （iPad縦 768px でも HOME まで届くこと） */
-@media (max-width:1180px){#topbar .t-id{display:none}}
 @media (max-width:980px){#topbar .t-title{font-size:15px}#topbar .t-lb{display:none}#book-title{width:88px}}
 @media (max-width:880px){#topbar .btn .lg{display:none}#topbar .btn .sm{display:inline}
   #topbar{gap:8px;padding:0 10px}#topbar .t-gap{width:2px}}
@@ -73,9 +71,9 @@ body.swap #side{border-right:1px solid rgba(255,210,122,.18);border-left:0}
 .tool:hover{background:rgba(255,79,168,.12)}
 .tool.on{background:var(--grad-btn);border-color:transparent;color:#fff;box-shadow:0 0 14px rgba(255,79,168,.55)}
 .rail-sep{width:24px;height:1px;background:rgba(255,210,122,.25);flex:none;margin:3px 0}
-/* レール最上段の小さい黄色ボタン（左右入替・全画面）。ツールより一回り小さくして道具と区別する */
+/* レール最上段の小さい黄色ボタン（左右入替）。高さはツールより低く・幅はツール幅に合わせた横長 */
 .railtop{display:flex;gap:4px;flex:none;margin-bottom:4px}
-.rt{width:17px;height:20px;display:flex;align-items:center;justify-content:center;
+.rt{width:38px;height:16px;display:flex;align-items:center;justify-content:center;
   background:transparent;border:1px solid rgba(255,210,122,.45);color:var(--gold);
   cursor:pointer;user-select:none;font-size:10px;line-height:1}
 .rt:hover{background:rgba(255,210,122,.14)}
@@ -165,9 +163,29 @@ select{width:100%}
 .el-row .el-lk.on{color:var(--gold)}
 .el-row .el-mg{font-size:8px;letter-spacing:.04em;color:var(--ice);cursor:pointer;padding:0 2px}
 .el-row .el-mg.off{color:rgba(181,142,255,.28);cursor:default}
-.el-sep{display:flex;align-items:center;gap:6px;margin:6px 0 2px;user-select:none}
+/* ---- ◆Items のグループ見出し（コマ欄）。並びは固定＝下から コマ1,2,3… / 一番上が「枠の上」 ---- */
+.el-sep{display:flex;align-items:center;gap:6px;margin:8px 0 3px;user-select:none;cursor:pointer;
+  padding:3px 5px;border-left:3px solid transparent;background:rgba(181,142,255,.05)}
+.el-sep:hover{background:rgba(255,210,122,.09)}
 .el-sep i{flex:1;height:1px;background:rgba(181,142,255,.22)}
-.el-sep span{font-size:8px;letter-spacing:.2em;color:rgba(181,142,255,.7);white-space:nowrap}
+.el-sep span.gl{font-size:8px;letter-spacing:.2em;color:rgba(181,142,255,.85);white-space:nowrap}
+.el-sep .gc{font-size:8px;color:rgba(181,142,255,.45);letter-spacing:.1em}
+.el-sep .gadd{font-size:7px;letter-spacing:.12em;color:var(--gold);border:1px solid rgba(255,210,122,.5);
+  padding:1px 4px;white-space:nowrap}
+.el-sep.tgt{background:rgba(255,210,122,.13)}
+.el-sep.tgt span.gl{color:var(--gold)}
+.el-sep.drop{background:rgba(90,233,255,.18);box-shadow:inset 0 0 0 1px rgba(90,233,255,.5)}
+.el-sep .gmv{font-size:7px;letter-spacing:.12em;color:var(--ice);border:1px solid rgba(90,233,255,.55);
+  padding:1px 4px;white-space:nowrap}
+.el-sep .gmv:hover{background:rgba(90,233,255,.16)}
+.el-empty{font-family:var(--jp);font-size:8px;color:rgba(181,142,255,.32);padding:2px 6px 2px 12px;user-select:none}
+/* 複数選択（主＝.sel、連れ＝.msel） */
+.el-row.msel{border-color:rgba(90,233,255,.55);background:rgba(90,233,255,.07)}
+.gnote{font-family:var(--jp);font-size:8px;color:rgba(181,142,255,.6);text-align:right;flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gchips .fp.on{background:linear-gradient(135deg,#FFD27A,#FF9A3C);border-color:transparent;color:#2a1600}
+.gchips .fp{display:flex;align-items:center;gap:4px}
+.gchips .fp .dot{width:7px;height:7px;flex:none;border-radius:50%}
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 .fp{font-size:8px;letter-spacing:.12em;padding:3px 7px;border:1px solid rgba(255,210,122,.4);color:var(--gold);
   cursor:pointer;text-transform:uppercase;user-select:none}
@@ -256,7 +274,6 @@ select{width:100%}
 <div id="app">
 
   <div id="topbar">
-    <span class="t-id">ANI×OBN×COM // SPEC_09</span>
     <span class="t-title">MANGA PLATE</span>
     <span id="pg-indic">—</span>
     <span class="t-sp"></span>
@@ -279,7 +296,6 @@ select{width:100%}
   <div id="rail">
     <div class="railtop">
       <div class="rt" id="btn-swap" title="ツールレールとパネルの左右入替（TAB）">⇄</div>
-      <div class="rt" id="btn-fs2" title="全画面表示 ON/OFF">⛶</div>
     </div>
     <div class="tool on" id="t-sel" title="選択（V）。Wクリックで コマ⇔素材 を切替">▣<small id="t-sel-lb">コマ</small></div>
     <div class="tool" id="t-div" title="コマ分割（D）— ドラッグで分割線。用紙の外から引くと定規のように縦横が決まる">╱<small>DIV</small></div>
@@ -332,6 +348,8 @@ select{width:100%}
     </div></details>
 
     <details class="sp" open><summary>◆ Items（素材・仕上げ）</summary><div class="spb">
+      <div class="tr"><span class="lb">追加先</span><span class="gnote" id="add-hint"></span></div>
+      <div class="chips gchips" id="add-target"></div>
       <div class="btnrow">
         <button class="btn ice" id="add-img">＋ 画像</button>
         <button class="btn" id="add-tone">＋ トーン</button>
@@ -471,6 +489,12 @@ let PAPER=paperOf('B4_600');
    ============================================================ */
 let BOOK=null, MATSRC={}, MATIMG={};   // MATSRC: srcId→dataURL（保存対象） / MATIMG: srcId→Image（実行時）
 let curPageIdx=0, selPanel=null, selItem=null, selCut=null;
+/* ◆Items のグループ運用（SPEC_09 v2.3）
+   ・pg.items は常に「グループ順」に正規化して持つ：コマ1 → コマ2 → … → コマN → 枠の上
+     （配列は背面→前面。リストは上下逆＝一番上が「枠の上」、一番下が「コマ1」）
+   ・addTarget = ＋で追加したときの入れ先（コマID / null＝枠の上）。連続で足しても外れない
+   ・selItems  = 複数選択。selItem（主）は必ずこの中に入っている */
+let addTarget=null, selItems=[];
 let tool='sel', divMode='f', selMode='panel', editMode='line';
 let textVert=true, brushPress=true, whiteErase=false;       // レールのWクリック/長押しで切り替わる道具の状態
 /* 次に置くもの の色と太さ。◆Items のパレット（下の色チップ）で選ぶ */
@@ -519,7 +543,7 @@ function migrate(b){
       if(!Array.isArray(k.cuts))k.cuts=[];                      // v2.0 のコマは分割線を持たない＝線編集の対象外
       if(!Array.isArray(k.base)||k.base.length<3)k.base=k.poly.map(q=>({x:q.x,y:q.y}));
     });
-    if(!Array.isArray(pg.items))pg.items=[];
+    if(!Array.isArray(pg.items))pg.items=[];   // v2.3: 以後この配列は「コマ欄」順に正規化して持つ
     pg.items=pg.items.filter(it=>it&&ITEM_DEFS[it.type]);
     pg.items.forEach(it=>{
       if(!it.id)it.id=uid('i_');
@@ -1192,7 +1216,16 @@ function render(){
     drawBrush(cx,{type:'brush',pts:stroke.pts,subs:[],lw:gBrushLw,color:gBrushColor,opacity:1,fill:false});
     cx.restore();
   }
-  /* 選択素材 */
+  /* 選択素材（複数選択の「連れ」は細い水色で） */
+  if(selItems.length>1){
+    selItems.forEach(o=>{
+      if(o===selItem)return;
+      const b=itemBounds(o);
+      cx.save();cx.translate(o.x,o.y);cx.rotate((o.rot||0)*Math.PI/180);
+      cx.strokeStyle='rgba(90,233,255,.55)';cx.lineWidth=Math.max(1.4/view.z,PAPER.w*0.0008);
+      cx.setLineDash([6/view.z,6/view.z]);cx.strokeRect(-b.w/2,-b.h/2,b.w,b.h);cx.setLineDash([]);cx.restore();
+    });
+  }
   if(selItem){
     const b=itemBounds(selItem);
     cx.save();cx.translate(selItem.x,selItem.y);cx.rotate((selItem.rot||0)*Math.PI/180);
@@ -1565,7 +1598,7 @@ function focusPageAt(ev){
   if(!spreadOn)return false;
   const idx=pageAtWorldX(evPtW(ev).x);
   if(idx===curPageIdx)return false;
-  curPageIdx=idx;selPanel=null;selItem=null;selCut=null;
+  curPageIdx=idx;selPanel=null;selItem=null;selItems=[];selCut=null;addTarget=null;
   renderItemList();renderItemParams();renderPanelSec();
   return true;
 }
@@ -1620,7 +1653,7 @@ cvs.addEventListener('pointerdown',ev=>{
       renderItemList();renderItemParams();renderPanelSec();render();focusTextArea();return;
     }
     const k=panelAt(pg,p.x,p.y);
-    selPanel=k;                                     // addItem がコマ割当と初期位置に使う
+    selPanel=k;addTarget=k?k.id:null;                // addItem がコマ割当と初期位置に使う
     const nt=addItem('text');
     nt.x=Math.round(p.x);nt.y=Math.round(p.y);nt.vertical=textVert;nt.color=gTextColor;
     commit();renderItemParams();focusTextArea();
@@ -1638,11 +1671,18 @@ cvs.addEventListener('pointerdown',ev=>{
   if(tool==='sel'){
     if(selMode==='item'){
       const it=itemAt(pg,p.x,p.y);
-      if(it){selItem=it;selPanel=null;drag={t:'item',px:p.x,py:p.y,ox:it.x,oy:it.y};
+      if(it){
+        /* 複数選択しているうちの1つを掴んだら、選択ぜんぶが一緒に動く */
+        const grp=(isSel(it)&&selAll().length>1)?selAll():[it];
+        if(grp.length===1){selItem=it;selItems=[it];}else{selItem=it;}
+        selPanel=null;
+        drag={t:'item',px:p.x,py:p.y,ox:it.x,oy:it.y,
+              mv:grp.filter(o=>!o.locked).map(o=>({it:o,ox:o.x,oy:o.y}))};
         renderItemList();renderItemParams();renderPanelSec();render();return;}
     }else{
       const k=panelAt(pg,p.x,p.y);
-      if(k){selPanel=k;selItem=null;drag={t:'none'};
+      if(k){selPanel=k;selItem=null;selItems=[];addTarget=k.id;   // 選んだコマが ＋ の入れ先になる
+        drag={t:'none'};
         renderItemList();renderItemParams();renderPanelSec();render();return;}
     }
   }
@@ -1697,7 +1737,10 @@ cvs.addEventListener('pointermove',ev=>{
     }
     commitD();return;}
   if(drag.t==='item'&&selItem){
-    selItem.x=Math.round(drag.ox+p.x-drag.px);selItem.y=Math.round(drag.oy+p.y-drag.py);commitD();return;}
+    const dx=p.x-drag.px, dy=p.y-drag.py;
+    if(drag.mv&&drag.mv.length)drag.mv.forEach(m=>{m.it.x=Math.round(m.ox+dx);m.it.y=Math.round(m.oy+dy);});
+    else{selItem.x=Math.round(drag.ox+dx);selItem.y=Math.round(drag.oy+dy);}
+    commitD();return;}
 });
 /* 戻り値 true = この指はジェスチャの一部だった（通常のツール処理はしない） */
 function touchEnd(ev){
@@ -1719,7 +1762,8 @@ cvs.addEventListener('pointerup',ev=>{
     const targets=selPanel?[selPanel]:pg.panels.slice();
     const n=splitPanels(pg,targets,L.x0,L.y0,L.x1-L.x0,L.y1-L.y0);
     divPreview=null;drag=null;
-    if(n){selPanel=null;commit();renderPanelSec();renderItemList();toast('コマを '+n+' か所で分割しました');}
+    if(n){selPanel=null;addTarget=null;normalizeItems(curPage());
+      commit();renderPanelSec();renderItemList();toast('コマを '+n+' か所で分割しました');}
     else{render();toast('コマに当たっていません（線がコマを横切るようにドラッグ）');}
     return;
   }
@@ -1734,7 +1778,8 @@ cvs.addEventListener('pointerup',ev=>{
         JSON.parse(JSON.stringify(defaultsFor('white',PAPER.bas))));
       it.x=Math.round(b.cx);it.y=Math.round(b.cy);it.color=col;it.erase=er;
       it.poly=pts.map(q=>({x:q.x-b.cx,y:q.y-b.cy}));
-      pg.items.push(it);selItem=it;selPanel=null;
+      pg.items.push(it);selItem=it;selItems=[it];selPanel=null;
+      normalizeItems(pg);
       commit();renderItemList();renderItemParams();renderPanelSec();
       toast(er?'囲った中の絵を消しました':(col==='#FFFFFF'?'ホワイトをかぶせました（◆Items で色や不透明度を変更できます）':'塗りました'));
     }else render();
@@ -1755,7 +1800,8 @@ cvs.addEventListener('pointerup',ev=>{
       it.fill=it.closed;
       it.x=Math.round(b.cx);it.y=Math.round(b.cy);
       it.pts=pts.map(q=>({x:+(q.x-b.cx).toFixed(1),y:+(q.y-b.cy).toFixed(1),w:+(q.w||1).toFixed(2)}));
-      pg.items.push(it);selItem=it;selPanel=null;
+      pg.items.push(it);selItem=it;selItems=[it];selPanel=null;
+      normalizeItems(pg);
       commit();renderItemList();renderItemParams();renderPanelSec();
       if(it.fill)toast('囲った中を塗りました（◆Items の「囲みを塗る」でOFFにできます）');
     }else render();
@@ -1825,7 +1871,8 @@ $('#pn-del').addEventListener('click',()=>{
   modalConfirm('このコマを削除します（余白になります）。\nコマ内に置いた素材はコマ割当が外れて前面に出ます。',()=>{
     pg.items.forEach(it=>{if(it.panelId===id)it.panelId=null;});
     pg.panels=pg.panels.filter(k=>k.id!==id);
-    selPanel=null;commit();renderPanelSec();renderItemList();
+    selPanel=null;if(addTarget===id)addTarget=null;
+    normalizeItems(pg);commit();renderPanelSec();renderItemList();renderItemParams();
   });
 });
 $('#pn-merge').addEventListener('click',()=>{
@@ -1892,9 +1939,13 @@ $('#bind-r').addEventListener('click',()=>{
    ============================================================ */
 function addItem(type,srcId,linkId){
   const pg=curPage();
-  const box=selPanel?polyBounds(dispPoly(selPanel)):PAPER.bas;
+  /* 入れ先は ◆Items の「追加先」チップ（＝コマを選ぶと自動で追従）。
+     連続で足しても外れない＝コマ2を選んでおけば何枚でもコマ2に入る */
+  validAddTarget();
+  const k=addTarget?findPanel(pg,addTarget):null;
+  const box=k?polyBounds(dispPoly(k)):PAPER.bas;
   const it=Object.assign({id:uid('i_'),type:type,visible:true,
-      panelId:selPanel?selPanel.id:null,
+      panelId:k?k.id:null,
       name:(type==='img'?'IMG':type.toUpperCase())+' '+(pg.items.length+1)},
     JSON.parse(JSON.stringify(defaultsFor(type,box))));
   if(type==='img'){
@@ -1902,7 +1953,8 @@ function addItem(type,srcId,linkId){
     const im=MATIMG[it.srcId];
     if(im&&im.width)it.scale=Math.min(box.w/im.width,box.h/im.height);
   }
-  pg.items.push(it);selItem=it;selPanel=null;
+  pg.items.push(it);selItem=it;selItems=[it];
+  normalizeItems(pg);
   commit();renderItemList();renderItemParams();renderPanelSec();
   return it;
 }
@@ -1941,11 +1993,13 @@ function setItemCell(it,i){
   edgeCache.clear();toneCache.clear();
   commit();renderItemParams();
 }
-function deleteItem(it){
-  const pg=curPage();
-  pg.items=pg.items.filter(o=>o!==it);
-  if(selItem===it)selItem=null;
-  commit();renderItemList();renderItemParams();
+function deleteItem(it){deleteItems([it]);}
+function deleteItems(list){
+  const pg=curPage(), set=new Set(list);
+  pg.items=pg.items.filter(o=>!set.has(o));
+  if(selItem&&set.has(selItem))selItem=null;
+  selItems=selItems.filter(o=>!set.has(o));
+  commit();renderItemList();renderItemParams();render();
 }
 /* 名前をその場で書き換え（行のWクリック） */
 function startRename(row,it){
@@ -1991,99 +2045,241 @@ function mergeDown(it){
   commit();renderItemList();renderItemParams();
   toast('結合しました（形 '+polysOf(it).length+'本）');
 }
-function renderItemList(){
-  const pg=curPage(), box=$('#item-list');box.innerHTML='';
-  if(!pg.items.length){box.innerHTML='<div class="note">まだ素材がありません。<br>コマを選んでから追加すると、そのコマの中に入ります。</div>';return;}
-  /* 表示は前面が上。ドラッグの並べ替えもこの見た目どおりに動かす */
-  let prevPin=null;
-  [...pg.items].reverse().forEach(it=>{
-    const kIdx=it.panelId?(pg.panels.findIndex(k=>k.id===it.panelId)+1):0;
-    /* コマが変わる所に線を入れる（グループにはしない。どのコマの素材かが目で追えれば十分） */
-    if(prevPin===null||prevPin!==kIdx){
-      const sep=document.createElement('div');sep.className='el-sep';
-      sep.innerHTML='<i></i><span>'+(kIdx?'コマ '+kIdx:'枠の上')+'</span><i></i>';
-      box.appendChild(sep);
-    }
-    prevPin=kIdx;
-    const row=document.createElement('div');
-    row.className='el-row'+(it===selItem?' sel':'')+(it.locked?' lock':'');
-    row.style.borderLeftColor=kIdx?PIN_COLORS[(kIdx-1)%PIN_COLORS.length]:'rgba(255,210,122,.5)';
-    row.innerHTML='<span class="el-vis'+(it.visible?'':' off')+'" data-a="vis" title="表示 ON/OFF">'+(it.visible?'◉':'○')+'</span>'
-      +'<span class="el-lk'+(it.locked?' on':'')+'" data-a="lock" title="ロック: キャンバス上で選べなくする（誤って動かさないため）">'+(it.locked?'▪':'▫')+'</span>'
-      +'<span class="el-nm" title="Wクリックで名前を変更／つかんで上下に並べ替え">'+esc(it.name)+'</span>'
-      +'<span class="el-pin">'+(kIdx?'▣'+kIdx:'上')+'</span>'
-      +'<span class="el-ty">'+it.type.toUpperCase()+'</span>'
-      +((it.type==='brush'||it.type==='white')
-         ?'<span class="el-mg'+(mergeTargetOf(it)?'':' off')+'" data-a="merge" title="下の1つと結合（同じコマ・同じ種類のみ）">▼結</span>':'')
-      +'<span class="el-ud" data-a="up" title="前面へ">▲</span>'
-      +'<span class="el-ud" data-a="dn" title="背面へ">▼</span>'
-      +'<span class="el-x" data-a="del" title="この素材を削除">✕</span>';
-    row.dataset.id=it.id;
-
-    row.addEventListener('click',ev=>{
-      const a=ev.target.dataset&&ev.target.dataset.a, i=pg.items.indexOf(it);
-      if(a==='vis'){it.visible=!it.visible;commit();renderItemList();return;}
-      if(a==='lock'){it.locked=!it.locked;if(it.locked&&selItem===it)selItem=null;
-        commit();renderItemList();renderItemParams();render();return;}
-      if(a==='merge'){mergeDown(it);return;}
-      if(a==='up'){if(i<pg.items.length-1){pg.items.splice(i,1);pg.items.splice(i+1,0,it);commit();renderItemList();}return;}
-      if(a==='dn'){if(i>0){pg.items.splice(i,1);pg.items.splice(i-1,0,it);commit();renderItemList();}return;}
-      if(a==='del'){modalConfirm(it.name+' を削除しますか？',()=>deleteItem(it));return;}
-      if(rowDrag&&rowDrag.moved)return;                      // 並べ替えたクリックは選択に使わない
-      selItem=it;selPanel=null;
-      if(selMode!=='item'){selMode='item';syncToolLabels();}  // リストで選んだら掴める状態にしておく
-      renderItemList();renderItemParams();renderPanelSec();render();
-    });
-    /* 名前の変更は Wクリック。iPadのダブルタップでも入れるよう共通ヘルパで張る */
-    onDoubleActivate(row,ev=>{
-      if(ev.target.dataset&&ev.target.dataset.a)return;
-      startRename(row,it);
-    });
-    /* 行の本体をつかんで上下に並べ替え。
-       move/up は window 側に張ってある（行を作り直すと行のイベントが死ぬため。
-       以前これが原因で「上へは1つずつしか動かない」状態になっていた） */
-    row.addEventListener('pointerdown',ev=>{
-      const a=ev.target.dataset&&ev.target.dataset.a;
-      if(a||ev.target.tagName==='INPUT')return;
-      rowDrag={id:it.id,y0:ev.clientY,moved:false};
-    });
-    box.appendChild(row);
-  });
+/* ============================================================
+   ◆Items グループ（コマ欄）— 並びはフォーマットとして固定
+   ============================================================ */
+/* 並べ替えキー。枠の上（panelId なし・迷子）は一番前面＝リストの一番上 */
+function itemGroupKey(pg,it){
+  if(!it.panelId)return 1e9;
+  const i=pg.panels.findIndex(k=>k.id===it.panelId);
+  return i<0?1e9:i;
 }
+/* pg.items をグループ順に整える（グループ内の並びは保つ＝安定ソート） */
+function normalizeItems(pg){
+  if(!pg||!pg.items)return;
+  pg.items.forEach((it,i)=>{it.__o=i;});
+  pg.items.sort((a,b)=>itemGroupKey(pg,a)-itemGroupKey(pg,b)||a.__o-b.__o);
+  pg.items.forEach(it=>{delete it.__o;});
+}
+/* コマ欄の並び（表示は上から）: 枠の上 → コマN … コマ2 → コマ1 */
+function itemGroups(pg){
+  const g=[{pid:null,label:'枠の上',color:'rgba(255,210,122,.55)',hint:'擬音・飛び出し（枠より前）'}];
+  const ks=pg.panels.map((k,i)=>({pid:k.id,label:'コマ '+(i+1),color:PIN_COLORS[i%PIN_COLORS.length],hint:''}));
+  return g.concat(ks.reverse());
+}
+/* 選択（複数）のヘルパ。selItem を直に代入している既存コードとも噛み合うよう、
+   描画のたびに「主が居ないなら単独選択に戻す」で整合を取る */
+function syncMultiSel(){
+  const pg=curPage();
+  selItems=selItems.filter(o=>pg.items.indexOf(o)>=0);
+  if(!selItem||selItems.indexOf(selItem)<0)selItems=selItem?[selItem]:[];
+}
+function selAll(){return selItems.length?selItems.slice():(selItem?[selItem]:[]);}
+function isSel(it){return it===selItem||selItems.indexOf(it)>=0;}
+/* ＋で追加する入れ先。コマを選ぶ操作と連動させておく（選んでから足す＝そこに入る） */
+function setAddTarget(pid,quiet){
+  const pg=curPage();
+  addTarget=pid||null;
+  selPanel=addTarget?findPanel(pg,addTarget):null;
+  selItem=null;selItems=[];                 // コマを選ぶ＝素材の選択は外す（キャンバスでコマを選んだときと同じ）
+  renderItemList();renderPanelSec();render();
+  if(!quiet)toast('追加先: '+(addTarget?('コマ '+(pg.panels.findIndex(k=>k.id===addTarget)+1)):'枠の上'));
+}
+function validAddTarget(){
+  const pg=curPage();
+  if(addTarget&&!findPanel(pg,addTarget))addTarget=null;
+  return addTarget;
+}
+/* 追加先チップ列（プルダウンを開かずに、見えたまま入れ先を選ぶ） */
+function renderAddTarget(){
+  const pg=curPage(), box=$('#add-target');if(!box)return;
+  validAddTarget();
+  box.innerHTML='';
+  const mk=(pid,label,color)=>{
+    const c=document.createElement('span');
+    c.className='fp'+((pid||null)===(addTarget||null)?' on':'');
+    c.innerHTML=(color?'<i class="dot" style="background:'+color+'"></i>':'')+esc(label);
+    c.title=(pid?label+' の中に入れる':'コマに入れず枠の上に置く（擬音・飛び出し）')+'（クリックで追加先に）';
+    c.addEventListener('click',()=>setAddTarget(pid));
+    box.appendChild(c);
+  };
+  mk(null,'枠の上','rgba(255,210,122,.7)');
+  pg.panels.forEach((k,i)=>mk(k.id,'コマ '+(i+1),PIN_COLORS[i%PIN_COLORS.length]));
+  const h=$('#add-hint');
+  if(h)h.textContent=pg.panels.length?'＋で足した素材はここに入ります':'まだコマがありません（DIV で分割）';
+}
+/* 選択中の素材をまとめて別のコマへ移す */
+function assignItemsTo(list,pid){
+  const pg=curPage();
+  if(!list.length)return;
+  list.forEach(it=>{it.panelId=pid||null;});
+  normalizeItems(pg);
+  commit();renderItemList();renderItemParams();render();
+  toast(list.length+' 個を '+(pid?('コマ '+(pg.panels.findIndex(k=>k.id===pid)+1)):'枠の上')+' へ移しました');
+}
+/* グループ内だけで前後させる（コマ欄そのものは動かない） */
+function moveItemIn(it,dir,toEnd){
+  const pg=curPage();
+  normalizeItems(pg);
+  const key=itemGroupKey(pg,it);
+  const idxs=[];pg.items.forEach((o,i)=>{if(itemGroupKey(pg,o)===key)idxs.push(i);});
+  const g=idxs.map(i=>pg.items[i]);
+  const from=g.indexOf(it);if(from<0)return false;
+  const to=toEnd?(dir>0?g.length-1:0):clamp(from+dir,0,g.length-1);
+  if(to===from)return false;
+  g.splice(from,1);g.splice(to,0,it);
+  idxs.forEach((ix,n)=>{pg.items[ix]=g[n];});
+  return true;
+}
+function renderItemList(){
+  const pg=curPage(), box=$('#item-list');
+  normalizeItems(pg);validAddTarget();syncMultiSel();
+  box.innerHTML='';
+  renderAddTarget();
+  const nSel=selAll().length;
+  /* コマ欄は「入っていなくても」出す＝そこへ放り込めるし、追加先も選べる。
+     並びはフォーマットとして固定（上＝枠の上、下へ向かって コマN…コマ2、コマ1） */
+  itemGroups(pg).forEach(g=>{
+    const list=pg.items.filter(it=>{
+      const k=itemGroupKey(pg,it);
+      return g.pid?(it.panelId===g.pid):(k===1e9);
+    }).reverse();                                   // 表示は前面が上
+    const sep=document.createElement('div');
+    sep.className='el-sep'+((g.pid||null)===(addTarget||null)?' tgt':'');
+    sep.dataset.gid=g.pid||'';
+    sep.innerHTML='<span class="gl" style="color:'+g.color+'">'+esc(g.label)+'</span>'
+      +'<span class="gc">'+(list.length||'—')+'</span><i></i>'
+      +(nSel?'<span class="gmv" data-g="mv" title="選択中の '+nSel+' 個をここへ移す">⇥移動</span>':'')
+      +'<span class="gadd" data-g="add" title="ここを追加先にする（＋で足した素材がここに入る）">'
+      +((g.pid||null)===(addTarget||null)?'◉追加先':'＋ここ')+'</span>';
+    sep.addEventListener('click',ev=>{
+      if(ev.target.dataset&&ev.target.dataset.g==='mv'){assignItemsTo(selAll(),g.pid);return;}
+      setAddTarget(g.pid);
+    });
+    box.appendChild(sep);
+    if(!list.length){
+      const e=document.createElement('div');e.className='el-empty';e.dataset.gid=g.pid||'';
+      e.textContent='（空）';box.appendChild(e);
+    }
+    list.forEach(it=>{
+      const kIdx=it.panelId?(pg.panels.findIndex(k=>k.id===it.panelId)+1):0;
+      const row=document.createElement('div');
+      row.className='el-row'+(it===selItem?' sel':(isSel(it)?' msel':''))+(it.locked?' lock':'');
+      row.style.borderLeftColor=g.color;
+      row.innerHTML='<span class="el-vis'+(it.visible?'':' off')+'" data-a="vis" title="表示 ON/OFF">'+(it.visible?'◉':'○')+'</span>'
+        +'<span class="el-lk'+(it.locked?' on':'')+'" data-a="lock" title="ロック: キャンバス上で選べなくする（誤って動かさないため）">'+(it.locked?'▪':'▫')+'</span>'
+        +'<span class="el-nm" title="Wクリックで名前を変更／つかんで上下に並べ替え（別のコマ欄へ放り込めば移動）">'+esc(it.name)+'</span>'
+        +'<span class="el-pin">'+(kIdx?'▣'+kIdx:'上')+'</span>'
+        +'<span class="el-ty">'+it.type.toUpperCase()+'</span>'
+        +((it.type==='brush'||it.type==='white')
+           ?'<span class="el-mg'+(mergeTargetOf(it)?'':' off')+'" data-a="merge" title="下の1つと結合（同じコマ・同じ種類のみ）">▼結</span>':'')
+        +'<span class="el-ud" data-a="up" title="前面へ（コマ欄の中で）">▲</span>'
+        +'<span class="el-ud" data-a="dn" title="背面へ（コマ欄の中で）">▼</span>'
+        +'<span class="el-x" data-a="del" title="この素材を削除">✕</span>';
+      row.dataset.id=it.id;
+      row.dataset.gid=g.pid||'';
+
+      row.addEventListener('click',ev=>{
+        const a=ev.target.dataset&&ev.target.dataset.a;
+        if(a==='vis'){const t=isSel(it)?selAll():[it];const v=!it.visible;t.forEach(o=>{o.visible=v;});commit();renderItemList();render();return;}
+        if(a==='lock'){const t=isSel(it)?selAll():[it];const v=!it.locked;t.forEach(o=>{o.locked=v;});
+          if(v){selItems=[];if(selItem&&selItem.locked)selItem=null;}
+          commit();renderItemList();renderItemParams();render();return;}
+        if(a==='merge'){mergeDown(it);return;}
+        if(a==='up'){if(moveItemIn(it,1,false)){commit();renderItemList();}else toast('このコマ欄の一番上です');return;}
+        if(a==='dn'){if(moveItemIn(it,-1,false)){commit();renderItemList();}else toast('このコマ欄の一番下です');return;}
+        if(a==='del'){
+          const t=isSel(it)?selAll():[it];
+          modalConfirm(t.length>1?(t.length+' 個の素材を削除しますか？'):(it.name+' を削除しますか？'),()=>deleteItems(t));
+          return;}
+        if(rowDrag&&rowDrag.moved)return;                      // 並べ替えたクリックは選択に使わない
+        /* 複数選択: Ctrl/⌘＝足し引き、Shift＝範囲（表示の並びで） */
+        if(ev.shiftKey&&selItem&&selItem!==it){
+          const disp=pg.items.slice().reverse();
+          const a0=disp.indexOf(selItem), b0=disp.indexOf(it);
+          if(a0>=0&&b0>=0){selItems=disp.slice(Math.min(a0,b0),Math.max(a0,b0)+1);selItem=it;}
+        }else if(ev.ctrlKey||ev.metaKey){
+          const cur=selAll(), n=cur.indexOf(it);
+          if(n>=0){cur.splice(n,1);selItems=cur;if(selItem===it)selItem=cur[cur.length-1]||null;}
+          else{cur.push(it);selItems=cur;selItem=it;}
+        }else{selItem=it;selItems=[it];}
+        selPanel=null;
+        if(selMode!=='item'){selMode='item';syncToolLabels();}  // リストで選んだら掴める状態にしておく
+        renderItemList();renderItemParams();renderPanelSec();render();
+      });
+      /* 名前の変更は Wクリック。iPadのダブルタップでも入れるよう共通ヘルパで張る */
+      onDoubleActivate(row,ev=>{
+        if(ev.target.dataset&&ev.target.dataset.a)return;
+        startRename(row,it);
+      });
+      /* 行の本体をつかんで並べ替え。別のコマ欄まで持っていけば、そのコマへ移る。
+         複数選択しているものを掴んだら、まとめて動く。
+         move/up は window 側に張ってある（行を作り直すと行のイベントが死ぬため） */
+      row.addEventListener('pointerdown',ev=>{
+        const a=ev.target.dataset&&ev.target.dataset.a;
+        if(a||ev.target.tagName==='INPUT')return;
+        rowDrag={items:(isSel(it)?selAll():[it]),y0:ev.clientY,moved:false};
+      });
+      box.appendChild(row);
+    });
+  });
+  if(!pg.items.length){
+    const n=document.createElement('div');n.className='note';
+    n.innerHTML='まだ素材がありません。<br>上の <b>追加先</b> でコマを選んでから ＋ を押すと、そのコマ欄に入ります。';
+    box.appendChild(n);
+  }
+}
+function itemById(pg,id){return pg.items.find(o=>o.id===id)||null;}
 function rowDragMove(ev){
   if(!rowDrag)return;
-  const pg=curPage(), it=pg.items.find(o=>o.id===rowDrag.id);
-  if(!it){rowDrag=null;return;}
+  const pg=curPage();
+  const mov=rowDrag.items.filter(o=>pg.items.indexOf(o)>=0);
+  if(!mov.length){rowDrag=null;return;}
   if(!rowDrag.moved&&Math.abs(ev.clientY-rowDrag.y0)<5)return;
   rowDrag.moved=true;
-  const rows=[...$('#item-list').querySelectorAll('.el-row')];
-  if(!rows.length)return;
-  /* カーソルが入っている行に置く（上下対称。行の中心で比べると上下で1行ぶんズレる） */
-  let to=rows.length-1;
-  for(let d=0;d<rows.length;d++){if(ev.clientY<rows[d].getBoundingClientRect().bottom){to=d;break;}}
-  const from=pg.items.indexOf(it);
-  const toIdx=pg.items.length-1-to;                       // 表示index → 配列index（前面が上）
-  if(toIdx===from||toIdx<0||toIdx>=pg.items.length)return;
-  pg.items.splice(from,1);pg.items.splice(toIdx,0,it);
-  selItem=it;renderItemList();commitD();
+  const box=$('#item-list');
+  const nodes=[...box.querySelectorAll('.el-row,.el-sep,.el-empty')];
+  if(!nodes.length)return;
+  /* カーソルが入っている要素で「どのコマ欄か」を決める（見出しや空欄に落としてもよい） */
+  let hit=null;
+  for(const n of nodes){if(ev.clientY<n.getBoundingClientRect().bottom){hit=n;break;}}
+  if(!hit)hit=nodes[nodes.length-1];
+  const gid=hit.dataset.gid||'';
+  const pid=gid||null;
+  /* そのコマ欄の表示順（前面→背面）。掴んでいる分を抜いたものが並べ替えの土台 */
+  const cur=[...box.querySelectorAll('.el-row')]
+    .filter(n=>(n.dataset.gid||'')===gid)
+    .map(n=>itemById(pg,n.dataset.id)).filter(Boolean);
+  const rest=cur.filter(o=>mov.indexOf(o)<0);
+  let pos=rest.length;
+  for(let d=0;d<rest.length;d++){
+    const n=box.querySelector('.el-row[data-id="'+rest[d].id+'"]');
+    if(n&&ev.clientY<n.getBoundingClientRect().bottom){pos=d;break;}
+  }
+  const movDisp=pg.items.filter(o=>mov.indexOf(o)>=0).reverse();   // 表示順（前面→背面）
+  const want=rest.slice();want.splice(pos,0,...movDisp);
+  /* 変わっていないなら触らない（毎フレーム並べ替え直さない） */
+  if(mov.every(o=>(o.panelId||null)===pid)&&want.length===cur.length&&want.every((o,n)=>o===cur[n]))return;
+  mov.forEach(o=>{o.panelId=pid;});
+  const set=new Set(want);
+  pg.items=pg.items.filter(o=>!set.has(o)).concat(want.slice().reverse());
+  normalizeItems(pg);
+  renderItemList();commitD();
 }
 function rowDragEnd(){
-  if(rowDrag&&rowDrag.moved){commit();renderItemList();}
+  if(rowDrag&&rowDrag.moved){commit();renderItemList();renderItemParams();render();}
   setTimeout(()=>{rowDrag=null;},0);
 }
 window.addEventListener('pointermove',rowDragMove);
 window.addEventListener('pointerup',rowDragEnd);
 window.addEventListener('pointercancel',rowDragEnd);
-/* ◆Items の並べ替え（AE/COMPOSER と同じ語彙）: Ctrl+↑↓ で1つ動かす・Shift併用で最前面/最背面 */
+/* ◆Items の並べ替え（AE/COMPOSER と同じ語彙）: Ctrl+↑↓ で1つ動かす・Shift併用で先頭/末尾。
+   コマ欄そのものは動かない＝同じコマの中だけで前後する */
 function moveItem(dir,toEnd){
-  const pg=curPage();
   if(!selItem)return;
-  const from=pg.items.indexOf(selItem);if(from<0)return;
-  const to=toEnd?(dir>0?pg.items.length-1:0):clamp(from+dir,0,pg.items.length-1);
-  if(to===from)return;
-  pg.items.splice(from,1);pg.items.splice(to,0,selItem);
-  commit();renderItemList();renderItemParams();
-  toast(dir>0?(toEnd?'最前面へ':'前面へ'):(toEnd?'最背面へ':'背面へ'));
+  if(!moveItemIn(selItem,dir,toEnd)){toast(dir>0?'このコマ欄の一番上です':'このコマ欄の一番下です');return;}
+  commit();renderItemList();renderItemParams();render();
+  toast(dir>0?(toEnd?'コマ内で最前面へ':'前面へ'):(toEnd?'コマ内で最背面へ':'背面へ'));
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function renderItemParams(){
@@ -2095,14 +2291,31 @@ function renderItemParams(){
     box.appendChild(w);
   }
   const it=selItem;
-  /* コマ割当 */
+  /* コマ割当 — プルダウンではなく出しっぱなしのチップ（押すだけで入る／複数選択ならまとめて） */
   const pg=curPage();
+  const tg=selAll(), multi=tg.length>1;
+  if(multi){
+    const m=document.createElement('div');m.className='note';
+    m.innerHTML='◈ <b style="color:var(--ice)">'+tg.length+' 個を選択中</b>'
+      +'（配置・表示・ロック・削除・リストのドラッグはまとめて効きます。数値は主 <b>'+esc(it.name)+'</b>）';
+    box.appendChild(m);
+  }
   const rowP=document.createElement('div');rowP.className='tr';
-  let opts='<option value="">（上に乗せる／擬音）</option>';
-  pg.panels.forEach((k,i)=>{opts+='<option value="'+k.id+'"'+(it.panelId===k.id?' selected':'')+'>コマ '+(i+1)+' の中</option>';});
-  rowP.innerHTML='<span class="lb">配置</span><select>'+opts+'</select>';
-  rowP.querySelector('select').addEventListener('change',e=>{it.panelId=e.target.value||null;commit();renderItemList();});
+  rowP.innerHTML='<span class="lb">配置'+(multi?'（'+tg.length+'個）':'')+'</span>';
   box.appendChild(rowP);
+  const chp=document.createElement('div');chp.className='chips gchips';
+  const same=tg.every(o=>(o.panelId||null)===(it.panelId||null));
+  const mkc=(pid,label,color)=>{
+    const c=document.createElement('span');
+    c.className='fp'+(same&&(pid||null)===(it.panelId||null)?' on':'');
+    c.innerHTML='<i class="dot" style="background:'+color+'"></i>'+esc(label);
+    c.title=pid?(label+' の中へ入れる（コマの形でカットされる）'):'コマに入れず枠の上へ（擬音・飛び出し）';
+    c.addEventListener('click',()=>assignItemsTo(selAll(),pid));
+    chp.appendChild(c);
+  };
+  mkc(null,'枠の上','rgba(255,210,122,.7)');
+  pg.panels.forEach((k,i)=>mkc(k.id,'コマ '+(i+1),PIN_COLORS[i%PIN_COLORS.length]));
+  box.appendChild(chp);
   /* 文字は「打つ欄」が先頭。ここに打つと即反映される */
   if(it.type==='text'){
     const ta=document.createElement('textarea');
@@ -2684,6 +2897,7 @@ function placeLinked(it,rec){
     it.scale=1/lk.scale;                       // 送った倍率の逆
     it.x=lk.box.x+lk.box.w/2;it.y=lk.box.y+lk.box.h/2;
   }
+  BOOK.pages.forEach(normalizeItems);            // 別ページに置かれた場合もコマ欄順を保つ
   if(pg!==tp){renderPanelSec();}
 }
 async function sendPageTo(target){
@@ -2817,16 +3031,25 @@ const HELP_GROUPS=[
     ['—','始めた位置のコマに割り当たるので、コマの外へはみ出さない'],
     ['◆Items','色を黒に変えれば「足す」側にも使える'],
   ]],
-  ['素材（◆Items）',[
+  ['素材（◆Items）— コマ欄',[
+    ['コマ欄','リストは<b>コマごとの欄</b>に分かれていて、<b>並びは固定</b>。上が「枠の上」、下へ向かって コマN…コマ2、コマ1'],
+    ['追加先','◆Items の上の<b>チップ</b>が ＋ の入れ先。<b>コマを選ぶと自動で追従</b>するので、コマ2を選んでおけば何枚足してもコマ2に入る'],
+    ['見出しをクリック','そのコマ欄を<b>追加先</b>にする（コマも選択される）'],
+    ['⇥移動','見出しの右のボタン＝<b>選択中の素材をそのコマへまとめて移す</b>'],
+    ['配置チップ','素材を選ぶと出る＝プルダウンを開かずに押すだけで別のコマへ移せる'],
+    ['上下移動','<b>コマ欄の中だけ</b>で前後する（コマ欄そのものは動かない）'],
+    ['別のコマへ','リストの行を<b>別のコマ欄まで持っていく</b>と、そのコマへ移る（空の欄にも落とせる）'],
+  ]],
+  ['素材（◆Items）— 選択と操作',[
+    ['Ctrl+クリック','<b>複数選択</b>の足し引き（⌘でも可）'],
+    ['Shift+クリック','<b>範囲選択</b>'],
+    ['複数選択中','ドラッグ・配置・表示・ロック・削除が<b>まとめて</b>効く（キャンバス上のドラッグも一緒に動く）'],
     ['↑ / ↓','リストの素材を順に選択（<b>Shift</b>で先頭／末尾へ）'],
-    ['Ctrl+↑ / ↓','<b>選択した素材を前後に動かす</b>（<b>Shift</b>併用で最前面／最背面）＝AE・COMPOSERと同じ'],
-    ['つかんで上下','リストの行を直接ドラッグしても並べ替えできる'],
+    ['Ctrl+↑ / ↓','<b>選択した素材を前後に動かす</b>（<b>Shift</b>併用でコマ内の最前面／最背面）＝AE・COMPOSERと同じ'],
     ['Wクリック','行の名前を変更（iPadはダブルタップ）'],
     ['錠アイコン','<b>ロック</b>＝キャンバス上で選べなくする（誤って動かさないため。リストからは選べる）'],
     ['▼結','<b>下の1つと結合</b>（ペン・ホワイトのみ／同じコマ・同じ種類）。結合後もまとめて動かせる'],
-    ['区切り線','リストは<b>コマごとに線と色帯</b>で仕切ってある（並び順＝重なり順はそのまま）'],
-    ['DEL','選択中の素材／コマを削除'],
-    ['配置','「コマNの中」＝マスクされて枠の下 ／「上に乗せる」＝枠の上（擬音）'],
+    ['DEL','選択中の素材／コマを削除（複数選択ならまとめて）'],
     ['境界効果','擬音などのアルファに白フチ。フチONのときだけ太さが効く'],
     ['網点化','グレーで塗った中間調だけをトーンに。線画と白はそのまま残る'],
     ['芯くずし','集中線の白場（真円）を崩す。0=真円 / 1=ぐしゃぐしゃ。SEEDを変えると崩れ方が変わる'],
@@ -2886,8 +3109,7 @@ $('#help-ovl').addEventListener('click',e=>{if(e.target===$('#help-ovl'))toggleH
 
 /* ===== 全画面表示（animator と同じ実装。iPhone Safari は非対応なので隠す）===== */
 (function(){
-  /* トップバーの ⛶ と、レール上の小さい ⛶ は同じ動きにする（手が近い方を使えるように） */
-  const btns=[$('#btn-fullscreen'),$('#btn-fs2')].filter(Boolean), root=document.documentElement;
+  const btns=[$('#btn-fullscreen')].filter(Boolean), root=document.documentElement;
   const btn=btns[0];
   const canFS=!!(root.requestFullscreen||root.webkitRequestFullscreen||document.body.webkitRequestFullscreen);
   if(!canFS){btns.forEach(b=>b.style.display='none');return;}
@@ -2965,7 +3187,7 @@ $('#main').addEventListener('drop',async ev=>{
   focusPageAt(ev);                       // 見開きなら落とした側のページへ
   const p=evPt(ev), pg=curPage();
   const k=panelAt(pg,p.x,p.y);
-  selPanel=k;
+  selPanel=k;addTarget=k?k.id:null;                      // 落とした場所のコマに入れる
   for(const f of fs)await addImage(await fileToDataURL(f),f.name.replace(/\.[^.]+$/,''),null);
   toast(k?'コマの中に入れました':'ページの上に置きました');
 });
@@ -2992,7 +3214,8 @@ window.addEventListener('keydown',ev=>{
     if($('#modal').style.display==='flex'){const f=modalCancel;modalClose();if(f)f();return;}
     if($('#pages-ov').style.display==='flex'){closePages();return;}
     if(selCut){selCut=null;render();return;}
-    if(selItem||selPanel){selItem=null;selPanel=null;renderItemList();renderItemParams();renderPanelSec();render();}
+    if(selItem||selPanel||selItems.length){selItem=null;selItems=[];selPanel=null;
+      renderItemList();renderItemParams();renderPanelSec();render();}
     return;
   }
   if(ev.key==='Tab'){ev.preventDefault();toggleSwapUI();return;}
@@ -3024,7 +3247,9 @@ window.addEventListener('keydown',ev=>{
   else if(k==='g'){showGuide=!showGuide;$('#t-guide').classList.toggle('on',showGuide);render();}
   else if(k==='f')fitView();
   else if(k==='delete'||k==='backspace'){
-    if(selItem)modalConfirm(selItem.name+' を削除しますか？',()=>deleteItem(selItem));
+    const t=selAll();
+    if(t.length>1)modalConfirm(t.length+' 個の素材を削除しますか？',()=>deleteItems(t));
+    else if(selItem)modalConfirm(selItem.name+' を削除しますか？',()=>deleteItems([selItem]));
     else if(selPanel)$('#pn-del').click();
   }
   else if(ev.key==='PageDown'||k===']')gotoPage(curPageIdx+1);
