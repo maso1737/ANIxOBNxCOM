@@ -562,6 +562,15 @@ html,body{
   letter-spacing:0.15em;pointer-events:none;
   z-index:10;
 }
+/* モード切替の一瞬の告知（キー操作はボタンが視界の外なので、これが無いと効いたか分からない） */
+#stage-toast{
+  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  padding:5px 12px;border-radius:2px;
+  background:rgba(10,4,24,0.86);border:1px solid rgba(255,79,168,0.45);
+  color:var(--acid);font-size:10px;letter-spacing:0.18em;white-space:nowrap;
+  pointer-events:none;z-index:30;opacity:0;transition:opacity 0.18s;
+}
+#stage-toast.show{opacity:1;}
 
 /* ズームコントロール */
 #zoom-ctl{
@@ -1560,6 +1569,7 @@ input[type=range]::-moz-range-thumb{
     <div id="stage-hud">
       <span id="hud-coord">16 · 698</span>
     </div>
+    <div id="stage-toast"></div>
     <div id="zoom-ctl">
       <button id="zoom-out">−</button>
       <span class="zval" id="zoom-val">41%</span>
@@ -1771,8 +1781,10 @@ input[type=range]::-moz-range-thumb{
       <div class="sc-row"><span class="sc-label">直線（前の終点から）</span><span class="sc-fixed">Shift+クリック</span></div>
       <div class="sc-row"><span class="sc-label">水平／垂直に拘束</span><span class="sc-fixed">Shift+ドラッグ</span></div>
       <div class="sc-row"><span class="sc-label">下書／指示の色を既定に戻す</span><span class="sc-fixed">長押し</span></div>
-      <div class="sc-row"><span class="sc-label">投げ縄塗り ⇔ バケツ</span><span class="sc-fixed">FILLをWクリック</span></div>
-      <div class="sc-row"><span class="sc-label">投げ縄透明消し ⇔ バケツ</span><span class="sc-fixed">FILLを長押し</span></div>
+      <div class="sc-row"><span class="sc-label">投げ縄塗り ⇔ バケツ</span><span class="sc-fixed">FILLをWクリック / G2連打</span></div>
+      <div class="sc-row"><span class="sc-label">投げ縄透明消し ⇔ バケツ</span><span class="sc-fixed">FILLを長押し / G長押し</span></div>
+      <div class="sc-row"><span class="sc-label">筆圧ペン ON/OFF</span><span class="sc-fixed">PENをWクリック / P2連打</span></div>
+      <div class="sc-row"><span class="sc-label">このコマを全消去</span><span class="sc-fixed">ERASEをWクリック / E2連打</span></div>
       <div class="sc-row"><span class="sc-label">パレット選択後の色送り</span><span class="sc-fixed">↑ / ↓</span></div>
     </div>
   </div>
@@ -5515,11 +5527,13 @@ function onDoubleActivate(el, handler){
 
 // PEN ボタン ダブルクリック/ダブルタップ → 筆圧ペン ON/OFF
 const penToolBtn = document.querySelector('.tool[data-tool="pen"]');
-onDoubleActivate(penToolBtn, () => {
+function togglePressurePen(){
   state.pressurePen = !state.pressurePen;
   penToolBtn.classList.toggle('pp-on', state.pressurePen);
-  penToolBtn.title = '筆圧ペン: ' + (state.pressurePen ? 'ON（Wクリックで切替）' : 'OFF（Wクリックで切替）');
-});
+  penToolBtn.title = '筆圧ペン: ' + (state.pressurePen ? 'ON' : 'OFF') + '（Wクリック / P2連打で切替）';
+  stageToast('筆圧ペン ' + (state.pressurePen ? 'ON' : 'OFF'));
+}
+onDoubleActivate(penToolBtn, togglePressurePen);
 // ロングプレス検出（FILL長押し＝投げ縄透明消し切替）。クリック/ダブルタップとは独立。
 function onLongPress(el, handler, ms = 500){
   if(!el) return;
@@ -5536,30 +5550,48 @@ function onLongPress(el, handler, ms = 500){
   ['pointerup','pointercancel','pointerleave'].forEach(ev => el.addEventListener(ev, clear));
 }
 
-// FILL ボタン ダブルクリック/ダブルタップ → 投げ縄塗り(lasso) ⇔ 通常の塗りつぶし(flood)
-// 投げ縄透明消しの状態から Wクリックしたときは「透明消しを解いて投げ縄塗り」に落とす。
 const fillToolBtn = document.querySelector('.tool[data-tool="fill"]');
-onDoubleActivate(fillToolBtn, () => {
+// ── 塗りモードの切替（FILLボタンの Wクリック/長押し・G の2連打/長押し が共有する入口）──
+// 投げ縄塗り(lasso) ⇔ バケツ(flood)。投げ縄透明消しからは「透明消しだけ解く」。
+function fillToggleLasso(){
   const lassoFill = (state.fillMode === 'lasso' && !state.fillErase);
   if(lassoFill){
-    state.fillMode = 'flood';           // もう一度Wクリックでバケツへ戻す
+    state.fillMode = 'flood';           // もう一度で バケツへ戻す
   }else{
     state.fillMode = 'lasso'; state.fillErase = false;
   }
   if(state.tool !== 'fill') fillToolBtn.click();
   applyFillModeUI();
-});
-// FILL ボタン 長押し → 投げ縄透明消し(lasso+erase) ⇔ 通常の塗りつぶし(flood) を切替
-onLongPress(fillToolBtn, () => {
+  stageToast(fillModeName());
+}
+// 投げ縄透明消し(lasso+erase) ⇔ バケツ(flood)
+function fillToggleLassoErase(){
   const lassoErase = (state.fillMode === 'lasso' && state.fillErase);
   if(lassoErase){
-    state.fillMode = 'flood'; state.fillErase = false;   // 長押しで通常塗りに戻す
+    state.fillMode = 'flood'; state.fillErase = false;   // もう一度で バケツへ戻す
   }else{
     state.fillMode = 'lasso'; state.fillErase = true;
   }
-  if(state.tool !== 'fill') fillToolBtn.click(); // 長押しで切替時はFILLを選択状態に
+  if(state.tool !== 'fill') fillToolBtn.click(); // 切替時はFILLを選択状態に
   applyFillModeUI();
-});
+  stageToast(fillModeName());
+}
+function fillModeName(){
+  if(state.fillMode !== 'lasso') return 'バケツ塗り';
+  return state.fillErase ? '投げ縄 透明消し' : '投げ縄 塗り';
+}
+onDoubleActivate(fillToolBtn, fillToggleLasso);   // Wクリック → 投げ縄塗り
+onLongPress(fillToolBtn, fillToggleLassoErase);   // 長押し   → 投げ縄透明消し
+// ステージ中央上に短い告知を出す（キー操作でモードが変わったことを知らせる）
+let gToastTimer = null;
+function stageToast(msg){
+  const el = document.getElementById('stage-toast');
+  if(!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  if(gToastTimer) clearTimeout(gToastTimer);
+  gToastTimer = setTimeout(() => { el.classList.remove('show'); gToastTimer = null; }, 900);
+}
 // FILLボタンのラベル/バッジ/カーソル/タイトルを現在の塗り方式・透明消しに同期
 function applyFillModeUI(){
   const lasso = state.fillMode === 'lasso';
@@ -5567,7 +5599,7 @@ function applyFillModeUI(){
   fillToolBtn.classList.toggle('fe-on', state.fillErase);
   const lbl = fillToolBtn.querySelector('.lbl');
   if(lbl) lbl.textContent = lasso ? (state.fillErase ? 'L-DEL' : 'LASSO') : 'FILL';
-  const hint = '（Wクリックで投げ縄塗り・長押しで投げ縄透明消し）';
+  const hint = '（Wクリック / G2連打＝投げ縄塗り・長押し / G長押し＝投げ縄透明消し）';
   fillToolBtn.title = (lasso
     ? (state.fillErase
         ? '投げ縄透明消し: 囲った内側を透明に消す'
@@ -5816,7 +5848,8 @@ function clearCanvas(){
   drawCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
   pushHistory();
 }
-// ERASEボタンのダブルクリック/ダブルタップでキャンバスをクリア
+// ERASEボタンのダブルクリック/ダブルタップでキャンバスをクリア。
+// click の時刻差で測っているので、Eキー2連打（＝ボタンを2回clickする）でも同じように通る。
 (function(){
   let lastEraseTap = 0;
   const eraseBtn = document.querySelector('[data-tool="erase"]');
@@ -5825,6 +5858,7 @@ function clearCanvas(){
     if(now - lastEraseTap < 380){
       clearCanvas();
       lastEraseTap = 0;
+      stageToast('このコマを全消去');
     } else {
       lastEraseTap = now;
     }
@@ -8470,6 +8504,52 @@ const SHORTCUT_ACTIONS = [
   { id:'swap',      label:'ツールバー左右入替', def:'Tab',        prevent:true, run:()=>toggleToolbarSwap() },
 ];
 const SC_BY_ID = Object.fromEntries(SHORTCUT_ACTIONS.map(a=>[a.id,a]));
+
+// ============================================================
+// ツールキーの「押し方」で増える操作（既定 G / P）
+//   単押し  … 従来どおりそのツールを選択
+//   2連打   … ボタンのWクリックと同じ
+//   長押し  … ボタンの長押しと同じ
+// キー自体は再割当できるので、キー名ではなくアクションid（fill/pen）に紐づける。
+// ERASE の「2連打で全消去」はボタン側の click 時刻差判定がキーの2回clickでも
+// そのまま成立するため、ここには登録しない（登録すると二重発火する）。
+// ============================================================
+const KEY_DBL_MS = 320;    // 2連打とみなす間隔
+const KEY_HOLD_MS = 500;   // 長押し成立（ボタンの onLongPress と同じ）
+const KEY_GESTURES = {
+  fill:  { dbl: () => fillToggleLasso(), hold: () => fillToggleLassoErase() },
+  pen:   { dbl: () => togglePressurePen() },
+  // erase は dbl を持たない（＝2回のclickがボタン側の380ms判定で全消去になる）。
+  // ここに登録するのは **オートリピート除け** が目的：押しっぱなしにすると
+  // click が連射されて全消去がUndoに何手も積まれてしまう。
+  erase: {},
+};
+let gKeyGestId = '', gKeyGestT = 0, gKeyGestTimer = null;
+function keyGestureClearTimer(){
+  if(gKeyGestTimer){ clearTimeout(gKeyGestTimer); gKeyGestTimer = null; }
+}
+function keyGestureDown(a, e){
+  const g = KEY_GESTURES[a.id];
+  if(!g){ a.run(); return; }
+  if(e.repeat) return;                 // オートリピートを連打・再実行にしない
+  const now = performance.now();
+  const dbl = (gKeyGestId === a.id) && (now - gKeyGestT < KEY_DBL_MS);
+  keyGestureClearTimer();
+  gKeyGestId = a.id; gKeyGestT = now;
+  if(dbl && g.dbl){
+    gKeyGestT = 0;                     // 3連打が2連打の続きにならないように
+    g.dbl();
+    return;
+  }
+  a.run();                             // 単押し＝従来の動作（ツール選択）
+  if(g.hold){
+    gKeyGestTimer = setTimeout(() => {
+      gKeyGestTimer = null;
+      gKeyGestT = 0;                   // 長押し成立後は2連打扱いしない
+      g.hold();
+    }, KEY_HOLD_MS);
+  }
+}
 const KEYMAP_LS = 'animator_keymap_v1';
 let gKeymap = {};        // {actionId: key}
 let gCaptureId = null;   // キー取得中のアクションID
@@ -8875,11 +8955,13 @@ window.addEventListener('keydown', e => {
   for(const a of SHORTCUT_ACTIONS){
     if(gKeymap[a.id] && gKeymap[a.id] === k){
       if(a.prevent) e.preventDefault();
-      a.run();
+      keyGestureDown(a, e);
       return;
     }
   }
 });
+window.addEventListener('keyup', keyGestureClearTimer);
+window.addEventListener('blur', keyGestureClearTimer);
 
 // ============================================================
 // INIT
