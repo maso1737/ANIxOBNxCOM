@@ -68,6 +68,17 @@ body.swap #side{border-right:1px solid rgba(255,210,122,.18);border-left:0}
   background:transparent;border:1px solid rgba(255,79,168,.35);color:var(--rouge);cursor:pointer;user-select:none;
   font-family:var(--mono);font-size:15px;line-height:1;flex:none}
 .tool small{font-size:6px;letter-spacing:.1em}
+/* ---- モードバッジ（ANIMATOR / econte と同じ「点灯2つ」）----
+   左上=紫 …「投げ縄で囲う道具である」 ／ 右上=水色 …「透明消し」 ／ 右上=金 …「筆圧ペン」
+   色そのものが状態の名前になっているので、ラベルを読まなくても何が効いているか分かる。 */
+.tool{position:relative}
+.tool.pp-on::after,.tool.fe-on::after{
+  content:'';position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;
+  background:var(--gold);box-shadow:0 0 5px rgba(255,210,122,.9)}
+.tool.fe-on::after{background:#5AE9FF;box-shadow:0 0 5px rgba(90,233,255,.9)}
+.tool.lasso-on::before{
+  content:'';position:absolute;top:3px;left:3px;width:6px;height:6px;border-radius:50%;
+  background:#B98CFF;box-shadow:0 0 5px rgba(185,140,255,.9)}
 .tool:hover{background:rgba(255,79,168,.12)}
 .tool.on{background:var(--grad-btn);border-color:transparent;color:#fff;box-shadow:0 0 14px rgba(255,79,168,.55)}
 .rail-sep{width:24px;height:1px;background:rgba(255,210,122,.25);flex:none;margin:3px 0}
@@ -299,18 +310,18 @@ select{width:100%}
     </div>
     <div class="tool on" id="t-sel" title="選択（V）。Wクリックで コマ⇔素材 を切替">▣<small id="t-sel-lb">コマ</small></div>
     <div class="tool" id="t-div" title="コマ分割（D）— ドラッグで分割線。用紙の外から引くと定規のように縦横が決まる">╱<small>DIV</small></div>
-    <div class="tool" id="t-edit" title="コマ線編集（P）。Wクリックで 線⇔ホワイト を切替">◈<small id="t-edit-lb">線</small></div>
+    <div class="tool" id="t-edit" title="コマ線編集（P）— 分割線の●=回転／■=平行移動。押しっぱなしで一時的に持ち替え">◈<small>線</small></div>
     <div class="rail-sep"></div>
     <div class="sub" id="dm-v" title="縦に分割（1）">│縦</div>
     <div class="sub" id="dm-h" title="横に分割（2）">─横</div>
     <div class="sub on" id="dm-f" title="斜め自由（3・Shiftで15°スナップ）">╱斜</div>
     <div class="rail-sep"></div>
     <div class="tool" id="t-text" title="テキスト（T）。クリックで置いて、右のパネルに打つ。Wクリックで 縦書き⇔横書き">あ<small id="t-text-lb">縦</small></div>
-    <div class="tool" id="t-brush" title="ベクターブラシ（B）。ドラッグで手描き線／囲うと塗り。Wクリックで 筆圧ON/OFF">✎<small id="t-brush-lb">筆圧</small></div>
-    <div class="tool" id="t-white" title="投げ縄ホワイト（W）。囲った中を白でかぶせる。Wクリックで 白⇔黒">◯<small id="t-white-lb">白</small></div>
+    <div class="tool pp-on" id="t-brush" title="ベクターブラシ（B）">✎<small id="t-brush-lb">筆圧</small></div>
+    <div class="tool lasso-on" id="t-white" title="投げ縄（G）">◯<small id="t-white-lb">白</small></div>
     <div class="rail-sep"></div>
     <div class="tool" id="t-shade" title="選択コマ以外を青くする（S）">▩<small>BLUE</small></div>
-    <div class="tool" id="t-guide" title="トンボ・内枠ガイド表示（G）">⊹<small>GUIDE</small></div>
+    <div class="tool" id="t-guide" title="トンボ・内枠ガイド表示（Ctrl+@ ／ Photoshop のグリッドと同じ位置）">⊹<small>GUIDE</small></div>
   </div>
 
   <div id="main">
@@ -495,7 +506,7 @@ let curPageIdx=0, selPanel=null, selItem=null, selCut=null;
    ・addTarget = ＋で追加したときの入れ先（コマID / null＝枠の上）。連続で足しても外れない
    ・selItems  = 複数選択。selItem（主）は必ずこの中に入っている */
 let addTarget=null, selItems=[];
-let tool='sel', divMode='f', selMode='panel', editMode='line';
+let tool='sel', divMode='f', selMode='panel';
 let textVert=true, brushPress=true, whiteErase=false;       // レールのWクリック/長押しで切り替わる道具の状態
 /* 次に置くもの の色と太さ。◆Items のパレット（下の色チップ）で選ぶ */
 let gWhiteColor='#FFFFFF', gBrushColor='#000000', gTextColor='#000000', gBrushLw=0;
@@ -1184,7 +1195,7 @@ function render(){
     cx.restore();
   }
   /* 分割線ハンドル（EDIT/線）— 中央=平行移動 / 両端=回転 */
-  if(tool==='edit'&&editMode==='line'){
+  if(tool==='edit'){
     const r=Math.max(7/view.z,PAPER.w*0.0042), lwl=Math.max(2/view.z,PAPER.w*0.0011);
     for(const cu of cutsOfPage(pg)){
       const s=cutSegment(cu), on=(selCut===cu.id);
@@ -1200,14 +1211,24 @@ function render(){
       cx.restore();
     }
   }
-  /* 投げ縄（W / EDIT白）の途中経過 */
-  if(lasso&&lasso.pts.length>1){
+  /* 投げ縄（G / W）の途中経過。多角形は1点目から見せる（打った印が出ないと入ったか分からない） */
+  if(lasso&&lasso.pts.length>=(lasso.poly?1:2)){
+    const pv=lasso.pts.concat((lasso.poly&&lasso.hover)?[lasso.hover]:[]);   // 次の一辺＝ラバーバンド
     cx.save();
     cx.strokeStyle='#FFD27A';cx.lineWidth=Math.max(2/view.z,PAPER.w*0.0012);
     cx.setLineDash([12/view.z,8/view.z]);
-    pathPoly(cx,lasso.pts);cx.stroke();cx.setLineDash([]);
-    cx.fillStyle=lasso.erase?'rgba(255,79,168,.22)'
-      :((lasso.color==='#FFFFFF'||!lasso.color)?'rgba(255,255,255,.45)':'rgba(0,0,0,.35)');cx.fill();
+    if(pv.length>1){
+      pathPoly(cx,pv);cx.stroke();cx.setLineDash([]);
+      cx.fillStyle=lasso.erase?'rgba(255,79,168,.22)'
+        :((lasso.color==='#FFFFFF'||!lasso.color)?'rgba(255,255,255,.45)':'rgba(0,0,0,.35)');cx.fill();
+    }
+    cx.setLineDash([]);
+    if(lasso.poly){
+      /* 打った頂点を点で見せる。**始点だけ大きく**＝「ここを押せば閉じる」 */
+      cx.fillStyle='#FF4FA8';
+      const rad=Math.max(4/view.z,PAPER.w*0.0022);
+      lasso.pts.forEach((q,i)=>{cx.beginPath();cx.arc(q.x,q.y,i===0?rad*1.8:rad,0,TAU);cx.fill();});
+    }
     cx.restore();
   }
   /* ブラシの途中経過（確定後とまったく同じ描き方＝出来上がりが読める） */
@@ -1278,15 +1299,14 @@ function updateStatus(){
       +(divMode==='f'?'斜のあいだは向きが勝手に切り替わりません'
                      :'用紙の外から引くと定規のように縦横が決まる')
       +'。コマ選択中はそのコマだけ、未選択なら横切る全コマ',
-    edit:(editMode==='line'
-      ?'分割線の●=回転／■=平行移動（Shiftで15°）。破綻する動きは自動で戻ります'
-      :'ドラッグで投げ縄→離すと白でかぶさります（EDITをWクリックで線編集に戻る）'),
+    edit:'分割線の●=回転／■=平行移動（Shiftで15°）。破綻する動きは自動で戻ります',
     text:'置きたい所をクリック→右の◆Itemsに打つ（'+(textVert?'縦書き':'横書き')+'）。文字をクリックすると編集に戻ります',
     brush:'ドラッグで手描き線（'+(brushPress?'筆圧あり・ペン軸のみ':'均一な太さ')+'）。描き始めに戻ると囲んだ中を塗ります',
-    white:whiteErase
-      ?'ドラッグで投げ縄→離すと囲った中の絵が消えます（長押しで塗りに戻る）'
-      :'ドラッグで投げ縄→離すと'+(gWhiteColor==='#FFFFFF'?'白でかぶさります':'その色で塗ります')
-        +'（色は下のチップ／長押しで透明消し）'};
+    white:(lasso&&lasso.poly
+      ?'多角形: クリックで頂点／始点をクリック・Enter・Wクリックで確定／Escで取消'
+      :'ドラッグ=フリーハンド ／ クリック=多角形。離すと'
+        +(whiteErase?'囲った中の絵が消えます':(gWhiteColor==='#FFFFFF'?'白でかぶさります':'その色で塗ります'))
+        +'（色は下のチップ／長押し・Shift+Gで透明消し）')};
   $('#bb-hint').textContent=H[tool]||'';
 }
 
@@ -1374,18 +1394,35 @@ function pruneEmptyText(keep){
 }
 function setTool(t){
   if(!BOOK)return;
+  if(lasso&&lasso.poly&&t!=='white')lassoCancel();      // 囲い途中はツールを変えたら捨てる（SPEC_17 §2-3）
   if(tool==='text'&&t!=='text')pruneEmptyText(null);
   tool=t;
   for(const k in TOOL_BTN)$(TOOL_BTN[k]).classList.toggle('on',t===k);
   if(t!=='edit')selCut=null;
   syncToolLabels();render();
 }
+/* ラベル＋モードバッジ＋タイトルを1か所で同期（ANIMATOR の applyFillModeUI と同じ役目）。
+   バッジの色が状態の名前: 紫=投げ縄で囲う道具 / 水色=透明消し / 金=筆圧ペン */
 function syncToolLabels(){
   $('#t-sel-lb').textContent=selMode==='panel'?'コマ':'素材';
-  $('#t-edit-lb').textContent=editMode==='line'?'線':'白';
   $('#t-text-lb').textContent=textVert?'縦':'横';
   $('#t-brush-lb').textContent=brushPress?'筆圧':'均一';
+  $('#t-brush').classList.toggle('pp-on',brushPress);
+  $('#t-brush').title='ベクターブラシ（B）: '+(brushPress?'筆圧あり（ペン軸のみ）':'均一な太さ')
+    +'\n Wクリック / B2連打 = 筆圧 ON/OFF ／ 押しっぱなしで一時的に持ち替え';
+  const w=$('#t-white');
   $('#t-white-lb').textContent=whiteErase?'消':(gWhiteColor==='#FFFFFF'?'白':'色');
+  w.classList.add('lasso-on');                       // 投げ縄しか持たない道具なので常時点灯
+  w.classList.toggle('fe-on',whiteErase);
+  w.title='投げ縄（G / W）: '+(whiteErase
+      ?'透明消し — 囲った内側の絵を消す'
+      :'塗り — 囲った内側を '+(gWhiteColor==='#FFFFFF'?'白':gWhiteColor)+' でかぶせる（色は下の色チップで選ぶ）')
+    +'\n ドラッグ=フリーハンド ／ クリック=多角形（Enterで確定・Escで取消）'
+    +'\n 長押し / G長押し / Shift+G = 塗り ⇔ 透明消し';
+  $('#t-sel').title='選択（V）: '+(selMode==='panel'?'コマを選ぶ':'素材を選ぶ')
+    +'\n Wクリック / V2連打 = コマ ⇔ 素材';
+  $('#t-text').title='テキスト（T）: '+(textVert?'縦書き':'横書き')
+    +'\n Wクリック / T2連打 = 縦書き ⇔ 横書き';
 }
 /* iPadは dblclick が飛ばないことがあるので、タッチのダブルタップも自前で拾う
    （animator-brush-ops スキルの正準。350ms/28px。両方から来ても1回しか効かせない） */
@@ -1407,13 +1444,7 @@ function toggleSelMode(){
   selMode=selMode==='panel'?'item':'panel';
   if(selMode==='item')selPanel=null;else selItem=null;
   syncToolLabels();renderPanelSec();renderItemList();renderItemParams();render();
-  toast(selMode==='panel'?'SEL: コマを選ぶ':'SEL: 素材（トーン/流線/画像）を選ぶ');
-}
-/* EDIT の Wクリック: 分割線の移動・回転 ⇔ ホワイト（投げ縄で白かぶせ） */
-function toggleEditMode(){
-  editMode=editMode==='line'?'white':'line';
-  selCut=null;syncToolLabels();render();
-  toast(editMode==='line'?'EDIT: 分割線を動かす／回す':'EDIT: 投げ縄で白をかぶせる');
+  stageToast(selMode==='panel'?'SEL コマ':'SEL 素材');
 }
 function setDivMode(m){
   divMode=m;
@@ -1426,17 +1457,73 @@ function setDivMode(m){
 function toggleTextVert(){
   textVert=!textVert;
   if(selItem&&selItem.type==='text'){selItem.vertical=textVert;commit();renderItemParams();}
-  syncToolLabels();render();toast(textVert?'文字: 縦書き':'文字: 横書き');
+  syncToolLabels();render();stageToast(textVert?'文字 縦書き':'文字 横書き');
 }
 function toggleBrushPress(){
   brushPress=!brushPress;syncToolLabels();
-  toast(brushPress?'ブラシ: 筆圧あり（ペンのみ）':'ブラシ: 均一な太さ');
+  stageToast('筆圧ペン '+(brushPress?'ON':'OFF'));
 }
-/* 長押し＝透明消し（ANIMATOR の FILL長押しと同じ手ぐせ）。もう一度長押しで塗りに戻る */
+/* 長押し / Shift+G ＝透明消し（ANIMATOR の FILL長押しと同じ手ぐせ）。もう一度で塗りに戻る */
 function toggleWhiteErase(){
-  whiteErase=!whiteErase;syncToolLabels();render();
-  toast(whiteErase?'投げ縄: 透明消し（囲った中の絵を消す）':'投げ縄: 塗り（下の色チップの色でかぶせる）');
+  whiteErase=!whiteErase;syncToolLabels();renderPalette();render();
+  stageToast(whiteErase?'投げ縄 透明消し':'投げ縄 塗り');
 }
+/* ============================================================
+   キーの押し方の文法（SPEC_17 §2-1。正準は animator.html）
+   単押し   … そのツールを選択（**遅らせない**）
+   2連打    … そのツールボタンの Wクリックと同じ
+   長押し   … そのツールボタンの長押しと同じ
+   Shift+   … 長押しと同じ動作へ待ち時間ゼロで直行
+   押しっぱなし→離す … 押している間だけそのツール／離すと元のツールへ戻る（バネ）
+   ★キー名ではなく **ツールid** に紐づける。キー→id は TOOL_KEYS の1枚だけ差し替えれば済む。
+   ============================================================ */
+const KEY_DBL_MS=320, KEY_HOLD_MS=500, KEY_SPRING_MS=250;   // ANIMATOR / econte と同値
+/* ★`W` は昔からの投げ縄キー。`G` を ANIMATOR / econte に合わせて足すが、
+   **W も残す**（手が覚え直しにならないのが SPEC_17 の目的なので片方を取り上げない）。
+   G が空いたのは GUIDE を Ctrl+@（Photoshop のグリッドと同じ位置）へ移したから。 */
+const TOOL_KEYS={v:'sel',d:'div',p:'edit',t:'text',b:'brush',g:'white',w:'white'};
+const KEY_GESTURES={
+  sel:  {dbl:toggleSelMode},
+  // div: 2連打の相手は「縦/横/斜」の3択＝1/2/3 で直接選べるので、空振りする押し方を作らない
+  div:  {spring:true},
+  // edit: 線編集だけになった（ホワイトは投げ縄へ一本化）＝2連打の相手が居ない
+  edit: {spring:true},
+  text: {dbl:toggleTextVert},
+  brush:{dbl:toggleBrushPress, spring:true},
+  // white: manga-plate は **常時投げ縄**（バケツが無い）＝econte と同じく dbl は持たせない。
+  //   塗り ⇔ 透明消しは 長押し と Shift+G（ANIMATOR と同じ場所）
+  white:{hold:toggleWhiteErase, shift:toggleWhiteErase, spring:true},
+};
+let gKeyGestId='', gKeyGestT=0, gKeyGestTimer=null;
+let gSpringKey='', gSpringFrom='', gSpringT=0;
+function keyGestClear(){if(gKeyGestTimer){clearTimeout(gKeyGestTimer);gKeyGestTimer=null;}}
+function keyGestureDown(id,e){
+  const g=KEY_GESTURES[id];
+  if(!g){setTool(id);return;}
+  if(e.repeat)return;                       // ★オートリピートを連打・再実行にしない
+  if(e.shiftKey&&g.shift){keyGestClear();gKeyGestT=0;g.shift();return;}
+  const now=performance.now();
+  const dbl=(gKeyGestId===id)&&(now-gKeyGestT<KEY_DBL_MS);
+  keyGestClear();
+  gKeyGestId=id;gKeyGestT=now;
+  if(dbl&&g.dbl){gKeyGestT=0;g.dbl();return;}   // 3連打が2連打の続きにならないように
+  if(g.spring){gSpringKey=id;gSpringFrom=tool;gSpringT=now;}
+  setTool(id);                                  // 単押し＝従来の動作（**遅らせない**）
+  if(g.hold)gKeyGestTimer=setTimeout(()=>{gKeyGestTimer=null;gKeyGestT=0;g.hold();},KEY_HOLD_MS);
+}
+/* 離したとき: 長押しタイマーを消す＋バネ式の戻り */
+function keyGestureUp(e){
+  keyGestClear();
+  const id=TOOL_KEYS[(e&&e.key||'').toLowerCase()];
+  if(!gSpringKey||!id||id!==gSpringKey)return;
+  const held=performance.now()-gSpringT, from=gSpringFrom;
+  gSpringKey='';gSpringFrom='';
+  if(held>=KEY_SPRING_MS&&from&&from!==tool){setTool(from);stageToast(from.toUpperCase()+' へ戻りました');}
+}
+function keyGestureReset(){keyGestClear();gSpringKey='';gSpringFrom='';}
+window.addEventListener('keyup',keyGestureUp);
+window.addEventListener('blur',keyGestureReset);
+
 /* 長押し。クリック/Wクリックとは独立に張る（500ms/12px＝animator と同じ数値） */
 function onLongPress(el,handler,ms){
   if(!el)return;
@@ -1454,7 +1541,6 @@ $('#t-sel').addEventListener('click',()=>setTool('sel'));
 onDoubleActivate($('#t-sel'),toggleSelMode);
 $('#t-div').addEventListener('click',()=>setTool('div'));
 $('#t-edit').addEventListener('click',()=>setTool('edit'));
-onDoubleActivate($('#t-edit'),toggleEditMode);
 $('#t-text').addEventListener('click',()=>setTool('text'));
 onDoubleActivate($('#t-text'),toggleTextVert);
 $('#t-brush').addEventListener('click',()=>setTool('brush'));
@@ -1507,6 +1593,59 @@ function cutAt(pg,x,y){
   return best;
 }
 let drag=null, lasso=null, stroke=null;
+/* --- 囲い方は2通り（SPEC_17 §2-3。正準は animator.html） -----------------------
+   ドラッグで始める … フリーハンド。離した所で確定（従来）
+   クリックで始める … 多角形。クリックのたびに頂点、次の一辺はラバーバンドで見せる
+   確定は Enter / 始点をクリック / Wクリック の3通り。Esc でいつでも捨てられる。
+   ★Alt+クリックは使わない（スポイトの正準割り当てと衝突する）。
+     「クリックで始めたら多角形」なら修飾キーが1つも要らない。 */
+const LASSO_DRAG_PX=6;     // これ以上動いたら「ドラッグ」＝フリーハンド確定
+const LASSO_CLOSE_PX=14;   // 始点に吸い付いて閉じる距離（画面px。ズームしても指の感覚が変わらない）
+function lassoPolyBegin(){
+  if(!lasso)return;
+  lasso.poly=true;lasso.hover=null;
+  render();updateStatus();
+  stageToast('多角形 投げ縄：クリックで頂点／Enterで確定');
+}
+/* 多角形モード中のクリック＝頂点を打つ（始点の近くなら閉じる） */
+function lassoPolyClick(ev){
+  if(!lasso)return;
+  const p=evPt(ev), f=lasso.scr[0];
+  if(f&&lasso.pts.length>=3&&Math.hypot(ev.clientX-f.cx,ev.clientY-f.cy)<LASSO_CLOSE_PX){lassoFinish();return;}
+  const q=lasso.pts[lasso.pts.length-1];
+  if(q&&Math.hypot(p.x-q.x,p.y-q.y)<1)return;          // Wクリックの2発目を頂点として重ねない
+  lasso.pts.push({x:p.x,y:p.y});
+  lasso.scr.push({cx:ev.clientX,cy:ev.clientY});
+  render();
+}
+/* 囲いを確定して white アイテムにする。フリーハンドでも多角形でも出口はここ1つ */
+function lassoFinish(){
+  if(!lasso)return;
+  const pts=lasso.pts, pid=lasso.panelId, col=lasso.color||'#FFFFFF', er=!!lasso.erase;
+  lasso=null;drag=null;
+  if(pts.length>2&&polyArea(pts)>minArea()){
+    const b=polyBounds(pts);
+    const pg=curPage();
+    const it=Object.assign({id:uid('i_'),type:'white',visible:true,panelId:pid,
+        name:(er?'ERASE ':col==='#FFFFFF'?'WHITE ':'FILL ')+(pg.items.length+1)},
+      JSON.parse(JSON.stringify(defaultsFor('white',PAPER.bas))));
+    it.x=Math.round(b.cx);it.y=Math.round(b.cy);it.color=col;it.erase=er;
+    it.poly=pts.map(q=>({x:q.x-b.cx,y:q.y-b.cy}));
+    pg.items.push(it);selItem=it;selItems=[it];selPanel=null;
+    normalizeItems(pg);
+    commit();renderItemList();renderItemParams();renderPanelSec();
+    toast(er?'囲った中の絵を消しました':(col==='#FFFFFF'?'ホワイトをかぶせました（◆Items で色や不透明度を変更できます）':'塗りました'));
+  }else{render();toast('囲いが小さすぎます（3点以上で、ある程度の広さが要ります）');}
+  updateStatus();
+}
+/* 塗らずに捨てる（Esc / ツール切替 / ページ切替）。**Undoも積まない** */
+function lassoCancel(){
+  if(!lasso)return;
+  const poly=lasso.poly;
+  lasso=null;drag=null;
+  render();updateStatus();
+  if(poly)stageToast('投げ縄 取消');
+}
 /* 筆圧: ペン軸のみ。0でも消えないよう下限を持たせる（animator と同じ式） */
 function pressW(ev){
   if(!brushPress||!ev||ev.pointerType!=='pen')return 1;
@@ -1598,6 +1737,7 @@ function focusPageAt(ev){
   if(!spreadOn)return false;
   const idx=pageAtWorldX(evPtW(ev).x);
   if(idx===curPageIdx)return false;
+  if(lasso)lassoCancel();
   curPageIdx=idx;selPanel=null;selItem=null;selItems=[];selCut=null;addTarget=null;
   renderItemList();renderItemParams();renderPanelSec();
   return true;
@@ -1612,6 +1752,13 @@ cvs.addEventListener('pointerdown',ev=>{
     }
   }
   if(gestureLock)return;
+  /* 多角形の投げ縄が進行中なら、何よりも先に頂点打ち（SPEC_17 §2-3）。
+     ただし見開きで**反対のページ**を触ったら捨てて、ふつうのページ切替へ落とす
+     （そのまま頂点を打つと、いま作業しているページの外へ点が飛ぶ） */
+  if(lasso&&lasso.poly){
+    if(spreadOn&&pageAtWorldX(evPtW(ev).x)!==curPageIdx)lassoCancel();
+    else{lassoPolyClick(ev);return;}
+  }
   cvs.setPointerCapture(ev.pointerId);
   focusPageAt(ev);
   const p=evPt(ev), pg=curPage();
@@ -1628,12 +1775,13 @@ cvs.addEventListener('pointerdown',ev=>{
     divPreview=divLine(drag);render();return;
   }
 
-  /* 投げ縄ホワイト = 専用ツール（W）／ EDIT の Wクリック、どちらからでも同じ動き */
-  if(tool==='white'||(tool==='edit'&&editMode==='white')){
+  /* 投げ縄（G / W）。囲った中を「下の色チップの色」でかぶせる。長押しで透明消しに切替。
+     EDIT の白モードは廃止（枠の上グループで同じことができるので二重に持つ意味が無くなった） */
+  if(tool==='white'){
     const k=panelAt(pg,p.x,p.y);
-    lasso={pts:[{x:p.x,y:p.y}],panelId:k?k.id:null,
-           color:tool==='white'?gWhiteColor:'#FFFFFF',
-           erase:tool==='white'&&whiteErase};
+    lasso={pts:[{x:p.x,y:p.y}],scr:[{cx:ev.clientX,cy:ev.clientY}],panelId:k?k.id:null,
+           color:gWhiteColor,erase:whiteErase,
+           poly:false,moved:false,hover:null,down:{cx:ev.clientX,cy:ev.clientY}};
     drag={t:'lasso'};render();return;
   }
 
@@ -1660,7 +1808,7 @@ cvs.addEventListener('pointerdown',ev=>{
     drag={t:'none'};return;
   }
 
-  if(tool==='edit'&&editMode==='line'){
+  if(tool==='edit'){
     const h=cutAt(pg,p.x,p.y);
     if(h){selCut=h.cut.id;selPanel=null;selItem=null;
       drag={t:'cut',cid:h.cut.id,grab:h.grab,seg:h.seg};
@@ -1704,6 +1852,11 @@ cvs.addEventListener('pointermove',ev=>{
     tPts.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
     if(pinch){pinchMove();return;}
   }
+  /* 多角形中は押していなくても次の一辺を見せる（drag が無いので早期returnの前に置く） */
+  if(lasso&&lasso.poly){
+    if(gestureLock)return;
+    lasso.hover=evPt(ev);renderQ();return;
+  }
   if(gestureLock||!drag)return;
   if(drag.t==='pan'){const r=cvs.getBoundingClientRect();
     view.x=drag.ox+((ev.clientX-r.left)-drag.sx)/view.z;view.y=drag.oy+((ev.clientY-r.top)-drag.sy)/view.z;renderQ();return;}
@@ -1712,8 +1865,9 @@ cvs.addEventListener('pointermove',ev=>{
     if(divMode==='v'||divMode==='h'){drag.x0=p.x;drag.y0=p.y;}
     divPreview=divLine(drag);renderQ();return;}
   if(drag.t==='lasso'&&lasso){
+    if(!lasso.moved&&Math.hypot(ev.clientX-lasso.down.cx,ev.clientY-lasso.down.cy)>LASSO_DRAG_PX)lasso.moved=true;
     const q=lasso.pts[lasso.pts.length-1], mn=Math.max(6/view.z,PAPER.w*0.002);
-    if(Math.hypot(p.x-q.x,p.y-q.y)>mn)lasso.pts.push({x:p.x,y:p.y});
+    if(Math.hypot(p.x-q.x,p.y-q.y)>mn){lasso.pts.push({x:p.x,y:p.y});lasso.scr.push({cx:ev.clientX,cy:ev.clientY});}
     renderQ();return;}
   if(drag.t==='brush'&&stroke){
     const q=stroke.pts[stroke.pts.length-1], mn=Math.max(2.5/view.z,PAPER.w*0.0008);
@@ -1755,6 +1909,7 @@ function touchEnd(ev){
   const was=gestureLock;gestureLock=false;
   return was;
 }
+cvs.addEventListener('dblclick',ev=>{if(lasso&&lasso.poly){ev.preventDefault();lassoFinish();}});
 cvs.addEventListener('pointerup',ev=>{
   if(touchEnd(ev)){cancelGestures();renderQ();return;}
   if(drag&&drag.t==='div'&&divPreview){
@@ -1768,22 +1923,9 @@ cvs.addEventListener('pointerup',ev=>{
     return;
   }
   if(drag&&drag.t==='lasso'&&lasso){
-    const pts=lasso.pts, pid=lasso.panelId, col=lasso.color||'#FFFFFF', er=!!lasso.erase;
-    lasso=null;drag=null;
-    if(pts.length>2&&polyArea(pts)>minArea()){
-      const b=polyBounds(pts);
-      const pg=curPage();
-      const it=Object.assign({id:uid('i_'),type:'white',visible:true,panelId:pid,
-          name:(er?'ERASE ':col==='#FFFFFF'?'WHITE ':'FILL ')+(pg.items.length+1)},
-        JSON.parse(JSON.stringify(defaultsFor('white',PAPER.bas))));
-      it.x=Math.round(b.cx);it.y=Math.round(b.cy);it.color=col;it.erase=er;
-      it.poly=pts.map(q=>({x:q.x-b.cx,y:q.y-b.cy}));
-      pg.items.push(it);selItem=it;selItems=[it];selPanel=null;
-      normalizeItems(pg);
-      commit();renderItemList();renderItemParams();renderPanelSec();
-      toast(er?'囲った中の絵を消しました':(col==='#FFFFFF'?'ホワイトをかぶせました（◆Items で色や不透明度を変更できます）':'塗りました'));
-    }else render();
-    return;
+    /* 動かさずに離した＝クリックで始めた＝ここから多角形（SPEC_17 §2-3） */
+    if(!lasso.moved){drag=null;lassoPolyBegin();return;}
+    lassoFinish();return;
   }
   if(drag&&drag.t==='brush'&&stroke){
     const pts=stroke.pts, pid=stroke.panelId;
@@ -2997,19 +3139,35 @@ $('#io-reset').addEventListener('click',()=>{
    ============================================================ */
 const HELP_GROUPS=[
   ['ツール（右のレール）',[
-    ['V','<b>SEL</b> 選択。<b>Wクリックで コマ⇔素材</b> を切替（トーンや流線が下敷きになっても掴める）'],
+    ['V','<b>SEL</b> 選択（<b>2連打で コマ⇔素材</b>）'],
     ['D','<b>DIV</b> コマ分割。ドラッグで線を引く'],
-    ['P','<b>EDIT</b> コマ線編集。<b>Wクリックで 線⇔白</b> を切替'],
+    ['P','<b>EDIT</b> コマ線編集（分割線を動かす／回す）'],
     ['1 / 2 / 3','分割の向き 縦 / 横 / 斜め（既定は斜め）'],
-    ['T','<b>文字</b>。置きたい所をクリック→右の欄に打つ。<b>Wクリックで 縦書き⇔横書き</b>'],
-    ['B','<b>ブラシ</b>。ベクターの手描き線。<b>Wクリックで 筆圧ON/OFF</b>（既定ON・ペン軸のみ）'],
-    ['W','<b>ホワイト</b>。投げ縄で囲った中をかぶせる。色は下のチップ（既定=白）。<b>長押しで 透明消し</b>'],
+    ['T','<b>文字</b>（<b>2連打で 縦書き⇔横書き</b>）'],
+    ['B','<b>ブラシ</b> ベクターの手描き線（<b>2連打で 筆圧ON/OFF</b>・既定ON・ペン軸のみ）'],
+    ['G （W も可）','<b>投げ縄</b>。囲った中を色チップの色でかぶせる（<b>長押し / Shift+G で 透明消し</b>）'],
     ['TAB / ⇄','ツールとパネルの左右入替（<b>⇄</b> はレールの一番上）'],
   ]],
-  ['文字・ブラシ・ホワイト（新しい3つ）',[
+  ['キーの押し方（ANIMATOR / econte と共通・SPEC_17）',[
+    ['単押し','そのツールを選ぶ（待たされない）'],
+    ['2連打','そのツールボタンの <b>Wクリックと同じ</b>（320ms以内）'],
+    ['長押し','そのツールボタンの <b>長押しと同じ</b>（500ms）'],
+    ['Shift+キー','長押しと同じ動作へ<b>待ち時間ゼロで直行</b>'],
+    ['押しっぱなし→離す','押しているあいだだけそのツール。離すと<b>元のツールへ戻る</b>（D / P / B / G）'],
+    ['点灯の色','ボタン左上の<b>紫</b>＝投げ縄で囲う道具 ／ 右上の<b>水色</b>＝透明消し ／ 右上の<b>金</b>＝筆圧ペン'],
+  ]],
+  ['投げ縄で囲う（G / W）',[
+    ['ドラッグで始める','<b>フリーハンド</b>。離した所で確定'],
+    ['クリックで始める','<b>多角形</b>。クリックのたびに頂点、次の一辺はラバーバンドで見える'],
+    ['多角形の確定','<b>Enter</b> ／ <b>始点をクリック</b>（大きい点） ／ <b>Wクリック</b> の3通り'],
+    ['ESC','囲いを捨てる（塗らない・<b>Undoも積まない</b>）。ツールやページを変えても捨てる'],
+    ['長押し / Shift+G','<b>塗り ⇔ 透明消し</b>。透明消しは囲った中の絵が消える'],
+    ['色','下の色チップ（既定=白）。黒に変えれば「足す」側にも使える'],
+    ['—','始めた位置のコマに割り当たるので、コマの外へはみ出さない'],
+  ]],
+  ['文字・ブラシ・投げ縄（描く3つ）',[
     ['文字','書体は<b>アンチック体</b>（しっぽりアンチック）。縦書きは改行＝次の列（右から左）。<b>白フチ</b>で絵の上でも読める'],
     ['ブラシ','ドラッグで線。<b>描き始めに戻ると「囲った」とみなして中を塗る</b>。太さ・色は次の線にも引き継ぐ'],
-    ['ホワイト','ドラッグで投げ縄。EDITのWクリック（線⇔白）からも同じ。<b>長押し＝透明消し</b>（囲った中の絵が消える）'],
     ['色の選び方','<b>何も選んでいないとき</b>の下の色チップ＝「次に置くものの色」。素材を選んでいるとその素材の色'],
     ['フチ','文字・ペンの両方に付けられる（白フチ＝絵の上でも読める／黒フチ＝白い線の縁取り）'],
     ['重なり','この3つは<b>いつも一番上</b>。トーン・集中線・流線は<b>乗算</b>なので、下の線画を塗り潰さない'],
@@ -3024,11 +3182,6 @@ const HELP_GROUPS=[
     ['■ 中央','分割線を平行移動。両側のコマが同時に追従する'],
     ['● 両端','反対の端を軸にして回転（Shiftで15°）'],
     ['—','コマが潰れる動きは自動で元に戻る。分割の履歴を持っているので何度でも直せる'],
-  ]],
-  ['仕上げのホワイト（EDIT / 白）',[
-    ['ドラッグ','投げ縄。離すとその形で白がかぶさる＝トーンや流線を部分的に消す'],
-    ['—','始めた位置のコマに割り当たるので、コマの外へはみ出さない'],
-    ['◆Items','色を黒に変えれば「足す」側にも使える'],
   ]],
   ['素材（◆Items）— コマ欄',[
     ['コマ欄','リストは<b>コマごとの欄</b>に分かれていて、<b>並びは固定</b>。上が「枠の上」、下へ向かって コマN…コマ2、コマ1'],
@@ -3075,7 +3228,7 @@ const HELP_GROUPS=[
   ]],
   ['表示・その他',[
     ['S','選択コマ以外を青くする ON/OFF'],
-    ['G','トンボ・内枠ガイド ON/OFF'],
+    ['Ctrl+@','トンボ・内枠ガイド ON/OFF（Photoshop のグリッドと同じ位置。G は投げ縄へ譲りました）'],
     ['M','左右見開き作業 ON/OFF'],
     ['F','用紙を画面に合わせる'],
     ['Ctrl+Z / Ctrl+Y','元に戻す / やり直し'],
@@ -3172,6 +3325,16 @@ function modalPick(msg,list,onPick){
 $('#modal-ok').addEventListener('click',()=>{const f=modalOk;modalClose();if(f)f();});
 $('#modal-cancel').addEventListener('click',()=>{const f=modalCancel;modalClose();if(f)f();});
 let toastT=null;
+/* モード切替の告知（SPEC_17 §2-4）。キー操作はボタンの点灯が視界の外なので、
+   切替後の「状態の名前」をステージ上部に一瞬だけ出す。manga-plate の #toast は
+   もともとステージ内・上部中央にあるので、時間だけ短くして使い回す。 */
+let gStageT=null;
+function stageToast(msg){
+  const t=$('#toast');t.innerHTML=esc(msg);t.style.display='block';
+  clearTimeout(toastT);
+  if(gStageT)clearTimeout(gStageT);
+  gStageT=setTimeout(()=>{t.style.display='none';gStageT=null;},900);
+}
 function toast(msg){const t=$('#toast');t.innerHTML=esc(msg);t.style.display='block';
   clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',2600);}
 
@@ -3208,6 +3371,11 @@ function stepItemSel(d,toEnd){
 window.addEventListener('keydown',ev=>{
   const tag=document.activeElement&&document.activeElement.tagName;
   if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA')return;
+  /* 囲い途中の多角形は **何よりも先**（SPEC_17 §2-3）。Enter=確定 / Esc=捨てる（Undoも積まない） */
+  if(lasso&&lasso.poly){
+    if(ev.key==='Escape'){ev.preventDefault();lassoCancel();return;}
+    if(ev.key==='Enter'){ev.preventDefault();lassoFinish();return;}
+  }
   if(ev.key==='Escape'){
     if($('#help-ovl').classList.contains('on')){toggleHelp(false);return;}
     if($('#modal').style.display==='flex'){const f=modalCancel;modalClose();if(f)f();return;}
@@ -3230,20 +3398,21 @@ window.addEventListener('keydown',ev=>{
   if(ev.key==='?'||(ev.shiftKey&&ev.key==='/')){toggleHelp();return;}
   if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();undo();return;}
   if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return;}
+  /* GUIDE は Ctrl+@（Photoshop のグリッド Ctrl+' と同じ位置。USレイアウトの ' も受ける）。
+     G は投げ縄へ譲った＝ANIMATOR / econte と同じ場所に揃えるため */
+  if((ev.ctrlKey||ev.metaKey)&&(ev.key==='@'||ev.key==="'")){
+    ev.preventDefault();
+    showGuide=!showGuide;$('#t-guide').classList.toggle('on',showGuide);render();
+    stageToast('GUIDE '+(showGuide?'ON':'OFF'));return;
+  }
   if(ev.ctrlKey||ev.metaKey||ev.altKey)return;
   const k=ev.key.toLowerCase();
-  if(k==='v')setTool('sel');
-  else if(k==='d')setTool('div');
-  else if(k==='p')setTool('edit');
-  else if(k==='t')setTool('text');
-  else if(k==='b')setTool('brush');
-  else if(k==='w')setTool('white');
-  else if(k==='1')setDivMode('v');
+  if(TOOL_KEYS[k]){keyGestureDown(TOOL_KEYS[k],ev);return;}   // SPEC_17 §2-1 の3通り＋バネ
+  if(k==='1')setDivMode('v');
   else if(k==='2')setDivMode('h');
   else if(k==='3')setDivMode('f');
   else if(k==='m')setSpread(!spreadOn);
   else if(k==='s'){showShade=!showShade;$('#t-shade').classList.toggle('on',showShade);render();}
-  else if(k==='g'){showGuide=!showGuide;$('#t-guide').classList.toggle('on',showGuide);render();}
   else if(k==='f')fitView();
   else if(k==='delete'||k==='backspace'){
     const t=selAll();
