@@ -6,7 +6,10 @@
 
 アプリ本体（単一HTML）:
 - `animator.html` — メインの作画エディタ（実体。最重要）
-- `oban-builder.html` — OBAN BUILDER。モーションコミック製造機（画像→PLACE→TAKE→単一HTMLビューア書き出し）。パイプライン上は animator と composer の間
+- `oban-builder.html` — OBAN BUILDER **SPECIAL EDITION（新UI・既定）**。モーションコミック製造機（画像→PLACE→TAKE→単一HTMLビューア書き出し）。パイプライン上は animator と composer の間。
+  UI リデザイン版（ゲーム風・操作明快）で、**描画エンジン（canvas / TAKE / DOF / 書き出し）は従来版と同一**。3テーマ切替あり。UI 規約は `OBAN_BUILDER_UI_HANDOVER.md`
+- `oban-builder-classic.html` — 従来UI版（差し替え前の実体を温存）。**エンジンも `localStorage['oban-project']` も共通**なので、作業中のプロジェクトのまま行き来できる。
+  相互リンク: 新UI = ⚙ SETTINGS ▸ FILE／連携 の `CLASSIC UI`（`#b-classic`）／ 従来版 = `#bar-right` の `NEW UI`（`#b-se`）
 - `composer.html` — マルチトラック合成（カメラ/キーフレーム/書き出し）
 - `manga-plate.html` — **MANGA PLATE v2。漫画ページ＆コマ割り**（ジャンプ規定B4 600dpi・多角形コマの縦/横/斜め分割・コマ内マスク・境界効果・ページ一覧・**左右見開き作業**・グレー→網点。SPEC_09 §v2 / §v2-6b）
 - `econte.html` — ECONTE。プリプロ（紙ネーム写真→BOARD切り出し→SHEET絵コンテ→加筆。SPEC_10。パイプライン上は animator の前）
@@ -137,7 +140,8 @@ https://claude.ai/code/artifact/a57e3c0b-064f-4e1b-97d2-a158602ab07b
 | ツール | 入出力ボタン | 備考 |
 |---|---|---|
 | `manga-plate` | EXPORT JSON / IMPORT JSON | 880px以下は `⇩JSON`/`⇧JSON` に短縮（iPad縦でHOMEまで届くこと） |
-| `oban-builder` | EXPORT JSON / IMPORT JSON | `#bar-right` の中 |
+| `oban-builder`（新UI） | ⇧ EXPORT JSON / ⇩ IMPORT JSON | **⚙ SETTINGS ▸ FILE／連携** の中（バーには置かない） |
+| `oban-builder-classic` | EXPORT JSON / IMPORT JSON | `#bar-right` の中 |
 | `econte` | ⇩ PROJ / ⇧ PROJ | **ZIP**なので表記は PROJ のまま（形式が違うものを同じ名前にしない） |
 
 `animator` / `composer` は入出力の性格が違う（ANIMATOR_v1・PROJECT_v2・連番・動画）ので**この並びには揃えない**。

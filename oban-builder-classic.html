@@ -9,13 +9,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="OBAN">
 <title>OBAN BUILDER — motion comic take rig</title>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500&display=swap">
 <style>
 
 /* ============================================================
    OBAN BUILDER — KINETIC STAGE skin (animator/composer 準拠)
-   rouge=配置(PLACE) / ice=カメラ(TAKE) / acc=撮影(FX) / plum stage
+   rouge=配置(PLACE) / ice=カメラ(TAKE) / amber=撮影(FX) / plum stage
    レイアウト・JSは不変。色/タイポ/質感のオーバーライドのみ。
    ============================================================ */
 @font-face{
@@ -24,99 +22,28 @@
   font-weight:300 500;
   font-display:swap;
 }
-/* ============================================================
-   TOKENS — GEN-EX redesign（GLOSS 既定 / SPOTLIGHT / ROUGE）
-   --acc* だけがテーマで入れ替わる。旧名（--acid/--ice/--gold…）は
-   別名として残し、既存パネルのCSSがそのまま新色に乗るようにしている。
-   ============================================================ */
 :root{
-  /* 面と線（テーマ不変の器） */
-  --bg:#08090C;--black:#05060A;--ink:#E8ECF2;--white:#E8ECF2;
-  --panel:rgba(10,12,16,.95);--panel2:#0D0F14;--cell:rgba(232,236,242,.03);
-  --grey:rgba(232,236,242,.55);--dim:rgba(232,236,242,.3);
-  --line:rgba(232,236,242,.14);--line-2:rgba(232,236,242,.08);
-  --border:rgba(232,236,242,.14);--border-bright:rgba(var(--accRGB),.55);
-  /* 書体 */
-  --saira:'Saira Condensed','Bank Gothic','Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
-  --bank:'Bank Gothic','Saira Condensed','Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
-  --mono:'JetBrains Mono','IBM Plex Mono','Menlo','Consolas',monospace;
-  --jp:'Noto Sans JP',-apple-system,'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
-  /* THEME: GLOSS（白黒トーン艶＋シアン） */
-  --acc:#E9F1FA;--accRGB:233,241,250;--acc2:#BFEFFF;--acc2RGB:191,239,255;
-  --acc-fill:linear-gradient(180deg,#FFFFFF,#DCE6F0 46%,#F4F9FF);--acc-ink:#05070B;
-  --acc-border:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,.2) 55%,rgba(190,240,255,.65));
-  --acc-pt:#5AE9FF;--acc-ptRGB:90,233,255;
-  --acc-inset:inset 0 1px 0 rgba(255,255,255,.9);
-  --acc-glow:0 0 18px rgba(90,233,255,.5);
-  --acc-hover-fill:linear-gradient(180deg,rgba(90,233,255,.24),rgba(255,255,255,.08));
-  --acc-hover-line:#5AE9FF;
-  /* 旧名の別名（レイアウトを触らずに色だけ移す） */
-  --acid:var(--acc);--rouge:var(--acc);--magenta:var(--acc2);--ice:var(--acc-pt);
-  --gold:var(--acc2);--neon:var(--acc2);
+  --acid:#FF4FA8;--rouge:#FF4FA8;--magenta:#B850FF;--ice:#5AE9FF;
+  --gold:#FFD27A;--neon:#FFD27A;--amber:#FFC94F;
+  --dim:#5b4a78;--grey:#9d8db3;--black:#07030f;--bg:#0c061d;
+  --white:#F8EFFF;--ink:#F8EFFF;--panel:#100722;--panel2:#150927;
+  --border:rgba(255,210,122,0.14);--border-bright:rgba(255,79,168,0.45);
+  --bank:'Bank Gothic','Barlow Condensed','Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
+  --mono:'IBM Plex Mono','Menlo','Consolas',monospace;
+  --jp:-apple-system,'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
 }
-body[data-theme="SPOTLIGHT"]{
-  --acc:#C46BFF;--accRGB:196,107,255;--acc2:#9BF3FF;--acc2RGB:155,243,255;
-  --acc-fill:linear-gradient(118deg,#5AE9FF,#8F7BFF 40%,#FF4FA8 72%,#B850FF 100%);--acc-ink:#FFFFFF;
-  --acc-border:linear-gradient(118deg,#5AE9FF,#8F7BFF 40%,#FF4FA8 72%,#B850FF 100%);
-  --acc-pt:#5AE9FF;--acc-ptRGB:90,233,255;
-  --acc-inset:inset 0 1px 0 rgba(255,255,255,.35);
-  --acc-glow:0 0 18px rgba(196,107,255,.45);
-  --acc-hover-fill:linear-gradient(180deg,rgba(90,233,255,.22),rgba(184,80,255,.12));
-  --acc-hover-line:#9BF3FF;
-}
-body[data-theme="ROUGE"]{
-  --acc:#FF4FA8;--accRGB:255,79,168;--acc2:#FFA6D6;--acc2RGB:255,166,214;
-  --acc-fill:linear-gradient(180deg,#FF6FB8,#FF4FA8 60%,#E0348C);--acc-ink:#0C0512;
-  --acc-border:linear-gradient(180deg,rgba(255,166,214,.9),rgba(255,79,168,.35));
-  --acc-pt:#FF4FA8;--acc-ptRGB:255,79,168;
-  --acc-inset:inset 0 1px 0 rgba(255,255,255,.28);
-  --acc-glow:0 0 16px rgba(255,79,168,.42);
-  --acc-hover-fill:linear-gradient(180deg,rgba(255,79,168,.22),rgba(184,80,255,.08));
-  --acc-hover-line:#FF4FA8;
-}
-@keyframes nowGlow{
-  0%,100%{box-shadow:0 0 0 1px rgba(var(--accRGB),.55),0 0 18px rgba(var(--accRGB),.18)}
-  50%{box-shadow:0 0 0 1px rgba(var(--accRGB),.9),0 0 26px rgba(var(--accRGB),.34)}
-}
-@media (prefers-reduced-motion:reduce){*{animation:none!important}}
-/* スクロールバー（全部で共通・アクセント） */
-*::-webkit-scrollbar{width:10px;height:10px}
-*::-webkit-scrollbar-track{background:rgba(232,236,242,.04)}
-*::-webkit-scrollbar-thumb{background:rgba(var(--accRGB),.45);border:3px solid transparent;background-clip:padding-box}
-*::-webkit-scrollbar-thumb:hover{background:rgba(var(--accRGB),.85);border:3px solid transparent;background-clip:padding-box}
-*::-webkit-scrollbar-corner{background:transparent}
-@supports not selector(::-webkit-scrollbar){*{scrollbar-width:thin;scrollbar-color:rgba(var(--accRGB),.5) rgba(232,236,242,.04)}}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden}
 body{
   background:
-    radial-gradient(ellipse 70% 60% at 50% 46%,transparent 40%,rgba(4,5,7,.72) 100%),
-    linear-gradient(rgba(232,236,242,.028) 1px,transparent 1px) center/80px 80px,
-    linear-gradient(90deg,rgba(232,236,242,.028) 1px,transparent 1px) center/80px 80px,
-    linear-gradient(180deg,#0A0C11,#07080B 62%,#0A0B0F);
+    radial-gradient(ellipse 68% 48% at 84% -4%,rgba(184,80,255,0.11),transparent 56%),
+    radial-gradient(ellipse 58% 55% at 6% 104%,rgba(90,233,255,0.08),transparent 55%),
+    radial-gradient(ellipse 72% 46% at 50% 110%,rgba(255,79,168,0.09),transparent 56%),
+    linear-gradient(180deg,#0c0620,#07030f);
   background-attachment:fixed;
-  color:var(--ink);font-family:var(--mono);font-size:11px;
-  -webkit-font-smoothing:antialiased;
+  color:var(--white);font-family:var(--mono);font-size:11px;
   -webkit-user-select:none;user-select:none;
 }
-/* ---------- アートワーク層（+マーク / 斜めハッチ。触れない・書き出さない） ---------- */
-#art{position:fixed;inset:0;z-index:4;pointer-events:none}
-#art .plus{
-  position:absolute;inset:0;opacity:.5;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cpath d='M80 73.5v13M73.5 80h13' stroke='%23E8ECF2' stroke-opacity='0.22' stroke-width='1'/%3E%3C/svg%3E");
-  background-position:center;
-}
-#art .hatch{
-  position:absolute;width:34vw;height:34vh;
-  background:repeating-linear-gradient(135deg,rgba(var(--accRGB),.055) 0 1px,transparent 1px 8px);
-}
-#art .hatch.tr{right:0;top:0;clip-path:polygon(100% 0,100% 100%,0 0)}
-#art .hatch.bl{left:0;bottom:0;clip-path:polygon(0 0,0 100%,100% 100%)}
-#art .diag{
-  position:absolute;left:-10vw;right:-10vw;top:38%;height:1px;transform:rotate(-6deg);
-  background:linear-gradient(90deg,transparent,rgba(var(--accRGB),.10) 30%,rgba(var(--accRGB),.02) 62%,transparent);
-}
-body.cleanview #art{display:none}
 a{color:var(--ice);text-decoration:none}
 a:hover{color:var(--acid)}
 /* touch-action:none = iPadでブラウザ側のピンチ/スクロールに取られず、指の操作を全部こちらで拾う */
@@ -128,7 +55,7 @@ body.panning #void,body.panning canvas#cv{cursor:grabbing}
 
 /* corner viewfinder ticks — KINETIC stage gate (gold→rouge brackets) */
 #ticks{
-  position:fixed;left:0;right:0;top:64px;bottom:0;z-index:5;pointer-events:none;opacity:.75;
+  position:fixed;left:0;right:0;top:44px;bottom:0;z-index:5;pointer-events:none;opacity:.65;
   background:
     linear-gradient(90deg,var(--gold),var(--acid)) 12px 12px/14px 1px no-repeat,
     linear-gradient(270deg,var(--gold),var(--acid)) calc(100% - 12px) 12px/14px 1px no-repeat,
@@ -142,68 +69,53 @@ body.panning #void,body.panning canvas#cv{cursor:grabbing}
 
 /* ---------- top bar ---------- */
 #bar{
-  position:fixed;left:0;right:0;top:0;z-index:50;display:flex;align-items:center;gap:12px;
-  flex-wrap:nowrap;overflow:hidden;height:64px;padding:0 16px;
-  background:linear-gradient(to bottom,rgba(6,7,10,.94),rgba(6,7,10,.68) 70%,rgba(6,7,10,.2));
-  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
-  border-bottom:1px solid var(--line);
-  font-family:var(--mono);font-size:9px;letter-spacing:.14em;
+  position:fixed;left:0;right:0;top:0;z-index:50;display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+  padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--border);
+  font-size:9px;letter-spacing:.14em;
 }
-#bar::after{
-  content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(var(--accRGB),.5) 16%,rgba(var(--accRGB),.07) 62%,transparent);
+#bar .title{
+  font-family:var(--bank);font-weight:400;letter-spacing:.32em;color:var(--white);margin-right:10px;
+  text-shadow:0 0 10px rgba(255,79,168,.25);
 }
-/* ブランド（GEN-EX ロックアップ） */
-/* GLOSS は accent が白＝丸い点が地に溶けるので、点だけテーマの水色にする */
-body[data-theme="GLOSS"] #bar .brand svg .pt{fill:var(--acc2)}
-#bar .brand{display:flex;align-items:center;gap:11px;flex:none}
-#bar .brand svg{display:block;overflow:visible;flex:none}
-#bar .bwrap{display:flex;flex-direction:column;gap:3px}
-#bar .bname{font-family:var(--bank);font-size:17px;letter-spacing:.02em;line-height:.82;color:var(--ink)}
-#bar .bsub{font-size:8px;letter-spacing:.26em;color:rgba(232,236,242,.4);line-height:1}
-#bar .flex{flex:1;min-width:6px}
-#bar .vline{flex:none;width:1px;height:26px;background:var(--line-2)}
-/* 手順チップ 01 PLACE › 02 TAKE › 03 EXPORT */
-#bar .steps{display:flex;align-items:center;gap:6px;flex:none;min-width:0}
-#bar .sep{flex:none;font-size:11px;color:rgba(232,236,242,.24)}
-.step{
-  cursor:pointer;position:relative;display:flex;align-items:center;gap:9px;height:36px;padding:0 15px;flex:none;
-  border:1px solid var(--line);background:var(--cell);transition:all .12s;
-}
-.step .n{font-size:10px;color:rgba(232,236,242,.32)}
-.step .en{font-family:var(--saira);font-weight:600;font-size:14px;letter-spacing:.24em;color:rgba(232,236,242,.6)}
-.step .jp{font-family:var(--jp);font-size:9px;letter-spacing:.1em;color:rgba(232,236,242,.3)}
-.step .nb{display:none;font-size:8px;letter-spacing:.22em;color:#08090C;background:var(--acc-pt);padding:2px 5px}
-.step:hover{background:var(--acc-hover-fill);border-color:var(--acc-hover-line);box-shadow:var(--acc-glow)}
-.step:hover .en{color:var(--ink)}
-.step:active{filter:brightness(1.18);box-shadow:var(--acc-glow),var(--acc-inset)}
-.step.on{
-  border:1px solid rgba(var(--accRGB),.85);border-image:var(--acc-border) 1;
-  background:rgba(var(--accRGB),.14);animation:nowGlow 3.2s ease-in-out infinite;
-}
-.step.on .en{color:var(--acc2);font-weight:700}
-.step.on .n{color:rgba(var(--acc2RGB),.7)}
-.step.on .jp{color:rgba(var(--acc2RGB),.72)}
-.step.on .nb{display:block}
-/* 汎用ボタン（バー・モーダル共通） */
+#bar .title b{color:var(--acid);font-weight:400;text-shadow:0 0 10px rgba(255,79,168,.5)}
 .btn{
-  cursor:pointer;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;flex:none;
-  border:1px solid var(--line);background:var(--cell);color:rgba(232,236,242,.7);
-  font-family:var(--saira);font-weight:600;font-size:11px;letter-spacing:.16em;transition:all .12s;
+  cursor:pointer;border:1px solid var(--border);background:transparent;color:rgba(255,255,255,.7);
+  font-family:var(--bank);font-size:9px;letter-spacing:.08em;padding:5px 11px;transition:all .12s;
 }
-.btn:hover{background:var(--acc-hover-fill);border-color:var(--acc-hover-line);color:var(--ink);box-shadow:var(--acc-glow)}
-.btn:active{filter:brightness(1.18);box-shadow:var(--acc-glow),var(--acc-inset)}
-.btn.on{background:var(--acc-fill);border-color:transparent;color:var(--acc-ink);box-shadow:var(--acc-inset),var(--acc-glow)}
-.btn.ico{width:34px;padding:0;justify-content:center;font-family:var(--mono);font-size:13px;letter-spacing:0}
-.btn.mode,.btn.ex{border-color:rgba(var(--accRGB),.3);color:rgba(232,236,242,.78)}
-/* FX も他のモードボタンと同じ振る舞い（点灯はONのときだけ） */
-.btn.fx{border-color:rgba(var(--accRGB),.34);color:rgba(232,236,242,.78)}
-#bar-right{display:flex;gap:6px;align-items:center;margin-left:auto;flex:none}
-/* 狭い窓では説明の要素から順に落とす（畳まずに1段を守る） */
-@media (max-width:1560px){.step .jp{display:none}}
-@media (max-width:1400px){#bar .bsub{display:none}#bar{gap:9px}}
-@media (max-width:1240px){#bar .lbl{display:none}.btn{padding:0 9px}}
-@media (max-width:1080px){#bar .brand .bwrap{display:none}.step{padding:0 11px}}
+.btn:hover{border-color:var(--border-bright);color:var(--acid)}
+.btn:active{background:rgba(255,79,168,.1)}
+.btn.mode{border-color:rgba(255,79,168,.4);color:var(--acid)}
+.btn.mode.on{
+  background:linear-gradient(135deg,var(--acid),var(--magenta));border-color:transparent;color:#0a0612;
+  box-shadow:0 0 14px rgba(255,79,168,.4);
+}
+.btn.mode.ice{border-color:rgba(90,233,255,.4);color:var(--ice)}
+.btn.mode.ice.on{
+  background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#04121a;
+  box-shadow:0 0 14px rgba(90,233,255,.4);
+}
+.btn.ex{border-color:rgba(90,233,255,.45);color:var(--ice)}
+.btn.ex:hover{
+  background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#04121a;
+  box-shadow:0 0 14px rgba(90,233,255,.4);
+}
+.btn.fx{border-color:rgba(255,201,79,.45);color:var(--amber)}
+/* COMPOSER と同じ作法: **ホバーは枠だけ**（押せることの合図）／**点灯はONのときだけ**（かかっていることの合図）。
+   両方を塗りつぶしにすると「触っただけ」と「効いている」の区別がつかなくなる */
+.btn.fx:hover{
+  background:rgba(255,201,79,.10);border-color:var(--amber);color:var(--amber);
+  box-shadow:0 0 10px rgba(255,201,79,.22);
+}
+/* SATSUEI FX ENABLED が ON の間だけ点灯（DOFは別建てなのでここには含めない） */
+.btn.fx.on{
+  background:linear-gradient(135deg,var(--amber),#e0a838);border-color:transparent;color:#1a1204;
+  box-shadow:0 0 14px rgba(255,201,79,.45);
+}
+.btn.fx.on:hover{
+  background:linear-gradient(135deg,#ffd98f,var(--amber));color:#1a1204;
+  box-shadow:0 0 18px rgba(255,201,79,.6);
+}
+#bar-right{display:flex;gap:7px;align-items:center;margin-left:auto}
 
 /* ---------- フローティングパネル共通：ヘッダの ▾ で最小化 ----------
    COMPOSER の INSPECTOR ▾ と同じ作法。ヘッダだけ残るので「置き場所」を忘れずに畳める。 */
@@ -211,178 +123,179 @@ body[data-theme="GLOSS"] #bar .brand svg .pt{fill:var(--acc2)}
 .pbtn{cursor:pointer;border:1px solid transparent;background:transparent;color:rgba(255,255,255,.5);
   font-family:var(--mono);font-size:11px;line-height:1;padding:2px 5px;transition:all .12s}
 .pbtn:hover{color:#fff;border-color:rgba(255,255,255,.25)}
+#cards.mini #cards-body,#cards.mini #cards-resize,
 #qe.mini #qe-body,#qe.mini #qe-resize,
 #mon.mini #mon-body,
-#fx-modal.mini #fx-body,#fx-modal.mini #fx-resize{display:none}
+#fx-modal.mini #fx-body,#fx-modal.mini #fx-resize,#fx-modal.mini #fx-head .fx-note{display:none}
 
-/* ---------- MONITOR（書き出しの見え方を出す小窓 / P） ----------
-   編集キャンバスは「いまのピント位置での見え方」なので、置いたピントが実際にどう送られるかは
-   プレビューしないと分からない。その答えを常時出しておく小窓。器は DETAIL と同じ作法。 */
+/* ---------- MONITOR（結果こうなるよ窓・ice） ----------
+   編集キャンバスは「いまのピント位置での見え方」を出しているので、置いたピントが実際にどう送られるかは
+   プレビューしないと分からない。その答えを常時出しておく小窓。16:9セーフフレームの中だけを映す。 */
 #mon{
-  position:fixed;left:18px;top:var(--bartop,80px);width:clamp(248px,25vw,352px);max-width:94vw;z-index:44;display:none;
-  border:1px solid rgba(232,236,242,.18);background:rgba(9,10,14,.93);
+  position:fixed;left:14px;top:var(--bartop,88px);width:clamp(240px,24vw,340px);max-width:94vw;z-index:41;display:none;
+  border:1px solid var(--border-bright);background:rgba(16,7,34,.96);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  box-shadow:0 30px 70px rgba(0,0,0,.6);
-  font-family:var(--mono);font-size:10px;letter-spacing:.06em;overflow:hidden;
+  box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 24px rgba(90,233,255,.06);
+  font-size:10px;letter-spacing:.1em;
 }
 body.monopen #mon{display:flex;flex-direction:column}
 #mon-head{
-  display:flex;align-items:center;gap:9px;height:44px;flex:none;padding:0 13px;cursor:move;user-select:none;
-  border-bottom:1px solid rgba(232,236,242,.12);background:rgba(var(--accRGB),.05);
+  display:flex;align-items:center;justify-content:space-between;cursor:move;user-select:none;
+  padding:8px 12px;border-bottom:1px solid var(--border);
+  background:linear-gradient(90deg,rgba(90,233,255,.10),transparent);
+  color:var(--ice);letter-spacing:.28em;font-family:var(--bank);
 }
-#mon-head .ttl{flex:none;font-family:var(--saira);font-weight:700;font-size:14px;letter-spacing:.24em;color:var(--acc)}
-#mon-head .ttl2{flex:none;font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.34)}
-#mon-head .sp{flex:1;min-width:0}
-#mon-pv{flex:none;font-family:var(--saira);font-weight:700;font-size:14px;letter-spacing:.06em;
-  color:var(--acc-ink);background:var(--acc-pt);padding:2px 6px;font-variant-numeric:tabular-nums}
-#mon-close{cursor:pointer;padding:0 2px;opacity:.75;flex:none}
-#mon-close:hover{opacity:1;color:#fff}
-#mon-body{padding:12px 13px 13px;display:flex;flex-direction:column;gap:10px}
-/* 16:9 の画。四隅のティック＝フィルムゲート（キャンバスと同じ語彙） */
-.mon-fr{position:relative;border:1px solid rgba(232,236,242,.14);background:#07080B;line-height:0}
-#mon-cv{display:block;width:100%;height:auto}
-.mon-fr i{position:absolute;width:11px;height:11px;pointer-events:none;
-  border:0 solid rgba(var(--accRGB),.85);border-top-width:1px;border-left-width:1px}
-.mon-fr i.t1{left:4px;top:4px}
-.mon-fr i.t2{right:4px;top:4px;transform:rotate(90deg)}
-.mon-fr i.t3{right:4px;bottom:4px;transform:rotate(180deg)}
-.mon-fr i.t4{left:4px;bottom:4px;transform:rotate(270deg)}
-/* スクロール位置の定規（下部コンソールと同じ .dk-ruler） */
-#mon-rl{margin:9px 6px 13px}
-#mon .mon-info{display:flex;align-items:baseline;gap:9px;font-size:10px;letter-spacing:.1em;
-  color:rgba(232,236,242,.5);font-variant-numeric:tabular-nums}
-#mon .mon-info b{font-family:var(--saira);font-weight:700;font-size:13px;letter-spacing:.1em;color:var(--acc2)}
-#mon .mon-note{font-family:var(--jp);font-size:9px;letter-spacing:.04em;line-height:1.65;color:rgba(232,236,242,.32)}
-#mon .mon-note b{font-weight:500;color:rgba(232,236,242,.55)}
+#mon-close{cursor:pointer;opacity:.5;padding:0 2px;margin-left:6px}
+#mon-close:hover{opacity:1;color:var(--acid)}
+#mon-body{padding:9px 10px 10px}
+#mon-cv{display:block;width:100%;height:auto;background:#07030f;border:1px solid var(--border)}
+#mon .mon-r{display:flex;align-items:center;gap:6px;margin-top:7px}
+#mon .mon-r input[type=range]{flex:1;min-width:40px;accent-color:var(--ice)}
+#mon .mon-r .v{flex:none;color:var(--ice);font-variant-numeric:tabular-nums}
+#mon .mon-info{margin-top:5px;color:var(--amber);font-variant-numeric:tabular-nums;letter-spacing:.06em}
+#mon .mon-note{margin-top:5px;opacity:.45;font-family:var(--jp);letter-spacing:.02em;font-size:9px;line-height:1.6}
 body.cleanview #mon{display:none}
 #crumb{color:var(--gold);letter-spacing:.2em;font-family:var(--bank)}
 #crumb b{font-weight:400;color:var(--ice)}
 #crumb .btn{margin-left:6px}
 
-#fx-resize{height:11px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--border);background:rgba(255,255,255,.02)}
-#fx-resize::after{content:'';width:28px;height:2px;background:rgba(255,255,255,.25)}
-body.dofpick #cv{cursor:crosshair}
-
-/* ---------- 詳細 / QUICK EDIT（選択中のコマ・フレーム・テキスト。PLACE） ----------
-   右の1枚パネル。選択肢は全部見せる（セグメント）／数値は左右ドラッグ。
-   ヘッダで移動・▾ で最小化・✕ で閉じる・[U] で開閉。 */
-#qe{
-  position:fixed;right:18px;top:var(--bartop,80px);width:clamp(300px,31vw,398px);max-width:94vw;
-  z-index:46;display:none;
-  border:1px solid rgba(232,236,242,.18);background:rgba(9,10,14,.93);
+/* ---------- KF cards (TAKE = ice) ---------- */
+/* TAKE カメラKFパネル：animator の REF/設定パネルと同じフローティング（ヘッダで移動・下端で高さ調整） */
+#cards{
+  position:fixed;right:14px;top:var(--bartop,88px);width:clamp(266px,30vw,300px);max-width:94vw;z-index:40;display:none;
+  border:1px solid var(--border-bright);background:rgba(16,7,34,.96);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  box-shadow:0 30px 70px rgba(0,0,0,.6);
-  font-family:var(--mono);font-size:10px;letter-spacing:.06em;overflow:hidden;
+  box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 24px rgba(90,233,255,.06);
+  font-size:10px;letter-spacing:.1em;
 }
-body.place #qe.sel,body.take #qe.sel{display:flex;flex-direction:column}
+#cards-head{
+  display:flex;align-items:center;justify-content:space-between;cursor:move;user-select:none;
+  padding:8px 12px;border-bottom:1px solid var(--border);
+  background:linear-gradient(90deg,rgba(90,233,255,.10),transparent);
+  color:var(--ice);letter-spacing:.28em;font-family:var(--bank);
+}
+#cards-head .drag-hint{opacity:.4;font-size:8px;letter-spacing:.2em}
+#cards-body{overflow-y:auto;max-height:60vh;padding:11px 12px}
+#cards-body::-webkit-scrollbar{width:4px}
+#cards-body::-webkit-scrollbar-thumb{background:rgba(90,233,255,.35)}
+#cards-resize,#fx-resize{height:11px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--border);background:rgba(255,255,255,.02)}
+#cards-resize::after,#fx-resize::after{content:'';width:28px;height:2px;background:rgba(255,255,255,.25)}
+body.take #cards{display:flex;flex-direction:column}
+.edc{border-bottom:1px dashed rgba(90,233,255,.22);padding:8px 0}
+.edc-h{display:flex;align-items:center;gap:6px}
+.edc-h b{color:var(--ice);text-shadow:0 0 6px rgba(90,233,255,.35);font-weight:400;font-size:9px;letter-spacing:.04em}
+.edc-no{font-family:var(--bank);letter-spacing:.14em;flex:none}
+.edc label{display:block;margin-top:5px;opacity:.8;letter-spacing:.08em}
+.edc select{background:var(--panel2);color:var(--white);border:1px solid var(--border);font-family:var(--mono);font-size:10px;padding:1px 4px}
+.edc input[type=range]{width:52%;vertical-align:middle;accent-color:var(--ice)}
+.edb{cursor:pointer;border:1px solid var(--border);background:transparent;color:rgba(255,255,255,.65);font-family:var(--mono);font-size:9px;letter-spacing:.08em;padding:3px 7px;transition:all .12s}
+.edb:hover{background:rgba(90,233,255,.12);border-color:var(--ice);color:var(--ice)}
+/* GOは単独行で大きく（いちばん押す）。他は下の行にまとめ、✕ は右端へ離して誤爆を防ぐ。
+   横1列に詰めると幅が狭いとき GO が潰れ、✕ が GO の真下へ回り込んで押し間違える */
+.edc-btns{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;margin-top:6px}
+.edc-btns.sub{margin-top:4px}
+.edb.go{width:100%;padding:7px 8px;font-size:10px;border-color:rgba(90,233,255,.5);color:var(--ice);letter-spacing:.16em}
+.edb.go:hover{background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#04121a;box-shadow:0 0 12px rgba(90,233,255,.4)}
+.edb.pin{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edb.pin.on{background:rgba(255,201,79,.2);border-color:var(--amber);color:var(--amber);box-shadow:0 0 10px rgba(255,201,79,.3)}
+.edb.del{flex:none;margin-left:8px;border-color:rgba(255,255,255,.16);color:rgba(255,255,255,.35)}
+.edb.del:hover{background:rgba(255,79,168,.18);border-color:var(--acid);color:var(--acid)}
+.edc.sel{background:rgba(90,233,255,.07);border-left:2px solid var(--ice);padding-left:7px}
+/* プレビュー中の再生位置（カードが光って自動スクロール） */
+.edc.now{background:rgba(255,79,168,.10);box-shadow:inset 0 0 0 1px rgba(255,79,168,.45)}
+.edc.now .edc-no{color:var(--acid);text-shadow:0 0 8px rgba(255,79,168,.6)}
+.edc-title{color:var(--ice);letter-spacing:.3em;margin-bottom:8px}
+/* DOF ピント（カメラの仕事なのでTAKEパネルに置く）。
+   KFが増えてもスクロールで上へ逃げないよう、パネル内で上端に貼り付ける（エクセルの固定と同じ狙い） */
+.dofstrip{border:1px solid rgba(255,201,79,.28);padding:7px 8px;margin-bottom:9px;background:rgba(255,201,79,.04);
+  position:sticky;top:-11px;z-index:2;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  background-color:rgba(22,12,38,.97)}
+/* 置いてあるピント点のチップ（クリック＝そのKFへ／✕で外す） */
+.dof-pts{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.dofpt{cursor:pointer;border:1px solid rgba(90,233,255,.35);background:transparent;color:var(--ice);
+  font-family:var(--mono);font-size:9px;letter-spacing:.06em;padding:2px 4px 2px 6px;display:flex;align-items:center;gap:4px}
+.dofpt b{font-weight:400;color:#fff;opacity:.85}
+.dofpt:hover{background:rgba(90,233,255,.12)}
+.dofpt.sel{border-color:var(--amber);color:var(--amber);background:rgba(255,201,79,.14)}
+.dofpt .x{opacity:.4;padding:0 2px}
+.dofpt .x:hover{opacity:1;color:var(--acid)}
+.dofstrip.on{border-color:rgba(255,201,79,.5)}
+.dofstrip .dof-h{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.dofstrip .dof-h label{color:var(--amber);letter-spacing:.14em;cursor:pointer;display:flex;align-items:center;gap:5px}
+.dofstrip input[type=checkbox]{accent-color:var(--amber)}
+.dofstrip .dof-r{display:flex;align-items:center;gap:6px;margin-top:5px}
+.dofstrip .dof-r .k{width:5.2em;flex:none;opacity:.65;letter-spacing:.1em}
+.dofstrip .dof-r .v{width:2.8em;flex:none;text-align:right;color:var(--ice);font-variant-numeric:tabular-nums}
+.dofstrip .dof-r input[type=range]{flex:1;min-width:40px;accent-color:var(--amber)}
+.dofstrip .edb{border-color:rgba(255,201,79,.4);color:var(--amber)}
+.dofstrip .edb:hover{background:rgba(255,201,79,.14);border-color:var(--amber);color:var(--amber)}
+.dofstrip .edb.on{background:rgba(255,201,79,.25);border-color:var(--amber);color:#fff;box-shadow:0 0 10px rgba(255,201,79,.4)}
+.dofstrip .dof-note{margin-top:6px;opacity:.5;font-family:var(--jp);letter-spacing:.02em;font-size:9px;line-height:1.6}
+/* 「そのピント位置にいるのはどのコマか」を名前で返す行（画面から取るの結果が言葉で確認できる） */
+.dofstrip .dof-who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--mono);font-size:9px;opacity:.6;letter-spacing:.02em}
+body.dofpick #cv{cursor:crosshair}
+/* KF並べ替え：グリップを上下ドラッグ（Ctrl+↑↓でも動く） */
+.edc-grip{cursor:grab;user-select:none;touch-action:none;opacity:.45;letter-spacing:0;margin-right:5px;padding:0 2px}
+.edc-grip:hover{opacity:1;color:var(--ice)}
+.edc.kfdrag{opacity:.4}
+.edc.kfdrop-before{box-shadow:inset 0 2px 0 var(--ice)}
+.edc.kfdrop-after{box-shadow:inset 0 -2px 0 var(--ice)}
+body.kfdragging{cursor:grabbing}
+
+/* ---------- QUICK EDIT（選択中のコマ/フレーム/テキストを編集。PLACE = rouge） ----------
+   COMPOSER の QUICK TRANSFORM と同じ作法：縦1行1項目・ヘッダで移動・✕で閉じる・[U]で開閉。
+   旧・画面下の横長チップを置き換え（項目が増えて横に伸び切ったため） */
+#qe{
+  /* 他のパネルと同じく上基準に置く。bottom基準だと中身が短くても常に画面下辺に貼り付いて見える */
+  position:fixed;left:14px;top:var(--bartop,88px);width:clamp(258px,32vw,300px);max-width:94vw;
+  max-height:calc(100vh - var(--bartop,88px) - 16px);z-index:40;display:none;
+  border:1px solid rgba(255,79,168,.45);background:rgba(16,7,34,.97);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 24px rgba(255,79,168,.10);
+  font-size:10px;letter-spacing:.08em;overflow:hidden;
+}
+body.place #qe.sel{display:flex;flex-direction:column}
 #qe-head{
-  display:flex;align-items:center;gap:9px;height:44px;flex:none;padding:0 13px;
-  cursor:move;user-select:none;
-  border-bottom:1px solid rgba(232,236,242,.12);background:rgba(var(--accRGB),.05);
+  display:flex;align-items:center;gap:8px;cursor:move;user-select:none;
+  padding:8px 10px;border-bottom:1px solid rgba(255,79,168,.3);
+  background:linear-gradient(90deg,rgba(255,79,168,.12),transparent);
+  color:var(--acid);letter-spacing:.24em;font-family:var(--bank);
 }
-#qe-head .ttl{flex:none;font-family:var(--saira);font-weight:700;font-size:14px;letter-spacing:.24em;color:var(--acc)}
-#qe-head .ttl2{flex:none;font-size:8px;letter-spacing:.22em;color:rgba(232,236,242,.34)}
-#qe-head .sp{flex:1;min-width:0}
-#qe-name{flex:none;max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-size:9px;letter-spacing:.16em;color:var(--acc-ink);background:var(--acc);padding:3px 6px}
-#qe-name:empty{display:none}
-#qe-body{flex:0 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;max-height:58vh;padding:0 0 6px}
+#qe-head .ttl{flex:none}
+#qe-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--white);opacity:.75;letter-spacing:.1em;font-family:var(--mono);font-size:9px;text-align:right}
+#qe-body{flex:0 1 auto;min-height:0;overflow-y:auto;max-height:52vh;padding:8px 10px}
+#qe-body::-webkit-scrollbar{width:4px}
+#qe-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,.35)}
 #qe-resize{height:11px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--border);background:rgba(255,255,255,.02)}
 #qe-resize::after{content:'';width:28px;height:2px;background:rgba(255,255,255,.25)}
-/* 見出し（EN＋JP）と 1行1項目の行 */
-.qd-sect{display:flex;align-items:baseline;gap:9px;padding:14px 13px 6px;border-top:1px solid rgba(232,236,242,.06)}
-.qd-sect:first-child{border-top:0;padding-top:12px}
-.qd-sect .en{font-family:var(--saira);font-weight:600;font-size:12px;letter-spacing:.26em;color:var(--acc)}
-.qd-sect .jp{font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.4)}
-.qd-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding:7px 13px;min-height:34px;border-top:1px solid rgba(232,236,242,.05)}
-.qd-sect+.qd-row{border-top:0}
-.qd-row.top{align-items:flex-start}
-.qd-row>.k{width:46px;flex:none;font-family:var(--jp);font-size:11px;letter-spacing:.08em;color:rgba(232,236,242,.6)}
-.qd-row>.k.en{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(232,236,242,.42)}
-.qd-row.top>.k{padding-top:9px}
-.qd-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
-.qd-row .sp{flex:1;min-width:0}
-/* セグメント：選択肢を開かずに見せて、押したものが点灯する */
-.qd-seg{display:flex;gap:2px;flex-wrap:wrap;min-width:0}
-/* KFの一覧は増えるので折り返さず横スクロール（行の高さが暴れない） */
-.qd-seg.scr{flex:1;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;padding-bottom:3px}
-.qd-sb{height:32px;padding:0 11px;flex:none;display:flex;align-items:center;justify-content:center;gap:6px;
-  border:1px solid rgba(232,236,242,.18);background:transparent;cursor:pointer;transition:all .12s;
-  font-family:var(--saira);font-weight:600;font-size:12px;letter-spacing:.14em;color:rgba(232,236,242,.62)}
-.qd-sb:hover{background:var(--acc-hover-fill);border-color:var(--acc-hover-line);color:var(--ink);box-shadow:var(--acc-glow)}
-.qd-sb.on{background:var(--acc);border-color:transparent;color:var(--acc-ink);font-weight:700}
-.qd-sb.on:hover{filter:brightness(1.08);background:var(--acc);color:var(--acc-ink)}
-.qd-sb.jp{font-family:var(--jp);font-weight:400;font-size:11px;letter-spacing:.06em}
-.qd-sb.min{width:46px;padding:0;font-family:var(--mono);font-size:8px;letter-spacing:.12em;color:rgba(232,236,242,.42)}
-.qd-sb.min.on{color:var(--acc-ink)}
-.qd-sb.pm{width:36px;padding:0;font-family:var(--mono);font-size:15px;letter-spacing:0}
-.qd-sb .kb{font-family:var(--mono);font-weight:400;font-size:9px;letter-spacing:.1em;opacity:.55}
-/* 数値は左右ドラッグ（細いつまみを指でつかまない） */
-.qd-num{display:flex;align-items:baseline;gap:4px;flex:none;cursor:ew-resize;touch-action:none;
-  border:0;background:none;padding:0;font-family:var(--mono)}
-.qd-num .k{font-size:8px;letter-spacing:.2em;color:rgba(232,236,242,.34)}
-.qd-num .v{font-family:var(--saira);font-weight:600;font-size:16px;color:var(--ink);line-height:1;
-  border-bottom:1px dashed rgba(232,236,242,.36);font-variant-numeric:tabular-nums}
-.qd-num .u{font-size:8px;letter-spacing:.1em;color:rgba(232,236,242,.3)}
-.qd-num:hover .v{border-bottom-color:var(--acc)}
-/* 0〜1 の小さな定規（PAR / DEPTH） */
-.qd-mr{position:relative;flex:1;min-width:56px;height:14px;touch-action:none;cursor:ew-resize}
-.qd-mr .ax{position:absolute;left:0;right:0;top:6px;height:1px;background:rgba(232,236,242,.2)}
-.qd-mr .dm{position:absolute;top:2px;width:9px;height:9px;margin-left:-4px;transform:rotate(45deg);
-  border:1px solid var(--acc);background:rgba(var(--accRGB),.3)}
-/* IN の向き（3×3） */
-.qd-grid{display:grid;grid-template-columns:repeat(3,36px);grid-template-rows:repeat(3,28px);gap:2px;flex:none}
-.qd-grid .qd-sb{width:36px;height:28px;padding:0;font-family:var(--mono);font-size:12px;letter-spacing:0}
-.qd-grid .qd-sb.c{font-size:8px;letter-spacing:.12em}
-/* いま何が起きるかの小窓 */
-.qd-prev{position:relative;height:62px;border:1px solid rgba(232,236,242,.1);background:rgba(232,236,242,.02);overflow:hidden}
-.qd-prev .slot{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:52px;height:34px;border:1px dashed rgba(232,236,242,.22)}
-.qd-prev .gh{position:absolute;left:50%;top:50%;margin:-17px 0 0 -26px;width:52px;height:34px;border:3px solid #0C0D11;
-  background:linear-gradient(150deg,#2A2E36,#161A20);box-shadow:0 0 0 1px rgba(var(--accRGB),.4)}
-.qd-prev .lb{position:absolute;left:7px;bottom:5px;font-size:8px;letter-spacing:.18em;color:rgba(var(--accRGB),.65)}
-@keyframes ghIn{0%{transform:translate(var(--gx,-15px),var(--gy,0));opacity:.12}62%,100%{transform:translate(0,0);opacity:.9}}
-@keyframes ghDrift{0%,100%{transform:scale(1)}50%{transform:scale(var(--gs,1.08))}}
-@media (prefers-reduced-motion:reduce){.qd-prev .gh{animation:none!important}}
-.qd-note{font-family:var(--jp);font-size:9px;letter-spacing:.08em;color:rgba(232,236,242,.34);line-height:1.5}
-.qd-note b{color:var(--acc);font-weight:400}
-/* 字幕：文字を打つ欄と「どう出るか」の小窓（書体はボタンと同じ Saira Condensed） */
-.qd-txt{flex:1;min-width:0;height:32px;padding:0 9px;border:1px solid rgba(232,236,242,.18);background:rgba(232,236,242,.04);
-  color:var(--ink);font-family:var(--saira);font-weight:600;font-size:13px;letter-spacing:.06em}
-.qd-txt:focus{outline:none;border-color:var(--acc);box-shadow:var(--acc-glow)}
-.qd-txt::placeholder{color:rgba(232,236,242,.28);font-family:var(--jp);font-weight:400;font-size:10px;letter-spacing:.08em}
-.qd-sprev{position:relative;flex:1;min-width:0;height:58px;border:1px solid rgba(232,236,242,.1);overflow:hidden;
-  background:linear-gradient(160deg,#15181E,#0B0D11);display:flex;align-items:flex-end;justify-content:center;padding:0 8px 9px}
-.qd-sprev i{position:absolute;left:8px;top:7px;width:24px;height:1px;background:rgba(var(--accRGB),.55)}
-.qd-sprev s{position:absolute;left:8px;top:12px;font-size:8px;letter-spacing:.2em;color:rgba(232,236,242,.28);text-decoration:none}
-.qd-sprev b{font-family:var(--saira);font-weight:600;letter-spacing:.05em;color:#fff;line-height:1.2;text-align:center;
-  text-shadow:0 1px 3px rgba(0,0,0,.95),0 0 12px rgba(0,0,0,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.qd-sprev.off b{color:rgba(232,236,242,.25);font-weight:400}
-.qd-p{flex:none;font-size:10px;letter-spacing:.1em;color:var(--acc)}
-.qd-sw{width:48px;height:32px;flex:none;background:linear-gradient(150deg,#EFEBE3,#D6D1C7);
-  border:5px solid #0C0D11;box-shadow:0 0 0 1px rgba(232,236,242,.14)}
-/* 移動中に IN / 止まっている間に DRIFT */
-.qd-tl{padding:4px 13px 14px}
-.qd-tl .hd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
-.qd-tl .hd .en{font-size:8px;letter-spacing:.22em;color:rgba(232,236,242,.34)}
-.qd-tl .hd .jp{font-family:var(--jp);font-size:9px;letter-spacing:.1em;color:rgba(232,236,242,.3)}
-.qd-tl .bar{display:flex;height:26px}
-.qd-tl .tv{flex:6;border:1px solid rgba(232,236,242,.2);border-right:none;display:flex;align-items:center;gap:6px;padding:0 8px}
-.qd-tl .dw{flex:4;background:rgba(var(--accRGB),.12);border:1px solid rgba(var(--accRGB),.55);display:flex;align-items:center;gap:6px;padding:0 8px}
-.qd-tl .t{font-size:8px;letter-spacing:.2em;color:rgba(232,236,242,.34)}
-.qd-tl .val{font-family:var(--saira);font-weight:600;font-size:11px;letter-spacing:.14em;color:var(--acc2)}
-.qd-tl .mk{position:relative;height:14px}
-.qd-tl .mk .d{position:absolute;left:60%;top:0;margin-left:-5px;font-size:10px;color:var(--acc)}
-.qd-tl .mk .n{position:absolute;left:60%;top:1px;margin-left:8px;font-size:9px;letter-spacing:.14em;color:rgba(232,236,242,.42)}
-/* DOFがONのとき「このコマはどれだけボケるか」を数字で出す */
-.qd-dof{flex:1;min-width:0;font-size:9px;letter-spacing:.04em;color:rgba(232,236,242,.7)}
-.qd-dof .a{color:var(--acc2)}
-.qd-dof .b{color:var(--acc)}
-/* フッタ：取り出す / 削除（いつも同じ場所にある） */
-#qe-foot{display:flex;align-items:center;gap:8px;flex:none;padding:10px 13px;border-top:1px solid rgba(232,236,242,.12)}
-#qe-foot .sp{flex:1}
-#qe-foot .qd-sb{height:34px}
-#qe-foot .del{border-color:rgba(255,90,90,.4);color:rgba(255,138,138,.9)}
-#qe-foot .del:hover{background:rgba(255,90,90,.14);border-color:rgba(255,90,90,.75);color:#fff;box-shadow:0 0 10px rgba(255,90,90,.3)}
+/* セクション見出し（何を触っているか分かるように） */
+#qe-body .qe-sect{color:var(--acid);opacity:.85;letter-spacing:.2em;font-family:var(--bank);
+  margin:9px 0 5px;padding-bottom:3px;border-bottom:1px dashed rgba(255,79,168,.25)}
+#qe-body .qe-sect:first-child{margin-top:0}
+#qe-body .qe-sect .hint{float:right;font-family:var(--jp);font-size:8px;letter-spacing:.02em;opacity:.45}
+/* 1行1項目：ラベル / コントロール / 数値 */
+#qe-body .qe-row{display:flex;align-items:center;gap:6px;margin:4px 0;min-height:20px}
+#qe-body .qe-row>.k{width:5.4em;flex:none;opacity:.7;letter-spacing:.1em}
+#qe-body .qe-row>.ctl{flex:1;display:flex;align-items:center;gap:4px;min-width:0}
+#qe-body .qe-row .v{width:3.2em;flex:none;text-align:right;color:var(--ice);font-variant-numeric:tabular-nums}
+#qe-body input[type=range]{flex:1;min-width:0;accent-color:var(--acid)}
+#qe-body select{flex:1;min-width:0;background:var(--panel2);color:var(--acid);
+  border:1px solid rgba(255,79,168,.4);font-family:var(--mono);font-size:10px;padding:2px 4px}
+#qe-body select option{background:#100722}
+#qe-body input[type=text]{flex:1;min-width:0;background:var(--panel2);color:var(--white);
+  border:1px solid var(--border);font-family:var(--mono);font-size:10px;padding:2px 5px}
+#qe-body .btn{padding:3px 8px;border-color:rgba(255,79,168,.4);color:var(--acid);flex:none}
+#qe-body .btn:hover{background:rgba(255,79,168,.14);border-color:var(--acid);color:var(--acid)}
+#qe-body .btn.on{background:rgba(255,79,168,.22);border-color:var(--acid);color:#fff;box-shadow:0 0 10px rgba(255,79,168,.35)}
+#qe-body .btn.danger{border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.6)}
+#qe-body .btn.danger:hover{background:rgba(255,79,168,.18);border-color:var(--acid);color:var(--acid)}
+#qe-body .qe-note{opacity:.42;font-family:var(--jp);letter-spacing:.02em;line-height:1.6;margin:3px 0 2px}
+/* DOFがONのとき「このコマは A/B でどれだけボケるか」を数字で出す（推測させない） */
+#qe-body .qe-dof{flex:1;min-width:0;font-family:var(--mono);font-size:9px;letter-spacing:.04em;color:rgba(255,255,255,.7)}
+#qe-body .qe-dof .a{color:var(--amber)}
+#qe-body .qe-dof .b{color:var(--ice)}
 #qe-close{cursor:pointer;padding:0 2px;opacity:.75;flex:none}
 #qe-close:hover{opacity:1;color:#fff}
 
@@ -392,77 +305,66 @@ body.place #qe.sel,body.take #qe.sel{display:flex;flex-direction:column}
   pointer-events:none;color:var(--white);
 }
 #drop .big{
-  font-family:var(--saira);font-weight:700;font-size:clamp(22px,3.4vw,40px);letter-spacing:.3em;
-  color:var(--ink);opacity:.9;
+  font-family:var(--bank);font-size:clamp(22px,3.4vw,40px);letter-spacing:.28em;opacity:.92;
+  background:linear-gradient(120deg,#FFE9B0,#FFD27A 26%,#FF4FA8 62%,#B58EFF 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;
 }
-#drop .sm{font-family:var(--jp);font-size:12px;opacity:.5;line-height:2;text-align:center;color:rgba(232,236,242,.65)}
-#drop .rule{width:min(52vw,620px);height:1px;background:linear-gradient(90deg,transparent,rgba(var(--accRGB),.5),transparent)}
+#drop .sm{font-family:var(--jp);font-size:12px;opacity:.5;line-height:2;text-align:center;color:rgba(255,255,255,.65)}
 #drop.hide{display:none}
-body.place #drop{padding-bottom:270px}   /* 下部コンソールぶん上へ（ヒントが被らないように） */
-body.dragover #drop{outline:1px dashed rgba(var(--accRGB),.7);outline-offset:-24px}
+body.dragover #drop{outline:2px dashed var(--acid);outline-offset:-24px}
 #toast{
-  position:fixed;left:50%;top:82px;transform:translateX(-50%);z-index:60;display:none;
-  border:1px solid rgba(var(--accRGB),.55);background:rgba(10,12,16,.97);color:var(--ink);
-  box-shadow:var(--acc-glow);
-  padding:9px 16px;font-size:9px;letter-spacing:.18em;font-family:var(--mono);
+  position:fixed;left:50%;top:78px;transform:translateX(-50%);z-index:60;display:none;
+  border:1px solid var(--ice);background:rgba(16,7,34,.97);color:var(--ice);
+  box-shadow:0 0 20px rgba(90,233,255,.15);
+  padding:8px 16px;font-size:9px;letter-spacing:.18em;font-family:var(--mono);
 }
-#toast::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--acc-pt)}
 
 /* ---------- confirm modal（native confirm の置き換え） ---------- */
 #cf-modal{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.7)}
 #cf-modal.show{display:flex}
-#cf-box{border:1px solid var(--acid);background:rgba(10,12,16,.98);box-shadow:0 0 24px rgba(255,79,168,.2);
+#cf-box{border:1px solid var(--acid);background:rgba(16,7,34,.98);box-shadow:0 0 24px rgba(255,79,168,.2);
   min-width:280px;max-width:420px;padding:20px}
 #cf-msg{font-family:var(--jp);font-size:12px;color:var(--white);line-height:1.7;white-space:pre-line;margin-bottom:18px}
 #cf-btns{display:flex;gap:8px;justify-content:flex-end}
 #cf-ok{border-color:var(--acid);color:var(--acid)}
 #cf-ok:hover{background:rgba(255,79,168,.12)}
 
-/* ---------- SATSUEI FX パネル（器は DETAIL / MONITOR と同じ作法・中身は qd-* の語彙） ---------- */
+/* ---------- SATSUEI FX modal (V2-C — 撮影系=琥珀/amber) ---------- */
 #fx-modal{
-  position:fixed;right:18px;top:var(--bartop,80px);width:clamp(300px,31vw,398px);max-width:94vw;z-index:70;display:none;
-  border:1px solid rgba(232,236,242,.18);background:rgba(9,10,14,.93);
+  /* 幅の下限を持たせる（狭い窓で 34vw まで縮むと右端の数値が切れるため） */
+  position:fixed;right:14px;top:var(--bartop,88px);width:clamp(272px,34vw,340px);max-width:94vw;z-index:70;display:none;
+  border:1px solid rgba(255,201,79,.5);background:rgba(16,7,34,.97);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  box-shadow:0 30px 70px rgba(0,0,0,.6);
-  font-family:var(--mono);font-size:10px;letter-spacing:.06em;overflow:hidden;
+  box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 24px rgba(255,201,79,.08);
+  font-size:10px;letter-spacing:.12em;overflow:hidden;
 }
 body.fxopen #fx-modal{display:flex;flex-direction:column}
-#fx-head{
-  display:flex;align-items:center;gap:9px;height:44px;flex:none;padding:0 13px;cursor:move;user-select:none;
-  border-bottom:1px solid rgba(232,236,242,.12);background:rgba(var(--accRGB),.05);
-}
-#fx-head .ttl{flex:none;font-family:var(--saira);font-weight:700;font-size:14px;letter-spacing:.24em;color:var(--acc)}
-#fx-head .ttl2{flex:none;font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.34)}
-#fx-head .sp{flex:1;min-width:0}
-#fx-badge{flex:none;font-family:var(--saira);font-weight:700;font-size:11px;letter-spacing:.16em;
-  color:var(--acc-ink);background:var(--acc);padding:3px 7px}
-#fx-badge.off{color:rgba(232,236,242,.4);background:transparent;box-shadow:inset 0 0 0 1px rgba(232,236,242,.18)}
-#fx-head .hb{flex:none;cursor:pointer;padding:0 2px;opacity:.75;border:0;background:none;color:inherit;
-  font-family:var(--mono);font-size:11px}
-#fx-head .hb:hover{opacity:1;color:#fff}
-#fx-body{flex:0 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;max-height:62vh;padding:0 0 8px}
+#fx-head{padding:10px 12px;border-bottom:1px solid rgba(255,201,79,.35);color:var(--amber);font-family:var(--bank);letter-spacing:.2em;cursor:move;user-select:none}
+#fx-head b{font-weight:400;opacity:.7}
+#fx-head .btn{float:right;border-color:rgba(255,201,79,.45);color:var(--amber);padding:3px 8px}
+#fx-head .btn:hover{background:rgba(255,201,79,.14);border-color:var(--amber);color:var(--amber)}
+#fx-head .fx-note{clear:both;font-family:var(--jp);letter-spacing:.03em;opacity:.5;margin-top:6px;line-height:1.6}
+#fx-body{max-height:60vh;overflow-y:auto;padding:10px 12px}
 #fx-body::-webkit-scrollbar{width:4px}
-#fx-body::-webkit-scrollbar-thumb{background:rgba(var(--accRGB),.4)}
-#fx-resize{height:11px;flex:none;cursor:ns-resize;display:flex;align-items:center;justify-content:center;
-  border-top:1px solid var(--border);background:rgba(255,255,255,.02)}
-#fx-resize::after{content:'';width:28px;height:2px;background:rgba(255,255,255,.25)}
-/* FX はラベルが長いので DETAIL より少し広く取る。選択肢は文字幅ぶん伸ばす */
-#fx-body .qd-row>.k{width:76px}
-#fx-body .qd-row>.k.en{font-size:8px;letter-spacing:.14em}
-#fx-body .qd-sb.min{width:auto;padding:0 10px}
-#fx-body .qd-note{flex:1;min-width:0}
-/* エフェクト1つぶん。見出しを押して ON/OFF・OFF のあいだは中身が沈む */
-.fx-hd{display:flex;align-items:center;gap:9px;padding:11px 13px 3px;border-top:1px solid rgba(232,236,242,.06)}
-.fx-hd .qd-sb{height:28px;font-size:11px;letter-spacing:.12em}
-.fx-hd .qd-note{flex:1;min-width:0}
-.fx-g.off .qd-row{opacity:.34}
-.fx-g.off .qd-row .qd-mr,.fx-g.off .qd-row .qd-num,.fx-g.off .qd-row .qd-sb,.fx-g.off .qd-row .fx-col{pointer-events:none}
-.fx-col{width:46px;height:24px;flex:none;padding:0;border:1px solid rgba(232,236,242,.2);background:none;cursor:pointer}
+#fx-body::-webkit-scrollbar-thumb{background:rgba(255,201,79,.35)}
+#fx-body label{display:block;margin:6px 0;cursor:pointer}
+#fx-body .fx-master{color:var(--amber);letter-spacing:.22em;font-family:var(--bank);border-bottom:1px dashed rgba(255,201,79,.35);padding-bottom:8px}
+#fx-body .fx-master .fx-sub{display:block;margin-top:3px;font-family:var(--jp);letter-spacing:.02em;font-size:9px;opacity:.45;color:var(--white)}
+#fx-body .fx-ent{border-bottom:1px dashed rgba(255,201,79,.2);padding:7px 0}
+#fx-body .fx-ent>label{color:var(--amber)}
+#fx-body .fx-row{display:flex;align-items:center;gap:6px;margin:3px 0;opacity:.9}
+#fx-body .fx-row .k{width:9em;flex:none;opacity:.65}
+#fx-body .fx-row input[type=range]{flex:1;min-width:44px;accent-color:var(--amber)}
+#fx-body .fx-row .v{width:4em;flex:none;text-align:right;font-variant-numeric:tabular-nums;color:var(--ice)}
+/* DOFの行は SET ボタンぶん詰まるので、ラベル幅を少し詰めて数値が切れないようにする */
+#fx-body .fx-ent .fx-row .k{width:8em}
+#fx-body .fx-row .btn{flex:none}
+#fx-body input[type=checkbox]{accent-color:var(--amber)}
 
 /* ---------- COPY FOR COMPOSER modal (SPEC_06 P3 — TAKE系=ice) ---------- */
 #cvt-modal{
   position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:75;display:none;width:320px;
-  border:1px solid rgba(90,233,255,.5);background:rgba(10,12,16,.97);
+  border:1px solid rgba(90,233,255,.5);background:rgba(16,7,34,.97);
   box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 24px rgba(90,233,255,.08);
   font-size:10px;letter-spacing:.12em;font-family:var(--mono);
 }
@@ -478,7 +380,7 @@ body.cvtopen #cvt-modal{display:block}
   flex:1;background:rgba(90,233,255,.06);border:1px solid rgba(90,233,255,.3);color:var(--ice);
   font-family:var(--mono);font-size:11px;padding:4px 6px;outline:none;
 }
-#cvt-body select option{background:#0D0F14;color:var(--ice)}
+#cvt-body select option{background:#100722;color:var(--ice)}
 #cvt-body .cvt-note{font-family:var(--jp);letter-spacing:.03em;opacity:.5;margin:8px 0;line-height:1.6}
 #cvt-body #cvt-copy{display:block;width:100%;margin-top:4px;border-color:rgba(90,233,255,.45);color:var(--ice)}
 #cvt-body #cvt-copy:hover{background:rgba(90,233,255,.14);border-color:var(--ice)}
@@ -486,7 +388,7 @@ body.cvtopen #cvt-modal{display:block}
 /* ---------- EXPORT モーダル（HTML / 動画 の選択。COPY FOR COMPOSER と同じ作法） ---------- */
 #exp-modal{
   position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:290;display:none;width:340px;
-  border:1px solid rgba(90,233,255,.5);background:rgba(10,12,16,.98);
+  border:1px solid rgba(90,233,255,.5);background:rgba(16,7,34,.98);
   box-shadow:0 8px 40px rgba(0,0,0,.7),0 0 24px rgba(90,233,255,.1);
   font-size:10px;letter-spacing:.12em;font-family:var(--mono);
 }
@@ -497,17 +399,17 @@ body.expopen #exp-modal{display:block}
 /* 種類のタブ（HTML / 動画）。選ばれているほうだけ下の設定が出る */
 #exp-kind{display:flex;gap:6px;margin-bottom:9px}
 #exp-kind .btn{flex:1;padding:7px 4px;border-color:rgba(90,233,255,.35);color:var(--ice)}
-#exp-kind .btn.on{background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#05070B;box-shadow:0 0 12px rgba(90,233,255,.4)}
+#exp-kind .btn.on{background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#04121a;box-shadow:0 0 12px rgba(90,233,255,.4)}
 #exp-body .row{display:flex;align-items:center;gap:8px;margin:6px 0}
 #exp-body .row .k{width:6.4em;flex:none;opacity:.65}
 #exp-body select,#exp-body input[type=number]{
   flex:1;background:rgba(90,233,255,.06);border:1px solid rgba(90,233,255,.3);color:var(--ice);
   font-family:var(--mono);font-size:11px;padding:4px 6px;outline:none;
 }
-#exp-body select option{background:#0D0F14;color:var(--ice)}
+#exp-body select option{background:#100722;color:var(--ice)}
 #exp-note{font-family:var(--jp);letter-spacing:.03em;opacity:.5;margin:8px 0 4px;line-height:1.6}
 #exp-go{display:block;width:100%;margin-top:6px;padding:8px;border-color:rgba(90,233,255,.5);color:var(--ice);letter-spacing:.18em}
-#exp-go:hover{background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#05070B}
+#exp-go:hover{background:linear-gradient(135deg,var(--ice),#3aa8d8);border-color:transparent;color:#04121a}
 #exp-go:disabled{opacity:.45;cursor:default}
 /* 進捗バー（書き出し中は入力を伏せる） */
 #exp-prog{display:none;margin-top:8px}
@@ -517,46 +419,28 @@ body.exprun #exp-kind,body.exprun #exp-opts,body.exprun #exp-go{display:none}
 #exp-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ice),var(--acid))}
 #exp-cancel{display:block;width:100%;margin-top:8px;border-color:rgba(255,79,168,.45);color:var(--acid)}
 
-/* ---------- ANIMATOR 取り込みパネル（器は DETAIL / MONITOR / FX と同じ作法） ---------- */
+/* ---------- FROM ANIMATOR modal (SPEC_07 — ap連携=rouge) ---------- */
+#b-ap{border-color:rgba(255,79,168,.4);color:var(--acid)}
+#b-ap:hover{background:rgba(255,79,168,.14);border-color:var(--acid);color:var(--acid)}
 #ap-modal{
-  position:fixed;left:calc(50% - 200px);top:var(--bartop,80px);z-index:75;display:none;
-  width:clamp(300px,32vw,400px);max-width:94vw;
-  border:1px solid rgba(232,236,242,.18);background:rgba(9,10,14,.93);
-  backdrop-filter:blur(14px) saturate(1.1);-webkit-backdrop-filter:blur(14px) saturate(1.1);
-  box-shadow:0 18px 60px rgba(0,0,0,.6),0 0 0 1px rgba(var(--accRGB),.08);
-  font-family:var(--mono);font-size:10px;letter-spacing:.06em;overflow:hidden;
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:75;display:none;width:400px;max-height:72vh;
+  border:1px solid rgba(255,79,168,.5);background:rgba(16,7,34,.97);
+  box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 24px rgba(255,79,168,.08);
+  font-size:10px;letter-spacing:.12em;font-family:var(--mono);
 }
 body.apopen #ap-modal{display:flex;flex-direction:column}
-#ap-modal.mini #ap-body,#ap-modal.mini #ap-resize{display:none}
-#ap-head{
-  display:flex;align-items:center;gap:9px;height:44px;flex:none;padding:0 13px;cursor:move;user-select:none;
-  border-bottom:1px solid rgba(232,236,242,.12);background:rgba(var(--accRGB),.05);
-}
-#ap-head .ttl{flex:none;font-family:var(--saira);font-weight:700;font-size:14px;letter-spacing:.24em;color:var(--acc)}
-#ap-head .ttl2{flex:none;font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.34)}
-#ap-head .sp{flex:1;min-width:0}
-#ap-badge{flex:none;font-family:var(--saira);font-weight:700;font-size:11px;letter-spacing:.16em;
-  color:var(--acc-ink);background:var(--acc);padding:3px 7px}
-#ap-badge.off{color:rgba(232,236,242,.4);background:transparent;box-shadow:inset 0 0 0 1px rgba(232,236,242,.18)}
-#ap-head .hb{flex:none;cursor:pointer;padding:0 2px;opacity:.75;border:0;background:none;color:inherit;
-  font-family:var(--mono);font-size:11px}
-#ap-head .hb:hover{opacity:1;color:#fff}
-#ap-body{flex:0 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;max-height:56vh;padding:0 0 8px}
+#ap-head{padding:10px 12px;border-bottom:1px solid rgba(255,79,168,.35);color:var(--acid);font-family:var(--bank);letter-spacing:.2em}
+#ap-head .btn{float:right;border-color:rgba(255,79,168,.45);color:var(--acid);padding:3px 8px}
+#ap-head .btn:hover{background:rgba(255,79,168,.14);border-color:var(--acid);color:var(--acid)}
+#ap-head .ap-note{clear:both;font-family:var(--jp);letter-spacing:.03em;opacity:.5;margin-top:6px;line-height:1.6}
+#ap-body{flex:1;overflow-y:auto;padding:10px 12px}
 #ap-body::-webkit-scrollbar{width:4px}
-#ap-body::-webkit-scrollbar-thumb{background:rgba(var(--accRGB),.4)}
-#ap-body .qd-note{padding:8px 13px 0}
-#ap-resize{height:11px;flex:none;cursor:ns-resize;display:flex;align-items:center;justify-content:center;
-  border-top:1px solid var(--border);background:rgba(255,255,255,.02)}
-#ap-resize::after{content:'';width:28px;height:2px;background:rgba(255,255,255,.25)}
-/* 一覧の1件（押せる行）。名前＝Saira ／ 素性＝mono */
-.qd-list{display:flex;flex-direction:column;gap:4px;padding:2px 13px 0}
-.qd-ent{display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;transition:all .12s;
-  border:1px solid rgba(232,236,242,.16);background:transparent;padding:9px 11px;
-  font-family:var(--mono);font-size:10px;color:rgba(232,236,242,.7)}
-.qd-ent:hover{background:var(--acc-hover-fill);border-color:var(--acc-hover-line);box-shadow:var(--acc-glow)}
-.qd-ent .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-family:var(--saira);font-weight:600;font-size:13px;letter-spacing:.14em;color:var(--acc)}
-.qd-ent .mt{flex:none;font-size:9px;line-height:1.5;letter-spacing:.12em;color:rgba(232,236,242,.45);text-align:right}
+#ap-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,.35)}
+#ap-body .ap-row{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;border:1px solid rgba(255,79,168,.25);padding:8px 10px;margin:6px 0}
+#ap-body .ap-row:hover{background:rgba(255,79,168,.12);border-color:var(--acid)}
+#ap-body .ap-nm{color:var(--acid)}
+#ap-body .ap-meta{opacity:.6;text-align:right}
+#ap-body .ap-empty{font-family:var(--jp);letter-spacing:.03em;opacity:.55;line-height:1.8;padding:6px 0}
 
 /* ---------- V2-D: 縦書きテキスト編集 / EN字幕 / クリックFX ---------- */
 #text-ed{
@@ -567,220 +451,40 @@ body.apopen #ap-modal{display:flex;flex-direction:column}
   caret-color:var(--acid);padding:1px 2px;min-height:1.1em;min-width:1.1em;
 }
 body.textarm #cv{cursor:crosshair}
-/* SETTINGS ／ SHORTCUTS（中央オーバーレイ＋グリッド一覧＝スクロールせず全部見える）
-   器の作法は DETAIL / MONITOR / FX と同じ（44px ヘッダ・ぼかし・同じ枠線）。ここだけ中央固定 */
-#set-ovl{position:fixed;inset:0;z-index:280;background:rgba(5,6,9,.8);display:none;
-  align-items:center;justify-content:center;padding:24px;
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.edc .subin{width:58%;background:var(--panel2);color:var(--white);border:1px solid var(--border);font-family:var(--mono);font-size:10px;padding:2px 5px;letter-spacing:.05em;vertical-align:middle}
+#fx-body select{background:#100722;color:var(--amber);border:1px solid rgba(255,201,79,.4);font-family:var(--mono);font-size:10px;padding:1px 4px}
+#fx-body .btn{border-color:rgba(255,201,79,.45);color:var(--amber);padding:3px 8px;margin-left:6px}
+#fx-body .btn:hover{background:rgba(255,201,79,.14);border-color:var(--amber);color:var(--amber)}
+/* SETTINGS / SHORTCUTS（econte.html と同じ中央オーバーレイ＋グリッド一覧＝スクロールせず全部見える） */
+#set-ovl{position:fixed;inset:0;z-index:280;background:rgba(7,3,15,.78);display:none;
+  align-items:center;justify-content:center;padding:24px}
 body.setopen #set-ovl{display:flex}
 /* スクロールせず1画面に収める。列は増やす方向（横に伸ばす）／行間は詰める方向で稼ぐ。
    `columns` の段組みにするとグループが列をまたいで割れるので、grid のまま最小幅を下げて列数を増やす。 */
-#set-box{background:rgba(9,10,14,.96);border:1px solid rgba(232,236,242,.18);
-  max-width:1480px;width:100%;max-height:100%;overflow-y:auto;
-  box-shadow:0 24px 80px rgba(0,0,0,.7),0 0 0 1px rgba(var(--accRGB),.08)}
-#set-box::-webkit-scrollbar{width:4px}
-#set-box::-webkit-scrollbar-thumb{background:rgba(var(--accRGB),.4)}
-#set-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:9px;height:44px;padding:0 13px;
-  border-bottom:1px solid rgba(232,236,242,.12);background:rgba(11,13,17,.97);
-  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
-#set-head .t{flex:none;font-family:var(--saira);font-weight:700;font-size:14px;letter-spacing:.24em;color:var(--acc)}
-#set-head .t2{flex:none;font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.34)}
-#set-head .sp{flex:1;min-width:0}
-#set-head .qd-sb{height:28px;font-size:11px}
-#set-head .hb{flex:none;cursor:pointer;padding:0 2px;opacity:.75;border:0;background:none;color:inherit;
-  font-family:var(--mono);font-size:11px}
-#set-head .hb:hover{opacity:1;color:#fff}
-/* FILE ／ 連携：バーから降りてきた入出力・外部ツール連携・HOME。
-   毎回押す道具ではない＝バーを空けて、押す場所を1か所（⚙）に集める */
-#set-acts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:11px 13px 9px;
-  padding:8px 10px;border:1px solid rgba(232,236,242,.1);background:rgba(232,236,242,.02)}
-#set-acts .h{font-family:var(--saira);font-weight:600;font-size:11px;letter-spacing:.22em;color:var(--acc);margin-right:4px}
-#set-acts .btn{height:32px;padding:0 11px}
-#set-acts .flex{flex:1}
-#set-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));gap:8px;align-items:start;margin:0 13px}
-.set-grp{border:1px solid rgba(232,236,242,.1);padding:7px 9px}
-.set-grp h4{font-family:var(--saira);font-weight:600;font-size:11px;letter-spacing:.22em;color:var(--acc);
-  margin-bottom:5px;font-weight:600}
-.set-grp .r{display:flex;gap:7px;align-items:baseline;padding:1px 0;font-family:var(--jp);font-size:10.5px}
-.set-grp .k{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.72);white-space:nowrap;
-  border:1px solid rgba(232,236,242,.14);background:rgba(232,236,242,.03);padding:1px 4px;min-width:66px;text-align:center;flex:none}
-.set-grp .d{color:rgba(232,236,242,.68);line-height:1.4}
-#set-note{font-family:var(--jp);font-size:9px;letter-spacing:.08em;color:rgba(232,236,242,.34);
-  margin:9px 13px 12px;line-height:1.5}
-#set-note b{color:var(--acc);font-weight:400}
+#set-box{background:rgba(16,7,34,.98);border:1px solid var(--border-bright);padding:12px 16px;
+  max-width:1480px;width:100%;max-height:100%;overflow-y:auto;box-shadow:0 0 40px rgba(255,79,168,.2)}
+#set-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+#set-head .t{font-family:var(--bank);font-size:12px;letter-spacing:.24em;color:var(--acid);flex:1}
+#set-head .btn{padding:3px 9px}
+#set-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));gap:8px;align-items:start}
+.set-grp{border:1px solid var(--border);padding:6px 8px}
+.set-grp h4{font-family:var(--bank);font-size:9px;letter-spacing:.18em;color:var(--gold);margin-bottom:4px;font-weight:400}
+.set-grp .r{display:flex;gap:6px;align-items:baseline;padding:1px 0;font-family:var(--jp);font-size:10.5px}
+.set-grp .k{font-family:var(--mono);font-size:9px;color:var(--ice);white-space:nowrap;
+  border:1px solid var(--border);padding:0 4px;min-width:66px;text-align:center;flex:none}
+.set-grp .d{color:rgba(248,239,255,.78);line-height:1.38}
+#set-note{color:rgba(255,255,255,.45);font-size:9.5px;font-family:var(--jp);margin-top:8px;line-height:1.5}
 /* 縦が足りない窓では、さらに一段詰める（それでも溢れるならスクロール） */
 @media (max-height:820px){
   #set-ovl{padding:12px}
-  #set-acts{margin:9px 11px 7px;padding:6px 8px}
-  #set-body{margin:0 11px}
+  #set-box{padding:9px 12px}
   .set-grp{padding:5px 7px}
   .set-grp .r{font-size:10px;line-height:1.3}
   .set-grp .d{line-height:1.3}
   #set-body{gap:6px}
 }
-/* ============================================================
-   DOCK — 画面下のコンソール。PLACE / TAKE / DETAIL で中身が入れ替わる。
-   フローティングパネルの置き換え＝「道具は常に同じ場所にある」。
-   ============================================================ */
-#dock{
-  position:fixed;left:0;right:0;bottom:0;z-index:45;pointer-events:none;
-  padding:30px 18px 14px;display:none;flex-direction:column;gap:12px;
-  background:linear-gradient(to top,rgba(6,7,10,.95),rgba(6,7,10,.72) 52%,rgba(6,7,10,0));
-  font-family:var(--mono);
-}
-#dock>*{pointer-events:auto}
-body.place #dock,body.take #dock,body.export #dock{display:flex}
-/* EXPORT: 出すもののカード（MP4 / HTML） */
-.dk-out{flex:none;width:212px;min-height:76px;border:1px solid var(--line);background:var(--cell);padding:8px;
-  display:flex;flex-direction:column;gap:5px;cursor:pointer;text-align:left;font-family:var(--mono);transition:all .12s}
-.dk-out:hover{border-color:var(--acc-hover-line);box-shadow:var(--acc-glow)}
-.dk-out .ch{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
-.dk-out .t{font-family:var(--saira);font-weight:600;font-size:15px;letter-spacing:.14em;color:rgba(232,236,242,.8)}
-.dk-out .s{font-family:var(--jp);font-size:9px;letter-spacing:.08em;color:rgba(232,236,242,.38);line-height:1.5}
-.dk-out .f{margin-top:auto;display:flex;align-items:center;gap:7px;font-size:9px;letter-spacing:.14em;color:rgba(232,236,242,.35)}
-.dk-out.on{width:232px;min-height:92px;border:1px solid rgba(var(--accRGB),.9);border-image:var(--acc-border) 1;
-  background:rgba(var(--accRGB),.1);animation:nowGlow 3.2s ease-in-out infinite}
-.dk-out.on .t{font-weight:700;font-size:17px;color:var(--acc2)}
-.dk-out.on .s{color:rgba(var(--acc2RGB),.7)}
-.dk-out.on .f{color:rgba(var(--acc2RGB),.6)}
-/* 出す範囲の [ ] つまみ */
-.dk-ruler .band{position:absolute;top:11px;height:7px;background:rgba(var(--accRGB),.14)}
-.dk-ruler .br{position:absolute;top:4px;width:8px;height:21px;border:2px solid var(--acc);
-  border-image:var(--acc-border) 1;cursor:ew-resize}
-.dk-ruler .br.l{border-right:none}
-.dk-ruler .br.r{border-left:none;margin-left:-8px}
-/* 書き出し設定（SIZE / FPS / BAKE） */
-.dk-set{display:flex;align-items:center;gap:11px;height:52px;padding:0 15px;flex:none;
-  border:1px solid rgba(232,236,242,.18);background:rgba(232,236,242,.04)}
-.dk-set .n{font-size:10px;letter-spacing:.1em;color:rgba(232,236,242,.34)}
-.dk-set .col{display:flex;flex-direction:column;gap:4px}
-.dk-set .lab{font-size:8px;letter-spacing:.24em;color:rgba(232,236,242,.4);line-height:1}
-.dk-set .opts{display:flex;gap:2px}
-.dk-opt{padding:3px 8px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:rgba(232,236,242,.55);
-  border:1px solid rgba(232,236,242,.16);background:transparent;cursor:pointer}
-.dk-opt:hover{border-color:var(--acc-hover-line);color:var(--ink)}
-.dk-opt.on{background:var(--acc-pt);border-color:transparent;color:#05070B}
-.dk-opt.tag{cursor:default}
-.dk-opt.tag.on{background:rgba(var(--acc-ptRGB),.22);border-color:rgba(var(--acc-ptRGB),.5);color:var(--acc2)}
-/* 書き出し中 */
-.dk-pct{font-family:var(--saira);font-weight:700;font-size:30px;letter-spacing:.04em;color:var(--acc);line-height:1}
-.dk-pf{font-size:10px;letter-spacing:.14em;color:rgba(232,236,242,.45)}
-.dk-pbar{position:relative;height:14px;border:1px solid rgba(232,236,242,.18);overflow:hidden}
-.dk-pbar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--acc-fill);box-shadow:var(--acc-inset)}
-.dk-pnote{display:flex;align-items:center;gap:10px;font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.4)}
-.dk-stop{display:flex;align-items:center;gap:10px;height:52px;padding:0 16px;flex:none;background:transparent;
-  border:1px solid rgba(255,90,90,.45);color:rgba(255,138,138,.92);cursor:pointer;font-family:var(--mono)}
-.dk-stop:hover{background:rgba(255,90,90,.12);box-shadow:0 0 16px rgba(255,90,90,.28)}
-.dk-stop .t{font-family:var(--saira);font-weight:600;font-size:16px;letter-spacing:.18em;line-height:1}
-.dk-stop .s{font-family:var(--jp);font-size:9px;letter-spacing:.12em;opacity:.7;line-height:1}
-body.cleanview #dock{display:none}
-.dk-row{display:flex;align-items:flex-end;gap:14px}
-.dk-hd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;gap:10px}
-.dk-hl{display:flex;align-items:baseline;gap:10px;min-width:0;overflow:hidden}
-.dk-lab{flex:none;font-family:var(--saira);font-weight:600;font-size:13px;letter-spacing:.28em;color:rgba(232,236,242,.75)}
-.dk-jp{flex:none;font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.34)}
-.dk-meta{flex:none;font-size:9px;letter-spacing:.14em;color:rgba(232,236,242,.3)}
-.dk-hr{display:flex;align-items:baseline;gap:8px;flex:none}
-.dk-hr .nm{font-size:9px;letter-spacing:.2em;color:rgba(232,236,242,.34);max-width:16em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dk-num{font-family:var(--saira);font-weight:700;font-size:19px;letter-spacing:.08em;color:var(--acc);line-height:1}
-/* 数値ステッパー（−／値を左右スクラブ／＋） */
-.dk-step{display:flex;align-items:center;gap:2px;height:46px;flex:none;border:1px solid rgba(232,236,242,.18);background:var(--cell)}
-.dk-step .pm{width:42px;height:44px;display:flex;align-items:center;justify-content:center;font-size:16px;color:rgba(232,236,242,.75);cursor:pointer}
-.dk-step .pm:hover{background:var(--acc-hover-fill);color:var(--ink)}
-.dk-step .val{display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 8px;cursor:ew-resize;touch-action:none}
-.dk-step .val .k{font-size:8px;letter-spacing:.24em;color:rgba(232,236,242,.4)}
-.dk-step .val .v{font-family:var(--saira);font-weight:600;font-size:15px;letter-spacing:.06em;color:var(--ink);line-height:1;border-bottom:1px dashed rgba(232,236,242,.36);padding-bottom:2px;font-variant-numeric:tabular-nums}
-.dk-step .val .h{font-size:7px;letter-spacing:.14em;color:rgba(232,236,242,.3);line-height:1}
-.dk-step.off{opacity:.35;pointer-events:none}
-/* 定規（DEPTH / FOCUS 共通） */
-.dk-ruler{position:relative;height:30px;touch-action:none;cursor:ew-resize}
-.dk-ruler.off{opacity:.35;pointer-events:none}
-.dk-ruler .axis{position:absolute;left:0;right:0;top:14px;height:1px;background:rgba(232,236,242,.2)}
-.dk-ruler .ticks{position:absolute;left:0;right:0;top:8px;height:13px;display:flex;justify-content:space-between}
-.dk-ruler .ticks i{width:1px;height:7px;background:rgba(232,236,242,.14)}
-.dk-ruler .ticks i.mj{height:13px;background:rgba(232,236,242,.24)}
-.dk-ruler .dot{position:absolute;top:9px;width:9px;height:9px;margin-left:-4px;border:1px solid rgba(232,236,242,.5);background:#0B0D11;transform:rotate(45deg);cursor:pointer}
-.dk-ruler .dot:hover{border-color:var(--acc);box-shadow:var(--acc-glow)}
-.dk-ruler .dot.sel{top:9px;width:15px;height:15px;margin-left:-7px;border:1px solid var(--acc);border-image:var(--acc-border) 1;background:rgba(var(--accRGB),.22)}
-.dk-ruler .stem{position:absolute;top:14px;bottom:0;width:1px;margin-left:-1px;background:linear-gradient(to bottom,rgba(var(--accRGB),.6),rgba(var(--accRGB),0))}
-.dk-ruler .car{position:absolute;top:-12px;margin-left:-14px;width:28px;text-align:center;font-size:28px;line-height:1;color:var(--acc-pt);text-shadow:0 0 14px rgba(var(--acc-ptRGB),.6);cursor:ew-resize}
-.dk-ruler .end{position:absolute;bottom:-13px;font-size:8px;letter-spacing:.24em;color:rgba(232,236,242,.28)}
-.dk-ruler .end.r{right:0}
-/* コマの一覧（奥→手前） */
-.dk-strip{display:flex;align-items:flex-end;gap:9px;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;padding-bottom:3px}
-.dk-card{flex:none;width:106px;height:76px;border:1px solid var(--line);background:var(--cell);padding:7px;display:flex;flex-direction:column;gap:6px;cursor:pointer;transition:border-color .12s,box-shadow .12s}
-.dk-card:hover{border-color:var(--acc-hover-line);box-shadow:var(--acc-glow)}
-.dk-card .ch{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
-.dk-card .no{font-family:var(--saira);font-weight:600;font-size:13px;letter-spacing:.14em;color:rgba(232,236,242,.7)}
-.dk-card .dp{font-size:11px;color:rgba(232,236,242,.5);font-variant-numeric:tabular-nums}
-.dk-card .th{flex:1;min-height:0;border:1px solid rgba(232,236,242,.1);background:linear-gradient(150deg,#20242C,#12141A);overflow:hidden;display:flex;align-items:center;justify-content:center}
-.dk-card .th img{width:100%;height:100%;object-fit:cover;display:block}
-.dk-card.frm{border-style:dashed}
-.dk-card.frm .th{background:transparent;border-style:dashed}
-.dk-card.on{width:132px;height:92px;border:1px solid rgba(var(--accRGB),.9);border-image:var(--acc-border) 1;background:rgba(var(--accRGB),.1);animation:nowGlow 3.2s ease-in-out infinite}
-.dk-card.on .no{font-size:17px;font-weight:700;color:var(--acc2)}
-.dk-card.on .dp{font-family:var(--saira);font-weight:700;font-size:17px;color:var(--acc)}
-.dk-card .cf{display:flex;align-items:center;justify-content:space-between;gap:6px}
-.dk-card .nm{font-family:var(--jp);font-size:9px;color:rgba(var(--acc2RGB),.75);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nb{flex:none;font-size:8px;letter-spacing:.22em;color:#08090C;background:var(--acc-pt);padding:2px 5px}
-.dk-add{flex:none;width:88px;height:76px;border:1px dashed rgba(232,236,242,.2);background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;color:rgba(232,236,242,.35);font-family:var(--mono);font-size:8px;letter-spacing:.18em}
-.dk-add:hover{border-color:var(--acc-hover-line);color:var(--ink)}
-.dk-add b{font-weight:400;font-size:15px;line-height:1}
-/* 操作の段（主動作＋いま何ができるか＋小道具） */
-.dk-acts{display:flex;align-items:center;gap:10px;padding-top:10px;border-top:1px solid rgba(232,236,242,.08);flex-wrap:wrap}
-.dk-pri{display:flex;align-items:center;gap:12px;height:52px;padding:0 18px;flex:none;border:0;background:var(--acc-fill);color:var(--acc-ink);box-shadow:var(--acc-inset);cursor:pointer}
-.dk-pri:hover{filter:brightness(1.1);box-shadow:var(--acc-inset),var(--acc-glow)}
-.dk-pri:active{filter:brightness(1.2);box-shadow:var(--acc-inset),var(--acc-glow)}
-.dk-pri .g{font-size:14px;line-height:1}
-.dk-pri .t{font-family:var(--saira);font-weight:700;font-size:18px;letter-spacing:.16em;line-height:1}
-.dk-pri .s{font-family:var(--jp);font-size:9px;letter-spacing:.14em;opacity:.72;line-height:1}
-.dk-chip{display:flex;align-items:center;gap:11px;height:52px;padding:0 15px;flex:none;border:1px solid rgba(232,236,242,.18);background:rgba(232,236,242,.04)}
-.dk-chip .n{font-size:10px;letter-spacing:.1em;color:rgba(232,236,242,.34)}
-.dk-chip .g{font-size:14px;color:rgba(232,236,242,.8);line-height:1}
-.dk-chip .t{font-family:var(--saira);font-weight:600;font-size:16px;letter-spacing:.18em;color:var(--ink);line-height:1}
-.dk-chip .s{font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.4);line-height:1}
-.dk-chip.on{border:1px solid rgba(var(--accRGB),.9);border-image:var(--acc-border) 1;background:rgba(var(--accRGB),.15);animation:nowGlow 3.2s ease-in-out infinite}
-.dk-chip.on .t{color:var(--acc2);font-weight:700}
-.dk-chip.on .g{color:var(--acc)}
-.dk-chip.on .s{color:rgba(var(--acc2RGB),.72)}
-.dk-chip.on .n{color:rgba(var(--acc2RGB),.7)}
-.dk-col{display:flex;flex-direction:column;gap:3px}
-.dk-mini{display:flex;align-items:center;gap:7px;height:44px;padding:0 13px;flex:none;border:1px solid var(--line);background:transparent;color:rgba(232,236,242,.6);cursor:pointer;font-family:var(--saira);font-weight:600;font-size:13px;letter-spacing:.2em;transition:all .12s}
-.dk-mini:hover{background:var(--acc-hover-fill);border-color:var(--acc-hover-line);color:var(--ink);box-shadow:var(--acc-glow)}
-.dk-mini:disabled{opacity:.3;pointer-events:none}
-.dk-mini.ico{width:44px;padding:0;justify-content:center;font-family:var(--mono);font-size:13px;letter-spacing:0}
-.dk-mini.on{background:rgba(var(--accRGB),.12);border-color:rgba(var(--accRGB),.55);color:var(--acc)}
-.dk-sep{width:1px;height:26px;flex:none;background:rgba(232,236,242,.14)}
-.dk-hint{font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.34)}
-/* --- TAKE 側の追加パーツ --- */
-.dk-take{display:flex;align-items:center;gap:10px;height:46px;padding:0 13px;flex:none;cursor:pointer;font-family:var(--mono);
-  border:1px solid rgba(var(--accRGB),.5);border-image:var(--acc-border) 1;background:rgba(var(--accRGB),.09)}
-.dk-take:hover{background:var(--acc-hover-fill);box-shadow:var(--acc-glow)}
-.dk-take .g{font-size:17px;color:var(--acc);line-height:1}
-.dk-take .t{font-family:var(--saira);font-weight:600;font-size:13px;letter-spacing:.2em;color:var(--acc2);line-height:1}
-.dk-take .s{font-size:8px;letter-spacing:.18em;color:rgba(var(--acc2RGB),.55);line-height:1}
-.dk-take.on{background:rgba(var(--accRGB),.2);animation:nowGlow 3.2s ease-in-out infinite}
-button.dk-chip{cursor:pointer;font-family:var(--mono);text-align:left}
-button.dk-chip:hover{background:var(--acc-hover-fill);border-color:var(--acc-hover-line);box-shadow:var(--acc-glow)}
-.dk-chip:disabled{opacity:.42;pointer-events:none}
-.dk-pri .kb{font-size:10px;letter-spacing:.1em;border:1px solid rgba(8,9,12,.35);padding:3px 6px;margin-left:4px}
-.dk-scr{display:flex;align-items:baseline;gap:5px;flex:none;cursor:ew-resize;touch-action:none;background:none;border:0;padding:0;font-family:var(--mono)}
-.dk-scr .k{font-size:8px;letter-spacing:.2em;color:rgba(232,236,242,.34)}
-.dk-scr .v{font-size:11px;letter-spacing:.1em;color:rgba(232,236,242,.78);border-bottom:1px dashed rgba(232,236,242,.32)}
-.dk-scr.ease{cursor:pointer}
-.dk-scr.off{opacity:.4;pointer-events:none}
-.dk-hr .vl{width:1px;height:11px;background:rgba(232,236,242,.16)}
-.dk-ruler .dot.pt{border-color:var(--acc-pt);background:rgba(var(--acc-ptRGB),.32)}
-.dk-ruler .pk{position:absolute;top:11px;width:1px;height:7px;background:rgba(232,236,242,.3)}
-.dk-card .rdy{font-size:8px;letter-spacing:.2em;color:rgba(232,236,242,.3)}
-.dk-card.now{border-color:var(--acc-pt);box-shadow:0 0 12px rgba(var(--acc-ptRGB),.35)}
-/* KFのミニマップ：置いてあるもの（薄い箱）と、そのKFが切り取る画角（accの枠） */
-.mm{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden}
-.mm i{position:absolute;background:rgba(232,236,242,.13);border:1px solid rgba(232,236,242,.16)}
-.mm b{position:absolute;border:1px solid rgba(var(--accRGB),.85);background:rgba(var(--accRGB),.1);box-shadow:0 0 8px rgba(var(--accRGB),.25)}
-.set-theme .thr{display:flex;gap:6px;margin:4px 0 7px}
 /* クリーン表示（H）: 編集UIを全部隠して絵だけ全面に（OBS等のキャプチャ用） */
-body.cleanview #bar,body.cleanview #art,body.cleanview #qe,body.cleanview #ticks,body.cleanview #fx-modal,body.cleanview #ap-modal,body.cleanview #set-ovl{display:none!important}
+body.cleanview #bar,body.cleanview #cards,body.cleanview #qe,body.cleanview #ticks,body.cleanview #fx-modal,body.cleanview #set-ovl{display:none!important}
 body.cleanview{cursor:none}
 
 </style>
@@ -791,88 +495,66 @@ body.cleanview{cursor:none}
 <div id="void"></div>
 <canvas id="cv"></canvas>
 <div id="ticks"></div>
-<div id="art"><div class="plus"></div><div class="diag"></div><div class="hatch tr"></div><div class="hatch bl"></div></div>
 
 <div id="bar">
-  <div class="brand">
-    <svg viewBox="0 0 120 120" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g transform="rotate(-9 60 60)"><path d="M 94.67 32.91 A 44 44 0 1 0 94.67 87.09" stroke="var(--acc)" stroke-width="12.5" stroke-linecap="round" fill="none"></path><path d="M 94.67 87.09 L 75 78.5" stroke="var(--acc)" stroke-width="12.5" stroke-linecap="round" fill="none"></path><rect x="54" y="41" width="11.5" height="28" rx="5.75" fill="var(--acc)"></rect><circle class="pt" cx="42" cy="72" r="8" fill="#FFFFFF"></circle></g></svg>
-    <div class="bwrap"><span class="bname">GEN-EX</span><span class="bsub">OBAN / TAKE RIG</span></div>
-  </div>
-
+  <span class="title"><b>OBAN</b></span>
   <!-- 手順1〜3（PLACE→TAKE→EXPORT） -->
-  <div class="steps">
-    <button class="step on" id="m-place" title="配置モード：画像をコマとして並べる。ドラッグ=移動 / [ ]=前後 / フレームに重ねて格納 / Wクリック=フレーム内へ / M=マスク編集"><span class="n">01</span><span class="en">PLACE</span><span class="jp">配置</span><span class="nb">NOW</span></button>
-    <span class="sep">›</span>
-    <button class="step" id="m-take" title="カメラモード：スクロールに沿ったカメラワークをキーフレームで打つ。C=CAPTURE / ↑↓=KF移動 / SPACE=PREVIEW"><span class="n">02</span><span class="en">TAKE</span><span class="jp">カメラ</span><span class="nb">NOW</span></button>
-    <span class="sep">›</span>
-    <button class="step" id="b-export" title="書き出し（単一HTMLビューア ／ 動画 MP4）を選んで書き出します"><span class="n">03</span><span class="en">EXPORT</span><span class="jp">書き出し</span></button>
-  </div>
-
+  <button class="btn mode on" id="m-place" title="配置モード：画像をコマとして並べる。ドラッグ=移動 / [ ]=前後 / フレームに重ねて格納 / Wクリック=フレーム内へ / M=マスク編集">1. PLACE 配置</button>
+  <button class="btn mode ice" id="m-take" title="カメラモード：スクロールに沿ったカメラワークをキーフレームで打つ。C=CAPTURE / ↑↓=KF移動 / SPACE=PREVIEW">2. TAKE カメラ</button>
+  <button class="btn ex" id="b-export" title="書き出し（単一HTMLビューア ／ 動画 MP4）を選んで書き出します">3. EXPORT</button>
+  <!-- 作成中に使う道具（EXPORTのとなり）。GUIDE/CLEAR はボタン廃止＝Gキー/SETTINGSへ集約 -->
+  <button class="btn mode" id="b-img" title="画像を選んで追加（複数選択できます。連番4枚以上は自動でパラパラに。iPadはD&Dの代わりにこちら）">▶ pic</button>
+  <input type="file" id="oban-img-input" accept="image/*" multiple style="display:none;">
+  <button class="btn mode" id="b-frame" title="フレーム（コマ枠）を追加。画像を重ねて格納できる">+ FRAME</button>
+  <button class="btn fx" id="b-fx" title="撮影処理（SATSUEI FX）・DOFピン送り・クリックFXを編集（F）。ONの間はボタンが点灯します">FX [F]</button>
+  <button class="btn mode ice" id="b-mon" title="MONITOR：書き出したときの見え方（カメラ・DEPTH・DOFピント）を16:9の小窓で常時表示（P）">▣ MONITOR</button>
+  <span style="width:14px"></span>
+  <!-- 入出力（読み込み・書き出し・連携）。矢印はパイプラインの向き -->
+  <button class="btn" id="b-ap" title="ANIMATORの連番をPNG書き出しなしで取り込み（同一ブラウザ・EX_DB経由。保存で自動同期）">▶ ANIMATOR</button>
+  <button class="btn" id="b-comp" title="TAKEをCOMPOSERのCAMERAトラックJSONに変換してコピー（COMPOSER側の + FROM OBAN で貼り付け）">COMPOSER ▶</button>
+  <input type="file" id="oban-json-input" accept="application/json,.json" style="display:none;">
   <span id="crumb"></span>
-  <span class="flex"></span>
-
-  <!-- 右端は最小限（詳細・設定・全画面）。作成の道具は下部コンソール、入出力と連携は ⚙ の中。
-       ここに置かないボタンも DOM には残す＝ドックやキーからの入口として使う -->
+  <!-- 右端グループ（プロジェクト入出力・設定・全画面・HOME。HOMEは常に一番右。
+       この並びは manga-plate / econte と揃えている＝ツールを渡り歩いても同じ場所にある） -->
   <span id="bar-right">
-    <button class="btn" id="b-detail" title="詳細（QUICK EDIT）を開閉：選択中のコマ／フレーム／テキストを編集（U）">詳細<span class="lbl"> ···</span></button>
-    <button class="btn ico" id="b-set" title="設定・テーマ・入出力・連携・使い方・ショートカット一覧">⚙</button>
-    <button class="btn ico" id="b-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
+    <button class="btn" id="b-export-json" title="プロジェクト全体をJSONファイルで書き出し">EXPORT JSON</button>
+    <button class="btn" id="b-import-json" title="JSONファイルからプロジェクトを読み込み（既存を置換）">IMPORT JSON</button>
+    <button class="btn" id="b-set" title="設定・使い方・ショートカット一覧">⚙</button>
+    <button class="btn" id="b-fullscreen" title="全画面表示 ON/OFF（PCのF11相当・iPad Safariでも使えます）">⛶</button>
+    <button class="btn" id="b-se" title="新UI（SPECIAL EDITION）の OBAN BUILDER を開く。同じエンジン・同じ保存データ">NEW UI</button>
+    <button class="btn" id="b-home" title="ランディングページに戻る">HOME</button>
   </span>
 </div>
 
-<!-- バーから降ろしたボタン群の置き場。表示しないが、ドック／キー／⚙ から click() で使う -->
-<span id="bar-proxy" style="display:none">
-  <button class="btn mode" id="b-img" title="画像を選んで追加（複数選択できます。連番4枚以上は自動でパラパラに。iPadはD&Dの代わりにこちら）">▶<span class="lbl">PIC 絵を置く</span></button>
-  <input type="file" id="oban-img-input" accept="image/*" multiple style="display:none;">
-  <button class="btn mode" id="b-frame" title="フレーム（コマ枠）を追加。画像を重ねて格納できる">＋<span class="lbl">FRAME</span></button>
-  <button class="btn fx" id="b-fx" title="撮影処理（SATSUEI FX）・DOFピン送り・クリックFXを編集（F）。ONの間はボタンが点灯します">FX<span class="lbl"> [F]</span></button>
-  <button class="btn mode" id="b-mon" title="MONITOR：書き出したときの見え方（カメラ・DEPTH・DOFピント）を16:9の小窓で常時表示（P）">▣<span class="lbl">MONITOR</span></button>
-</span>
-
-<span id="set-acts-src" style="display:none">
-  <span>
-    <button class="btn" id="b-ap" title="ANIMATORの連番をPNG書き出しなしで取り込み（同一ブラウザ・EX_DB経由。保存で自動同期）">▶<span class="lbl">ANIMATOR</span></button>
-    <button class="btn" id="b-comp" title="TAKEをCOMPOSERのCAMERAトラックJSONに変換してコピー（COMPOSER側の + FROM OBAN で貼り付け）"><span class="lbl">COMPOSER </span>▶</button>
-    <input type="file" id="oban-json-input" accept="application/json,.json" style="display:none;">
-    <span class="vline"></span>
-    <button class="btn" id="b-export-json" title="プロジェクト全体をJSONファイルで書き出し">⇧ EXPORT JSON</button>
-    <button class="btn" id="b-import-json" title="JSONファイルからプロジェクトを読み込み（既存を置換）">⇩ IMPORT JSON</button>
-    <button class="btn" id="b-classic" title="従来UIの OBAN BUILDER を開く（同じエンジン・同じ保存データ。見慣れた画面で作業したいとき用）">CLASSIC UI</button>
-    <button class="btn" id="b-home" title="ランディングページに戻る">HOME</button>
-  </span>
-</span>
+<div id="cards">
+  <div id="cards-head"><span>TAKE — CAMERA</span><span class="pbtns"><span class="drag-hint">DRAG</span><button class="pbtn" id="cards-mini" title="最小化／展開">▾</button></span></div>
+  <div id="cards-body"></div>
+  <div id="cards-resize" title="ドラッグで高さ調整"></div>
+</div>
 
 <!-- QUICK EDIT: 選択対象(コマ/シーケンス/フレーム/テキスト)に応じて中身を動的生成 -->
 <div id="qe">
-  <div id="qe-head"><span class="ttl">詳細</span><span class="ttl2">QUICK EDIT</span><span class="sp"></span><span id="qe-name"></span><span class="pbtns"><button class="pbtn" id="qe-mini" title="最小化／展開">▾</button></span><span id="qe-close" title="閉じる（U で開き直せます）">✕</span></div>
+  <div id="qe-head"><span class="ttl">QUICK EDIT</span><span id="qe-name"></span><span class="pbtns"><button class="pbtn" id="qe-mini" title="最小化／展開">▾</button></span><span id="qe-close" title="閉じる（U で開き直せます）">✕</span></div>
   <div id="qe-body"></div>
-  <div id="qe-foot"></div>
   <div id="qe-resize" title="ドラッグで高さ調整"></div>
 </div>
 
 <!-- MONITOR: 16:9セーフフレームの中を「書き出したときの見え方」で出す小窓（P で開閉） -->
 <div id="mon">
-  <div id="mon-head"><span class="ttl">MONITOR</span><span class="ttl2">書き出しの見え方</span><span class="sp"></span><span id="mon-pv">0%</span><span class="pbtns"><button class="pbtn" id="mon-mini" title="最小化／展開">▾</button></span><span id="mon-close" title="閉じる（P で開き直せます）">✕</span></div>
+  <div id="mon-head"><span>MONITOR — 結果</span><span class="pbtns"><button class="pbtn" id="mon-mini" title="最小化／展開">▾</button></span><span id="mon-close" title="閉じる（P で開き直せます）">✕</span></div>
   <div id="mon-body">
-    <div class="mon-fr"><canvas id="mon-cv"></canvas><i class="t1"></i><i class="t2"></i><i class="t3"></i><i class="t4"></i></div>
-    <div id="mon-rl" class="dk-ruler" title="スクロール位置（左＝先頭／右＝末尾）。◇＝カメラを打った位置。プレビュー中とKF選択中は自動で追従します">
-      <div class="axis"></div>
-      <div class="ticks"><i class="mj"></i><i></i><i></i><i></i><i class="mj"></i><i></i><i></i><i></i><i class="mj"></i></div>
-      <div class="pks"></div>
-      <div class="stem" style="left:0%"></div><div class="car" style="left:0%">▼</div>
-      <span class="end">HEAD</span><span class="end r">TAIL</span>
+    <canvas id="mon-cv"></canvas>
+    <div class="mon-r">
+      <input type="range" id="mon-p" min="0" max="1" step="0.001" value="0" title="スクロール位置（0=先頭 / 1=末尾）。プレビュー中とKF選択時は自動で追従します">
+      <span class="v" id="mon-pv">0%</span>
     </div>
-    <input type="range" id="mon-p" min="0" max="1" step="0.001" value="0" hidden>
     <div class="mon-info" id="mon-info">—</div>
-    <div class="mon-note">カメラ・DEPTH・DOFピントを<b>書き出しと同じ式</b>で反映した16:9の中身。撮影処理（SATSUEI FX）は乗りません — SPACE のプレビューで確認してください。</div>
+    <div class="mon-note">カメラ・DEPTH・DOFピントを<b>書き出しと同じ式</b>で反映した16:9の中身。撮影FX（SATSUEI FX）は反映しません（SPACE のプレビューで確認）。</div>
   </div>
 </div>
 
-<div id="dock"></div>
-
 <div id="drop">
   <div class="big">DROP IMAGES HERE</div>
-  <div class="rule"></div>
   <div class="sm">コミックのコマ/パネル画像をドロップすると縦に並びます。<br>並べて、カメラを打って、1本のスクロール作品として書き出せます。</div>
 </div>
 
@@ -891,12 +573,8 @@ body.cleanview{cursor:none}
 
 <!-- ==================== SATSUEI FX MODAL (V2-C / SPEC_06 P2) ==================== -->
 <div id="fx-modal">
-  <div id="fx-head">
-    <span class="ttl">SATSUEI</span><span class="ttl2">撮影処理</span><span class="sp"></span>
-    <span id="fx-badge" class="off">OFF</span>
-    <button class="hb" id="fx-mini" title="最小化／展開">▾</button>
-    <button class="hb" id="fx-close" title="閉じる (Esc)">✕</button>
-  </div>
+  <div id="fx-head"><span>SATSUEI FX — take.fx <b>[rt]</b></span><button class="btn" id="fx-close" title="閉じる (Esc)">✕</button><button class="btn" id="fx-mini" title="最小化／展開">▾</button>
+    <div class="fx-note">プレビュー(SPACE)と書き出しビューアに適用。編集中はOFF（軽量優先）</div></div>
   <div id="fx-body"></div>
   <div id="fx-resize" title="ドラッグで高さ調整"></div>
 </div>
@@ -906,10 +584,9 @@ body.cleanview{cursor:none}
   <div id="set-box">
     <!-- CLEAR は econte の「全消去」と同じ位置（SETTINGSの閉じるの隣）。
          普段のバーには置かない＝押し間違いの入口を作らない -->
-    <div id="set-head"><span class="t">SETTINGS</span><span class="t2">設定とキー操作</span><span class="sp"></span>
-      <button class="qd-sb" id="b-clear" title="プロジェクトを空にする（元に戻せません。先に EXPORT JSON で保存を）">CLEAR</button>
-      <button class="hb" id="set-close" title="閉じる (Esc)">✕</button></div>
-    <div id="set-acts"><span class="h">FILE ／ 連携</span></div>
+    <div id="set-head"><span class="t">SETTINGS ／ SHORTCUTS</span>
+      <button class="btn" id="b-clear" title="プロジェクトを空にする（元に戻せません。先に EXPORT JSON で保存を）">CLEAR</button>
+      <button class="btn" id="set-close" title="閉じる (Esc)">✕</button></div>
     <div id="set-body"></div>
     <div id="set-note">ショートカットは固定です。書き出したビューアでは <b>S</b> = 字幕 ON/OFF、<b>?fx=0</b> で撮影処理OFF、<b>?sub=0</b> で字幕を初期非表示にできます。</div>
   </div>
@@ -961,14 +638,9 @@ body.cleanview{cursor:none}
 
 <!-- ==================== FROM ANIMATOR MODAL (SPEC_07) ==================== -->
 <div id="ap-modal">
-  <div id="ap-head">
-    <span class="ttl">ANIMATOR</span><span class="ttl2">連番の取り込み</span><span class="sp"></span>
-    <span id="ap-badge" class="off">0</span>
-    <button class="hb" id="ap-mini" title="最小化／展開">▾</button>
-    <button class="hb" id="ap-close" title="閉じる (Esc)">✕</button>
-  </div>
+  <div id="ap-head"><span>▶ ANIMATOR</span><button class="btn" id="ap-close" title="閉じる (Esc)">✕</button>
+    <div class="ap-note">ANIMATORの連番をPNG書き出しなしでseqパネルに。追加後はANIMATOR保存で自動同期（同一ブラウザ限定）。</div></div>
   <div id="ap-body"></div>
-  <div id="ap-resize" title="ドラッグで高さ調整"></div>
 </div>
 
 <script id="satsuei-core">
@@ -1828,14 +1500,10 @@ function setupApLive(){
 function toggleApModal(force){
   const open=force!==undefined?force:!document.body.classList.contains('apopen');
   document.body.classList.toggle('apopen',open);
-  if(open){
-    const m=$('#ap-modal');
-    if(m){m.classList.remove('mini');bringToFront(m,true);}
-    openApList();
-  }
+  if(open)openApList();
 }
 async function openApList(){
-  const root=$('#ap-body');if(root)root.innerHTML='<div class="qd-note">EXCHANGE DB を読み込み中…</div>';
+  const root=$('#ap-body');if(root)root.innerHTML='<div class="ap-empty">EXCHANGE DB を読み込み中…</div>';
   apAnnounce();   // 開いているANIMATORへ最新を要求（届き次第一覧が更新される）
   try{gApExList=await exGetAll();}catch(e){gApExList=[];}
   renderApList();
@@ -1853,21 +1521,15 @@ function apCandidates(){
 function renderApList(){
   const root=$('#ap-body');if(!root||!document.body.classList.contains('apopen'))return;
   const cands=apCandidates();
-  const bd=$('#ap-badge');
-  if(bd){bd.textContent=cands.length?String(cands.length).padStart(2,'0'):'0';bd.classList.toggle('off',!cands.length);}
-  const hd='<div class="qd-sect"><span class="en">PROJECTS</span><span class="jp">'
-    +(cands.length?'押すとコマになる':'まだありません')+'</span></div>';
   if(!cands.length){
-    root.innerHTML=hd+'<div class="qd-note">ANIMATOR でプロジェクトを開いて <b>LIVE</b> または <b>→ COMPOSER</b> を押すと、ここに出ます（同じブラウザの中だけ）。</div>';
+    root.innerHTML='<div class="ap-empty">まだプロジェクトがありません。<br>ANIMATORでプロジェクトを開いて「LIVE」または「→ COMPOSER」を押すと、ここに出ます（同一ブラウザ限定）。</div>';
     return;
   }
-  root.innerHTML=hd+'<div class="qd-list">'+cands.map(r=>{
+  root.innerHTML=cands.map(r=>{
     const nm=String(r.scene||r.name||r.projectId).slice(0,18);
     const at=r.exportedAt?String(r.exportedAt).replace('T',' ').slice(5,16):'—';
-    return '<button class="qd-ent" data-ap="'+r.projectId+'"><span class="nm">'+nm+'</span>'
-      +'<span class="mt">'+(r.cellCount||r.cells.length)+' CELL ・ '+(r.width||'?')+'×'+(r.height||'?')+'<br>'+at+'</span></button>';
-  }).join('')+'</div>'
-    +'<div class="qd-note">PNG の書き出しなしでコマになります。取り込んだあとは ANIMATOR で保存するたびに自動で更新（絵は常に ANIMATOR が正）。</div>';
+    return `<div class="ap-row" data-ap="${r.projectId}"><span class="ap-nm">${nm}</span><span class="ap-meta">${r.cellCount||r.cells.length}cell · ${r.width||'?'}×${r.height||'?'} · ${at}</span></div>`;
+  }).join('');
 }
 function addApPanel(rec){
   if(!apIngest(rec)){toast('プロジェクトを読み込めませんでした');return;}
@@ -1883,7 +1545,7 @@ function addApPanel(rec){
 $('#b-ap').addEventListener('click',()=>toggleApModal());
 $('#ap-close').addEventListener('click',()=>toggleApModal(false));
 $('#ap-body').addEventListener('click',e=>{
-  const row=e.target&&e.target.closest?e.target.closest('.qd-ent'):null;
+  const row=e.target&&e.target.closest?e.target.closest('.ap-row'):null;
   if(!row)return;
   const rec=apCandidates().find(r=>r.projectId===row.dataset.ap);
   if(rec)addApPanel(rec);
@@ -2123,7 +1785,7 @@ function drawSubs(g,P,W,H,scale){
   for(const t of PROJECT.texts){
     if(t.type!=='sub'||t.kf==null||!t.str)continue;
     const a=kfWinAlpha(t.kf,P);if(a<=0.01)continue;
-    g.save();g.globalAlpha=a;g.font='600 '+((t.size||22)*DPRs)+'px "Saira Condensed","Saira",system-ui,sans-serif';g.textAlign='center';
+    g.save();g.globalAlpha=a;g.font=(11*DPRs)+'px monospace';g.textAlign='center';
     g.fillStyle='rgba(0,0,0,.8)';g.fillText(t.str,W/2+1,H-H*0.055+1);
     g.fillStyle='#f2eefc';g.fillText(t.str,W/2,H-H*0.055);
     g.restore();
@@ -2338,29 +2000,6 @@ function drawTakePath(cam){
   cx.restore();
 }
 
-/* EXPORT: 「この枠の中がそのまま出る」を選んだサイズのアスペクトで見せる（設定と連動＝ガイドとは別物） */
-function drawOutFrame(){
-  if(mode!=='export'||cleanView)return;
-  const d=expDims(),ar=d[0]/d[1],W=cv.width,H=cv.height;
-  let aw=W,ah=W/ar;if(ah>H){ah=H;aw=H*ar;}
-  const ax=(W-aw)/2,ay=(H-ah)/2,c=24*DPR;
-  cx.save();
-  cx.strokeStyle='rgba(232,241,250,.7)';cx.lineWidth=1*DPR;cx.strokeRect(ax,ay,aw,ah);
-  cx.strokeStyle='#E9F1FA';cx.lineWidth=2*DPR;
-  const cor=(x,y,sx,sy)=>{cx.beginPath();cx.moveTo(x,y+sy*c);cx.lineTo(x,y);cx.lineTo(x+sx*c,y);cx.stroke();};
-  cor(ax,ay,1,1);cor(ax+aw,ay,-1,1);cor(ax,ay+ah,1,-1);cor(ax+aw,ay+ah,-1,-1);
-  cx.textBaseline='alphabetic';
-  const ly=ay+c+18*DPR;                       // 枠の内側（上辺のブラケットの下）に出す
-  cx.fillStyle='#5AE9FF';cx.fillRect(ax+8*DPR,ly-11*DPR,31*DPR,15*DPR);
-  cx.fillStyle='#05070B';cx.font=`${9*DPR}px monospace`;cx.fillText('OUT',ax+13*DPR,ly);
-  cx.fillStyle='rgba(232,241,250,.92)';cx.font=`${11*DPR}px monospace`;
-  const dim=d[0]+' × '+d[1];
-  const dw=cx.measureText(dim).width;
-  cx.fillText(dim,ax+46*DPR,ly);
-  cx.fillStyle='rgba(232,236,242,.42)';cx.font=`${9*DPR}px monospace`;
-  cx.fillText('この枠の中がそのまま出ます',ax+46*DPR+dw+14*DPR,ly);
-  cx.restore();
-}
 /* ---------- V2-A: ガイド（16:9セーフ+中央十字+三分割、Gで切替・書き出さない） ---------- */
 function drawGuides(){
   if(!guides)return;
@@ -2393,8 +2032,6 @@ function toggleGuides(){guides=!guides;try{localStorage.setItem('oban-guides',gu
 function drawDofRuler(){
   const d=PROJECT.dof;
   if(!d||!d.on)return;
-  if(mode==='take'||mode==='place'||mode==='export')return;   // 定規は下部コンソール（FOCUS）へ移設
-  if(mode==='place')return;   // PLACE は下部コンソールの DEPTH 定規が主役（二重に出さない）
   const W=cv.width,H=cv.height;
   // キャンバスは CVOFF ぶん下へずれている＝下端が画面外に出る。実際に見えている底から測る
   const w=Math.min(W*0.52,560*DPR),x0=(W-w)/2,y0=visBottomPx()-58*DPR;
@@ -2449,7 +2086,6 @@ function drawDofRuler(){
 function dofRulerHit(cssX,cssY){
   const d=PROJECT.dof;
   if(!d||!d.on||PV.on||cleanView)return null;
-  if(mode==='take'||mode==='place'||mode==='export')return null;   // ▼ はコンソール側で持つ
   const W=cv.width,H=cv.height;
   const w=Math.min(W*0.52,560*DPR),x0=(W-w)/2,y0=visBottomPx()-58*DPR;
   const px=cssX*DPR,py=cssY*DPR;
@@ -2484,11 +2120,6 @@ function drawDofBadge(o,R){
 const MON={on:false,p:0};
 let monCv=null,monCx=null,monLast=0;
 function monVisible(){return MON.on&&!cleanView;}
-/* MONITOR の点灯を「見えているボタン」＝下部コンソール側に反映する（バーには置かない） */
-function syncMonBtn(){
-  const mb=$('#b-mon');if(mb)mb.classList.toggle('on',MON.on);
-  if(typeof mode!=='undefined'&&mode==='place')renderDock();
-}
 function setMonitor(on){
   MON.on=(on==null)?!MON.on:!!on;
   document.body.classList.toggle('monopen',MON.on);
@@ -2528,47 +2159,27 @@ function monRender(){
   monInfo(P);
 }
 function monInfo(P){
-  const inf=$('#mon-info'),pv=$('#mon-pv'),sl=$('#mon-p'),rl=$('#mon-rl');
+  const inf=$('#mon-info'),pv=$('#mon-pv'),sl=$('#mon-p');
   if(pv)pv.textContent=Math.round((P||0)*100)+'%';
-  if(sl)sl.value=String(P||0);
-  if(rl){                                   // ▼＝いまの位置 / ◇＝カメラを打った位置
-    const x=(clamp(P||0,0,1)*100).toFixed(2)+'%';
-    const st=rl.querySelector('.stem'),ca=rl.querySelector('.car'),pk=rl.querySelector('.pks');
-    if(st)st.style.left=x;
-    if(ca)ca.style.left=x;
-    if(pk){
-      const sig=PROJECT.take.kf.length+'/'+((TT.segs&&TT.segs.length)||0);
-      if(pk.dataset.sig!==sig){
-        pk.dataset.sig=sig;
-        pk.innerHTML=PROJECT.take.kf.map((k,i)=>{
-          const s=TT.segs&&TT.segs[2*i];if(!s)return '';
-          return '<span class="dot" style="left:'+(((s.p0+s.p1)/2)*100).toFixed(2)+'%;pointer-events:none"></span>';
-        }).join('');
-      }
-    }
-  }
+  if(sl&&document.activeElement!==sl)sl.value=String(P||0);
   if(!inf)return;
-  if(P==null){inf.innerHTML='<span>KFがありません — 2.TAKE で C＝CAPTURE</span>';return;}
+  if(P==null){inf.textContent='KFがありません — 2.TAKE で C=CAPTURE';return;}
   const f=focusAt(P),k=kfIndexAtP(P);
-  inf.innerHTML='<span>KF</span><b>#'+pad(Math.max(k,0))+'</b>'
-    +'<span>ピント</span><b>'+(f==null?'—':f.toFixed(2))+'</b>'
-    +(f==null?'<span style="opacity:.6">DOF OFF</span>':'');
+  inf.textContent='KF #'+pad(Math.max(k,0))+'   ピント '+(f==null?'—（DOF OFF）':f.toFixed(2));
 }
 {
-  /* 定規を押した／ドラッグした場所がそのまま位置（細いつまみを指でつかまない） */
-  const rl=$('#mon-rl');
-  if(rl)rl.addEventListener('pointerdown',e=>{
-    e.preventDefault();
+  const sl=$('#mon-p');
+  if(sl)sl.addEventListener('input',()=>{
     if(PV.on)stopPreview();          // 手で覗きたいので再生は止める
-    const r=rl.getBoundingClientRect();
-    const at=ev=>{MON.p=clamp((ev.clientX-r.left)/Math.max(1,r.width),0,1);monRender();renderDock();};
-    at(e);dkDrag(e,at);
+    MON.p=parseFloat(sl.value)||0;monRender();
   });
   const mc=$('#mon-close');if(mc)mc.addEventListener('click',()=>setMonitor(false));
-  const mb=$('#b-mon');if(mb)mb.addEventListener('click',()=>{setMonitor();syncMonBtn();});
+  const mb=$('#b-mon');if(mb)mb.addEventListener('click',()=>{setMonitor();mb.classList.toggle('on',MON.on);});
 }
 
-/* ---------- TAKE の状態（表示は DETAIL と下部コンソールに一本化） ---------- */
+/* ---------- cards (TAKE) ---------- */
+const cards=$('#cards');
+const cardsBody=$('#cards-body');
 /* DOF ピン送りのストリップ（カメラの仕事なのでTAKEパネルに置く＝配置モードへ戻らずに設定できる） */
 let dofPick=null;   // 'a' | 'b' … 「画面から取る」待機中（キャンバスのコマをクリックで確定）
 /* ピント位置に最も近いコマの名前（「いま何にピントが合っているか」を言葉で返す） */
@@ -2578,16 +2189,81 @@ function dofNearest(v){
   if(!best)return '—';
   return escH(String(best.name).slice(0,14))+(bd<=Math.max(0.02,PROJECT.dof.range)?'':'（近いだけ）');
 }
-/* KFの状態は DETAIL（選択KF）と下部コンソール（並び）が持つ。ここは両方を描き直すだけ */
-function renderCards(){
-  renderDock();
-  const ae=document.activeElement;
-  if(mode==='take'&&!(ae&&ae.dataset&&ae.dataset.sub==='str'))renderKfDetail();
+/* ピントのトラック UI。
+ * 操作は2手に絞る: ①KFを選ぶ ②「画面から取る」でコマをクリック → そのKFに点が入る。
+ * 微調整は画面下のHUD定規のキャレット（▼）を直接ドラッグする＝「今ここ・今ここ」と置いていける。 */
+/* ◎ボタン／ストリップの「置く・更新・設定済」の出し分け。
+ * ボタンは減らしたいので **1つのボタンが状態で意味を変える**（外すのは点チップの ✕ に一本化）。
+ * ・点が無い     → 「置く」
+ * ・点があり同値 → 「✓ 設定済」（押しても同じ値を入れ直すだけ＝壊れない）
+ * ・点があり差分 → 「↻ 0.85→0.62」＝何がどう変わるか数字で見える */
+function dofSetLabel(kf,what){
+  const i=dofPtAt(kf);
+  if(i<0)return '◎ '+(what||'')+'を置く '+dofPin.toFixed(2);
+  const f=PROJECT.dof.pts[i].f;
+  return (Math.abs(f-dofPin)<0.005)?('✓ '+(what||'')+' '+f.toFixed(2))
+                                   :('↻ 更新 '+f.toFixed(2)+'→'+dofPin.toFixed(2));
 }
+function dofStripHTML(){
+  const d=PROJECT.dof;
+  let s=`<div class="dofstrip${d.on?' on':''}">
+    <div class="dof-h"><label title="奥行き（コマのDEPTH）でボケる。KFごとに「ここにピント」を何点でも置けます"><input type="checkbox" data-dof="on"${d.on?' checked':''}> DOF ピント</label>
+      <button class="edb" data-dof="more" title="ピントの幅・ボケの強さ・BOUNCE は FX パネルにあります">詳細…</button></div>`;
+  if(d.on){
+    const at=(selKf>=0)?dofPtAt(selKf):-1;
+    s+=`
+    <div class="dof-r"><span class="k">ピント</span>
+      <input type="range" data-dof="pin" min="0" max="1" step="0.01" value="${dofPin}" title="編集画面のピント位置。画面下の定規の ▼ をドラッグしても動きます">
+      <span class="v" id="dof-pinv">${dofPin.toFixed(2)}</span></div>
+    <div class="dof-r"><span class="k"></span><span class="dof-who">→ ${dofNearest(dofPin)}</span></div>
+    <div class="dof-r"><span class="k"></span>
+      <button class="edb${dofPick?' on':''}" data-dof="pick" title="押してからコマをクリック＝そのコマにピントを合わせ、選択中のKFに置きます">${dofPick?'コマをクリック…':'画面から取る'}</button>
+      ${selKf>=0?`<button class="edb${at>=0?' on':''}" data-dof="set" title="選択中のKFに、いまのピント位置を置く／更新する（外すのは点チップの ✕）">${dofSetLabel(selKf,'#'+pad(selKf)+' のピント')}</button>`
+                :`<span class="dof-who">KFを選ぶと置けます</span>`}</div>`;
+    s+=`<div class="dof-pts">`;
+    if(!d.pts.length)s+=`<span class="dof-who">まだ点がありません — 1点だけ置けば「合いっぱなし」になります</span>`;
+    else s+=d.pts.map(pt=>`<button class="dofpt${pt.kf===selKf?' sel':''}" data-dof="go" data-kf="${pt.kf}"
+      title="クリック＝このKFへ／✕は点を外す">#${pad(pt.kf)}<b>${pt.f.toFixed(2)}</b><span class="x" data-dof="del" data-kf="${pt.kf}">✕</span></button>`).join('');
+    s+=`</div>
+    <div class="dof-note">${(selKf>=0&&at>=0)
+      ? '<b>#'+pad(selKf)+' は点あり＝▼ を動かすとこの点もそのまま更新されます</b>（ボタンを押さなくてOK）。外すのは点チップの ✕'
+      : (d.pts.length<=1
+        ? '点が1つ以下＝ピントは動きません（合いっぱなし）。2点以上でその間を送ります'
+        : '各点へ向かうカメラ移動の間に、前の点から次の点へピントを送ります')}</div>`;
+  }
+  return s+`</div>`;
+}
+function renderCards(){
+  const d=PROJECT.dof;
+  cardsBody.innerHTML=dofStripHTML()+
+    `<div class="edc-title">TAKE — ${PROJECT.take.kf.length} KF ${selKf>=0?`/ SEL #${pad(selKf)}`:''}</div>`+
+    PROJECT.take.kf.map((k,i)=>`
+    <div class="edc${i===selKf?' sel':''}${i===kfNow?' now':''}" data-i="${i}">
+      <div class="edc-h"><span class="edc-grip" data-i="${i}" title="ドラッグで順番を入れ替え（Ctrl+↑↓でも可）">⠿</span><span class="edc-no">#${pad(i)}</span>
+        <b>x${(+k.x).toFixed(2)} y${(+k.y).toFixed(2)} z${(+(k.z??1)).toFixed(2)}</b></div>
+      <div class="edc-btns">
+        <button class="edb go" data-i="${i}" data-act="go" title="このKFの構図へ。プレビュー中なら再生位置をここへ飛ばします">▸ GO</button>
+      </div>
+      <div class="edc-btns sub">
+        <button class="edb" data-i="${i}" data-act="upd" title="いまの画面の構図でこのKFを上書き">↻ UPD</button>
+        ${d.on?(pt=>`<button class="edb pin${pt?' on':''}" data-i="${i}" data-act="pin" title="${pt?'いまのピント位置（'+dofPin.toFixed(2)+'）でこのKFの点を更新（外すのは上の点チップの ✕）':'いまのピント位置（'+dofPin.toFixed(2)+'）をこのKFに置く'}">${dofSetLabel(i,'ピント')}</button>`)(d.pts.find(x=>x.kf===i)):''}
+        <button class="edb del" data-i="${i}" data-act="del" title="このKFを削除">✕</button>
+      </div>
+      <label>EASE <select data-i="${i}" data-act="ease">
+        ${['smooth','inout','linear','outCubic','inCubic'].map(e=>`<option value="${e}"${(k.ease||'smooth')===e?' selected':''}>${e}</option>`).join('')}
+      </select></label>
+      <label>DWELL <input type="range" data-i="${i}" data-act="dwell" min="0.05" max="3" step="0.05" value="${k.dwell??1}"> ${(k.dwell??1).toFixed(2)}</label>
+      <label>SUB <input type="text" class="subin" data-i="${i}" data-act="sub" value="${escH(subOf(i))}" placeholder="EN subtitle（空で削除）" spellcheck="false"></label>
+    </div>`).join('');
+}
+function subOf(i){const t=PROJECT.texts.find(x=>x.type==='sub'&&x.kf===i);return t?t.str:'';}   // V2-D: KFごとに1本
 /* プレビュー中の「いまここ」表示。再描画は重いのでクラスの付け替えだけ（毎フレーム走る） */
 function markKfNow(){
-  const dk=document.getElementById('dock');
-  if(dk)dk.querySelectorAll('.dk-card[data-dk="kf"]').forEach(el=>el.classList.toggle('now',+el.dataset.i===kfNow));
+  cardsBody.querySelectorAll('.edc').forEach(el=>{
+    const on=(+el.dataset.i===kfNow);
+    el.classList.toggle('now',on);
+    if(on&&el.scrollIntoView)el.scrollIntoView({block:'nearest'});
+  });
 }
 /* ---------- V2-A: undo/redoスタック（60段・スライダーは300ms合体） ---------- */
 let history=[],hIdx=-1,histT=null;
@@ -2629,6 +2305,8 @@ function selectKf(i,go=true){
   kfFlash=performance.now();   // キャンバス上のKF点をピンクで一瞬光らせる（いまどれかを迷わせない）
   renderCards();
   monSyncP();monRender();      // MONITOR も選んだKFの見え方へ（開いていなければ何もしない）
+  const el=cards.querySelector?cards.querySelector(`.edc[data-i="${selKf}"]`):null;
+  if(el&&el.scrollIntoView)el.scrollIntoView({block:'nearest'});
 }
 /* ---------- KFの並べ替え/挿入/削除で「KF番号への参照」を追従させる ----------
  * 参照元: texts[].kf（縦書きの表示窓 / EN字幕）・frames[].fx.kf（IN演出/ドリフト）・dof.kf（ピン送り）。
@@ -2644,7 +2322,7 @@ function remapKfRefs(fn){
   }
   PROJECT.texts=PROJECT.texts.filter(t=>!(t.type==='sub'&&t.kf==null));
 }
-/* 選択KFを from → to へ移動（カードのドラッグ / Ctrl+←→）。dwell/ease/字幕ごと動く */
+/* 選択KFを from → to へ移動（カードのドラッグ / Ctrl+↑↓）。dwell/ease/字幕ごと動く */
 function moveKf(from,to){
   const n=PROJECT.take.kf.length;
   if(from<0||from>=n)return false;
@@ -2682,13 +2360,170 @@ function goKf(i){
   }
   selectKf(i,true);
 }
-/* HUDのキャレットと下部コンソールの定規で共有する「いまのピント位置」。
+cards.addEventListener('click',e=>{
+  const t=e.target;if(!t||!t.dataset)return;
+  if(t.dataset.dof!==undefined){                                     // DOFストリップ
+    if(t.dataset.dof!=='on')onDofStrip(t.dataset.dof,t.dataset.kf);  // ONはchangeで拾う（二重発火防止）
+    return;
+  }
+  if(t.dataset.act===undefined){                      // V2-A: カードクリック=フォーカス（カメラは動かさない）
+    const c=t.closest?t.closest('.edc'):null;
+    if(c&&c.dataset&&c.dataset.i!==undefined)selectKf(+c.dataset.i,false);
+    return;
+  }
+  const i=+t.dataset.i,k=PROJECT.take.kf[i];if(!k)return;
+  if(t.dataset.act==='go')goKf(i);
+  else if(t.dataset.act==='upd'){Object.assign(k,{x:+VC.x.toFixed(3),y:+VC.y.toFixed(3),z:+VC.z.toFixed(3)});selKf=i;rebuild();}
+  else if(t.dataset.act==='pin'){   // このKFにピントを「置く / 更新する」（外すのは点チップの ✕ だけ）
+    const had=dofPtAt(i)>=0,old=had?PROJECT.dof.pts[dofPtAt(i)].f:null;
+    selKf=i;
+    dofSetPoint(i,dofPin);
+    toast(had?('#'+pad(i)+' のピントを更新 '+old.toFixed(2)+' → '+dofPin.toFixed(2))
+             :('#'+pad(i)+' のピント = '+dofPin.toFixed(2)+'（'+dofNearest(dofPin).replace(/<[^>]*>/g,'')+'）'));
+    renderCards();commit();
+  }
+  else if(t.dataset.act==='del'){
+    PROJECT.take.kf.splice(i,1);
+    remapKfRefs(o=>(o===i?null:(o>i?o-1:o)));   // 消えたKFへの参照は解除（字幕は削除）・後続は番号を詰める
+    if(selKf>=PROJECT.take.kf.length)selKf=PROJECT.take.kf.length-1;rebuild();
+  }
+});
+/* DOFストリップ: ON / 画面から取る（ピッカー）/ KFに置く / 点の選択・削除 / 詳細（FXパネル） */
+function onDofStrip(act,kfAttr){
+  const d=PROJECT.dof;
+  if(act==='on'){
+    d.on=!d.on;
+    if(!d.on)dofPick=null,document.body.classList.remove('dofpick');
+    renderCards();syncFxBtn();commit();
+    return;
+  }
+  if(act==='more'){toggleFxModal(true);return;}
+  if(act==='pick'){
+    dofPick=dofPick?null:'pin';
+    document.body.classList.toggle('dofpick',!!dofPick);
+    renderCards();
+    if(dofPick)toast('ピントを合わせたいコマをキャンバスでクリック（Escで取消）'
+      +(selKf>=0?' — #'+pad(selKf)+' に置きます':' — KF未選択なので見え方だけ変わります'));
+    return;
+  }
+  if(act==='set'){                                    // 選択中のKFに、いまのピント位置を置く／更新する
+    if(selKf<0){toast('先にKFを選んでください');return;}
+    const had=dofPtAt(selKf)>=0,old=had?d.pts[dofPtAt(selKf)].f:null;
+    dofSetPoint(selKf,dofPin);
+    toast(had?('#'+pad(selKf)+' のピントを更新 '+old.toFixed(2)+' → '+dofPin.toFixed(2))
+             :('#'+pad(selKf)+' のピント = '+dofPin.toFixed(2)));
+    renderCards();commit();
+    return;
+  }
+  if(act==='go'){                                     // 点をクリック＝そのKFへ飛んで、その見え方にする
+    const kf=+kfAttr,i=dofPtAt(kf);
+    if(i<0)return;
+    dofPin=PROJECT.dof.pts[i].f;
+    goKf(kf);
+    return;
+  }
+  if(act==='del'){
+    const kf=+kfAttr;
+    dofRemovePoint(kf);renderCards();commit();
+    toast('#'+pad(kf)+' のピントを外しました');
+  }
+}
+cards.addEventListener('input',e=>{
+  const t=e.target;
+  if(!t||!t.dataset||t.dataset.dof!=='pin')return;
+  setDofPin(parseFloat(t.value));                    // 編集ビューのピント位置＝保存しない
+});
+/* HUDのキャレットとストリップのスライダーで共有する「いまのピント位置」。
  * 点を選んでいるときは、その点の値も一緒に動かす＝「触ったら決まる」ようにする */
 function setDofPin(v,writeThrough){
   dofPin=clamp(v,0,1);
-  dkFocusSync();   // 下部コンソールの ▼ と数字
-  if(writeThrough&&selKf>=0&&dofPtAt(selKf)>=0){dofSetPoint(selKf,dofPin);commitD();}
+  const s=cardsBody.querySelector('input[data-dof="pin"]');if(s)s.value=dofPin;
+  const o=$('#dof-pinv');if(o)o.textContent=dofPin.toFixed(2);
+  const who=cardsBody.querySelector('.dof-who');if(who)who.innerHTML='→ '+dofNearest(dofPin);
+  if(writeThrough&&selKf>=0&&dofPtAt(selKf)>=0){dofSetPoint(selKf,dofPin);commitD();renderDofPts();}
+  /* 「置く／更新／設定済」の表示だけ差し替える（カード全体を作り直すとドラッグの掴みが切れる） */
+  const setb=cardsBody.querySelector('button[data-dof="set"]');
+  if(setb&&selKf>=0)setb.textContent=dofSetLabel(selKf,'#'+pad(selKf)+' のピント');
+  cardsBody.querySelectorAll('button[data-act="pin"]').forEach(b=>{
+    b.textContent=dofSetLabel(+b.dataset.i,'ピント');
+  });
 }
+/* 点チップだけ描き直す（スライダーのドラッグ中にストリップ全体を作り直すと掴みが切れる） */
+function renderDofPts(){
+  const box=cardsBody.querySelector('.dof-pts');if(!box)return;
+  const d=PROJECT.dof;
+  box.innerHTML=d.pts.length
+    ? d.pts.map(pt=>`<button class="dofpt${pt.kf===selKf?' sel':''}" data-dof="go" data-kf="${pt.kf}"
+        title="クリック＝このKFへ／✕は点を外す">#${pad(pt.kf)}<b>${pt.f.toFixed(2)}</b><span class="x" data-dof="del" data-kf="${pt.kf}">✕</span></button>`).join('')
+    : `<span class="dof-who">まだ点がありません — 1点だけ置けば「合いっぱなし」になります</span>`;
+}
+cards.addEventListener('change',e=>{
+  const t=e.target;
+  if(t&&t.dataset&&t.dataset.dof==='on')onDofStrip('on');
+});
+/* ---------- KFカードの上下ドラッグで並べ替え（グリップ ⠿ を掴む） ---------- */
+let kfDrag=null;
+function kfSlotAtY(y){                        // 挿入スロット 0..n を返す
+  const els=[...cardsBody.querySelectorAll('.edc')];
+  for(let i=0;i<els.length;i++){
+    const r=els[i].getBoundingClientRect();
+    if(y<r.top+r.height/2)return i;
+  }
+  return els.length;
+}
+function kfDropMark(slot){
+  cardsBody.querySelectorAll('.edc').forEach(el=>el.classList.remove('kfdrop-before','kfdrop-after'));
+  const els=[...cardsBody.querySelectorAll('.edc')];
+  if(!els.length)return;
+  if(slot>=els.length)els[els.length-1].classList.add('kfdrop-after');
+  else els[slot].classList.add('kfdrop-before');
+}
+cardsBody.addEventListener('pointerdown',e=>{
+  const g=e.target&&e.target.closest?e.target.closest('.edc-grip'):null;
+  if(!g)return;
+  const card=g.closest('.edc');if(!card)return;
+  kfDrag={from:+card.dataset.i,slot:+card.dataset.i,el:card};
+  card.classList.add('kfdrag');
+  document.body.classList.add('kfdragging');
+  try{cardsBody.setPointerCapture(e.pointerId);}catch(err){}
+  e.preventDefault();e.stopPropagation();
+});
+const kfDragMove=e=>{
+  if(!kfDrag)return;
+  kfDrag.slot=kfSlotAtY(e.clientY);
+  kfDropMark(kfDrag.slot);
+};
+cardsBody.addEventListener('pointermove',kfDragMove);
+addEventListener('pointermove',kfDragMove);   // setPointerCapture が効かない環境でも追従させる
+function kfDragEnd(){
+  if(!kfDrag)return;
+  const{from,slot}=kfDrag;kfDrag=null;
+  document.body.classList.remove('kfdragging');
+  cardsBody.querySelectorAll('.edc').forEach(el=>el.classList.remove('kfdrag','kfdrop-before','kfdrop-after'));
+  const to=slot>from?slot-1:slot;             // スロット→移動後の添字
+  if(!moveKf(from,to))renderCards();
+}
+cardsBody.addEventListener('pointerup',kfDragEnd);
+cardsBody.addEventListener('pointercancel',kfDragEnd);
+addEventListener('pointerup',kfDragEnd);      // パネルの外で離しても掴んだままにならないように
+addEventListener('pointercancel',kfDragEnd);
+cards.addEventListener('input',e=>{
+  const t=e.target;if(!t||!t.dataset)return;
+  const i=+t.dataset.i,k=PROJECT.take.kf[i];if(!k)return;
+  if(t.dataset.act==='dwell'){k.dwell=parseFloat(t.value)||1;TT=buildTake(PROJECT.take);commitD();}
+  else if(t.dataset.act==='ease'){k.ease=t.value;TT=buildTake(PROJECT.take);commitD();}
+  else if(t.dataset.act==='sub'){   // V2-D: EN字幕トラック（KFに1本・空で削除）
+    const v=t.value;
+    const s=PROJECT.texts.find(x=>x.type==='sub'&&x.kf===i);
+    if(!v.trim()){if(s)PROJECT.texts=PROJECT.texts.filter(x=>x!==s);}
+    else if(s)s.str=v;
+    else PROJECT.texts.push({id:'t'+(pid++),type:'sub',str:v,x:0,y:0,size:11,col:'#fff',parent:null,kf:i});
+    commitD();
+  }
+});
+cards.addEventListener('change',e=>{
+  const t=e.target;if(t&&t.dataset&&t.dataset.act==='dwell')renderCards();
+});
 
 /* ---------- QUICK EDIT（PLACE） — 選択対象に応じて動的生成 ----------
  * COMPOSER の QUICK TRANSFORM と同じ「縦1行1項目」。行ごとに title= で何が変わるか説明。
@@ -2709,689 +2544,97 @@ function fitQe(force){
   qeUserH=false;
   qeBody.style.height='auto';qeBody.style.maxHeight='none';
   const top=qeBody.getBoundingClientRect().top;
-  const ft=document.getElementById('qe-foot');
-  const fh=(ft&&ft.getClientRects().length)?ft.getBoundingClientRect().height:0;
-  const dk=document.getElementById('dock');
-  const dh=(dk&&dk.getClientRects().length)?Math.max(0,dk.getBoundingClientRect().height-26):0;
-  const avail=Math.max(200,window.innerHeight-top-24-fh-dh);   // フッタ／下端バー／下部コンソールぶんを残す
+  const avail=Math.max(80,window.innerHeight-top-34);   // 下端リサイズバー＋余白ぶん残す
   const h=Math.min(qeBody.scrollHeight,avail);
   qeBody.style.height=h+'px';qeBody.style.maxHeight=h+'px';
 }
-/* 詳細（QUICK EDIT）の部品。選択肢はセグメントで全部見せる／数値は左右ドラッグ。 */
-const qdSect=(en,jp)=>`<div class="qd-sect"><span class="en">${en}</span>${jp?`<span class="jp">${jp}</span>`:''}</div>`;
-const qdRow=(k,body,title,cls)=>`<div class="qd-row${cls?' '+cls:''}"${title?` title="${title}"`:''}>`
-  +(k?`<span class="k${/^[\x20-\x7E]+$/.test(k)?' en':''}">${k}</span>`:'')+body+`</div>`;
-const qdSeg=(act,opts,cur)=>`<div class="qd-seg">`+opts.map(o=>
-  `<button class="qd-sb${o.c?' '+o.c:''}${String(o.v)===String(cur)?' on':''}" data-act="${act}" data-v="${o.v==null?'':o.v}"${o.t?` title="${o.t}"`:''}>${o.l}</button>`).join('')+`</div>`;
-const qdNum=(act,label,val,unit)=>`<button class="qd-num" data-scr="${act}" title="左右にドラッグで変える">`
-  +(label?`<span class="k">${label}</span>`:'')
-  +`<span class="v" id="qd-${act}">${val}</span><span class="u">${unit==null?'⟷':unit}</span></button>`;
-const qdMr=(act,v)=>`<div class="qd-mr" data-scr="${act}" data-abs="1"><div class="ax"></div>`
-  +`<div class="dm" style="left:${(clamp(v,0,1)*100).toFixed(1)}%"></div></div>`;
-const qdKfSeg=(act,cur,head)=>qdSeg(act,[{v:'',l:head,c:'jp'}].concat(
-  PROJECT.take.kf.map((k,i)=>({v:i,l:'#'+pad(i)}))),cur==null?'':cur)
-  .replace('class="qd-seg"','class="qd-seg scr"');
-/* IN の向きは 3×3 のグリッドで直に指す（プルダウンで方角を選ばせない） */
-function qdInGrid(fx){
-  const cur=fx.in||'none';
-  const b=(v,l,c)=>`<button class="qd-sb${c?' '+c:''}${cur===v?' on':''}" data-act="fin" data-v="${v}" `
-    +`title="${v==='none'?'登場の演出なし':l+' 側から枠ごと滑り込む'}">${l}</button>`;
-  return `<div class="qd-grid"><span></span>${b('slide-t','▲')}<span></span>`
-    +`${b('slide-l','◀')}${b('none','OFF','c')}${b('slide-r','▶')}`
-    +`<span></span>${b('slide-b','▼')}<span></span></div>`;
-}
-/* 選んだ演出が「どう動くか」を小窓で実演する（言葉だけで想像させない） */
-function qdPrev(fx){
-  const IN={'slide-l':['-15px','0','SLIDE-L','左から枠ごと滑り込む'],'slide-r':['15px','0','SLIDE-R','右から枠ごと滑り込む'],
-    'slide-t':['0','-15px','SLIDE-T','上から枠ごと滑り込む'],'slide-b':['0','15px','SLIDE-B','下から枠ごと滑り込む']}[fx.in];
-  const DR={'push-in':['1.09','PUSH-IN','ゆっくり寄る'],'pull-out':['0.91','PULL-OUT','ゆっくり引く']}[fx.drift];
-  let st='',lb='OFF',note='演出なし＝置いたまま動きません';
-  if(IN){st=`--gx:${IN[0]};--gy:${IN[1]};animation:ghIn 2.6s ease-in-out infinite`;lb=IN[2];
-    note='KFへ向かうカメラ移動の間に、'+IN[3];}
-  else if(DR){st=`--gs:${DR[0]};animation:ghDrift 3.2s ease-in-out infinite`;lb=DR[1];
-    note='そのKFで止まっている間、'+DR[2];}
-  return `<div class="qd-prev"><div class="slot"></div><div class="gh" style="${st}"></div><div class="lb">${lb}</div></div>`
-    +`<span class="qd-note">${note}</span>`;
-}
-function qdTl(o,fx){
-  const ki=(fx.kf!=null&&PROJECT.take.kf[fx.kf])?fx.kf:frameKfIdx(o);
-  const up=v=>(v&&v!=='none')?String(v).toUpperCase():'—';
-  return `<div class="qd-tl"><div class="hd"><span class="en">TIMELINE</span>`
-    +`<span class="jp">移動中に IN / 止まっている間に DRIFT</span></div>`
-    +`<div class="bar"><div class="tv"><span class="t">TRAVEL</span><span class="val">${up(fx.in)}</span></div>`
-    +`<div class="dw"><span class="t">DWELL</span><span class="val">${up(fx.drift)}</span></div></div>`
-    +`<div class="mk"><span class="d">◆</span><span class="n">${ki==null?'KFなし':'#'+pad(ki)+' 到着'}</span></div></div>`;
-}
+const qeRow=(label,ctl,title,val)=>
+  `<div class="qe-row"${title?` title="${title}"`:''}><span class="k">${label}</span><span class="ctl">${ctl}</span>${val==null?'':`<span class="v">${val}</span>`}</div>`;
+const qeSect=(t,hint)=>`<div class="qe-sect">${t}${hint?`<span class="hint">${hint}</span>`:''}</div>`;
+const qeOpts=(arr,cur)=>arr.map(m=>`<option${cur===m?' selected':''}>${m}</option>`).join('');
+/* SIZE スライダーは対数目盛り（0.05〜4）。線形だと小さい側が数pxに潰れて触れない */
+const H_MIN=0.05,H_MAX=4;
+const hToSlider=h=>Math.round(Math.log(clamp(h??1,H_MIN,H_MAX)/H_MIN)/Math.log(H_MAX/H_MIN)*1000);
+const sliderToH=v=>+(H_MIN*Math.pow(H_MAX/H_MIN,clamp(v,0,1000)/1000)).toFixed(4);
+const qeKfOpts=(cur,head)=>`<option value="">${head}</option>`+
+  PROJECT.take.kf.map((k,i)=>`<option value="${i}"${cur===i?' selected':''}>#${pad(i)}</option>`).join('');
 function renderChip(){
-  renderDock();
-  if(mode==='take'){renderKfDetail();return;}   // TAKE の DETAIL は「選んだKF」を出す
   qePanel.classList.toggle('sel',!!sel&&qeOpen);
-  const nm=$('#qe-name'),ft=$('#qe-foot');
-  if(!sel){chip.innerHTML='';if(ft)ft.innerHTML='';if(nm)nm.textContent='';qeLastSel=null;return;}
+  const nm=$('#qe-name');
+  if(!sel){chip.innerHTML='';if(nm)nm.textContent='';qeLastSel=null;return;}
   const o=sel;
   if(nm)nm.textContent=isText(o)?('T:'+(String(o.str||'').split('\n')[0].slice(0,14)||'(空)')):o.name;
   let s='';
   if(isText(o)){   // V2-D: テキスト（常に最前グループなのでORDERなし）
-    s+=qdSect('TEXT','読み文字');
-    s+=qdRow('色',qdSeg('tcol',[{v:'#fff',l:'白',c:'jp'},{v:'#000',l:'黒',c:'jp'}],o.col==='#000'?'#000':'#fff'),
-      '文字色を白/黒で切り替え（フチは反対色で自動）');
-    s+=qdRow('SIZE',qdNum('tsize','',Math.round(o.size??24),'px')
-      +'<div class="qd-seg"><button class="qd-sb pm" data-act="minus">−</button><button class="qd-sb pm" data-act="plus">＋</button></div>',
-      '文字の大きさ');
-    s+=qdRow('表示',qdKfSeg('tkf',o.kf,'常時'),'常時＝ずっと表示 / #n＝そのKFで止まっている間だけフェードで出す');
-    s+=qdRow('文字','<button class="qd-sb jp" data-act="tedit">打ち直す<span class="kb">DBL CLICK</span></button>',
-      '文字を打ち直す（キャンバスをダブルクリックでも開きます）');
+    s+=qeSect('TEXT 読み文字');
+    s+=qeRow('COL',`<button class="btn" data-act="tcol">${o.col==='#000'?'黒':'白'}</button>`,'文字色を白/黒で切り替え（フチは反対色で自動）');
+    s+=qeRow('SIZE',`<input type="range" data-act="tsl" min="4" max="400" step="1" value="${o.size??24}">`
+      +`<button class="btn" data-act="minus">−</button><button class="btn" data-act="plus">＋</button>`,'文字の大きさ','<span id="chip-ts">'+(o.size??24)+'</span>');
+    s+=qeRow('表示',`<select data-act="tkf">${qeKfOpts(o.kf,'常時')}</select>`,'常時＝ずっと表示 / #n＝そのKFで止まっている間だけフェードで出す');
+    s+=qeRow('文字',`<button class="btn" data-act="tedit">EDIT</button>`,'文字を打ち直す（キャンバスをダブルクリックでも開きます）');
   }else{
-    s+=qdSect('PLACE',isFrame(o)?'フレーム':(o.seq?'パラパラのコマ':'コマ'));
-    s+=qdRow('重なり','<div class="qd-seg"><button class="qd-sb jp" data-act="back">◀ 奥へ</button>'
-      +'<button class="qd-sb jp" data-act="front">手前へ ▶</button></div>',
-      '前後の重ね順だけを変える（視差＝DEPTHとは別）');
-    s+=qdRow('SIZE',qdNum('h','',(o.h??1).toFixed(2))
-      +'<div class="qd-seg"><button class="qd-sb pm" data-act="minus">−</button><button class="qd-sb pm" data-act="plus">＋</button></div>',
-      'コマの大きさ。iPadでは2本指ピンチでも変えられます');
-    s+=qdRow('DEPTH',qdMr('depth',o.depth??0.5)+qdNum('depth','',(o.depth??0.5).toFixed(2),''),
-      '奥行き（視差）。大きい＝手前で、カメラが動いたとき大きくずれる。ピント位置もこの値で合わせます');
+    s+=qeSect('配置',isFrame(o)?'FRAME':(o.seq?'SEQ':'コマ'));
+    s+=qeRow('重なり',`<button class="btn" data-act="back">◀ 奥</button><button class="btn" data-act="front">手前 ▶</button>`,'前後の重ね順だけを変える（視差＝DEPTHとは別。[ ] キーでも動きます）');
+    // スライダー（対数）＋ ± の併用。スライダーで大づかみ、± で最後の詰め
+    s+=qeRow('SIZE',`<input type="range" data-act="hsl" min="0" max="1000" step="1" value="${hToSlider(o.h)}">`
+      +`<button class="btn" data-act="minus">−</button><button class="btn" data-act="plus">＋</button>`,
+      'コマの大きさ（画面高に対する比）。iPadでは2本指ピンチでも変えられます','<span id="chip-hv">'+(o.h??1).toFixed(2)+'</span>');
+    s+=qeRow('DEPTH',`<input type="range" data-act="depth" min="0" max="1" step="0.05" value="${o.depth??0.5}">`,
+      '奥行き（視差）。大きい＝手前で、カメラが動いたとき大きくずれる。ピン送りのピント位置もこの値で合わせます','<span id="chip-dv">'+(o.depth??0.5).toFixed(2)+'</span>');
     if(PROJECT.dof&&PROJECT.dof.on){   // DOFがONのときだけ「このコマのボケ具合」を数字で出す
       const H=cv.height/DPR,now=dofBlurAtFocus(o.depth,dofPin,H);
       const hits=PROJECT.dof.pts.filter(pt=>dofBlurAtFocus(o.depth,pt.f,H)<0.5).map(pt=>'#'+pad(pt.kf));
-      s+=qdRow('ピント','<span class="qd-dof"><span class="a">いま '+(now<0.5?'くっきり':now.toFixed(1)+'px')+'</span>'
-        +(hits.length?' ／ <span class="b">合う '+hits.join(' ')+'</span>':' ／ <span class="b">合うKFなし</span>')+'</span>',
-        'いまのピント位置でどれだけボケるか／このコマにピントが合うKF');
+      s+=qeRow('ピント',`<span class="qe-dof"><span class="a">いま ${now<0.5?'くっきり':now.toFixed(1)+'px'}</span>`
+        +(hits.length?` ／ <span class="b">合う ${hits.join(' ')}</span>`:` ／ <span class="b">合うKFなし</span>`)+`</span>`,
+        'いまのピント位置でどれだけボケるか／このコマにピントが合うKF。2.TAKE の「画面から取る」で置きます');
     }
     if(isFrame(o)){
-      const ln=o.line||{on:false,w:10};
-      s+=qdSect('THE WINDOW','コマの窓');
-      s+=qdRow('枠線',qdSeg('fline',[{v:'on',l:'ON'},{v:'off',l:'OFF',c:'min'}],ln.on?'on':'off')
-        +(ln.on?qdNum('flw','W',ln.w??10,'px'):'')
-        +'<span class="sp"></span><span class="qd-sw" style="border-width:'+(ln.on?clamp(Math.round((ln.w??10)/2),1,10):0)+'px"></span>',
-        'コマの黒フチ。書き出しにも出ます');
-      s+=qdRow('窓','<button class="qd-sb jp'+(maskEdit.on&&maskEdit.f===o?' on':'')+'" data-act="mask">'
-        +(maskEdit.on&&maskEdit.f===o?'編集中 ●':'4隅を編集')+'<span class="kb">M</span></button>'
-,
-        'コマの形（四隅）をドラッグで変える');
-      s+=qdRow('PAR',qdMr('par',o.par??0.6)+qdNum('par','',(o.par??0.6).toFixed(2),''),
+      s+=qeSect('コマの窓','FRAME');
+      s+=qeRow('PAR',`<input type="range" data-act="par" min="0" max="1" step="0.05" value="${o.par??0.6}">`,
         '窓の中の絵がカメラに合わせてずれる量（＝コマの中の視差）。0でぴたり固定');
-      const fx=o.fx||(o.fx={in:'none',drift:'none',amt:0.12,kf:null});
-      s+=qdSect('ENTRANCE','登場の演出');
-      s+=qdRow('KF',qdKfSeg('fkf',fx.kf,'自動 #'+(frameKfIdx(o)==null?'-':pad(frameKfIdx(o)))),
+      s+=qeRow('マスク',`<button class="btn${maskEdit.on&&maskEdit.f===o?' on':''}" data-act="mask">${maskEdit.on&&maskEdit.f===o?'編集中 ●':'4隅を編集'}</button>`,
+        'コマの形（四隅）をドラッグで変える＝斜めゴマ。[M] キーでも切替');
+      s+=qeRow('枠線',`<button class="btn${o.line&&o.line.on?' on':''}" data-act="fline">${o.line&&o.line.on?'ON':'OFF'}</button>`
+        +(o.line&&o.line.on?`<input type="range" data-act="flw" min="2" max="40" step="1" value="${o.line.w??10}">`:''),
+        'コマの黒フチ。書き出しにも出ます',o.line&&o.line.on?('<span id="chip-lw">'+(o.line.w??10)+'</span>'):null);
+      const fx=o.fx||{in:'none',drift:'none',amt:0.12,kf:null};
+      s+=qeSect('登場の演出','FRAME');
+      s+=qeRow('KF',`<select data-act="fkf">${qeKfOpts(fx.kf,'自動 #'+(frameKfIdx(o)??'-'))}</select>`,
         'どのカメラKFに合わせて演出するか。自動＝コマに一番近いKF');
-      s+=qdRow('IN',qdInGrid(fx)+'<div class="qd-col">'+qdPrev(fx)+'</div>',null,'top');
-      s+=qdRow('DRIFT',qdSeg('fdrift',[{v:'none',l:'OFF',c:'min'},{v:'push-in',l:'PUSH-IN'},{v:'pull-out',l:'PULL-OUT'}],fx.drift||'none')
-        +'<span class="sp"></span>'+qdNum('famt','AMT',(fx.amt??0.12).toFixed(2)),
-        'そのKFで止まっている間、ゆっくり寄る(PUSH-IN)／引く(PULL-OUT)。AMT＝効き幅');
-      s+=qdRow('WIPE',qdSeg('fwipe',[{v:'none',l:'OFF',c:'min'},{v:'invert',l:'INVERT'},{v:'whiteout',l:'WHITEOUT'}],o.wipe||'none')
-        +'<span class="sp"></span><span class="qd-p">◇ P '+(o._wipeP==null?'—':o._wipeP.toFixed(2))+'</span>',
-        'このコマが画面を覆い切った瞬間に世界を反転(INVERT)／白く飛ばす(WHITEOUT)');
-      s+=qdTl(o,fx);
+      s+=qeRow('IN',`<select data-act="fin">${qeOpts(['none','slide-l','slide-r','slide-t','slide-b'],fx.in)}</select>`,
+        'そのKFへ向かうカメラ移動の間に、コマが枠ごと滑り込んでくる（slide-l＝左から）');
+      s+=qeRow('DRIFT',`<select data-act="fdrift">${qeOpts(['none','push-in','pull-out'],fx.drift)}</select>`,
+        'そのKFで止まっている間、ゆっくり寄る(push-in)／引く(pull-out)');
+      s+=qeRow('AMT',`<input type="range" data-act="famt" min="0" max="0.4" step="0.01" value="${fx.amt??0.12}">`,'DRIFTの効き幅','<span id="chip-amt">'+(fx.amt??0.12).toFixed(2)+'</span>');
+      s+=qeRow('WIPE',`<select data-act="fwipe">${qeOpts(['none','invert','whiteout'],o.wipe||'none')}</select>`,
+        'このコマが画面を覆い切った瞬間に世界を反転(invert)／白く飛ばす(whiteout)');
     }
     if(o.seq){
-      s+=qdSect('FLIP',o.seq.n+'枚のパラパラ');
-      s+=qdRow('MODE',qdSeg('mode',[{v:'loop',l:'LOOP'},{v:'once',l:'ONCE'},{v:'pingpong',l:'PINGPONG'}],o.seq.mode),
-        'LOOP=繰り返し（目パチ・なびき） / ONCE=1回だけ / PINGPONG=往復');
-      s+=qdRow('FPS',qdNum('fps','',o.seq.fps,'fps'),'1秒あたりのコマ数');
-      s+=qdRow('TRIGGER',qdSeg('trigger',[{v:'always',l:'ALWAYS'},{v:'enter',l:'ENTER'}],o.seq.trigger),
-        'ALWAYS=常に再生 / ENTER=画面に入った瞬間から再生（出ると巻き戻る）');
+      s+=qeSect('パラパラ',o.seq.n+'枚');
+      s+=qeRow('MODE',`<select data-act="mode">${qeOpts(['loop','once','pingpong'],o.seq.mode)}</select>`,
+        'loop=繰り返し（目パチ・なびき） / once=1回だけ / pingpong=往復');
+      s+=qeRow('FPS',`<input type="range" data-act="fps" min="4" max="30" step="1" value="${o.seq.fps}">`,'1秒あたりのコマ数','<span id="chip-fps">'+o.seq.fps+'</span>');
+      s+=qeRow('TRIGGER',`<select data-act="trigger">${qeOpts(['always','enter'],o.seq.trigger)}</select>`,
+        'always=常に再生 / enter=画面に入った瞬間から再生（出ると巻き戻る）');
       if(o.seq.src==='ap'){
-        s+=qdSect('ANIMATOR',escH(o.seq.apName||String(o.seq.apId).slice(0,8)));
-        s+=qdRow('同期','<span class="qd-dof" id="chip-apat">'
-          +(AP[o.seq.apId]?('●SYNC '+escH(o.seq.apAt||'')):'○未同期')+'</span>'
-          +'<button class="qd-sb" data-act="apreload">RELOAD</button>',
-          'ANIMATOR側で保存すると自動で絵が入れ替わります。届いていないときはRELOAD');
-        s+=qdRow('編集','<button class="qd-sb jp" data-act="apedit">ANIMATORで開く</button>',
-          'このコマの元データをANIMATORで開きます');
+        s+=qeSect('ANIMATOR連携',escH(o.seq.apName||String(o.seq.apId).slice(0,8)));
+        s+=qeRow('同期',`<span id="chip-apat">${AP[o.seq.apId]?('●SYNC '+escH(o.seq.apAt||'')):'○未同期'}</span>`
+          +`<button class="btn" data-act="apreload">RELOAD</button>`,'ANIMATOR側で保存すると自動で絵が入れ替わります。届いていないときはRELOAD');
+        s+=qeRow('編集',`<button class="btn" data-act="apedit">ANIMATORで開く</button>`,'このコマの元データをANIMATORで開きます');
       }
     }
   }
+  s+=qeSect('　');
+  s+=qeRow('',(o.parent?`<button class="btn" data-act="eject">EJECT 取り出す</button>`:'')
+    +`<button class="btn danger" data-act="del">DELETE</button>`,o.parent?'EJECT=フレームの外へ戻す':'選択中のものを削除');
   chip.innerHTML=s;
-  if(ft)ft.innerHTML=(o.parent?'<button class="qd-sb jp" data-act="eject" title="フレームの外へ戻す">EJECT<span class="kb">取り出す</span></button>':'')
-    +'<span class="sp"></span><button class="qd-sb del" data-act="del" title="選択中のものを削除">DELETE</button>';
   if(qeLastSel!==o){qeLastSel=o;qeUserH=false;}   // 選び直したら高さもフィットし直す
-  fitQe();
-}
-/* ============================================================
-   DOCK — 画面下のコンソール（PLACE）
-   ・SIZE は数値を左右スクラブ（TAKE と同じ手触り）／−＋も残す
-   ・DEPTH は ▼ をドラッグ。ひし形は他のコマ＝クリックでそのコマへ移れる
-   ・PANELS は奥→手前の並びで、押せば選択（キャンバスを探さなくていい）
-   ============================================================ */
-function dkThumb(o){
-  if(isFrame(o))return '';
-  const nm=o.seq?seqFile(o.seq,0):o.name;
-  const c=IMGCACHE[nm];
-  return (c&&c.img&&c.img.src)?'<img src="'+escH(c.img.src)+'" alt="">':'';
-}
-function dkName(o){return isFrame(o)?o.name:String(o.name||'').replace(/\.(png|webp|jpe?g)$/i,'');}
-function dkRulerTicks(){let t='';for(let i=0;i<9;i++)t+='<i class="'+((i%4===0)?'mj':'')+'"></i>';return '<div class="ticks">'+t+'</div>';}
-function dkDepthHTML(){
-  const items=rootItems().slice().sort(bySort);
-  const has=!!sel&&!isText(sel);
-  const v=has?clamp(sel.depth??0.5,0,1):0.5;
-  let dots='';
-  for(const o of items){
-    if(o===sel)continue;
-    dots+='<div class="dot" data-dk="pick" data-id="'+dkKey(o)+'" style="left:'+(clamp(o.depth??0.5,0,1)*100).toFixed(2)+'%" title="'+escH(dkName(o))+' D '+(o.depth??0.5).toFixed(2)+'"></div>';
-  }
-  if(has){
-    const L=(v*100).toFixed(2)+'%';
-    dots+='<div class="dot sel" style="left:'+L+'"></div>'
-        +'<div class="stem" style="left:'+L+'"></div>'
-        +'<div class="car" style="left:'+L+'">▼</div>';
-  }
-  return '<div class="dk-ruler'+(has?'':' off')+'" data-dk="depth">'
-    +'<div class="axis"></div>'+dkRulerTicks()+dots
-    +'<div class="end">奥 0.00</div><div class="end r">1.00 手前</div></div>';
-}
-function dkKey(o){return isFrame(o)?('f'+o.id):('p'+o.id);}
-function dkFind(k){
-  const id=+String(k).slice(1);
-  return String(k)[0]==='f'?PROJECT.frames.find(f=>f.id===id):PROJECT.panels.find(p=>p.id===id);
-}
-function dkCards(){
-  const items=rootItems().slice().sort(bySort);
-  let h='';
-  items.forEach((o,i)=>{
-    const on=(o===sel);
-    h+='<button class="dk-card'+(isFrame(o)?' frm':'')+(on?' on':'')+'" data-dk="sel" data-id="'+dkKey(o)+'" title="'+escH(dkName(o))+'">'
-      +'<div class="ch"><span class="no">'+pad(i+1)+'</span><span class="dp">'+(isFrame(o)?'FRAME':(o.depth??0.5).toFixed(2).replace(/^0/,''))+'</span></div>'
-      +'<div class="th">'+dkThumb(o)+'</div>'
-      +(on?'<div class="cf"><span class="nb">NOW</span><span class="nm">'+escH(dkName(o).slice(0,12))+'</span></div>':'')
-      +'</button>';
-  });
-  h+='<button class="dk-add" data-dk="pic" title="画像を選んで追加（ドロップでも置けます）"><b>＋</b><span>DROP</span></button>';
-  return h;
-}
-function dkPlaceHTML(){
-  const has=!!sel&&!isText(sel);
-  const hasT=!!sel&&isText(sel);
-  const sz=hasT?(sel.size??24):(has?(sel.h??0.5):0);
-  const n=rootItems().length;
-  return '<div class="dk-row">'
-  +'<div class="dk-step'+((has||hasT)?'':' off')+'">'
-    +'<div class="pm" data-dk="size-" title="小さく">−</div>'
-    +'<div class="val" data-dk="size" title="左右にドラッグで大きさ"><span class="k">SIZE</span>'
-    +'<span class="v">'+(hasT?sz.toFixed(0):sz.toFixed(2))+'</span><span class="h">⟷ DRAG</span></div>'
-    +'<div class="pm" data-dk="size+" title="大きく">＋</div>'
-  +'</div>'
-  +'<div style="flex:1;min-width:0">'
-    +'<div class="dk-hd"><div class="dk-hl">'
-      +'<span class="dk-lab">DEPTH</span>'
-      +'<span class="dk-jp">▼ をドラッグ＝奥行き（大きいほど手前）</span>'
-      +'<span class="dk-meta">PANELS '+n+(has?' / SEL '+escH(dkName(sel).slice(0,14)):'')+'</span>'
-    +'</div><div class="dk-hr">'
-      +(has?'<span class="nm">'+escH(dkName(sel).slice(0,18))+'</span><span class="dk-num">'+(sel.depth??0.5).toFixed(2)+'</span>':'<span class="dk-jp">コマを選ぶと奥行きが出ます</span>')
-    +'</div></div>'
-    +dkDepthHTML()
-  +'</div></div>'
-  +'<div class="dk-row" style="padding-top:6px">'
-    +'<div style="display:flex;flex-direction:column;gap:5px;flex:none;width:76px">'
-      +'<span class="dk-lab" style="font-size:12px;letter-spacing:.24em;color:rgba(232,236,242,.55)">PANELS</span>'
-      +'<span class="dk-meta">'+n+' / 奥→手前</span></div>'
-    +'<div class="dk-strip">'+dkCards()+'</div>'
-  +'</div>'
-  +'<div class="dk-acts">'
-    +'<button class="dk-pri" data-dk="pic" title="画像を選んで追加（複数選択可・連番4枚以上は自動でパラパラ）">'
-      +'<span class="g">▶</span><span class="dk-col"><span class="t">PIC 絵を置く</span>'
-      +'<span class="s">画像を選ぶ／ドロップでも置ける</span></span></button>'
-    +'<div class="dk-chip"><span class="n">01</span><span class="g">✥</span>'
-      +'<span class="dk-col"><span class="t">動かす</span><span class="s">ドラッグで位置</span></span></div>'
-    +'<div class="dk-chip'+(has?' on':'')+'"><span class="n">02</span><span class="g">◈</span>'
-      +'<span class="dk-col"><span class="t">奥行き</span><span class="s">▼ で視差と重なり順</span></span>'
-      +(has?'<span class="nb">NOW</span>':'')+'</div>'
-    +'<div style="flex:1;min-width:8px"></div>'
-    +'<button class="dk-mini'+(PROJECT.take&&PROJECT.take.fx&&PROJECT.take.fx.enabled?' on':'')+'" data-dk="fx" title="撮影処理（SATSUEI FX）・DOFピン送り・クリックFXを編集（F）">FX</button>'
-    +'<button class="dk-mini ico'+(MON&&MON.on?' on':'')+'" data-dk="mon" title="MONITOR：書き出したときの見え方を16:9の小窓で常時表示（P）">▣</button>'
-    +'<span class="dk-sep"></span>'
-    +'<button class="dk-mini" data-dk="frame" title="フレーム（コマ枠）を追加">＋ FRAME</button>'
-    +'<button class="dk-mini" data-dk="text" title="縦書きテキスト（セリフ）を追加">＋ TEXT</button>'
-    +'<button class="dk-mini ico" data-dk="undo" title="元に戻す（Ctrl+Z）">↶</button>'
-    +'<button class="dk-mini ico" data-dk="redo" title="やり直す（Ctrl+Shift+Z）">↷</button>'
-  +'</div>';
-}
-/* ============================================================
-   DOCK — 画面下のコンソール（TAKE）
-   ・FOCUS 定規＝ピント。◇＝置いてある点（押すとそのKFへ）／薄い縦線＝コマの奥行き／▼＝いまのピント
-   ・SHOTS＝打ったカメラの並び。ミニマップで「どこを切っているか」が一目で分かる
-   ・EASE / DWELL は選択中のKFのもの（DWELLは左右ドラッグ・EASEは押して切替）
-   ============================================================ */
-const DK_EASE=['smooth','inout','linear','outCubic','inCubic'];
-/* KFの画角と、置いてあるものの外接をそろえて小さな見取り図にする。
-   単位は「画面幅=1」に統一（yは H/W ぶん割る）。箱は 16:9 固定なので縦だけアスペクト補正。
-   世界（原点と縮尺）は strip 全体で1回だけ決める＝カード同士を並べて比べられる。 */
-function dkWorld(){
-  const A=Math.max(.2,(cv.width/cv.height)||1.777);
-  const its=rootItems().map(o=>{
-    const h=o.h??.5;
-    return {w:h*(o.ar||1.414)/A,h:h/A,x:o.x??0,y:(o.y??0)/A};
-  });
-  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
-  const add=(cx,cy,w,h)=>{x0=Math.min(x0,cx-w/2);x1=Math.max(x1,cx+w/2);y0=Math.min(y0,cy-h/2);y1=Math.max(y1,cy+h/2);};
-  for(const o of its)add(o.x,o.y,o.w,o.h);
-  for(const k of PROJECT.take.kf){const z=Math.max(.05,k.z??1);add(k.x,k.y/A,1/z,1/(z*A));}
-  if(x0>x1){x0=-.5;x1=.5;y0=-.5/A;y1=.5/A;}   // 何もないときの既定（画面1枚ぶん）
-  return {A,bA:16/9,its,x0,x1,y0,y1};
-}
-function dkMini(k,W){
-  const A=W.A,bA=W.bA;
-  const z=Math.max(.05,k.z??1),fw=1/z,fh=1/(z*A);
-  const s=Math.min(.9/Math.max(1e-4,W.x1-W.x0),.9/Math.max(1e-4,(W.y1-W.y0)*bA));
-  const mx=(W.x0+W.x1)/2,my=(W.y0+W.y1)/2;
-  const PX=v=>(50+(v-mx)*s*100).toFixed(2)+'%',PY=v=>(50+(v-my)*s*bA*100).toFixed(2)+'%';
-  const WP=v=>(v*s*100).toFixed(2)+'%',HP=v=>(v*s*bA*100).toFixed(2)+'%';
-  let h='';
-  for(const o of W.its)h+='<i style="left:'+PX(o.x-o.w/2)+';top:'+PY(o.y-o.h/2)+';width:'+WP(o.w)+';height:'+HP(o.h)+'"></i>';
-  h+='<b style="left:'+PX(k.x-fw/2)+';top:'+PY(k.y/A-fh/2)+';width:'+WP(fw)+';height:'+HP(fh)+'"></b>';
-  return '<div class="mm">'+h+'</div>';
-}
-function dkFocusHTML(){
-  const d=PROJECT.dof,on=!!d.on;
-  let s='';
-  for(const o of rootItems())   // コマの奥行き＝どこに何があるか（キャンバスのHUDから移設）
-    s+='<span class="pk" style="left:'+(clamp(o.depth??.5,0,1)*100).toFixed(2)+'%" title="'+escH(dkName(o))+' D '+(o.depth??.5).toFixed(2)+'"></span>';
-  if(on){
-    for(const pt of d.pts)
-      s+='<div class="dot'+(pt.kf===selKf?' pt':'')+'" data-dk="dofgo" data-kf="'+pt.kf+'" style="left:'+(pt.f*100).toFixed(2)+'%" title="#'+pad(pt.kf)+' のピント '+pt.f.toFixed(2)+'（押すとこのKFへ）"></div>';
-    const L=(clamp(dofPin,0,1)*100).toFixed(2)+'%';
-    s+='<div class="stem" id="dk-stem" style="left:'+L+'"></div><div class="car" id="dk-car" style="left:'+L+'">▼</div>';
-  }
-  return '<div class="dk-ruler'+(on?'':' off')+'" data-dk="focus">'
-    +'<div class="axis"></div>'+dkRulerTicks()+s
-    +'<div class="end">奥 0.00</div><div class="end r">1.00 手前</div></div>';
-}
-function dkShots(){
-  const d=PROJECT.dof,W=dkWorld();let h='';
-  PROJECT.take.kf.forEach((k,i)=>{
-    const on=(i===selKf),pi=dofPtAt(i);
-    h+='<button class="dk-card'+(on?' on':'')+(i===kfNow?' now':'')+'" data-dk="kf" data-i="'+i+'" '
-      +'title="#'+pad(i)+'  x'+(+k.x).toFixed(2)+' y'+(+k.y).toFixed(2)+' z'+(+(k.z??1)).toFixed(2)+'（押すとこの構図へ）">'
-      +'<div class="ch"><span class="no">#'+pad(i)+'</span><span class="dp">'
-        +(d.on?(pi>=0?d.pts[pi].f.toFixed(2):'—'):'z'+(+(k.z??1)).toFixed(2))+'</span></div>'
-      +'<div class="th">'+dkMini(k,W)+'</div>'
-      +(on?'<div class="cf"><span class="nb">NOW</span><span class="nm">'+(k.dwell??1).toFixed(2)+'s / '+(k.ease||'smooth')+'</span></div>'
-         :'<span class="rdy">'+(k.dwell??1).toFixed(2)+'s</span>')
-      +'</button>';
-  });
-  h+='<button class="dk-add" data-dk="cap" title="いまの構図でカメラを1枚打つ（C）"><b>＋</b><span>CAPTURE</span></button>';
-  return h;
-}
-function dkTakeHTML(){
-  const kfs=PROJECT.take.kf,n=kfs.length,d=PROJECT.dof;
-  const k=(selKf>=0&&selKf<n)?kfs[selKf]:null;
-  const ptI=k?dofPtAt(selKf):-1;
-  return '<div class="dk-row">'
-  +'<button class="dk-take'+(dofPick?' on':'')+'" data-dk="dofpick" title="押してからコマをクリック＝そのコマにピントを合わせます（KFを選んでいればそこに置きます・Escで取消）">'
-    +'<span class="g">◎</span><span class="dk-col"><span class="t">'+(dofPick?'コマをクリック…':'画面から取る')+'</span>'
-    +'<span class="s">TAP A PANEL</span></span></button>'
-  +'<div style="flex:1;min-width:0">'
-    +'<div class="dk-hd"><div class="dk-hl">'
-      +'<span class="dk-lab">FOCUS</span>'
-      +'<span class="dk-jp">▼ をドラッグ＝ピント</span>'
-      +'<span class="dk-meta">TAKE '+n+' KF'+(selKf>=0?' / SEL #'+pad(selKf):'')+'</span>'
-    +'</div><div class="dk-hr">'
-      +'<button class="dk-scr ease'+(k?'':' off')+'" data-dk="ease" title="EASE — 押して切替（'+DK_EASE.join(' / ')+'）">'
-        +'<span class="k">EASE</span><span class="v">'+(k?(k.ease||'smooth'):'—')+'</span></button>'
-      +'<button class="dk-scr'+(k?'':' off')+'" data-dk="dwell" title="DWELL — 左右にドラッグ＝このKFで止まっている長さ">'
-        +'<span class="k">DWELL</span><span class="v" id="dk-dwellv">'+(k?(k.dwell??1).toFixed(2)+'s':'—')+'</span></button>'
-      +'<span class="vl"></span>'
-      +'<span class="nm" id="dk-near">'+(d.on?dofNearest(dofPin):'ピント OFF')+'</span>'
-      +'<span class="dk-num" id="dk-pinv">'+(d.on?dofPin.toFixed(2):'—')+'</span>'
-    +'</div></div>'
-    +dkFocusHTML()
-  +'</div></div>'
-  +'<div class="dk-row" style="padding-top:6px">'
-    +'<div style="display:flex;flex-direction:column;gap:5px;flex:none;width:76px">'
-      +'<span class="dk-lab" style="font-size:12px;letter-spacing:.24em;color:rgba(232,236,242,.55)">SHOTS</span>'
-      +'<span class="dk-meta">'+n+' / 順に再生</span></div>'
-    +'<div class="dk-strip">'+dkShots()+'</div>'
-  +'</div>'
-  +'<div class="dk-acts">'
-    +'<button class="dk-pri" data-dk="cap" title="いまの構図でカメラを打つ（C）"><span class="g">●</span>'
-      +'<span class="dk-col"><span class="t">CAPTURE</span><span class="s">いまの構図でカメラを打つ</span></span>'
-      +'<span class="kb">C</span></button>'
-    +'<button class="dk-chip" data-dk="go"'+(k?'':' disabled')+'><span class="n">01</span><span class="g">▶</span>'
-      +'<span class="dk-col"><span class="t">GO</span><span class="s">'+(k?'#'+pad(selKf)+' へ飛ぶ':'KFを選ぶ')+'</span></span></button>'
-    +'<button class="dk-chip'+(d.on?' on':'')+'" data-dk="dofon"><span class="n">02</span><span class="g">◎</span>'
-      +'<span class="dk-col"><span class="t">ピント</span><span class="s">'
-      +(d.on?(k?(ptI>=0?'#'+pad(selKf)+' に点あり':'▼ で決めて置く'):'KFを選ぶと置ける'):'DOFを入れる')+'</span></span>'
-      +(d.on?'<span class="nb">ON</span>':'')+'</button>'
-    +(d.on&&k?'<button class="dk-mini" data-dk="dofset" title="'+(ptI>=0?'この点をいまの ▼ の位置で更新（外すときは隣の「点を外す」）':'いまの ▼ の位置を #'+pad(selKf)+' の点として置く')+'">'
-      +(ptI>=0?'↻ 点を更新':'◎ 点を置く')+'</button>':'')
-    +(d.on&&k&&ptI>=0?'<button class="dk-mini" data-dk="dofdel" title="#'+pad(selKf)+' のピントの点を外す（前後の点からの補間に戻ります）">✕ 点を外す</button>':'')
-    +'<div style="flex:1;min-width:8px"></div>'
-    +'<button class="dk-mini" data-dk="upd"'+(k?'':' disabled')+' title="いまの構図でこのKFを上書き">↻ UPD</button>'
-    +'<button class="dk-mini ico" data-dk="delkf"'+(k?'':' disabled')+' title="このKFを削除">✕</button>'
-    +'<button class="dk-mini'+(PROJECT.take&&PROJECT.take.fx&&PROJECT.take.fx.enabled?' on':'')+'" data-dk="fx" title="撮影処理（SATSUEI FX）・DOFピン送り・クリックFXを編集（F）">FX</button>'
-    +'<button class="dk-mini ico'+(MON&&MON.on?' on':'')+'" data-dk="mon" title="MONITOR：書き出したときの見え方を16:9の小窓で常時表示（P）">▣</button>'
-    +'<span class="dk-sep"></span>'
-    +'<button class="dk-mini ico" data-dk="undo" title="元に戻す（Ctrl+Z）">↶</button>'
-    +'<button class="dk-mini ico" data-dk="redo" title="やり直す（Ctrl+Shift+Z）">↷</button>'
-    +'<button class="dk-mini'+(PV.on?' on':'')+'" data-dk="prev" title="打った順に再生（SPACE）">'+(PV.on?'■ STOP':'▷ PLAY')+'</button>'
-  +'</div>';
-}
-/* ============================================================
-   DOCK — 画面下のコンソール（EXPORT）
-   ・OUTPUT＝出すもの（動画 MP4 / HTML ビューア）
-   ・RANGE＝出す範囲。[ ] が頭と末尾、◇ が各KF、▼ がいまの再生位置
-   ・SIZE / FPS / BAKE は書き出しの設定。書き出し中はこの段が進捗に入れ替わる
-   ============================================================ */
-const EXP_SIZES={screen:['画面と同じ',null],fhd:['FHD',[1920,1080]],qhd:['QHD',[2560,1440]],uhd:['4K',[3840,2160]]};
-const EXP={kind:'mp4',size:'fhd',fps:60,sec:8,in:0,out:1,secSet:false};
-function expDims(){return (EXP.size==='screen')?[cv.width,cv.height]:EXP_SIZES[EXP.size][1];}
-function expSecDefault(){return Math.max(1,Math.round((TT.total||1)*1.15*10)/10);}
-function expClip(){return Math.max(0.1,EXP.sec*Math.max(0.02,EXP.out-EXP.in));}
-function dkRangeHTML(){
-  const kfs=PROJECT.take.kf;
-  let s='<div class="band" style="left:'+(EXP.in*100).toFixed(2)+'%;right:'+(100-EXP.out*100).toFixed(2)+'%"></div>';
-  kfs.forEach((k,i)=>{
-    const seg=TT.segs&&TT.segs[2*i];
-    const p=seg?(seg.p0+seg.p1)/2:(kfs.length<2?0:i/(kfs.length-1));
-    s+='<div class="dot" data-dk="rkf" data-i="'+i+'" style="left:'+(p*100).toFixed(2)+'%" title="#'+pad(i)+' P '+p.toFixed(2)+'（押すとここを見る）"></div>';
-  });
-  const pv=PV.on?PV.p:MON.p;
-  if(pv!=null)s+='<div class="stem" style="left:'+(clamp(pv,0,1)*100).toFixed(2)+'%"></div>'
-    +'<div class="car" style="left:'+(clamp(pv,0,1)*100).toFixed(2)+'%">▼</div>';
-  s+='<div class="br l" data-dk="rin" style="left:'+(EXP.in*100).toFixed(2)+'%" title="出す範囲の頭"></div>'
-    +'<div class="br r" data-dk="rout" style="left:'+(EXP.out*100).toFixed(2)+'%" title="出す範囲の末尾"></div>';
-  return '<div class="dk-ruler" data-dk="range"><div class="axis"></div>'+dkRulerTicks()+s
-    +'<div class="end">頭 0.00</div><div class="end r">1.00 末尾</div></div>';
-}
-function dkExpRunHTML(){
-  return '<div class="dk-acts" style="border-top:0">'
-    +'<div style="display:flex;align-items:baseline;gap:9px;flex:none">'
-      +'<span class="dk-pct" id="dk-ppct">0%</span><span class="dk-pf" id="dk-pf"></span></div>'
-    +'<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">'
-      +'<div class="dk-pbar" id="dk-pbar"><i></i></div>'
-      +'<div class="dk-pnote"><span id="dk-pmsg">準備中…</span><span style="opacity:.5">このまま待てば保存されます</span></div>'
-    +'</div>'
-    +'<button class="dk-stop" data-dk="cancel" title="中断（Esc）"><span style="font-size:13px">■</span>'
-      +'<span class="dk-col"><span class="t">中断</span><span class="s">ESC / 保存されません</span></span></button>'
-  +'</div>';
-}
-function dkExportHTML(){
-  if(document.body.classList.contains('exprun'))return dkExpRunHTML();
-  const mp4=(EXP.kind==='mp4'),d=expDims(),W=d[0],H=d[1];
-  const n=PROJECT.take.kf.length,frames=Math.round(expClip()*EXP.fps);
-  const subs=PROJECT.texts.some(t=>t.type==='sub'&&t.str);
-  const wipes=PROJECT.frames.some(f=>f.wipe);
-  const fxOn=!!(PROJECT.take.fx&&PROJECT.take.fx.enabled);
-  /* 段の順番は PLACE / TAKE と同じ：定規 → 一覧（出すもの）→ ボタン */
-  let out='<div class="dk-row" style="align-items:flex-end;padding-top:6px">'
-    +'<div style="display:flex;flex-direction:column;gap:5px;flex:none;width:76px">'
-      +'<span class="dk-lab" style="font-size:12px;letter-spacing:.24em;color:rgba(232,236,242,.55)">OUTPUT</span>'
-      +'<span class="dk-meta">出すもの</span></div>'
-    +'<div style="display:flex;align-items:flex-end;gap:9px;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;padding-bottom:3px">'
-      +'<button class="dk-out'+(mp4?' on':'')+'" data-dk="kind" data-v="mp4" title="TAKE の範囲を1本の動画に焼く（撮影FX・DOF・字幕・ワイプも入る）">'
-        +'<div class="ch"><span class="t">動画 MP4</span>'+(mp4?'<span class="nb">NOW</span>':'')+'</div>'
-        +'<span class="s">TAKE の範囲をそのまま1本の動画に焼く</span>'
-        +'<span class="f"><span>H.264</span><span style="opacity:.4">/</span><span>FX・DOF・字幕も焼込み</span></span></button>'
-      +'<button class="dk-out'+(mp4?'':' on')+'" data-dk="kind" data-v="html" title="スクロールで動く単一HTMLビューア（依存ゼロ）">'
-        +'<div class="ch"><span class="t">HTML ビューア</span>'+(mp4?'':'<span class="nb">NOW</span>')+'</div>'
-        +'<span class="s">スクロールで動く単一HTML。絵は同じフォルダに置く</span>'
-        +'<span class="f"><span>依存ゼロ</span></span></button>'
-      +'<div style="flex:1;min-width:8px"></div>'
-      +'<button class="dk-mini" data-dk="json-out" title="プロジェクト全体をJSONファイルで書き出し">JSON ⇧</button>'
-      +'<button class="dk-mini" data-dk="json-in" title="JSONファイルから読み込み（既存を置換）">JSON ⇩</button>'
-      +'<button class="dk-mini" data-dk="comp" title="COMPOSER 用のシーンJSONを作る">COMPOSER ▶</button>'
-    +'</div></div>';
-  let s='';
-  if(mp4){
-    s+='<div class="dk-row">'
-      +'<div class="dk-step">'
-        +'<div class="pm" data-dk="sec-" title="短く">−</div>'
-        +'<div class="val" data-dk="sec" title="左右にドラッグで尺（TAKE 全体の長さ）"><span class="k">SEC</span>'
-        +'<span class="v">'+EXP.sec.toFixed(1)+'</span><span class="h">⟷ DRAG</span></div>'
-        +'<div class="pm" data-dk="sec+" title="長く">＋</div>'
-      +'</div>'
-      +'<div style="flex:1;min-width:0">'
-        +'<div class="dk-hd"><div class="dk-hl">'
-          +'<span class="dk-lab">RANGE</span>'
-          +'<span class="dk-jp">[ ] をドラッグ＝出す範囲</span>'
-          +'<span class="dk-meta">TAKE '+n+' KF / '+frames+' f</span>'
-        +'</div><div class="dk-hr">'
-          +'<button class="dk-scr" data-dk="rin" title="出す範囲の頭（左右にドラッグ）"><span class="k">IN</span><span class="v">'+EXP.in.toFixed(2)+'</span></button>'
-          +'<button class="dk-scr" data-dk="rout" title="出す範囲の末尾（左右にドラッグ）"><span class="k">OUT</span><span class="v">'+EXP.out.toFixed(2)+'</span></button>'
-          +'<span class="vl"></span>'
-          +'<span class="dk-num">'+expClip().toFixed(1)+'s</span>'
-        +'</div></div>'
-        +dkRangeHTML()
-      +'</div></div>';
-  }else{
-    s+='<div class="dk-row"><div style="flex:1;min-width:0"><div class="dk-hd"><div class="dk-hl">'
-      +'<span class="dk-lab">HTML</span>'
-      +'<span class="dk-jp">画像は同梱しないので、書き出したHTMLを画像と同じフォルダに置いてください（ANIMATOR連番だけ同梱されます）</span>'
-      +'</div></div></div></div>';
-  }
-  s+=out;
-  s+='<div class="dk-acts">'
-    +'<button class="dk-pri" data-dk="go" title="'+(mp4?'いまの設定で動画を書き出す':'HTMLビューアを書き出す')+'">'
-      +'<span class="g">▼</span><span class="dk-col"><span class="t">書き出す</span>'
-      +'<span class="s">'+(mp4?('MP4 '+W+'×'+H+' / '+EXP.fps+'fps / '+expClip().toFixed(1)+'s'):'単一HTML ビューア')+'</span></span></button>';
-  if(mp4){
-    s+='<div class="dk-set"><span class="n">01</span><span class="col"><span class="lab">SIZE 大きさ</span><span class="opts">'
-      +['screen','fhd','qhd','uhd'].map(k=>'<button class="dk-opt'+(EXP.size===k?' on':'')+'" data-dk="size" data-v="'+k+'">'+EXP_SIZES[k][0]+'</button>').join('')
-      +'</span></span></div>'
-      +'<div class="dk-set"><span class="n">02</span><span class="col"><span class="lab">FPS</span><span class="opts">'
-      +[24,30,60].map(f=>'<button class="dk-opt'+(EXP.fps===f?' on':'')+'" data-dk="fps" data-v="'+f+'">'+f+'</button>').join('')
-      +'</span></span></div>'
-      +'<div class="dk-set"><span class="n">03</span><span class="col"><span class="lab">BAKE 焼き込み</span><span class="opts">'
-      +'<button class="dk-opt'+(fxOn?' on':'')+'" data-dk="fx" title="撮影処理（SATSUEI FX）。押すとFXパネルが開きます">撮影FX</button>'
-      +'<span class="dk-opt tag'+(wipes?' on':'')+'" title="ワイプを設定したコマがあれば焼き込まれます">ワイプ</span>'
-      +'<span class="dk-opt tag'+(subs?' on':'')+'" title="KFに字幕があれば焼き込まれます">字幕</span>'
-      +'</span></span></div>';
-  }
-  s+='<div style="flex:1;min-width:8px"></div>'
-    +'<button class="dk-mini'+(PV.on?' on':'')+'" data-dk="prev" title="通しで再生して確認（SPACE）">'+(PV.on?'■ STOP':'▷ PREVIEW')+'</button>'
-  +'</div>';
-  return s;
-}
-/* 再生中や ▼ ドラッグ中は作り直さず、動いた数字だけ差し替える */
-function dkFocusSync(){
-  if(mode!=='take')return;
-  const L=(clamp(dofPin,0,1)*100).toFixed(2)+'%';
-  const c=$('#dk-car'),s=$('#dk-stem'),v=$('#dk-pinv'),nr=$('#dk-near');
-  if(c)c.style.left=L;if(s)s.style.left=L;
-  if(v)v.textContent=dofPin.toFixed(2);
-  if(nr)nr.innerHTML=dofNearest(dofPin);
-}
-let dkDepthActive=false;
-function renderDock(){
-  const el=document.getElementById('dock');
-  if(!el)return;
-  if(mode==='place')el.innerHTML=dkPlaceHTML();
-  else if(mode==='take')el.innerHTML=dkTakeHTML();
-  else if(mode==='export')el.innerHTML=dkExportHTML();
-}
-/* SIZE の増減。テキストは pt、コマ/フレームは高さ（画面比） */
-function dkSize(d){
-  if(!sel)return;
-  if(isText(sel))sel.size=+clamp((sel.size??24)+d*8,6,400).toFixed(1);
-  else sel.h=+clamp((sel.h??0.5)+d*0.02,0.03,6).toFixed(3);
-  renderDock();renderChip();commitD();
-}
-function dkSetDepth(v){
-  if(!sel||isText(sel))return;
-  sel.depth=+clamp(v,0,1).toFixed(3);
-  renderDock();renderChip();commitD();
-}
-/* 定規・数値スクラブの共通ドラッグ（pointer capture でUIの外に出ても追従） */
-function dkDrag(e,onMove,onUp){
-  const id=e.pointerId,t=e.currentTarget||e.target;
-  try{t.setPointerCapture(id);}catch(err){}
-  const mv=ev=>{ev.preventDefault();onMove(ev);};
-  const up=()=>{
-    t.removeEventListener('pointermove',mv);t.removeEventListener('pointerup',up);
-    t.removeEventListener('pointercancel',up);dkDepthActive=false;commit();
-    if(onUp)onUp();
-  };
-  t.addEventListener('pointermove',mv);t.addEventListener('pointerup',up);t.addEventListener('pointercancel',up);
-}
-document.getElementById('dock').addEventListener('pointerdown',e=>{
-  const g=e.target.closest&&e.target.closest('[data-dk]');
-  if(!g)return;
-  const a=g.dataset.dk;
-  if(a==='depth'){
-    if(!sel||isText(sel))return;
-    e.preventDefault();dkDepthActive=true;
-    const r=g.getBoundingClientRect();
-    const at=ev=>dkSetDepth((ev.clientX-r.left)/Math.max(1,r.width));
-    at(e);dkDrag(e,at);
-  }else if(a==='size'){
-    if(!sel)return;
-    e.preventDefault();
-    const x0=e.clientX,base=isText(sel)?(sel.size??24):(sel.h??0.5),k=isText(sel)?0.35:0.004;
-    const at=ev=>{
-      const v=base+(ev.clientX-x0)*k;
-      if(isText(sel))sel.size=+clamp(v,6,400).toFixed(1);
-      else sel.h=+clamp(v,0.03,6).toFixed(3);
-      renderDock();renderChip();commitD();
-    };
-    dkDrag(e,at);
-  }
-  /* --- TAKE --- */
-  else if(a==='focus'){
-    if(!PROJECT.dof.on)return;
-    e.preventDefault();
-    const r=g.getBoundingClientRect();
-    const at=ev=>setDofPin(clamp((ev.clientX-r.left)/Math.max(1,r.width),0,1),true);
-    at(e);dkDrag(e,at,()=>renderDock());
-  }else if(a==='dwell'){
-    const k=PROJECT.take.kf[selKf];if(!k)return;
-    e.preventDefault();
-    const x0=e.clientX,base=k.dwell??1,vv=$('#dk-dwellv');
-    const at=ev=>{
-      k.dwell=+clamp(base+(ev.clientX-x0)*0.008,0.05,3).toFixed(2);
-      if(vv)vv.textContent=k.dwell.toFixed(2)+'s';
-      TT=buildTake(PROJECT.take);commitD();
-    };
-    dkDrag(e,at,()=>{renderCards();});
-  }
-  /* --- EXPORT --- */
-  else if(a==='sec'){
-    e.preventDefault();
-    const x0=e.clientX,base=EXP.sec;
-    const at=ev=>{EXP.sec=+clamp(base+(ev.clientX-x0)*0.03,1,600).toFixed(1);EXP.secSet=true;renderDock();};
-    dkDrag(e,at);
-  }
-  else if(a==='rin'||a==='rout'){
-    e.preventDefault();
-    const abs=g.classList.contains('br');
-    const rl=abs?g.parentElement.getBoundingClientRect():null;
-    const x0=e.clientX,base=(a==='rin')?EXP.in:EXP.out;
-    const at=ev=>{
-      const v=abs?((ev.clientX-rl.left)/Math.max(1,rl.width)):(base+(ev.clientX-x0)*0.002);
-      if(a==='rin')EXP.in=+clamp(v,0,EXP.out-0.02).toFixed(3);
-      else EXP.out=+clamp(v,EXP.in+0.02,1).toFixed(3);
-      renderDock();
-    };
-    at(e);dkDrag(e,at);
-  }
-  else if(a==='range'){
-    e.preventDefault();
-    const rl=g.getBoundingClientRect();
-    const at=ev=>{
-      const p=clamp((ev.clientX-rl.left)/Math.max(1,rl.width),0,1);
-      if(PV.on)PV.p=p; MON.p=p; monRender(); renderDock();
-    };
-    at(e);dkDrag(e,at);
-  }
-});
-document.getElementById('dock').addEventListener('click',e=>{
-  const g=e.target.closest&&e.target.closest('[data-dk]');
-  if(!g)return;
-  const a=g.dataset.dk;
-  if(a==='pic')$('#b-img').click();
-  else if(a==='fx')$('#b-fx').click();
-  else if(a==='mon')$('#b-mon').click();
-  else if(a==='frame')$('#b-frame').click();
-  else if(a==='text'){openTextEditor(innerWidth/2,innerHeight/2,null);}
-  else if(a==='undo')undo();
-  else if(a==='redo')redo();
-  else if(a==='size+')dkSize(1);
-  else if(a==='size-')dkSize(-1);
-  else if(a==='sel'||a==='pick'){
-    const o=dkFind(g.dataset.id);
-    if(o){sel=o;qeOpen=true;renderChip();renderDock();}
-  }
-  /* --- TAKE --- */
-  else if(a==='cap')capture();
-  else if(a==='kf')selectKf(+g.dataset.i,true);
-  else if(a==='dofgo')selectKf(+g.dataset.kf,true);
-  else if(a==='go'){if(selKf>=0)goKf(selKf);}
-  else if(a==='upd'){
-    const k=PROJECT.take.kf[selKf];if(!k)return;
-    Object.assign(k,{x:+VC.x.toFixed(3),y:+VC.y.toFixed(3),z:+VC.z.toFixed(3)});
-    rebuild();toast('#'+pad(selKf)+' をいまの構図で上書きしました');
-  }
-  else if(a==='delkf'){
-    if(selKf<0)return;
-    const i=selKf;
-    PROJECT.take.kf.splice(i,1);
-    remapKfRefs(o=>(o===i?null:(o>i?o-1:o)));
-    if(selKf>=PROJECT.take.kf.length)selKf=PROJECT.take.kf.length-1;
-    rebuild();
-  }
-  else if(a==='ease'){
-    const k=PROJECT.take.kf[selKf];if(!k)return;
-    k.ease=DK_EASE[(DK_EASE.indexOf(k.ease||'smooth')+1)%DK_EASE.length];
-    TT=buildTake(PROJECT.take);renderCards();commitD();
-  }
-  else if(a==='dofon'){
-    const d=PROJECT.dof;d.on=!d.on;
-    if(!d.on){dofPick=null;document.body.classList.remove('dofpick');}
-    renderCards();syncFxBtn();commit();
-  }
-  else if(a==='dofpick'){
-    dofPick=dofPick?null:'pin';
-    document.body.classList.toggle('dofpick',!!dofPick);
-    renderCards();
-    if(dofPick)toast('ピントを合わせたいコマをキャンバスでクリック（Escで取消）'
-      +(selKf>=0?' — #'+pad(selKf)+' に置きます':' — KF未選択なので見え方だけ変わります'));
-  }
-  else if(a==='dofset'){
-    if(selKf<0)return;
-    dofSetPoint(selKf,dofPin);renderCards();commit();
-    toast('#'+pad(selKf)+' のピント = '+dofPin.toFixed(2));
-  }
-  /* 点を外す。旧 #cards の ✕ が担っていた口で、パネル撤去で行き場を失っていたもの */
-  else if(a==='dofdel'){
-    if(selKf<0||dofPtAt(selKf)<0)return;
-    dofRemovePoint(selKf);renderCards();commit();
-    toast('#'+pad(selKf)+' のピントを外しました');
-  }
-  else if(a==='prev'){PV.on?stopPreview():startPreview();renderDock();}
-  /* --- EXPORT --- */
-  else if(a==='kind'){EXP.kind=g.dataset.v;renderDock();}
-  else if(a==='size'){EXP.size=g.dataset.v;renderDock();}
-  else if(a==='fps'){EXP.fps=+g.dataset.v||60;renderDock();}
-  else if(a==='sec+'||a==='sec-'){
-    EXP.sec=+clamp(EXP.sec+(a==='sec+'?0.5:-0.5),1,600).toFixed(1);EXP.secSet=true;renderDock();
-  }
-  else if(a==='rkf'){
-    const i=+g.dataset.i,seg=TT.segs&&TT.segs[2*i];
-    const p=seg?(seg.p0+seg.p1)/2:0;
-    if(PV.on)PV.p=p;
-    MON.p=p;monRender();renderDock();
-  }
-  else if(a==='json-out')$('#b-export-json').click();
-  else if(a==='json-in')$('#b-import-json').click();
-  else if(a==='comp')$('#b-comp').click();
-  else if(a==='cancel')gVidAbort=true;
-  else if(a==='go')expRun();
-});
-/* 書き出しの実行。HTMLはそのまま、動画は範囲（IN/OUT）ぶんだけ焼く */
-async function expRun(){
-  if(gVidExporting)return;
-  if(!PROJECT.panels.length){toast('パネルがありません — まず画像をドロップ');return;}
-  if(EXP.kind==='html'){await exportViewerHTML();return;}
-  if(!PROJECT.take.kf.length){toast('TAKEが空です — 2.TAKE で C=CAPTURE してから書き出し');return;}
-  const d=expDims();
-  expProgress('準備中…',0);
-  await exportVideo(d[0],d[1],EXP.fps,expClip(),EXP.in,EXP.out);
+  fitQe();                                       // DELETE の下でぴたっと終わらせる（FRAMEでも同じ）
 }
 /* U / ✕ で開閉。選択し直すと開き直す＝旧チップと同じ手触りを保つ */
 function toggleQuickEdit(force){
   qeOpen=(typeof force==='boolean')?force:!qeOpen;
-  if(qeOpen&&mode==='take'&&selKf<0)toast('詳細 — 先に SHOTS でKFを選んでください（C＝CAPTURE で作れます）');
-  else if(qeOpen&&mode!=='take'&&!sel)toast('QUICK EDIT — 先にコマ／フレーム／テキストを選んでください');
+  if(qeOpen&&!sel)toast('QUICK EDIT — 先にコマ／フレーム／テキストを選んでください');
   renderChip();
 }
 function ejectPanel(p){
@@ -3459,191 +2702,48 @@ function toggleMask(){
   if(!sel||!isFrame(sel)){maskEdit.on=false;maskEdit.f=null;return;}
   maskEdit.on=!maskEdit.on;maskEdit.f=maskEdit.on?sel:null;renderChip();
 }
-/* セグメント／ボタンはすべて data-act。押した値は data-v（本文と同じ語彙のまま） */
-function qeAct(e){
-  const t=e.target.closest&&e.target.closest('[data-act]');
-  const act=t&&t.dataset.act;if(!act||!sel)return;
-  const v=t.dataset.v;
+chip.addEventListener('click',e=>{
+  const t=e.target,act=t&&t.dataset&&t.dataset.act;if(!act||!sel)return;
   if(act==='back')reorder(sel,-1);
   else if(act==='front')reorder(sel,+1);
   else if(act==='minus'||act==='plus'){
     const k=(act==='minus')?0.88:1.14;
-    if(isText(sel)){sel.size=+clamp((sel.size??24)*k,4,400).toFixed(1);
-      const d=$('#qd-tsize');if(d)d.textContent=Math.round(sel.size);}
-    else{sel.h=+clamp(sel.h*k,H_MIN,H_MAX).toFixed(4);
-      const d=$('#qd-h');if(d)d.textContent=sel.h.toFixed(2);}
-    renderDock();   // PLACE コンソールの SIZE も同じ値に合わせる
+    if(isText(sel)){sel.size=+clamp((sel.size??24)*k,4,400).toFixed(1);const d=$('#chip-ts');if(d)d.textContent=sel.size;
+      const s2=chip.querySelector('input[data-act="tsl"]');if(s2)s2.value=sel.size;}
+    else{sel.h=+clamp(sel.h*k,H_MIN,H_MAX).toFixed(4);const d=$('#chip-hv');if(d)d.textContent=sel.h.toFixed(2);
+      const s2=chip.querySelector('input[data-act="hsl"]');if(s2)s2.value=hToSlider(sel.h);}
     commitD();
   }
-  else if(act==='tcol'&&isText(sel)){sel.col=(v==='#000')?'#000':'#fff';renderChip();commit();}   // V2-D
-  else if(act==='tedit'&&isText(sel))editTextAt(sel);
-  else if(act==='tkf'&&isText(sel)){sel.kf=(v==='')?null:+v;renderChip();commit();}
+  else if(act==='tcol'&&isText(sel)){sel.col=sel.col==='#000'?'#fff':'#000';renderChip();commit();}   // V2-D
+  else if(act==='tedit'&&isText(sel))editTextAt(sel);                                                 // V2-D
   else if(act==='mask')toggleMask();
-  else if(act==='fline'&&isFrame(sel)){if(!sel.line)sel.line={on:false,w:10};
-    sel.line.on=(v==='on');renderChip();commit();}   // SPEC_09 P4
-  else if(act==='fin'&&isFrame(sel)){sel.fx.in=v;computeWipeP();renderChip();commit();}   // V2-C
-  else if(act==='fdrift'&&isFrame(sel)){sel.fx.drift=v;computeWipeP();renderChip();commit();}
-  else if(act==='fkf'&&isFrame(sel)){sel.fx.kf=(v==='')?null:+v;computeWipeP();renderChip();commit();}
-  else if(act==='fwipe'&&isFrame(sel)){sel.wipe=(v==='none')?null:v;computeWipeP();renderChip();commit();}
-  else if(act==='mode'&&sel.seq){sel.seq.mode=v;sel._t0=null;renderChip();commit();}
-  else if(act==='trigger'&&sel.seq){sel.seq.trigger=v;sel._t0=null;renderChip();commit();}
+  else if(act==='fline'&&isFrame(sel)){if(!sel.line)sel.line={on:false,w:10};sel.line.on=!sel.line.on;renderChip();commit();}   // SPEC_09 P4
   else if(act==='apreload'&&sel.seq&&sel.seq.src==='ap')apReload(sel);   // SPEC_07
-  else if(act==='apedit'&&sel.seq&&sel.seq.src==='ap')apEdit(sel);
-  else if(act==='eject'){if(isText(sel))ejectText(sel);else ejectPanel(sel);}
+  else if(act==='apedit'&&sel.seq&&sel.seq.src==='ap')apEdit(sel);       // SPEC_07
+  else if(act==='eject'){if(isText(sel))ejectText(sel);else ejectPanel(sel);}   // V2-D: テキスト対応
   else if(act==='del')deleteSel();
-}
-/* 数値は左右ドラッグ。data-abs の定規だけ「押した位置＝その値」 */
-const QD_SCR={
-  h:{g:o=>o.h??1,s:(o,v)=>{o.h=+clamp(v,H_MIN,H_MAX).toFixed(3);},k:0.006,f:v=>v.toFixed(2),dock:1},
-  depth:{g:o=>o.depth??0.5,s:(o,v)=>{o.depth=+clamp(v,0,1).toFixed(2);},k:0.004,f:v=>v.toFixed(2),dock:1},
-  par:{g:o=>o.par??0.6,s:(o,v)=>{o.par=+clamp(v,0,1).toFixed(2);},k:0.004,f:v=>v.toFixed(2)},
-  flw:{g:o=>(o.line&&o.line.w)||10,s:(o,v)=>{if(!o.line)o.line={on:true,w:10};o.line.w=Math.round(clamp(v,2,40));},k:0.09,f:v=>String(Math.round(v))},
-  famt:{g:o=>(o.fx&&o.fx.amt!=null)?o.fx.amt:0.12,s:(o,v)=>{o.fx.amt=+clamp(v,0,0.4).toFixed(2);},k:0.0016,f:v=>v.toFixed(2),wipe:1},
-  fps:{g:o=>(o.seq&&o.seq.fps)||12,s:(o,v)=>{o.seq.fps=Math.round(clamp(v,4,30));},k:0.09,f:v=>String(Math.round(v))},
-  tsize:{g:o=>o.size??24,s:(o,v)=>{o.size=+clamp(v,4,400).toFixed(1);},k:0.35,f:v=>String(Math.round(v)),dock:1}
-};
-function qeScrub(e){
-  const g=e.target.closest&&e.target.closest('[data-scr]');
-  if(!g||!sel)return;
-  const key=g.dataset.scr,cfg=QD_SCR[key];if(!cfg)return;
-  e.preventDefault();
-  const abs=g.dataset.abs==='1',r=g.getBoundingClientRect(),x0=e.clientX,base=cfg.g(sel);
-  const row=g.closest('.qd-row');
-  const vEl=(row||chip).querySelector('#qd-'+key);
-  const dm=row?row.querySelector('.qd-mr .dm'):null;
-  const at=ev=>{
-    cfg.s(sel,abs?((ev.clientX-r.left)/Math.max(1,r.width)):(base+(ev.clientX-x0)*cfg.k));
-    const cur=cfg.g(sel);
-    if(vEl)vEl.textContent=cfg.f(cur);
-    if(dm)dm.style.left=(clamp(cur,0,1)*100).toFixed(1)+'%';
-    if(cfg.wipe)computeWipeP();
-    if(cfg.dock)renderDock();
-    commitD();
-  };
-  at(e);dkDrag(e,at,()=>renderChip());
-}
-chip.addEventListener('click',qeAct);
-chip.addEventListener('pointerdown',qeScrub);
-{const ft=$('#qe-foot');if(ft)ft.addEventListener('click',qeAct);}
-/* ============================================================
-   DETAIL（TAKE）— 選んだKF＝1カットの中身。旧 TAKE — CAMERA パネルの
-   固有機能（並べ替え・字幕）はここへ一本化した。
-   ============================================================ */
-const SUB_SIZE_DEF=22;                                   // 旧11pxは小さすぎたので既定を上げた
-const subOfKf=i=>PROJECT.texts.find(x=>x.type==='sub'&&x.kf===i)||null;
-const qdKNum=(act,label,val,unit)=>'<button class="qd-num" data-kscr="'+act+'" title="左右にドラッグで変える">'
-  +(label?'<span class="k">'+label+'</span>':'')
-  +'<span class="v" id="qd-'+act+'">'+val+'</span><span class="u">'+(unit==null?'⟷':unit)+'</span></button>';
-function subPrevHTML(str,size){
-  const px=Math.round(clamp(size*0.62,8,34));
-  return '<div class="qd-sprev'+(str?'':' off')+'"><i></i><s>16:9 PREVIEW</s>'
-    +'<b style="font-size:'+px+'px">'+(escH(str)||'字幕なし')+'</b></div>';
-}
-function renderKfDetail(){
-  const n=PROJECT.take.kf.length,i=selKf,ok=(i>=0&&i<n);
-  const nm=$('#qe-name'),ft=$('#qe-foot');
-  qePanel.classList.toggle('sel',ok&&qeOpen);
-  if(!ok){chip.innerHTML='';if(ft)ft.innerHTML='';if(nm)nm.textContent='';qeLastSel=null;return;}
-  const k=PROJECT.take.kf[i],sb=subOfKf(i),st=sb?(sb.size??SUB_SIZE_DEF):SUB_SIZE_DEF;
-  if(nm)nm.textContent='#'+pad(i);
-  let s=qdSect('SHOT','カメラの一手 '+(i+1)+' / '+n);
-  s+=qdRow('順番','<div class="qd-seg"><button class="qd-sb pm" data-kfa="mvu"'+(i<=0?' disabled':'')+'>◀</button>'
-    +'<button class="qd-sb pm" data-kfa="mvd"'+(i>=n-1?' disabled':'')+'>▶</button></div>'
-    +'<span class="sp"></span>'+qdKNum('dwell','DWELL',(k.dwell??1).toFixed(2),'秒'),
-    '◀▶＝カメラが回る順番（Ctrl+←→ でも動く）／DWELL＝このKFで止まっている時間');
-  s+=qdRow('EASE',qdSeg('kfease',DK_EASE.map(e=>({v:e,l:e.toUpperCase(),c:'min'})),k.ease||'smooth'),
-    'このKFへ向かう動きの緩急');
-  s+=qdSect('SUBTITLE','字幕');
-  s+=qdRow('文字','<input class="qd-txt" data-sub="str" value="'+escH(sb?sb.str:'')
-    +'" placeholder="このカットで出す字幕（空にすると削除）" spellcheck="false">',
-    'このKFで止まっている間だけフェードで出ます。日本語も入ります');
-  s+=qdRow('SIZE',qdKNum('subsize','',Math.round(st),'px')
-    +'<div class="qd-seg"><button class="qd-sb pm" data-kfa="sub-">−</button>'
-    +'<button class="qd-sb pm" data-kfa="sub+">＋</button></div>'
-    +'<span class="sp"></span><span class="qd-note">書き出しでも同じ相対サイズ</span>',
-    '字幕の大きさ（画面の高さ基準・書き出しにも同じ相対サイズで出ます）');
-  s+=qdRow('',subPrevHTML(sb?sb.str:'',st),null,'top');
-  chip.innerHTML=s;
-  if(ft)ft.innerHTML='<span class="qd-note">'+n+' KF ／ 選択 #'+pad(i)+'</span>'
-    +'<span class="sp"></span><button class="qd-sb del" data-kfa="del" title="このKFを削除">DELETE</button>';
-  if(qeLastSel!=='kf'+i){qeLastSel='kf'+i;qeUserH=false;}
-  fitQe();
-}
-/* 数値の左右ドラッグ（KF用。sel ではなく selKf を見る） */
-const QK_SCR={
-  dwell:{g:k=>k.dwell??1,s:(k,v)=>{k.dwell=+clamp(v,0.05,3).toFixed(2);},k:0.006,f:v=>v.toFixed(2),take:1},
-  subsize:{g:()=>{const b=subOfKf(selKf);return b?(b.size??SUB_SIZE_DEF):SUB_SIZE_DEF;},
-    s:(k,v)=>{const b=subOfKf(selKf);if(b)b.size=Math.round(clamp(v,10,90));},k:0.2,f:v=>String(Math.round(v))}
-};
-function qeKfScrub(e){
-  if(mode!=='take'||selKf<0)return;
-  const g=e.target.closest&&e.target.closest('[data-kscr]');
-  if(!g)return;
-  const key=g.dataset.kscr,cfg=QK_SCR[key],k=PROJECT.take.kf[selKf];
-  if(!cfg||!k)return;
-  if(key==='subsize'&&!subOfKf(selKf)){toast('先に字幕の文字を入れてください');return;}
-  e.preventDefault();
-  const x0=e.clientX,base=cfg.g(k),vEl=chip.querySelector('#qd-'+key),pv=chip.querySelector('.qd-sprev b');
-  const at=ev=>{
-    cfg.s(k,base+(ev.clientX-x0)*cfg.k);
-    const cur=cfg.g(k);
-    if(vEl)vEl.textContent=cfg.f(cur);
-    if(key==='subsize'&&pv)pv.style.fontSize=Math.round(clamp(cur*0.62,8,34))+'px';
-    if(cfg.take){TT=buildTake(PROJECT.take);
-      const dv=document.getElementById('dk-dwellv');   // FOCUS 側の数値も追従（ドラッグ中は文字だけ差し替え）
-      if(key==='dwell'&&dv)dv.textContent=cur.toFixed(2)+'s';}
-    commitD();
-  };
-  at(e);dkDrag(e,at,()=>{renderKfDetail();renderDock();});
-}
-/* ボタン／セグメント */
-function qeKfClick(e){
-  if(mode!=='take')return;
-  const t=e.target.closest&&e.target.closest('[data-kfa],[data-act="kfease"]');
-  if(!t)return;
-  const n=PROJECT.take.kf.length,i=selKf;
-  if(i<0||i>=n)return;
-  const k=PROJECT.take.kf[i],a=t.dataset.kfa;
-  if(t.dataset.act==='kfease'){k.ease=t.dataset.v;TT=buildTake(PROJECT.take);renderKfDetail();renderDock();commitD();return;}
-  if(a==='go')selectKf(i,true);
-  else if(a==='upd'){
-    Object.assign(k,{x:+VC.x.toFixed(3),y:+VC.y.toFixed(3),z:+VC.z.toFixed(3)});
-    rebuild();toast('#'+pad(i)+' をいまの構図で上書きしました');
-  }
-  else if(a==='mvu'||a==='mvd'){
-    const to=i+(a==='mvu'?-1:1);
-    if(to<0||to>=n)return;
-    moveKf(i,to);
-  }
-  else if(a==='sub+'||a==='sub-'){
-    const b=subOfKf(i);
-    if(!b){toast('先に字幕の文字を入れてください');return;}
-    b.size=Math.round(clamp((b.size??SUB_SIZE_DEF)*(a==='sub+'?1.18:0.85),10,90));
-    renderKfDetail();commitD();
-  }
-  else if(a==='del'){
-    PROJECT.take.kf.splice(i,1);
-    remapKfRefs(o=>(o===i?null:(o>i?o-1:o)));
-    if(selKf>=PROJECT.take.kf.length)selKf=PROJECT.take.kf.length-1;
-    rebuild();
-  }
-}
-chip.addEventListener('click',qeKfClick);
-chip.addEventListener('pointerdown',qeKfScrub);
-{const ft=$('#qe-foot');if(ft)ft.addEventListener('click',qeKfClick);}
-/* 字幕の文字。打っている間はパネルを作り直さない（フォーカスが飛ぶため） */
-chip.addEventListener('input',e=>{
-  const t=e.target;
-  if(!t||!t.dataset||t.dataset.sub!=='str')return;
-  if(mode!=='take'||selKf<0)return;
-  const v=t.value,i=selKf,s0=subOfKf(i);
-  if(!v.trim()){if(s0)PROJECT.texts=PROJECT.texts.filter(x=>x!==s0);}
-  else if(s0)s0.str=v;
-  else PROJECT.texts.push({id:'t'+(pid++),type:'sub',str:v,x:0,y:0,size:SUB_SIZE_DEF,col:'#fff',parent:null,kf:i});
-  const box=chip.querySelector('.qd-sprev'),pv=box&&box.querySelector('b');
-  if(pv){pv.textContent=v||'字幕なし';box.classList.toggle('off',!v);}
-  renderDock();commitD();
 });
+chip.addEventListener('input',e=>{
+  const t=e.target,act=t&&t.dataset&&t.dataset.act;if(!act||!sel)return;
+  if(act==='hsl'){sel.h=sliderToH(+t.value);const d=$('#chip-hv');if(d)d.textContent=sel.h.toFixed(2);commitD();}
+  else if(act==='tsl'&&isText(sel)){sel.size=+t.value;const d=$('#chip-ts');if(d)d.textContent=sel.size;commitD();}
+  else if(act==='depth'){sel.depth=parseFloat(t.value);const d=$('#chip-dv');if(d)d.textContent=sel.depth.toFixed(2);commitD();}
+  else if(act==='par'&&isFrame(sel)){sel.par=parseFloat(t.value);commitD();}
+  else if(act==='flw'&&isFrame(sel)&&sel.line){sel.line.w=parseInt(t.value)||10;const d=$('#chip-lw');if(d)d.textContent=sel.line.w;commitD();}   // SPEC_09 P4
+  else if(act==='fps'&&sel.seq){sel.seq.fps=parseInt(t.value)||12;const d=$('#chip-fps');if(d)d.textContent=sel.seq.fps;commitD();}
+  else if(act==='famt'&&isFrame(sel)){sel.fx.amt=parseFloat(t.value);const d=$('#chip-amt');if(d)d.textContent=sel.fx.amt.toFixed(2);computeWipeP();commitD();}   // V2-C
+});
+chip.addEventListener('change',e=>{
+  const t=e.target,act=t&&t.dataset&&t.dataset.act;if(!act||!sel)return;
+  if(sel.seq&&act==='mode'){sel.seq.mode=t.value;sel._t0=null;commit();}
+  else if(sel.seq&&act==='trigger'){sel.seq.trigger=t.value;sel._t0=null;commit();}
+  else if(isFrame(sel)&&act==='fin'){sel.fx.in=t.value;computeWipeP();commit();}                   // V2-C
+  else if(isFrame(sel)&&act==='fdrift'){sel.fx.drift=t.value;computeWipeP();commit();}
+  else if(isFrame(sel)&&act==='fkf'){sel.fx.kf=t.value===''?null:+t.value;computeWipeP();commit();renderChip();}
+  else if(isFrame(sel)&&act==='fwipe'){sel.wipe=t.value==='none'?null:t.value;computeWipeP();commit();}
+  else if(isText(sel)&&act==='tkf'){sel.kf=t.value===''?null:+t.value;commit();}   // V2-D: 常時 or KFのdwell窓で表示
+});
+
 /* ---------- interactions ---------- */
 /* ---------- V2-B: ヒット判定（フレーム内編集中は子だけ） ---------- */
 let ctxFrame=null;
@@ -3806,7 +2906,7 @@ addEventListener('pointerup',e=>{
 });
 addEventListener('wheel',e=>{
   // V2-A: UIホバー中はUI側のスクロールに委ねる（ビューをズームしない）
-  if(e.target&&e.target.closest&&e.target.closest('#bar,#qe,#mon,#fx-modal,#ap-modal,#set-ovl'))return;
+  if(e.target&&e.target.closest&&e.target.closest('#bar,#cards,#qe,#mon,#fx-modal,#ap-modal,#set-modal'))return;
   e.preventDefault();
   /* Alt+ホイール＝**表示ズーム(VS)**。中ボタンの「画面ズラし」と対になる “見え方だけ” の操作で、
      カーソルの下の絵が動かないようにズラし量(VOX/VOY)を同時に補正する。
@@ -3920,15 +3020,9 @@ function setMode(m){
   mode=m;
   document.body.classList.toggle('place',m==='place');
   document.body.classList.toggle('take',m==='take');
-  document.body.classList.toggle('export',m==='export');
   $('#m-place').classList.toggle('on',m==='place');
   $('#m-take').classList.toggle('on',m==='take');
-  {const be=$('#b-export');if(be)be.classList.toggle('on',m==='export');}
   if(m==='take')renderCards();
-  if(m==='export'){
-    if(!EXP.secSet)EXP.sec=expSecDefault();   // 既定はPREVIEWと同じ尺（手で決めたら尊重）
-    renderDock();
-  }
   if(m!=='place'){sel=null;maskEdit.on=false;maskEdit.f=null;renderChip();}
   else fitQe(true);   // PLACEに戻った瞬間に測り直す（非表示の間は高さを測れないため）
 }
@@ -4031,7 +3125,7 @@ function editTextAt(t){   // 現在の画面位置にエディタを重ねて再
   openTextEditor(sx/DPR,sy/DPR,t,fs/DPR);   // キャンバス内座標で渡す（画面へは openTextEditor が scrX/scrY で戻す）
 }
 
-function startPreview(){if(!PROJECT.take.kf.length){toast('KFがまだありません — TAKEモードで C=CAPTURE');return;}PV.on=true;PV.p=0;renderDock();}
+function startPreview(){if(!PROJECT.take.kf.length){toast('KFがまだありません — TAKEモードで C=CAPTURE');return;}PV.on=true;PV.p=0;}
 /* 停止したらその場の構図をそのまま編集カメラへ引き継ぐ（元のアングルに戻って探し直す手間をなくす） */
 function stopPreview(){
   if(PV.on&&PROJECT.take.kf.length){
@@ -4068,19 +3162,18 @@ addEventListener('keydown',e=>{
   else if(e.key==='0'&&!e.ctrlKey&&!e.metaKey){setViewScale(1);setViewOffset(0,0,true);}   // 原寸＋中央に戻す
   else if(e.key==='1')setMode('place');
   else if(e.key==='2')setMode('take');
-  else if(e.key==='3')setMode('export');
   else if((e.key==='c'||e.key==='C')&&mode==='take')capture();
   else if(e.key===' '){e.preventDefault();PV.on?stopPreview():startPreview();}
-  else if((e.ctrlKey||e.metaKey)&&(e.key==='ArrowLeft'||e.key==='ArrowRight')&&mode==='take'&&selKf>=0){
-    e.preventDefault();moveKf(selKf,selKf+(e.key==='ArrowLeft'?-1:1));   // 選択KFの順番を入れ替え
+  else if((e.ctrlKey||e.metaKey)&&(e.key==='ArrowUp'||e.key==='ArrowDown')&&mode==='take'&&selKf>=0){
+    e.preventDefault();moveKf(selKf,selKf+(e.key==='ArrowUp'?-1:1));   // 選択KFの順番を入れ替え
   }
   else if(e.key==='ArrowUp'&&mode==='take'){e.preventDefault();selectKf(selKf<0?PROJECT.take.kf.length-1:selKf-1,true);}   // V2-A
   else if(e.key==='ArrowDown'&&mode==='take'){e.preventDefault();selectKf(selKf<0?0:selKf+1,true);}
   else if(e.key==='['&&mode==='place'&&sel&&!isText(sel))reorder(sel,-1);   // V2-A: 背面へ（テキストは常に最前）
   else if(e.key===']'&&mode==='place'&&sel&&!isText(sel))reorder(sel,+1);   // V2-A: 前面へ
   else if((e.key==='m'||e.key==='M')&&mode==='place')toggleMask();   // V2-B
-  else if(e.key==='u'||e.key==='U')toggleQuickEdit();   // DETAIL 開閉（COMPOSERのUに合わせる）
-  else if(e.key==='p'||e.key==='P'){setMonitor();syncMonBtn();}   // MONITOR（結果こうなるよ窓）
+  else if((e.key==='u'||e.key==='U')&&mode==='place')toggleQuickEdit();   // QUICK EDIT 開閉（COMPOSERのUに合わせる）
+  else if(e.key==='p'||e.key==='P'){setMonitor();const mb=$('#b-mon');if(mb)mb.classList.toggle('on',MON.on);}   // MONITOR（結果こうなるよ窓）
   else if(e.key==='t'||e.key==='T')fireClickFx();                    // CLICK FX を1回テスト発火（FXパネルのTESTと同じ）
   else if(e.key==='f'||e.key==='F')toggleFxModal();                  // V2-C
   else if(e.key==='g'||e.key==='G')toggleGuides();
@@ -4160,175 +3253,125 @@ function toggleFxModal(force){
     if(m){m.classList.remove('mini');bringToFront(m,true);}
   }
 }
-/* ---------- パネルの部品（DETAIL と同じ語彙：セグメントと数値の左右ドラッグ） ----------
- * 中身は FX_DEFS から自動生成する設計のまま。ラベルだけ日本語の対応表を持たせて、
- * 生の英字パラメータ名がそのまま並ばないようにしている。 */
-const FX_JP={mb:'動きにブレを足す',dof:'DOF',olm:'線をなめす',diffusion:'にじませる',para:'色を被せる',
-  grade:'色を整える',vignette:'四隅を落とす',grain:'粒を乗せる',glitch:'画を乱す'};
-const FX_PJP={shutter:'シャッター',samples:'サンプル',rtStrength:'RT 強さ',threshold:'しきい値',radius:'半径',
-  strength:'強さ',gain:'ゲイン',mode:'モード',angle:'角度',a1:'濃度 1',a2:'濃度 2',mid:'境目',soft:'ぼかし',
-  lift:'リフト',gamma:'ガンマ',sat:'彩度',temp:'色温度',amount:'量',size:'粒の大きさ',mono:'モノクロ',
-  bands:'帯の数',rgb:'色ズレ',speed:'速さ',focusZ:'ピント位置',range:'幅',maxBlur:'最大ボケ'};
-const FX_UNIT={shutter:'°',angle:'°',maxBlur:'px',radius:'px',size:'px',samples:'枚',bands:'本'};
-const FX_BIN={mode:['SCREEN','ADD'],mono:['COLOR','MONO']};
-const fxK=k=>'<span class="k'+(/^[\x20-\x7E]+$/.test(k)?' en':'')+'">'+escH(k)+'</span>';
-/* 選択肢は開かずに全部見せる（下部コンソール／DETAIL と同じ作法） */
-function fxSegRow(k,opts,get,set,title){
-  const row=document.createElement('div');row.className='qd-row';
-  const cur=String(get());
-  row.innerHTML=fxK(k)+'<div class="qd-seg">'+opts.map(o=>
-    '<button class="qd-sb min'+(String(o.v)===cur?' on':'')+'" data-v="'+o.v+'">'+o.l+'</button>').join('')+'</div>';
-  if(title)row.title=title;
-  const bs=[...row.querySelectorAll('.qd-sb')];
-  bs.forEach(b=>b.addEventListener('click',()=>{bs.forEach(x=>x.classList.toggle('on',x===b));set(b.dataset.v);}));
-  return row;
-}
-const fxOnRow=(k,get,set,title)=>fxSegRow(k,[{v:0,l:'OFF'},{v:1,l:'ON'}],()=>(get()?1:0),v=>set(v==='1'),title);
-/* 数値：定規を押した場所へ飛ぶ／数字を左右ドラッグで詰める（細いつまみを指でつかまない） */
-function fxNumRow(o){
-  const row=document.createElement('div');row.className='qd-row';
-  const dg=o.step>=1?0:(o.step>=0.1?1:(o.step>=0.01?2:3));
-  const fmt=v=>(+v).toFixed(dg);
-  const q=v=>clamp((v-o.min)/Math.max(1e-9,o.max-o.min),0,1);
-  row.innerHTML=fxK(o.label)
-    +'<div class="qd-mr"><div class="ax"></div><div class="dm" style="left:'+(q(o.get())*100).toFixed(1)+'%"></div></div>'
-    +'<button class="qd-num" title="左右にドラッグで変える"><span class="v">'+fmt(o.get())+'</span>'
-    +'<span class="u">'+(o.unit||'⟷')+'</span></button>';
-  if(o.title)row.title=o.title;
-  const mr=row.querySelector('.qd-mr'),dm=row.querySelector('.dm'),vEl=row.querySelector('.v');
-  const put=v=>{
-    v=clamp(Math.round(v/o.step)*o.step,o.min,o.max);
-    o.set(+v.toFixed(4));
-    const cur=o.get();
-    vEl.textContent=fmt(cur);dm.style.left=(q(cur)*100).toFixed(1)+'%';
-  };
-  mr.addEventListener('pointerdown',ev0=>{
-    ev0.preventDefault();
-    const r=mr.getBoundingClientRect();
-    const at=ev=>put(o.min+(o.max-o.min)*clamp((ev.clientX-r.left)/Math.max(1,r.width),0,1));
-    at(ev0);dkDrag(ev0,at);
-  });
-  row.querySelector('.qd-num').addEventListener('pointerdown',ev0=>{
-    ev0.preventDefault();
-    const x0=ev0.clientX,base=o.get(),k=(o.max-o.min)/260;
-    dkDrag(ev0,ev=>put(base+(ev.clientX-x0)*k));
-  });
-  return row;
-}
-function fxColRow(k,get,set){
-  const row=document.createElement('div');row.className='qd-row';
-  row.innerHTML=fxK(k)+'<input type="color" class="fx-col" value="'+escH(get())+'">'
-    +'<span class="qd-note">'+escH(get())+'</span>';
-  const i=row.querySelector('input'),n=row.querySelector('.qd-note');
-  i.addEventListener('input',ev=>{set(ev.target.value);n.textContent=ev.target.value;});
-  return row;
-}
-const fxNote=(root,html)=>{const d=document.createElement('div');d.className='qd-row';
-  d.innerHTML='<span class="qd-note">'+html+'</span>';root.appendChild(d);return d;};
-
 function buildFxUI(){
   const root=$('#fx-body');
   if(!root)return;
   const fxp=PROJECT.take.fx;
-  const hasCore=!!(SFX&&fxp&&fxp.chain);
   root.innerHTML='';
-  /* 主電源＝トップバー／コンソールの FX ボタンの点灯と1対1。DOF と CLICK FX はこれとは独立に効く */
-  root.insertAdjacentHTML('beforeend',qdSect('SATSUEI','撮影処理の主電源'));
+  /* SATSUEI FX ENABLED はパネルの一番上（＝トップバーのFXボタンの点灯と1対1で対応する主電源）。
+     DOF / CLICK FX はこの主電源とは独立に効くので、その旨を注記して下へ並べる。 */
+  const hasCore=!!(SFX&&fxp&&fxp.chain);
   if(hasCore){
-    root.appendChild(fxOnRow('主電源',()=>fxp.enabled,v=>{fxp.enabled=v;commitD();syncFxBtn();},
-      '下のチェーンをまとめて掛ける／切る'));
-    fxNote(root,'プレビュー（SPACE）と書き出したビューアに掛かります。編集中は掛かりません（軽さ優先）。<b>DOF ／ CLICK FX は主電源とは別</b>に効きます。');
-  }else{
-    fxNote(root,'<b style="color:var(--acid)">SATSUEI CORE がありません</b> — WebGL とコアの読み込みを確認してください。');
+    const master=document.createElement('label');
+    master.className='fx-master';
+    master.innerHTML='<input type="checkbox" '+(fxp.enabled?'checked':'')+'> SATSUEI FX ENABLED'
+      +'<span class="fx-sub">下の撮影処理チェーンの主電源（DOF / CLICK FX は独立）</span>';
+    const mi=master.querySelector('input');
+    if(mi)mi.onchange=e=>{fxp.enabled=e.target.checked;syncFxBtn();commitD();};
+    root.appendChild(master);
   }
   buildDofUI(root);       // DOF/ピン送りはOBAN独自（レイヤー別ボケ）なのでコアと独立
   buildClickFxUI(root);   // V2-D: クリックFXはSATSUEIコアと独立に常時表示
-  if(!hasCore){syncFxBadge();return;}
-  root.insertAdjacentHTML('beforeend',qdSect('CHAIN','掛ける順番（上から順に重なる）'));
+  if(!hasCore){
+    const w=document.createElement('div');
+    w.innerHTML='<span style="opacity:.6">SATSUEI CORE がありません（WebGL/コア読込を確認）</span>';
+    root.appendChild(w);return;
+  }
   for(const ent of fxp.chain){
     const def=SFX.FX_DEFS[ent.t];if(!def)continue;   // 未知はUIにも出さない（前方互換）
-    if(def.tier==='layer')continue;   // レイヤー型（DOF）は全画面チェーンでは効かない。上の専用UIが担当
-    const g=document.createElement('div');g.className='fx-g'+(ent.on?'':' off');
-    const hd=document.createElement('div');hd.className='fx-hd';
-    hd.title=def.label+' ['+def.tier+']';
-    hd.innerHTML='<button class="qd-sb'+(ent.on?' on':'')+'">'+escH(def.label.replace(/\s*[（(].*$/,''))+'</button>'
-      +'<span class="qd-note">'+escH(FX_JP[ent.t]||'')+'</span>';
-    hd.querySelector('.qd-sb').addEventListener('click',ev=>{
-      ent.on=!ent.on;ev.currentTarget.classList.toggle('on',ent.on);g.classList.toggle('off',!ent.on);commitD();});
-    g.appendChild(hd);
+    if(def.tier==='layer')continue;   // レイヤー型（DOF）はOBANの全画面チェーンでは効かない。上の専用UIが担当
+    const box=document.createElement('div');box.className='fx-ent';
+    const head=document.createElement('label');
+    head.innerHTML='<input type="checkbox" '+(ent.on?'checked':'')+'> '+def.label+' <span style="opacity:.45">['+def.tier+']</span>';
+    const hi=head.querySelector('input');
+    if(hi)hi.onchange=e=>{ent.on=e.target.checked;commitD();};
+    box.appendChild(head);
     for(const u of (def.ui||[])){
-      const lb=FX_PJP[u.k]||u.label;
-      if(u.min===0&&u.max===1&&u.step===1){
-        const o=FX_BIN[u.k]||['OFF','ON'];
-        g.appendChild(fxSegRow(lb,[{v:0,l:o[0]},{v:1,l:o[1]}],()=>ent.p[u.k],
-          v=>{ent.p[u.k]=+v;commitD();},u.label));
-      }else{
-        g.appendChild(fxNumRow({label:lb,title:u.label,unit:FX_UNIT[u.k],min:u.min,max:u.max,step:u.step,
-          get:()=>ent.p[u.k],set:v=>{ent.p[u.k]=v;commitD();}}));
-      }
+      const row=document.createElement('div');row.className='fx-row';
+      const val=ent.p[u.k];
+      row.innerHTML='<span class="k">'+u.label+'</span>'
+        +'<input type="range" min="'+u.min+'" max="'+u.max+'" step="'+u.step+'" value="'+val+'">'
+        +'<span class="v">'+val+'</span>';
+      const inp=row.querySelector('input'),out=row.querySelector('.v');
+      if(inp)inp.oninput=()=>{ent.p[u.k]=parseFloat(inp.value);if(out)out.textContent=inp.value;commitD();};
+      box.appendChild(row);
     }
-    for(const ck of (def.colors||[]))
-      g.appendChild(fxColRow(ck.toUpperCase(),()=>ent.p[ck],v=>{ent.p[ck]=v;commitD();}));
-    root.appendChild(g);
+    for(const ck of (def.colors||[])){
+      const row=document.createElement('div');row.className='fx-row';
+      row.innerHTML='<span class="k">'+ck.toUpperCase()+'</span><input type="color" value="'+ent.p[ck]+'">';
+      const ci=row.querySelector('input');
+      if(ci)ci.oninput=e=>{ent.p[ck]=e.target.value;commitD();};
+      box.appendChild(row);
+    }
+    root.appendChild(box);
   }
-  syncFxBadge();
 }
-/* ---------- DOF / ピン送り（ここは細かい詰めだけ） ----------
- * よく触る ON / ピント位置 / KFへ置く は下部コンソール（FOCUS 定規）にある。
+/* ---------- DOF / ピン送り（FXパネル側＝細かい詰めだけ） ----------
+ * よく触る ON / ピント位置 / KFへ置く は 2.TAKE カメラ パネルに置いてある（配置モードへ往復しないため）。
  * ここには「一度決めたらあまり触らない」ピントの幅・ボケの強さ・BOUNCE だけを残す。 */
 function buildDofUI(root){
   const d=PROJECT.dof;
-  root.insertAdjacentHTML('beforeend',qdSect('DOF','ピン送り／奥行きでボケる'));
-  root.appendChild(fxOnRow('主電源',()=>d.on,v=>{d.on=v;syncFxBtn();renderCards();commit();},
-    'ピントから離れたコマがボケます'));
-  const P=(label,key,min,max,step,title,unit)=>root.appendChild(fxNumRow({label,title,min,max,step,unit,
-    get:()=>d[key],set:v=>{d[key]=v;commitD();}}));
-  P('ピントの幅','range',0.05,1,0.01,'この奥行き差でボケが最大になる。小さいほど浅い（前後がすぐボケる）');
-  P('ボケの強さ','maxBlur',0,40,1,'いちばんボケるところのぼかし量（画面高1000px基準）','px');
-  P('送りの長さ','pull',0.3,3,0.05,'ピントが合うまでの長さ。1.0＝カメラ移動区間ぴったり。大きいほど「ゆっくり・わざとらしく」合い、着地後の静止にも食い込みます');
-  P('BOUNCE','bounce',0,1,0.01,'着地でわずかに行き過ぎて戻る量。実機のピント送りらしい一瞬の往復が出ます');
-  fxNote(root,'ピントを置く操作は<b>画面下のコンソール</b>です（FOCUS 定規の ◇ をドラッグ ／ ピント ボタン）。'
-    +'canvas ぼかし判定: <b style="color:'+(CAN_FILTER?'var(--acc2)':'var(--acid)')+'">'
-    +(CAN_FILTER_NATIVE?'対応':(DOF_FORCE?'未対応（強制ONで使用中）':'未対応'))+'</b>');
-  if(!CAN_FILTER_NATIVE){
-    root.appendChild(fxOnRow('強制ON',()=>DOF_FORCE,v=>{
-      DOF_FORCE=v;CAN_FILTER=CAN_FILTER_NATIVE||DOF_FORCE;
-      try{localStorage.setItem('oban-dof-force',DOF_FORCE?'1':'0');}catch(err){}
-      toast(DOF_FORCE?'DOFを強制的に有効化しました — ボケなければ本当に非対応です':'DOFの判定を既定に戻しました');
-      syncFxBtn();
-    },'canvas のぼかし判定を無視して有効にする'));
-    fxNote(root,'<b style="color:var(--acid)">このブラウザは canvas のぼかしに未対応と判定されました</b>。'
-      +'iPadOS 17 以降なら本来は対応しています — 判定が外れているだけなら強制ONで効きます（本当に非対応なら単にボケないだけで、他は壊れません）。'
-      +'書き出したビューアでは URL の末尾に <b>?dof=1</b> を付けると同じ強制ONになります。');
-  }
+  const box=document.createElement('div');box.className='fx-ent';
+  const rng=(id,label,min,max,step,val,title,digits)=>
+    '<div class="fx-row" title="'+title+'"><span class="k">'+label+'</span>'
+    +'<input type="range" id="'+id+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+val+'">'
+    +'<span class="v" id="'+id+'v">'+(+val).toFixed(digits==null?2:digits)+'</span></div>';
+  box.innerHTML=
+    '<label style="color:var(--amber)"><input type="checkbox" id="dof-on"'+(d.on?' checked':'')+'> DOF ピン送り（奥行きでボケる）</label>'
+   +rng('dof-range','ピントの幅',0.05,1,0.01,d.range,'この奥行き差でボケが最大になる。小さいほど浅い（前後がすぐボケる）')
+   +rng('dof-blur','ボケの強さ',0,40,1,d.maxBlur,'いちばんボケるところのぼかし量（px・画面高1000px基準）',0)
+   +rng('dof-pull','送りの長さ',0.3,3,0.05,d.pull,'ピントが合うまでの長さ。1.0＝カメラ移動区間ぴったり。大きいほど「ゆっくり・わざとらしく」合い、着地後の静止にも食い込みます（揺り戻しも一緒に伸びます）')
+   +rng('dof-bounce','BOUNCE',0,1,0.01,d.bounce,'着地でわずかに行き過ぎて戻る量。実機のピント送りらしい一瞬の往復が出ます')
+   +'<div class="fx-row" style="opacity:.45;font-family:var(--jp);letter-spacing:.02em;line-height:1.6;display:block">'
+     +'<b>ピントを置く操作は「2. TAKE カメラ」パネル</b>にあります（KFを選ぶ → 画面から取る／KFカードの ◎、画面下の定規の ▼ をドラッグ）。<br>'
+     +'canvas ぼかし判定: <b style="color:'+(CAN_FILTER?'var(--ice)':'var(--acid)')+'">'
+       +(CAN_FILTER_NATIVE?'対応':(DOF_FORCE?'未対応（強制ONで使用中）':'未対応'))+'</b></div>'
+   +(CAN_FILTER_NATIVE?''
+     :'<div class="fx-row" style="font-family:var(--jp);letter-spacing:.02em;line-height:1.6;display:block">'
+       +'<b style="color:var(--acid)">このブラウザは canvas のぼかしに未対応と判定されました</b>'
+       +'<label style="display:block;margin-top:4px;color:var(--amber)"><input type="checkbox" id="dof-force"'+(DOF_FORCE?' checked':'')+'> 判定を無視して強制的に有効にする（再読み込み）</label>'
+       +'<span style="opacity:.55">iPadOS 17 以降なら本来は対応しています。判定が外れているだけならこれで効きます（本当に非対応なら単にボケないだけで、他は壊れません）。'
+       +'書き出したビューアでは URL の末尾に <b>?dof=1</b> を付けると同じ強制ONになります。</span></div>');
+  root.appendChild(box);
+  const g=id=>box.querySelector('#'+id);
+  const bindRange=(id,key,digits)=>{
+    const inp=g(id),out=g(id+'v');
+    if(inp)inp.oninput=()=>{d[key]=parseFloat(inp.value);if(out)out.textContent=d[key].toFixed(digits==null?2:digits);commitD();};
+  };
+  const on=g('dof-on');
+  if(on)on.onchange=e=>{d.on=e.target.checked;syncFxBtn();renderCards();commit();};
+  bindRange('dof-range','range');
+  bindRange('dof-blur','maxBlur',0);
+  bindRange('dof-pull','pull');
+  bindRange('dof-bounce','bounce');
+  const fo=g('dof-force');
+  if(fo)fo.onchange=e=>{
+    DOF_FORCE=e.target.checked;CAN_FILTER=CAN_FILTER_NATIVE||DOF_FORCE;
+    try{localStorage.setItem('oban-dof-force',DOF_FORCE?'1':'0');}catch(err){}
+    toast(DOF_FORCE?'DOFを強制的に有効化しました — ボケなければ本当に非対応です':'DOFの判定を既定に戻しました');
+  };
+}
+/* FXボタンの点灯は **SATSUEI FX ENABLED が ON のときだけ**（COMPOSER と同じ「かかっている＝点灯」）。
+   DOFは別建ての機能で、状態は 2.TAKE パネルのストリップが常時見せているのでここには混ぜない。 */
+function syncFxBtn(){
+  const b=$('#b-fx');if(!b)return;
+  const f=PROJECT.take&&PROJECT.take.fx;
+  b.classList.toggle('on',!!(f&&f.enabled));
+  /* FXパネルが開いていれば DOF の ON/OFF を双方向で合わせる（TAKE側で切ってもチェックが残らない） */
+  const fo=$('#dof-on');if(fo)fo.checked=!!(PROJECT.dof&&PROJECT.dof.on);
 }
 /* V2-D: クリックFX（ビューアのクリック反応。ATTRACT解除と共存・その場でテスト可） */
 function buildClickFxUI(root){
-  root.insertAdjacentHTML('beforeend',qdSect('CLICK FX','ビューアのクリック反応'));
-  root.appendChild(fxSegRow('TYPE',[{v:'invert',l:'INVERT'},{v:'white',l:'WHITE'},{v:'none',l:'NONE'}],
-    ()=>PROJECT.clickFx||'invert',v=>{PROJECT.clickFx=v;commit();},'書き出したビューアで画面を押したときの反応'));
-  const r=document.createElement('div');r.className='qd-row';
-  r.innerHTML='<span class="k"></span><button class="qd-sb" id="fx-clicktest">TEST <span class="kb">T</span></button>'
-    +'<span class="qd-note">いまの設定で1回だけ試す</span>';
-  r.querySelector('#fx-clicktest').addEventListener('click',fireClickFx);
-  root.appendChild(r);
-}
-/* FXボタンの点灯とヘッダのバッジは **主電源が ON のときだけ**（COMPOSER と同じ「かかっている＝点灯」）。
-   DOFは別建ての機能で、状態は下部コンソールの FOCUS 定規が常時見せているのでここには混ぜない。 */
-function syncFxBadge(){
-  const b=$('#fx-badge');if(!b)return;
-  const on=!!(PROJECT.take&&PROJECT.take.fx&&PROJECT.take.fx.enabled);
-  b.textContent=on?'ON':'OFF';b.classList.toggle('off',!on);
-}
-function syncFxBtn(){
-  const b=$('#b-fx');
-  const f=PROJECT.take&&PROJECT.take.fx;
-  if(b)b.classList.toggle('on',!!(f&&f.enabled));
-  if(typeof mode!=='undefined'&&mode==='place')renderDock();   // FXの点灯はコンソール側のボタンが見せる
-  syncFxBadge();
-  /* パネルが開いていれば作り直して DOF の ON/OFF などを合わせる（触っている位置は保つ） */
-  const body=$('#fx-body');
-  if(body&&document.body.classList.contains('fxopen')){const t=body.scrollTop;buildFxUI();body.scrollTop=t;}
+  const cf=document.createElement('div');cf.className='fx-ent';
+  cf.innerHTML='<label style="color:var(--amber)">CLICK FX — ビューアのクリック反応</label>'
+    +'<div class="fx-row"><span class="k">TYPE</span><select id="fx-click">'
+    +['invert','white','none'].map(m=>'<option'+((PROJECT.clickFx||'invert')===m?' selected':'')+'>'+m+'</option>').join('')
+    +'</select><button class="btn" id="fx-clicktest" title="いまの設定でクリック反応を1回発火（パネルを開いていなくても T キーで試せます）">TEST [T]</button></div>';
+  root.appendChild(cf);
+  const cs=cf.querySelector('#fx-click');
+  if(cs)cs.onchange=e=>{PROJECT.clickFx=e.target.value;commit();};
+  const ct=cf.querySelector('#fx-clicktest');
+  if(ct)ct.onclick=fireClickFx;
 }
 {
   const bf=$('#b-fx');if(bf)bf.addEventListener('click',toggleFxModal);
@@ -4389,16 +3432,16 @@ function makePanelResizable(handle, body, snapSel){
   handle.addEventListener('pointerup',end);
   handle.addEventListener('pointercancel',end);
 }
+makePanelDraggable($('#cards'),$('#cards-head'));
+makePanelResizable($('#cards-resize'),$('#cards-body'),'.dofstrip,.edc-title,.edc');
 makePanelDraggable($('#fx-modal'),$('#fx-head'));
-makePanelResizable($('#fx-resize'),$('#fx-body'),'.qd-row,.qd-sect,.fx-hd');
-makePanelDraggable($('#ap-modal'),$('#ap-head'));
-makePanelResizable($('#ap-resize'),$('#ap-body'),'.qd-ent,.qd-sect');
+makePanelResizable($('#fx-resize'),$('#fx-body'),'.fx-master,.fx-ent');
 makePanelDraggable($('#qe'),$('#qe-head'));
-makePanelResizable($('#qe-resize'),$('#qe-body'),'.qd-row,.qd-sect');
+makePanelResizable($('#qe-resize'),$('#qe-body'),'.qe-row,.qe-sect');
 makePanelDraggable($('#mon'),$('#mon-head'));
 {const qc=$('#qe-close');if(qc)qc.addEventListener('click',()=>toggleQuickEdit(false));}
 /* ヘッダの ▾ で最小化（COMPOSER の INSPECTOR と同じ）。ヘッダだけ残るので置き場所を見失わない */
-[['#qe','#qe-mini'],['#fx-modal','#fx-mini'],['#mon','#mon-mini'],['#ap-modal','#ap-mini']].forEach(([ps,bs])=>{
+[['#cards','#cards-mini'],['#qe','#qe-mini'],['#fx-modal','#fx-mini'],['#mon','#mon-mini']].forEach(([ps,bs])=>{
   const p=$(ps),b=$(bs);if(!p||!b)return;
   b.addEventListener('click',e=>{
     e.stopPropagation();
@@ -4417,7 +3460,7 @@ function bringToFront(p,force){
   if(!force&&z>=zTop)return;              // すでに最前なら触らない（force=明示的に前面へ出す）
   zTop++;p.style.zIndex=zTop;
 }
-['#qe','#fx-modal','#mon','#ap-modal'].forEach(s=>{
+['#cards','#qe','#fx-modal','#mon'].forEach(s=>{
   const el=$(s);
   if(el)el.addEventListener('pointerdown',()=>bringToFront(el),true);
 });
@@ -4525,8 +3568,7 @@ $('#oban-img-input').addEventListener('change',e=>{
   if(fs.length)addFiles(fs);
 });
 $('#b-home').addEventListener('click',()=>{ location.href='index.html'; });
-/* 従来UI版へ。エンジンも localStorage のキーも共通なので、作業中のプロジェクトはそのまま向こうで開く */
-$('#b-classic').addEventListener('click',()=>{ location.href='oban-builder-classic.html'; });
+$('#b-se').addEventListener('click',()=>{ location.href='oban-builder.html'; });
 /* GUIDEはボタンを廃止（Gキー／SETTINGSの一覧に集約）。トグル自体は toggleGuides() が持つ */
 
 /* ---------- 設定・ショートカット一覧（econte式：中央オーバーレイにグリッドで全部出す） ---------- */
@@ -4534,8 +3576,8 @@ const SET_GROUPS=[
   {t:'はじめに',rows:[
     ['画像を D&D','コマになる。連番4枚以上は自動でパラパラ'],
     ['▶ pic','画像を選んで追加（複数可。iPadはこちら）'],
-    ['1 / 2 / 3','1=PLACE 配置 ／ 2=TAKE カメラ ／ 3=EXPORT 書き出し'],
-    ['3. EXPORT','下部コンソールで <b>HTMLビューア／動画MP4</b>・範囲・サイズ・FPS を決めて書き出し'],
+    ['1 / 2','1=PLACE 配置 ／ 2=TAKE カメラ の切替'],
+    ['3. EXPORT','<b>HTMLビューア／動画MP4</b>を選んで書き出し'],
     ['CLEAR','この一覧の ✕ の隣（誤爆しない場所へ移した）'],
   ]},
   {t:'動画 MP4 書き出し',rows:[
@@ -4573,10 +3615,10 @@ const SET_GROUPS=[
   {t:'2. TAKE カメラ',rows:[
     ['C','いまの構図を CAPTURE。<b>選択KFがあればその次に挿入</b>される'],
     ['↑ / ↓','KFの選択を移動（カメラもそこへ飛ぶ）'],
-    ['Ctrl+← / →','選択KFの<b>順番</b>を入れ替え（カード左の ⠿ ドラッグでも可）'],
+    ['Ctrl+↑ / ↓','選択KFの<b>順番</b>を入れ替え（カード左の ⠿ ドラッグでも可）'],
     ['▸ GO','そのKFの構図へ。<b>プレビュー中は再生位置がそこへ飛ぶ</b>'],
     ['↻ UPD','いまの画面の構図でそのKFを上書き'],
-    ['字幕','詳細（U）の SUBTITLE。そのKFで止まっている間だけ出る。文字サイズも変えられます'],
+    ['SUB 欄','そのKFで出る英字幕（空にすると削除）'],
   ]},
   {t:'DOF ピント',rows:[
     ['考え方','<b>「このKFではここ」を何点でも置く</b>。間はカメラ移動に合わせて送られる'],
@@ -4600,7 +3642,7 @@ const SET_GROUPS=[
   {t:'共通',rows:[
     ['Ctrl+Z / Ctrl+Shift+Z','元に戻す／やり直し'],
     ['Esc','キャンセル（書き出し中断→モーダル→選択→プレビューの順）'],
-    ['⚙ / ⛶','この一覧（入出力・連携・HOMEもこの中）／全画面'],
+    ['⚙ / ⛶ / HOME','この一覧／全画面／ランディングページ'],
   ]},
   {t:'iPad（キーボードなし）',rows:[
     ['＋ 画像','<b>複数選択で読み込める</b>（D&Dの代わり）。連番4枚以上は自動でパラパラになる'],
@@ -4614,7 +3656,7 @@ const SET_GROUPS=[
 ];
 function renderSettings(){
   const body=$('#set-body');if(!body)return;
-  body.innerHTML=themeSetHTML()+SET_GROUPS.map(g=>
+  body.innerHTML=SET_GROUPS.map(g=>
     '<div class="set-grp"><h4>'+g.t+'</h4>'
     +g.rows.map(r=>'<div class="r"><span class="k">'+r[0]+'</span><span class="d">'+r[1]+'</span></div>').join('')
     +'</div>').join('');
@@ -4624,37 +3666,6 @@ function toggleSetModal(force){
   if(open)renderSettings();
   document.body.classList.toggle('setopen',open);
 }
-/* ---------- テーマ（GLOSS / SPOTLIGHT / ROUGE） ----------
-   色は全部 --acc* に集約してあるので、body[data-theme] を差し替えるだけで
-   バー・パネル・モーダルまで一斉に乗り換わる（再描画もJSの再計算も無い）。 */
-const THEMES=['GLOSS','SPOTLIGHT','ROUGE'];
-let THEME='GLOSS';
-try{const t=localStorage.getItem('oban-theme');if(THEMES.indexOf(t)>=0)THEME=t;}catch(e){}
-function applyTheme(t,quiet){
-  THEME=(THEMES.indexOf(t)>=0)?t:'GLOSS';
-  document.body.dataset.theme=THEME;
-  try{if(!HARNESS_ON)localStorage.setItem('oban-theme',THEME);}catch(e){}
-  if(document.body.classList.contains('setopen'))renderSettings();
-  if(!quiet)toast('THEME — '+THEME);
-}
-function themeSetHTML(){
-  return '<div class="set-grp set-theme"><h4>THEME 画面の色</h4><div class="thr">'
-    +THEMES.map(function(t){return '<button class="qd-sb'+(t===THEME?' on':'')+'" data-theme="'+t+'">'+t+'</button>';}).join('')
-    +'</div><div class="r"><span class="d">GLOSS＝白黒トーンの艶＋シアン ／ SPOTLIGHT＝ICE→紫→ROUGE の斜め掃引 ／ ROUGE＝桃</span></div></div>';
-}
-applyTheme(THEME,true);
-$('#set-body').addEventListener('click',function(e){
-  const b=e.target.closest&&e.target.closest('[data-theme]');
-  if(b)applyTheme(b.dataset.theme);
-});
-$('#b-detail').addEventListener('click',()=>toggleQuickEdit());
-/* FILE／連携のボタンは ⚙ の中に住む（バーはごちゃごちゃさせない）。
-   DOMは1個のまま移すだけ＝既存のリスナがそのまま生きる */
-(function(){
-  const src=$('#set-acts-src'),dst=$('#set-acts');
-  if(src&&dst){while(src.firstElementChild&&src.firstElementChild.firstElementChild){
-    dst.appendChild(src.firstElementChild.firstElementChild);}src.remove();}
-})();
 $('#b-set').addEventListener('click',()=>toggleSetModal());
 $('#set-close').addEventListener('click',()=>toggleSetModal(false));
 $('#set-ovl').addEventListener('pointerdown',e=>{if(e.target&&e.target.id==='set-ovl')toggleSetModal(false);});   // 外側クリックで閉じる
@@ -4735,8 +3746,6 @@ function viewerHTML(apBake){
      generated by OBAN BUILDER / ?attract=1 で自動再生・&hud=0 でバー非表示 -->
 <html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OBAN — ${PROJECT.name}</title>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600&display=swap">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0c061d;overflow-x:hidden}
@@ -4949,7 +3958,7 @@ function drawSubs(P,W,H){
   for(const t of (PROJ.texts||[])){
     if(t.type!=='sub'||t.kf==null||!t.str)continue;
     const a=kfWinAlpha(t.kf,P);if(a<=0.01)continue;
-    vx.save();vx.globalAlpha=a;vx.font='600 '+((t.size||22)*DPR)+'px "Saira Condensed","Saira",system-ui,sans-serif';vx.textAlign='center';
+    vx.save();vx.globalAlpha=a;vx.font=(11*DPR)+'px monospace';vx.textAlign='center';
     vx.fillStyle='rgba(0,0,0,.8)';vx.fillText(t.str,W/2+1,H-H*0.055+1);
     vx.fillStyle='#f2eefc';vx.fillText(t.str,W/2,H-H*0.055);
     vx.restore();
@@ -5194,16 +4203,6 @@ function vidBitrate(W,H,fps){ // だいたい 0.1bit/px/frame。4K60で約50Mbps
   return Math.round(clamp(W*H*fps*0.1,4e6,6e7));
 }
 function expProgress(msg,ratio){
-  /* 下部コンソール（EXPORT）側の進捗。旧モーダルの器も同時に更新しておく */
-  const r=clamp(ratio||0,0,1);
-  const pm=$('#dk-pmsg'),pb=$('#dk-pbar'),pc=$('#dk-ppct'),pf=$('#dk-pf');
-  if(pm)pm.textContent=msg;
-  if(pb&&pb.firstElementChild)pb.firstElementChild.style.width=Math.round(r*100)+'%';
-  if(pc)pc.textContent=Math.round(r*100)+'%';
-  if(pf&&EXP.kind==='mp4'){
-    const N=Math.max(2,Math.round(expClip()*EXP.fps));
-    pf.textContent=Math.round(r*N)+' / '+N+' f';
-  }
   const m=$('#exp-msg'),b=$('#exp-bar');
   if(m)m.textContent=msg;
   if(b&&b.firstElementChild)b.firstElementChild.style.width=Math.round(clamp(ratio||0,0,1)*100)+'%';
@@ -5249,15 +4248,13 @@ function saveVideoBlob(blob,ext){
   setTimeout(()=>URL.revokeObjectURL(url),4000);
   toast(ext.toUpperCase()+' を書き出しました（'+Math.round(blob.size/1048576*10)/10+'MB）');
 }
-async function exportVideo(W,H,fps,sec,p0,p1){
-  const pa=(p0==null?0:p0),pb=(p1==null?1:p1);   // 出す範囲（EXPORTのIN/OUT）
+async function exportVideo(W,H,fps,sec){
   if(gVidExporting)return;
   const N=Math.max(2,Math.round(sec*fps));
   // 画面のキャンバスを書き出しサイズへ張り替える（メインループは止めておく）
   const save={w:cv.width,h:cv.height,mode,pv:PV.on,pvp:PV.p,clean:cleanView};
   gVidExporting=true;gVidAbort=false;
   document.body.classList.add('exprun');
-  if(mode==='export')renderDock();   // コンソールの下段を進捗に入れ替える
   PV.on=false;
   const expCv=document.createElement('canvas');expCv.width=W;expCv.height=H;
   const expCx=expCv.getContext('2d');
@@ -5278,7 +4275,7 @@ async function exportVideo(W,H,fps,sec,p0,p1){
       const us=Math.round(1e6/fps);
       for(let f=0;f<N;f++){
         if(gVidAbort||encErr)break;
-        const P=pa+(pb-pa)*f/(N-1);
+        const P=f/(N-1);
         vidRenderFrame(P,f/fps,W,H,expCx,expCv,subScale);
         const vf=new VideoFrame(expCv,{timestamp:f*us,duration:us});
         enc.encode(vf,{keyFrame:f%(fps*2)===0});
@@ -5309,7 +4306,7 @@ async function exportVideo(W,H,fps,sec,p0,p1){
       const t0=performance.now();
       for(let f=0;f<N;f++){
         if(gVidAbort)break;
-        vidRenderFrame(pa+(pb-pa)*f/(N-1),f/fps,W,H,expCx,expCv,subScale);
+        vidRenderFrame(f/(N-1),f/fps,W,H,expCx,expCv,subScale);
         if(f%6===0)expProgress('REC '+Math.round(f/N*100)+'%（実時間・'+ext.toUpperCase()+'）',f/N);
         const due=t0+(f+1)*1000/fps;
         await new Promise(r=>setTimeout(r,Math.max(0,due-performance.now())));
@@ -5325,7 +4322,6 @@ async function exportVideo(W,H,fps,sec,p0,p1){
     mode=save.mode;PV.on=save.pv;PV.p=save.pvp;cleanView=save.clean;
     gVidExporting=false;
     document.body.classList.remove('exprun');
-    if(mode==='export')renderDock();
     onResize();                       // CVOFF/--bartop とワイプ発火点を取り直す
     resetCanvasState();
   }
@@ -5363,7 +4359,7 @@ function toggleExpModal(force){
   document.body.classList.toggle('expopen',open);
   if(!open)document.body.classList.remove('exprun');
 }
-$('#b-export').addEventListener('click',()=>setMode('export'));   // 旧モーダルは進捗の器としてDOMに残すだけ
+$('#b-export').addEventListener('click',()=>toggleExpModal());
 $('#exp-close').addEventListener('click',()=>toggleExpModal(false));
 $('#exp-kind').addEventListener('click',e=>{
   const b=e.target.closest&&e.target.closest('.btn');
@@ -5452,7 +4448,6 @@ function frameBody(nowMs){
     drawTakePath(cam);
     drawGuides();
     drawDofRuler();                         // DOFの奥行き定規（プレビュー中は薄く出して送りを見せる）
-    drawOutFrame();                         // EXPORT: 選んだサイズで「ここが出る」枠
     if(VS!==1){                             // 表示ズーム中はキャンバスの縁と倍率を出す（縮んでいると分かるように）
       cx.save();
       cx.strokeStyle='rgba(255,210,122,.45)';cx.lineWidth=1*DPR;
@@ -5479,7 +4474,6 @@ load();
 apRestore();      // SPEC_07 B0: ap-seqパネルをEX_DBから自動復元（無ければプレースホルダ）
 setupApLive();    // SPEC_07 B1: tdr_live 自動同期（composer-hello / request-sync）
 renderCards();
-renderDock();   // 下部コンソール（PLACE）の初期描画
 syncFxBtn();   // FXボタンの点灯を復元状態に合わせる
 commit();   // V2-A: 履歴の初期状態を積む
 computeWipeP();
