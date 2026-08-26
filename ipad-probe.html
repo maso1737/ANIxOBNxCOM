@@ -8,7 +8,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PROBE">
-<link rel="manifest" href="manifest.webmanifest">
+<!-- ★ manifest は意図的にリンクしていない。link rel=manifest を張ると
+     「ホーム画面に追加」がこのページではなく manifest.webmanifest の start_url
+     （index.html）をインストールしてしまう（実機で踏んだ・SPEC_18 P0）。
+     実物5本と同じく apple-mobile-web-app-* メタだけで standalone にする。
+     manifest.webmanifest 自体は fetch() で読めるかだけ⑤タブで確認する -->
 <title>iPad PROBE — 操作文法の実機測定</title>
 <style>
 :root{
@@ -205,7 +209,7 @@ a.navlink b{color:var(--gold);display:block;font-size:10px;letter-spacing:.1em;m
     このページを<b>ホーム画面のアイコンから</b>開いた状態で、下を順に押してください。
     <b>上に maso1737.github.io のバーが出たら「standalone を抜けた」</b>です。
   </p>
-  <a class="navlink" href="ipad-probe-nav.html"><b>TEST 1 — 同一スコープの別ページ</b>manifest の scope 内。ここで抜けるなら scope は効いていない</a>
+  <a class="navlink" href="ipad-probe-nav.html"><b>TEST 1 — 同一オリジンの別ページ</b>apple-mobile-web-app-* メタだけで standalone になっている（実物5本と同じ条件）</a>
   <a class="navlink" href="composer.html"><b>TEST 2 — 実アプリ（COMPOSER）</b>いま困っている経路そのもの</a>
   <a class="navlink" href="index.html"><b>TEST 3 — ポータル（index.html）</b></a>
   <div class="card">

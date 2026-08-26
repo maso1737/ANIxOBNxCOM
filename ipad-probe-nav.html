@@ -7,7 +7,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PROBE NAV">
-<link rel="manifest" href="manifest.webmanifest">
+<!-- ★ manifest は意図的にリンクしていない。link rel=manifest を張ると
+     「ホーム画面に追加」がこのページではなく manifest.webmanifest の start_url
+     （index.html）をインストールしてしまう（実機で踏んだ・SPEC_18 P0）。
+     実物5本と同じく apple-mobile-web-app-* メタだけで standalone にする。
+     manifest.webmanifest 自体は fetch() で読めるかだけ⑤タブで確認する -->
 <title>PROBE — 遷移先</title>
 <style>
 body{
