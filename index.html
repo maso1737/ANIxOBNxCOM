@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<!-- iPad: ホーム画面に追加すると Safari のバーごと消えた「アプリ」として起動する（SPEC_18 P0・正準は animator.html）
+     status-bar-style は指定しない＝既定の不透明バー。時刻・日付・バッテリーだけが上に出て、本文はその下から始まる。
+     black-translucent にすると本文がバーの下へ潜るので safe-area の手当てが要る（OBAN だけそちら。P1 で揃えるか決める） -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ANI SUITE">
 <title>GEN-EX Animation Suite</title>
 <style>
 /* ════════════════════════════════════════════════════════════
