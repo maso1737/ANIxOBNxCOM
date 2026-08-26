@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PROBE NAV">
+<link rel="manifest" href="manifest.webmanifest">
+<title>PROBE — 遷移先</title>
+<style>
+body{
+  margin:0;background:#07030f;color:#F8EFFF;
+  font-family:'SF Mono','JetBrains Mono',Consolas,monospace;font-size:13px;line-height:1.7;
+  padding:calc(20px + env(safe-area-inset-top,0px)) 18px calc(20px + env(safe-area-inset-bottom,0px));
+}
+h1{font-size:14px;letter-spacing:.18em;color:#FF4FA8;margin:0 0 4px}
+p{color:#8f7bb5;font-size:11px;margin:0 0 16px}
+.big{
+  background:#150927;border:1px solid #2a1a45;border-radius:3px;
+  padding:18px;margin-bottom:14px;font-size:15px;text-align:center;
+}
+.big b{display:block;font-size:11px;letter-spacing:.14em;color:#FFD27A;margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:14px}
+td,th{padding:5px 6px;border-bottom:1px solid #2a1a45;text-align:left}
+th{color:#8f7bb5;font-weight:400;width:46%}
+td{color:#5AE9FF;word-break:break-all}
+a{
+  display:block;background:#150927;border:1px solid #2a1a45;color:#5AE9FF;
+  padding:14px;border-radius:2px;text-decoration:none;text-align:center;min-height:44px;
+}
+</style>
+</head>
+<body>
+<h1>PROBE — 遷移先ページ</h1>
+<p>ipad-probe.html と同じ場所・同じ scope にある別ページです。</p>
+
+<div class="big">
+  <b>いま上に URL バーは出ていますか？</b>
+  出ていない＝standalone のまま遷移できた<br>
+  出ている＝標準の挙動どおり抜けた
+</div>
+
+<table>
+  <tr><th>display-mode</th><td id="dm">—</td></tr>
+  <tr><th>navigator.standalone</th><td id="ns">—</td></tr>
+  <tr><th>safe-area top</th><td id="sa">—</td></tr>
+  <tr><th>ビューポート高さ</th><td id="vh">—</td></tr>
+</table>
+
+<a href="ipad-probe.html">← PROBE へ戻る</a>
+
+<script>
+const $ = s => document.querySelector(s);
+$('#dm').textContent = ['standalone','fullscreen','minimal-ui','browser']
+  .find(m => matchMedia('(display-mode: ' + m + ')').matches) || '不明';
+$('#ns').textContent = (typeof navigator.standalone === 'boolean')
+  ? String(navigator.standalone) : 'この端末は持っていない';
+const p = document.createElement('div');
+p.style.cssText = 'position:fixed;left:-9999px;padding-top:env(safe-area-inset-top,0px)';
+document.body.appendChild(p);
+$('#sa').textContent = getComputedStyle(p).paddingTop;
+p.remove();
+$('#vh').textContent = innerWidth + ' × ' + innerHeight;
+</script>
+</body>
+</html>

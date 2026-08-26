@@ -9236,7 +9236,14 @@ function wire(){
   $('#btn-view-studio').addEventListener('click', () => setView('studio'));
   // 編集画面はGRIDが主戦場。1カットを詰めるときだけ ✎ / ダブルクリックで SINGLE へ
   $('#btn-view-edit').addEventListener('click', () => enterEdit('grid'));
-  $('#btn-fs').addEventListener('click', toggleFullscreen);
+  /* 全画面ボタンは「全画面にできる環境」でだけ出す（animator/composer/manga/oban と同じ canFS 判定）。
+     ホーム画面に追加した standalone 起動では Fullscreen API が無い＝すでに全画面なので、ボタン自体を消す */
+  (function(){
+    const b = $('#btn-fs'), root = document.documentElement;
+    const canFS = !!(root.requestFullscreen || root.webkitRequestFullscreen || document.body.webkitRequestFullscreen);
+    if(!canFS){ b.style.display = 'none'; return; }
+    b.addEventListener('click', toggleFullscreen);
+  })();
   $('#btn-help').addEventListener('click', () => toggleHelp());
   $('#btn-help-close').addEventListener('click', () => toggleHelp(false));
   $('#help-ovl').addEventListener('click', e => { if(e.target === $('#help-ovl')) toggleHelp(false); });

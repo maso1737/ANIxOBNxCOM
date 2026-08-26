@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<!-- standalone で起動して測ることが目的なので、他ツールと同じメタを持たせる -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PROBE">
+<link rel="manifest" href="manifest.webmanifest">
+<title>iPad PROBE — 操作文法の実機測定</title>
+<style>
+:root{
+  --acid:#FF4FA8; --magenta:#B850FF; --ice:#5AE9FF; --gold:#FFD27A;
+  --ok:#7BE38B; --ng:#FF6B6B; --warn:#FFD27A;
+  --black:#07030f; --panel:#100722; --panel2:#150927;
+  --border:#2a1a45; --white:#F8EFFF; --dim:#8f7bb5;
+  --mono:'SF Mono','JetBrains Mono','Consolas',monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  margin:0; background:var(--black); color:var(--white);
+  font-family:var(--mono); font-size:12px; line-height:1.5;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  overscroll-behavior:none;
+}
+/* black-translucent なので中身をステータスバーぶん押し下げる（OBAN と同じ手当て） */
+header{
+  position:sticky; top:0; z-index:20;
+  padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;
+  background:linear-gradient(to bottom,rgba(7,3,15,.97),rgba(7,3,15,.88));
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+}
+h1{margin:0;font-size:13px;letter-spacing:.18em;color:var(--acid);font-weight:600}
+h1 small{color:var(--dim);letter-spacing:.08em;font-weight:400;margin-left:8px}
+nav{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+nav button{
+  background:var(--panel); border:1px solid var(--border); color:var(--dim);
+  font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+  padding:7px 11px; border-radius:2px; cursor:pointer; min-height:34px;
+}
+nav button.on{background:var(--panel2);border-color:var(--acid);color:var(--acid)}
+section{display:none;padding:14px}
+section.on{display:block}
+h2{font-size:11px;letter-spacing:.16em;color:var(--gold);margin:0 0 4px;font-weight:600}
+p.note{color:var(--dim);font-size:11px;margin:0 0 12px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:12px;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+td,th{padding:4px 6px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+th{color:var(--dim);font-weight:400;width:44%}
+td.v{color:var(--ice);word-break:break-all}
+.ok{color:var(--ok)} .ng{color:var(--ng)} .warn{color:var(--warn)} .dim{color:var(--dim)}
+button.act{
+  background:var(--panel2); border:1px solid var(--border); color:var(--white);
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em;
+  padding:9px 13px; border-radius:2px; cursor:pointer; min-height:40px; margin:2px;
+}
+button.act.on{border-color:var(--acid);color:var(--acid);background:#1c0c2e}
+button.act.danger{border-color:var(--ng);color:var(--ng)}
+#pad{
+  height:230px; background:var(--panel2); border:1px dashed var(--magenta);
+  border-radius:3px; touch-action:none; user-select:none; -webkit-user-select:none;
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  color:var(--dim); font-size:11px; position:relative; overflow:hidden;
+}
+#pad.live{border-style:solid;border-color:var(--acid)}
+#padBig{position:absolute;font-size:58px;color:var(--acid);opacity:.32;pointer-events:none}
+.counts{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:10px}
+.counts div{background:var(--panel2);border:1px solid var(--border);border-radius:2px;padding:7px 3px;text-align:center}
+.counts b{display:block;font-size:19px;color:var(--gold);font-weight:600}
+.counts span{font-size:9px;color:var(--dim);letter-spacing:.06em}
+#log{
+  height:190px; overflow-y:auto; background:#0a0518; border:1px solid var(--border);
+  border-radius:2px; padding:8px; font-size:10px; line-height:1.6; margin-top:10px;
+  -webkit-overflow-scrolling:touch;
+}
+#log div{border-bottom:1px solid rgba(42,26,69,.5);padding:1px 0}
+#inkcv{width:100%;height:210px;display:block;background:#fff;border-radius:3px;touch-action:none;border:1px solid var(--border)}
+.fields label{display:block;margin-bottom:10px}
+.fields span.lbl{display:block;color:var(--dim);font-size:10px;margin-bottom:3px;letter-spacing:.06em}
+.fields input,.scrub{
+  width:100%; background:var(--panel2); border:1px solid var(--border); color:var(--ice);
+  font-family:var(--mono); font-size:15px; padding:9px; border-radius:2px; text-align:right;
+  min-height:42px;
+}
+.scrub{cursor:ew-resize;touch-action:none;user-select:none;-webkit-user-select:none;display:block}
+textarea{
+  width:100%; height:260px; background:#0a0518; color:var(--ice);
+  border:1px solid var(--border); border-radius:2px; font-family:var(--mono);
+  font-size:10px; padding:8px; line-height:1.5;
+}
+a.navlink{
+  display:block; background:var(--panel2); border:1px solid var(--border);
+  color:var(--ice); padding:12px; border-radius:2px; margin-bottom:7px;
+  text-decoration:none; font-size:11px; min-height:44px;
+}
+a.navlink b{color:var(--gold);display:block;font-size:10px;letter-spacing:.1em;margin-bottom:2px}
+.hint{color:var(--dim);font-size:10px;margin-top:6px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>iPad PROBE <small>SPEC_18 実機測定</small></h1>
+  <nav>
+    <button data-tab="env" class="on">① 環境</button>
+    <button data-tab="gest">② 多指</button>
+    <button data-tab="pen">③ 筆圧</button>
+    <button data-tab="scr">④ Scribble</button>
+    <button data-tab="nav">⑤ 遷移</button>
+    <button data-tab="out">⑥ 書き出し</button>
+  </nav>
+</header>
+
+<!-- ═══ ① 環境 ═══ -->
+<section id="t-env" class="on">
+  <h2>環境と safe-area の実測</h2>
+  <p class="note">ホーム画面に追加したアイコンから開いて見てください。Safari で開いた場合と数値が変わります。</p>
+  <div class="card"><table id="envtbl"></table></div>
+  <button class="act" onclick="fillEnv()">↻ 再測定</button>
+</section>
+
+<!-- ═══ ② 多指 ═══ -->
+<section id="t-gest">
+  <h2>多指タップが Web に届くか</h2>
+  <p class="note">
+    下の枠を 1〜5 本指でタップしてください。<b>タップのたびに「OSのバーが出たか」も目で見てください。</b>
+    preventDefault を切り替えて、届き方が変わるかを比べます。
+  </p>
+
+  <div class="card">
+    <button class="act on" id="b-pd">preventDefault: ON</button>
+    <button class="act on" id="b-osdet">OS横取り検出: ON</button>
+    <button class="act danger" onclick="resetGest()">✕ カウンタと記録を消す</button>
+    <div class="hint">
+      「OS横取り検出」を ON にすると画面外に contenteditable を1つ置き、iPadOS の取り消し／やり直しが
+      発火したときに <b>beforeinput(historyUndo / historyRedo)</b> を捕まえます。これが出たら
+      <b>OSが持っていった証拠</b>です。
+    </div>
+  </div>
+
+  <div id="pad"><span id="padtxt">ここを 1〜5 本指でタップ</span><span id="padBig"></span></div>
+
+  <div class="counts">
+    <div><b id="c1">0</b><span>1本</span></div>
+    <div><b id="c2">0</b><span>2本</span></div>
+    <div><b id="c3">0</b><span>3本</span></div>
+    <div><b id="c4">0</b><span>4本</span></div>
+    <div><b id="c5">0</b><span>5本</span></div>
+  </div>
+
+  <div id="log"></div>
+  <div class="hint">
+    見るところ ──
+    <b class="ok">TAP n=3</b> が出れば「3本指はWebに届く」。
+    <b class="ng">OS-UNDO / OS-REDO</b> が出たら「OSが横取りした」。
+    <b class="warn">CANCEL</b> が出たら「途中でOSに取り上げられた」。
+    両方出るなら <b>二重発火</b>です。
+  </div>
+</section>
+
+<!-- ═══ ③ 筆圧 ═══ -->
+<section id="t-pen">
+  <h2>Apple Pencil の筆圧・着地スパイク</h2>
+  <p class="note">白い面に<b>ペンで</b>ゆっくり1本、線を引いてください（指は無視します）。入り・抜きの実値を出します。</p>
+  <canvas id="inkcv"></canvas>
+  <div style="margin-top:8px">
+    <button class="act" onclick="clearInk()">✕ 消す</button>
+    <button class="act" id="b-taper">弧長テーパー: OFF</button>
+  </div>
+  <div class="card" style="margin-top:12px"><table id="pentbl"></table></div>
+  <div class="hint">
+    <b>1発目の筆圧</b>が 2〜6発目の中央値より大きく外れていたら「着地スパイク」＝ANIMATOR のインク溜まりの主因です。
+    「弧長テーパー」を ON にすると、入り 12px・抜き 12px を弧長で絞った線に変わります。見比べてください。
+  </div>
+</section>
+
+<!-- ═══ ④ Scribble ═══ -->
+<section id="t-scr">
+  <h2>Scribble（手書き入力）が出るのはどれか</h2>
+  <p class="note">4通りの数値欄を用意しました。<b>ペンで</b>それぞれの上を横にドラッグして、手書き入力UIが出るかを見てください。</p>
+  <div class="card fields">
+    <label><span class="lbl">A ── 素の input[type=number]（いまの COMPOSER / ANIMATOR fps 欄）</span>
+      <input type="number" id="f-a" value="100"></label>
+    <label><span class="lbl">B ── readonly な input（前回わたしが誤って勧めた形）</span>
+      <input type="number" id="f-b" value="100" readonly></label>
+    <label><span class="lbl">C ── inputmode="none" の input</span>
+      <input type="number" id="f-c" value="100" inputmode="none"></label>
+    <label><span class="lbl">D ── div スクラブ（input を DOM に置かない・研究の推奨形）</span>
+      <span class="scrub" id="f-d" contenteditable="false">100</span></label>
+  </div>
+  <div class="card"><table id="scrtbl"></table></div>
+  <div class="hint">
+    D はダブルタップで初めて入力欄に化けます。<b>A〜D それぞれで「手書きUIが出たか / キーボードが出たか / スクラブできたか」を
+    ⑥の欄に手で書き足してください</b>。ここだけは目で見ないと分かりません。
+  </div>
+</section>
+
+<!-- ═══ ⑤ 遷移 ═══ -->
+<section id="t-nav">
+  <h2>standalone のまま遷移できるか</h2>
+  <p class="note">
+    このページを<b>ホーム画面のアイコンから</b>開いた状態で、下を順に押してください。
+    <b>上に maso1737.github.io のバーが出たら「standalone を抜けた」</b>です。
+  </p>
+  <a class="navlink" href="ipad-probe-nav.html"><b>TEST 1 — 同一スコープの別ページ</b>manifest の scope 内。ここで抜けるなら scope は効いていない</a>
+  <a class="navlink" href="composer.html"><b>TEST 2 — 実アプリ（COMPOSER）</b>いま困っている経路そのもの</a>
+  <a class="navlink" href="index.html"><b>TEST 3 — ポータル（index.html）</b></a>
+  <div class="card">
+    <table>
+      <tr><th>いまの表示モード</th><td class="v" id="nav-mode">—</td></tr>
+      <tr><th>manifest 読み込み</th><td class="v" id="nav-man">—</td></tr>
+    </table>
+  </div>
+  <div class="hint">
+    戻るときはホーム画面から開き直してください（standalone には「戻る」がありません）。
+    結果は⑥の欄に手で書き足してください。
+  </div>
+</section>
+
+<!-- ═══ ⑥ 書き出し ═══ -->
+<section id="t-out">
+  <h2>結果の書き出し</h2>
+  <p class="note">これを全部コピーして Claude に貼ってください。目視でしか分からない項目は下に追記できます。</p>
+  <button class="act" onclick="buildReport()">↻ いまの状態で作り直す</button>
+  <button class="act on" onclick="copyReport()">⧉ 全部コピー</button>
+  <textarea id="report" spellcheck="false"></textarea>
+  <div class="hint">コピーが効かない場合は、枠内を長押し→全選択→コピーしてください。</div>
+</section>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const now = () => performance.now();
+const memo = [];                       // 目視メモを兼ねた記録
+function log(cls, msg){
+  const d = document.createElement('div');
+  d.className = cls;
+  const t = new Date().toTimeString().slice(0,8);
+  d.textContent = t + '  ' + msg;
+  const L = $('#log');
+  L.insertBefore(d, L.firstChild);
+  while(L.children.length > 250) L.removeChild(L.lastChild);
+  memo.push(t + '  [' + cls + ']  ' + msg);
+  if(memo.length > 300) memo.shift();
+}
+
+/* ── タブ ── */
+document.querySelectorAll('nav button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('section').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    $('#t-' + b.dataset.tab).classList.add('on');
+    if(b.dataset.tab === 'out') buildReport();
+    if(b.dataset.tab === 'pen'){ sizeInk(); redraw(); fillPen(); }   // 幅0で初期化されているので開くたびに採寸
+  });
+});
+
+/* ══════════ ① 環境 ══════════ */
+function envRows(){
+  const cs = getComputedStyle(document.documentElement);
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:-9999px;top:0;' +
+    'padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) ' +
+    'env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);';
+  document.body.appendChild(probe);
+  const p = getComputedStyle(probe);
+  const sa = { t:p.paddingTop, r:p.paddingRight, b:p.paddingBottom, l:p.paddingLeft };
+  probe.remove();
+
+  const standaloneNav = (typeof navigator.standalone === 'boolean') ? navigator.standalone : null;
+  const dm = ['standalone','fullscreen','minimal-ui','browser']
+    .find(m => matchMedia('(display-mode: ' + m + ')').matches) || '不明';
+
+  const canFS = !!(document.documentElement.requestFullscreen ||
+                   document.documentElement.webkitRequestFullscreen ||
+                   document.body.webkitRequestFullscreen);
+
+  return [
+    ['navigator.standalone', standaloneNav === null ? 'この端末は持っていない' : String(standaloneNav)],
+    ['display-mode', dm],
+    ['safe-area top', sa.t + '  ← ステータスバーの高さ'],
+    ['safe-area bottom', sa.b + '  ← ホームバー'],
+    ['safe-area left / right', sa.l + ' / ' + sa.r],
+    ['画面 (screen)', screen.width + ' × ' + screen.height + '  @' + (window.devicePixelRatio||1) + 'x'],
+    ['ビューポート', innerWidth + ' × ' + innerHeight],
+    ['向き', innerWidth >= innerHeight ? '横' : '縦'],
+    ['Fullscreen API', canFS ? '<span class="ok">ある</span>（⛶ ボタンが出る）'
+                             : '<span class="warn">無い</span>（⛶ ボタンは消える）'],
+    ['最大同時タッチ点', String(navigator.maxTouchPoints)],
+    ['PointerEvent', 'PointerEvent' in window ? 'あり' : '<span class="ng">なし</span>'],
+    ['getCoalescedEvents', ('PointerEvent' in window && PointerEvent.prototype.getCoalescedEvents)
+      ? '<span class="ok">あり</span>' : '<span class="ng">なし</span>'],
+    ['EyeDropper', 'EyeDropper' in window ? 'あり' : 'なし（Safari は非対応）'],
+    ['ctx.filter', (function(){ try{ return 'filter' in document.createElement('canvas').getContext('2d')
+      ? '<span class="ok">あり</span>' : '<span class="ng">なし</span>'; }catch(e){ return '?'; } })()],
+    ['userAgent', navigator.userAgent],
+  ];
+}
+function fillEnv(){
+  $('#envtbl').innerHTML = envRows()
+    .map(r => '<tr><th>' + r[0] + '</th><td class="v">' + r[1] + '</td></tr>').join('');
+  $('#nav-mode').textContent =
+    (['standalone','fullscreen','minimal-ui','browser'].find(m => matchMedia('(display-mode: ' + m + ')').matches) || '不明') +
+    ' / navigator.standalone=' + navigator.standalone;
+}
+fillEnv();
+addEventListener('resize', fillEnv);
+addEventListener('orientationchange', () => setTimeout(fillEnv, 300));
+
+fetch('manifest.webmanifest')
+  .then(r => r.ok ? r.json() : Promise.reject(r.status))
+  .then(j => { $('#nav-man').innerHTML = '<span class="ok">読めた</span> — scope: ' + (j.scope || '(未指定)') +
+                                         ' / display: ' + (j.display || '(未指定)'); })
+  .catch(e => { $('#nav-man').innerHTML = '<span class="ng">読めない (' + e + ')</span>' +
+                                          ' — manifest.webmanifest を同じ場所に置いてください'; });
+
+/* ══════════ ② 多指 ══════════ */
+const TAP_MS = 300, TAP_SLOP = 14;     // econte / manga と同値
+let usePD = true, useOS = true;
+const ptrs = new Map();
+let maxN = 0, tapT0 = 0, moved = 0, seq = 0;
+const counts = [0,0,0,0,0,0];
+
+$('#b-pd').addEventListener('click', function(){
+  usePD = !usePD;
+  this.classList.toggle('on', usePD);
+  this.textContent = 'preventDefault: ' + (usePD ? 'ON' : 'OFF');
+  log('dim', '── preventDefault を ' + (usePD ? 'ON' : 'OFF') + ' にした ──');
+});
+
+/* OS の取り消し／やり直しを捕まえる罠。
+   iPadOS が編集コンテキストへ Undo/Redo を撃つと beforeinput(historyUndo/historyRedo) が飛ぶ。
+   これが出れば「OSが持っていった」動かぬ証拠になる。 */
+let trap = null;
+function setTrap(on){
+  if(on && !trap){
+    trap = document.createElement('div');
+    trap.contentEditable = 'true';
+    trap.setAttribute('aria-hidden','true');
+    trap.style.cssText = 'position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;';
+    trap.textContent = 'probe';
+    document.body.appendChild(trap);
+    trap.addEventListener('beforeinput', e => {
+      if(e.inputType === 'historyUndo')      log('ng', '★ OS-UNDO を検出（OSが横取りした）');
+      else if(e.inputType === 'historyRedo') log('ng', '★ OS-REDO を検出（OSが横取りした）');
+      else                                   log('warn', 'beforeinput: ' + e.inputType);
+      e.preventDefault();
+    });
+  } else if(!on && trap){ trap.remove(); trap = null; }
+}
+setTrap(true);
+$('#b-osdet').addEventListener('click', function(){
+  useOS = !useOS; setTrap(useOS);
+  this.classList.toggle('on', useOS);
+  this.textContent = 'OS横取り検出: ' + (useOS ? 'ON' : 'OFF');
+});
+
+const pad = $('#pad');
+pad.addEventListener('pointerdown', e => {
+  if(usePD) e.preventDefault();          // ★ 1打目で即抑止するのが資料Aの主張
+  if(ptrs.size === 0){ tapT0 = now(); maxN = 0; moved = 0; seq++; }
+  ptrs.set(e.pointerId, { sx:e.clientX, sy:e.clientY, type:e.pointerType });
+  if(ptrs.size > maxN) maxN = ptrs.size;
+  pad.classList.add('live');
+  $('#padBig').textContent = ptrs.size;
+  $('#padtxt').textContent = '';
+  log('dim', 'down  id=' + e.pointerId + '  同時=' + ptrs.size + '  type=' + e.pointerType +
+             '  isPrimary=' + e.isPrimary);
+}, { passive:false });
+
+pad.addEventListener('pointermove', e => {
+  const p = ptrs.get(e.pointerId); if(!p) return;
+  if(usePD) e.preventDefault();
+  const d = Math.hypot(e.clientX - p.sx, e.clientY - p.sy);
+  if(d > moved) moved = d;
+}, { passive:false });
+
+function endPtr(e, cancelled){
+  if(!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if(cancelled) log('warn', '⚠ CANCEL  id=' + e.pointerId + '（OSに取り上げられた）');
+  $('#padBig').textContent = ptrs.size || '';
+  if(ptrs.size > 0) return;
+
+  pad.classList.remove('live');
+  const dt = now() - tapT0;
+  if(cancelled){
+    log('warn', '  → n=' + maxN + ' は CANCEL で終わった（' + Math.round(dt) + 'ms）');
+  } else if(dt < TAP_MS && moved < TAP_SLOP){
+    counts[maxN] = (counts[maxN] || 0) + 1;
+    for(let i = 1; i <= 5; i++) $('#c' + i).textContent = counts[i] || 0;
+    log('ok', '✓ TAP  n=' + maxN + '  (' + Math.round(dt) + 'ms / ' + Math.round(moved) + 'px)');
+  } else {
+    log('dim', '  → n=' + maxN + ' はタップ判定外 (' + Math.round(dt) + 'ms / ' + Math.round(moved) + 'px)');
+  }
+  setTimeout(() => { if(ptrs.size === 0) $('#padtxt').textContent = 'ここを 1〜5 本指でタップ'; }, 700);
+}
+pad.addEventListener('pointerup',     e => endPtr(e, false));
+pad.addEventListener('pointercancel', e => endPtr(e, true));
+
+/* OSに画面を持っていかれた瞬間も記録する（4/5本指スワイプ・ピンチの検証用） */
+addEventListener('blur',       () => log('warn', '⚠ window blur（OSが前面を奪った可能性）'));
+document.addEventListener('visibilitychange',
+  () => log('warn', '⚠ visibility → ' + document.visibilityState));
+
+function resetGest(){
+  for(let i = 0; i <= 5; i++) counts[i] = 0;
+  for(let i = 1; i <= 5; i++) $('#c' + i).textContent = '0';
+  $('#log').innerHTML = ''; memo.length = 0;
+  log('dim', '── 記録を消した ──');
+}
+
+/* ══════════ ③ 筆圧 ══════════ */
+const cv = $('#inkcv'), ctx = cv.getContext('2d');
+let taper = false;
+$('#b-taper').addEventListener('click', function(){
+  taper = !taper;
+  this.classList.toggle('on', taper);
+  this.textContent = '弧長テーパー: ' + (taper ? 'ON' : 'OFF');
+  clearInk();
+});
+/* ★このタブは display:none で始まるので、起動時は幅0。
+   タブを開いた時点で必ず採寸し直す（0のまま描くと真っ白のまま何も出ない） */
+function ensureInkSize(){
+  const r = cv.getBoundingClientRect();
+  if(!r.width || !r.height) return false;
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  if(cv.width !== w || cv.height !== h){
+    cv.width = w; cv.height = h;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  return true;
+}
+function sizeInk(){
+  if(!ensureInkSize()) return;
+  const r = cv.getBoundingClientRect();
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, r.width, r.height);
+}
+function clearInk(){ sizeInk(); pts.length = 0; coalTotal = 0; coalCalls = 0; fillPen(); }
+addEventListener('resize', () => setTimeout(clearInk, 100));
+
+/* getCoalescedEvents のオブジェクトはプールされるので必ず値コピーで持つ（資料B） */
+let pts = [], drawing = false, coalTotal = 0, coalCalls = 0, arc = 0;
+const MAXR = 7, MINR = 0.6, TAPER_PX = 12;
+
+function radiusAt(i){
+  const p = pts[i];
+  let r = Math.max(MINR, MAXR * Math.max(0.02, Math.min(1, p.pr)));
+  if(taper){
+    const inK  = Math.min(1, p.s / TAPER_PX);                       // 入り＝始点からの弧長
+    const outK = Math.min(1, (arc - p.s) / TAPER_PX);               // 抜き＝終点までの弧長
+    r = Math.max(MINR, r * Math.min(inK, outK));
+  }
+  return r;
+}
+function redraw(){
+  sizeInkKeep();
+  for(let i = 1; i < pts.length; i++){
+    const a = pts[i-1], b = pts[i];
+    const ra = radiusAt(i-1), rb = radiusAt(i);
+    const steps = Math.max(1, Math.ceil(Math.hypot(b.x-a.x, b.y-a.y) / 1.2));
+    for(let k = 0; k <= steps; k++){
+      const t = k / steps;
+      ctx.beginPath();
+      ctx.arc(a.x + (b.x-a.x)*t, a.y + (b.y-a.y)*t, ra + (rb-ra)*t, 0, 6.2832);
+      ctx.fillStyle = '#111'; ctx.fill();
+    }
+  }
+}
+function sizeInkKeep(){
+  if(!ensureInkSize()) return;
+  const r = cv.getBoundingClientRect();
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, r.width, r.height);
+}
+cv.addEventListener('pointerdown', e => {
+  if(e.pointerType === 'touch') return;                 // 指では描かない（本番の方針と同じ）
+  e.preventDefault();
+  try{ cv.setPointerCapture(e.pointerId); }catch(_){}   // 捕まえ損ねてもストロークは続ける
+  drawing = true; pts = []; arc = 0; coalTotal = 0; coalCalls = 0;
+  const r = cv.getBoundingClientRect();
+  pts.push({ x:e.clientX-r.left, y:e.clientY-r.top, pr:e.pressure, s:0, t:now(), first:true });
+  fillPen();
+}, { passive:false });
+cv.addEventListener('pointermove', e => {
+  if(!drawing) return;
+  e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  /* 空配列が返る環境がある（合成イベント・Safari の初回 move）。
+     そのまま回すと move の点を全部落とすので、必ず自分自身へ落とす */
+  let list = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+  if(!list || !list.length) list = [e];
+  coalCalls++; coalTotal += list.length;
+  for(const ce of list){
+    const x = ce.clientX - r.left, y = ce.clientY - r.top;
+    const last = pts[pts.length-1];
+    arc += Math.hypot(x - last.x, y - last.y);
+    pts.push({ x, y, pr:ce.pressure, s:arc, t:now(), first:false });   // ★値コピー
+  }
+  redraw(); fillPen();
+}, { passive:false });
+function endInk(e){ if(!drawing) return; drawing = false; redraw(); fillPen(); }
+cv.addEventListener('pointerup', endInk);
+cv.addEventListener('pointercancel', endInk);
+
+function median(a){ if(!a.length) return NaN; const s=[...a].sort((x,y)=>x-y); return s[s.length>>1]; }
+function fillPen(){
+  const f  = pts.length ? pts[0].pr : NaN;
+  const nx = pts.slice(1, 7).map(p => p.pr);
+  const med = median(nx);
+  const all = pts.map(p => p.pr);
+  let verdict = '<span class="dim">まだ引かれていない</span>';
+  if(pts.length > 6 && isFinite(med) && med > 0){
+    const ratio = f / med;
+    if(ratio > 1.35)      verdict = '<span class="ng">着地スパイクあり（1発目が ' + ratio.toFixed(2) + ' 倍）</span>';
+    else if(ratio < 0.35) verdict = '<span class="warn">1発目が異常に低い（' + ratio.toFixed(2) + ' 倍）</span>';
+    else                  verdict = '<span class="ok">1発目は素直（' + ratio.toFixed(2) + ' 倍）</span>';
+  }
+  const rows = [
+    ['1発目の pressure（pointerdown）', isFinite(f) ? f.toFixed(4) : '—'],
+    ['2〜7発目の中央値', isFinite(med) ? med.toFixed(4) : '—'],
+    ['判定', verdict],
+    ['最大 / 最小 pressure', all.length ? Math.max(...all).toFixed(4) + ' / ' + Math.min(...all).toFixed(4) : '—'],
+    ['点の数', String(pts.length)],
+    ['弧長', arc.toFixed(1) + ' px'],
+    ['getCoalescedEvents 平均', coalCalls ? (coalTotal / coalCalls).toFixed(2) + ' 点 / move（' + coalCalls + '回）' : '—'],
+    ['pressure が 0 の点', String(all.filter(v => v === 0).length)],
+    ['pressure が 0.5 ちょうどの点', String(all.filter(v => v === 0.5).length) + '  ← 多いと筆圧が来ていない'],
+  ];
+  $('#pentbl').innerHTML = rows.map(r => '<tr><th>' + r[0] + '</th><td class="v">' + r[1] + '</td></tr>').join('');
+}
+sizeInk(); fillPen();
+
+/* ══════════ ④ Scribble ══════════ */
+const scrLog = { a:[], b:[], c:[], d:[] };
+['a','b','c','d'].forEach(k => {
+  const el = $('#f-' + k);
+  ['focus','pointerdown','beforeinput','input'].forEach(ev => {
+    el.addEventListener(ev, e => {
+      const tag = ev + (e.inputType ? '(' + e.inputType + ')' : '') +
+                  (e.pointerType ? '[' + e.pointerType + ']' : '');
+      if(scrLog[k].length < 40) scrLog[k].push(tag);
+      fillScr();
+    });
+  });
+});
+/* D だけは推奨形を実装：input を DOM に置かず、pointerdown で preventDefault してスクラブ。
+   ダブルタップで初めて input を生成する。 */
+(function(){
+  const el = $('#f-d');
+  /* lastTap の初期値を 0 にすると performance.now() がまだ小さい「起動直後」に
+     一発目が2連打と誤判定される（実際に踏んだ）。十分過去を入れておく */
+  let act=false, sx=0, sv=0, mv=false, lastTap=-1e9, lastMoved=false;
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();                                   // ★フォーカスを渡さない＝Scribble が起きない
+    const t = now();
+    // 直前がスクラブ（動かした）なら2連打と数えない（econte の◆と同じ切り分け）
+    if(t - lastTap < 320 && !lastMoved){ lastTap = -1e9; toInput(); return; }
+    lastTap = t;
+    act = true; mv = false; sx = e.clientX; sv = parseFloat(el.textContent) || 0;
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+  }, { passive:false });
+  el.addEventListener('pointermove', e => {
+    if(!act) return;
+    const dx = e.clientX - sx;
+    if(!mv && Math.abs(dx) < 3) return;
+    mv = true; e.preventDefault();
+    el.textContent = String(Math.round(sv + dx));
+  }, { passive:false });
+  el.addEventListener('pointerup', () => { act = false; lastMoved = mv; });
+  /* ★span は DOM に残したまま隠して、input を隣に足す。
+     replaceWith で入れ替えると、フォーカスが入らなかった端末で blur が来ず、
+     元の要素が外れたまま戻れなくなる（実際に踏んだ） */
+  let inp = null;
+  function toInput(){
+    if(inp) return;
+    inp = document.createElement('input');
+    inp.type = 'text'; inp.inputMode = 'decimal'; inp.value = el.textContent;
+    inp.className = 'scrub'; inp.style.textAlign = 'right';
+    el.style.display = 'none';
+    el.parentNode.insertBefore(inp, el.nextSibling);
+    inp.focus(); inp.select();
+    /* remove() がその場で blur を誘発して done が二重に走るので、
+       参照を先に外してから消す（Esc で確定と取消が両方走っていた） */
+    const done = commit => {
+      const node = inp; if(!node) return;
+      inp = null;
+      if(commit) el.textContent = node.value || '0';
+      node.remove();
+      el.style.display = '';
+    };
+    inp.addEventListener('blur', () => done(true), { once:true });
+    inp.addEventListener('keydown', ev => {
+      if(ev.key === 'Enter'){ done(true); }
+      else if(ev.key === 'Escape'){ done(false); }
+    });
+  }
+})();
+function fillScr(){
+  const name = { a:'A 素の number', b:'B readonly', c:'C inputmode=none', d:'D div スクラブ' };
+  $('#scrtbl').innerHTML = ['a','b','c','d'].map(k =>
+    '<tr><th>' + name[k] + '</th><td class="v">' +
+    (scrLog[k].length ? scrLog[k].join(', ') : '<span class="dim">まだ触っていない</span>') +
+    '</td></tr>').join('');
+}
+fillScr();
+
+/* ══════════ ⑥ 書き出し ══════════ */
+function buildReport(){
+  const strip = s => String(s).replace(/<[^>]+>/g, '');
+  const L = [];
+  L.push('=== iPad PROBE 結果 ===');
+  L.push('測定日時: ' + new Date().toString());
+  L.push('');
+  L.push('--- ① 環境 ---');
+  envRows().forEach(r => L.push('  ' + r[0] + ': ' + strip(r[1])));
+  L.push('');
+  L.push('--- ② 多指タップ（届いた回数） ---');
+  for(let i = 1; i <= 5; i++) L.push('  ' + i + '本指 TAP: ' + (counts[i] || 0) + ' 回');
+  L.push('  preventDefault: ' + (usePD ? 'ON' : 'OFF') + ' / OS横取り検出: ' + (useOS ? 'ON' : 'OFF'));
+  L.push('');
+  L.push('--- ② イベントログ（新しい順・最大300行） ---');
+  memo.slice().reverse().forEach(m => L.push('  ' + m));
+  L.push('');
+  L.push('--- ③ 筆圧 ---');
+  const pt = $('#pentbl').querySelectorAll('tr');
+  pt.forEach(tr => L.push('  ' + tr.children[0].textContent + ': ' + tr.children[1].textContent));
+  if(pts.length){
+    L.push('  最初の12点の pressure: ' + pts.slice(0,12).map(p => p.pr.toFixed(3)).join(', '));
+    L.push('  最後の12点の pressure: ' + pts.slice(-12).map(p => p.pr.toFixed(3)).join(', '));
+  }
+  L.push('');
+  L.push('--- ④ Scribble（拾えたイベント） ---');
+  $('#scrtbl').querySelectorAll('tr').forEach(tr =>
+    L.push('  ' + tr.children[0].textContent + ': ' + tr.children[1].textContent));
+  L.push('');
+  L.push('--- 目視でしか分からない項目（手で書いてください） ---');
+  L.push('  [ ] 3本指タップ: OSのバー（取り消し/やり直し）が出た？  → ');
+  L.push('  [ ] 4本指タップ: アプリが切り替わった？ 何も起きずTAPだけ届いた？  → ');
+  L.push('  [ ] 5本指タップ: ホームに戻った？ TAPだけ届いた？  → ');
+  L.push('  [ ] Scribble A（素のnumber）: 手書きUIが出た？ キーボードは？  → ');
+  L.push('  [ ] Scribble B（readonly）: 手書きUIが出た？  → ');
+  L.push('  [ ] Scribble C（inputmode=none）: 手書きUIが出た？  → ');
+  L.push('  [ ] Scribble D（divスクラブ）: 手書きUIは出ない？ ドラッグで数値が動いた？ Wタップで入力欄になった？  → ');
+  L.push('  [ ] ⑤TEST1（同一スコープ別ページ）: 上にURLバーが出た？  → ');
+  L.push('  [ ] ⑤TEST2（COMPOSER）: 上にURLバーが出た？  → ');
+  L.push('  [ ] 筆圧: 入りと抜きにインクが溜まって見えた？ テーパーONで直った？  → ');
+  L.push('');
+  $('#report').value = L.join('\n');
+}
+function copyReport(){
+  buildReport();
+  const ta = $('#report');
+  ta.focus(); ta.select(); ta.setSelectionRange(0, 999999);
+  let ok = false;
+  try{ ok = document.execCommand('copy'); }catch(_){}
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ta.value).then(() => {}, () => {});
+    ok = true;
+  }
+  alert(ok ? 'コピーしました' : '枠内を長押し → 全選択 → コピーしてください');
+}
+buildReport();
+log('dim', '── PROBE 起動 ──');
+</script>
+</body>
+</html>

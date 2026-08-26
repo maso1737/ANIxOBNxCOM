@@ -1,0 +1,11 @@
+{
+  "name": "ANI × OBN × COM",
+  "short_name": "ANI SUITE",
+  "description": "ブラウザベースの日本アニメ作画特化エディタ群",
+  "scope": "./",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#07030f",
+  "theme_color": "#07030f"
+}

@@ -133,7 +133,7 @@ body.panning #void,body.panning canvas#cv{cursor:grabbing}
 
 /* corner viewfinder ticks — KINETIC stage gate (gold→rouge brackets) */
 #ticks{
-  position:fixed;left:0;right:0;top:64px;bottom:0;z-index:5;pointer-events:none;opacity:.75;
+  position:fixed;left:0;right:0;top:calc(64px + env(safe-area-inset-top,0px));bottom:0;z-index:5;pointer-events:none;opacity:.75;
   background:
     linear-gradient(90deg,var(--gold),var(--acid)) 12px 12px/14px 1px no-repeat,
     linear-gradient(270deg,var(--gold),var(--acid)) calc(100% - 12px) 12px/14px 1px no-repeat,
@@ -148,7 +148,11 @@ body.panning #void,body.panning canvas#cv{cursor:grabbing}
 /* ---------- top bar ---------- */
 #bar{
   position:fixed;left:0;right:0;top:0;z-index:50;display:flex;align-items:center;gap:12px;
-  flex-wrap:nowrap;overflow:hidden;height:64px;padding:0 16px;
+  /* black-translucent＋viewport-fit=cover で本文が最上部(0,0)から描かれるので、
+     ステータスバー(時計/日付/バッテリー)の高さぶんだけ中身を押し下げる。
+     背景は上まで届いたまま＝全画面の見た目を保ったまま、ロゴだけが重ならない。SPEC_18 P0 */
+  flex-wrap:nowrap;overflow:hidden;
+  height:calc(64px + env(safe-area-inset-top,0px));padding:env(safe-area-inset-top,0px) 16px 0;
   background:linear-gradient(to bottom,rgba(6,7,10,.94),rgba(6,7,10,.68) 70%,rgba(6,7,10,.2));
   backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
   border-bottom:1px solid var(--line);
