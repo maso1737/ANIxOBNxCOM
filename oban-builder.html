@@ -36,6 +36,11 @@
   --grey:rgba(232,236,242,.55);--dim:rgba(232,236,242,.3);
   --line:rgba(232,236,242,.14);--line-2:rgba(232,236,242,.08);
   --border:rgba(232,236,242,.14);--border-bright:rgba(var(--accRGB),.55);
+  /* canvas の HUD だけが使う「注目マーカー」。旧 --amber の行き先。
+     ワイプ発火点◇ / 選択KFのピント旗 / ピック中のキャレット＝“いまここを見ろ”の1色。
+     アクセント(--acc)にすると ice(--acc-pt) や選択の桃と近づいて読めなくなるので、
+     テーマからは独立させたまま「変数経由」だけを満たす。canvas 側は CVC.mark で読む */
+  --mark:#FFC94F;
   /* 書体 */
   --saira:'Saira Condensed','Bank Gothic','Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
   --bank:'Bank Gothic','Saira Condensed','Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
@@ -455,6 +460,15 @@ body.fxopen #fx-modal{display:flex;flex-direction:column}
 .fx-hd{display:flex;align-items:center;gap:9px;padding:11px 13px 3px;border-top:1px solid rgba(232,236,242,.06)}
 .fx-hd .qd-sb{height:28px;font-size:11px;letter-spacing:.12em}
 .fx-hd .qd-note{flex:1;min-width:0}
+/* §7-2: 畳んだエフェクトはヘッダ1行だけになる。OFF のものは既定で畳んである */
+.fx-bd{display:block}
+.fx-g.fold .fx-bd{display:none}
+.fx-hd .fx-fold{flex:none;cursor:pointer;border:1px solid transparent;background:none;
+  color:rgba(255,255,255,.45);font-family:var(--mono);font-size:11px;line-height:1;
+  width:26px;height:26px;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.fx-hd .fx-fold:hover{color:#fff;border-color:rgba(255,255,255,.25)}
+.fx-g.fold .fx-hd .fx-fold{transform:rotate(-90deg)}
+.fx-g.fold .fx-hd{padding-bottom:11px}
 .fx-g.off .qd-row{opacity:.34}
 .fx-g.off .qd-row .qd-mr,.fx-g.off .qd-row .qd-num,.fx-g.off .qd-row .qd-sb,.fx-g.off .qd-row .fx-col{pointer-events:none}
 .fx-col{width:46px;height:24px;flex:none;padding:0;border:1px solid rgba(232,236,242,.2);background:none;cursor:pointer}
@@ -590,6 +604,37 @@ body.setopen #set-ovl{display:flex}
 #set-head .hb{flex:none;cursor:pointer;padding:0 2px;opacity:.75;border:0;background:none;color:inherit;
   font-family:var(--mono);font-size:11px}
 #set-head .hb:hover{opacity:1;color:#fff}
+
+/* ============================================================
+   §7-3: 44px ヘッダの ▾ / ✕ を「押せる四角」に揃える
+   ------------------------------------------------------------
+   これまで各パネルが padding:0 2px の素の文字だったので、実寸 15px 程度の的が
+   9px 間隔で隣り合っていた（狭い画面・タッチだと押し分けられない）。
+   ヘッダは 44px あるので 28px の正方形なら余裕で収まる。
+   タッチ環境と狭い窓では 34px まで上げる（指の的の下限）。
+   ここは4パネルぶんまとめて上書きする＝新しいパネルを足すときもこの行に足す。
+   ============================================================ */
+#qe-head .pbtn,#qe-close,
+#mon-head .pbtn,#mon-close,
+#fx-head .hb,#ap-head .hb,#set-head .hb{
+  width:28px;height:28px;padding:0;flex:none;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid transparent;border-radius:0;
+}
+#qe-head .pbtn:hover,#qe-close:hover,
+#mon-head .pbtn:hover,#mon-close:hover,
+#fx-head .hb:hover,#ap-head .hb:hover,#set-head .hb:hover{
+  background:rgba(232,236,242,.08);border-color:rgba(232,236,242,.22);color:#fff;opacity:1;
+}
+/* ▾ と ✕ の間だけ気持ち広く取る（隣同士の押し間違いが起きるのはこの2つ） */
+.pbtns{gap:4px;margin-left:2px}
+#qe-close,#mon-close,#fx-close,#ap-close,#set-close{margin-left:4px}
+@media (max-width:900px),(pointer:coarse){
+  #qe-head .pbtn,#qe-close,
+  #mon-head .pbtn,#mon-close,
+  #fx-head .hb,#ap-head .hb,#set-head .hb{width:34px;height:34px}
+  #qe-close,#mon-close,#fx-close,#ap-close,#set-close{margin-left:6px}
+}
 /* FILE ／ 連携：バーから降りてきた入出力・外部ツール連携・HOME。
    毎回押す道具ではない＝バーを空けて、押す場所を1か所（⚙）に集める */
 #set-acts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:11px 13px 9px;
@@ -803,7 +848,7 @@ body.cleanview{cursor:none}
   <div class="steps">
     <button class="step on" id="m-place" title="配置モード：画像をコマとして並べる。ドラッグ=移動 / [ ]=前後 / フレームに重ねて格納 / Wクリック=フレーム内へ / M=マスク編集"><span class="n">01</span><span class="en">PLACE</span><span class="jp">配置</span><span class="nb">NOW</span></button>
     <span class="sep">›</span>
-    <button class="step" id="m-take" title="カメラモード：スクロールに沿ったカメラワークをキーフレームで打つ。C=CAPTURE / ↑↓=KF移動 / SPACE=PREVIEW"><span class="n">02</span><span class="en">TAKE</span><span class="jp">カメラ</span><span class="nb">NOW</span></button>
+    <button class="step" id="m-take" title="カメラモード：スクロールに沿ったカメラワークをキーフレームで打つ。C=CAPTURE / ←→=KF移動 / SPACE=PREVIEW"><span class="n">02</span><span class="en">TAKE</span><span class="jp">カメラ</span><span class="nb">NOW</span></button>
     <span class="sep">›</span>
     <button class="step" id="b-export" title="書き出し（単一HTMLビューア ／ 動画 MP4）を選んで書き出します"><span class="n">03</span><span class="en">EXPORT</span><span class="jp">書き出し</span></button>
   </div>
@@ -2329,10 +2374,10 @@ function drawTakePath(cam){
     if(f._wipeP==null)continue;
     const c2=camAt(f._wipeP);
     const x=W/2+(c2.x-cam.x)*W*cam.z,y=H/2+(c2.y-cam.y)*H*cam.z;
-    cx.strokeStyle='#FFC94F';cx.beginPath();
+    cx.strokeStyle=CVC.mark;cx.beginPath();
     cx.moveTo(x,y-8*DPR);cx.lineTo(x+8*DPR,y);cx.lineTo(x,y+8*DPR);cx.lineTo(x-8*DPR,y);
     cx.closePath();cx.stroke();
-    cx.fillStyle='#FFC94F';cx.fillText(f.wipe,x+10*DPR,y+3*DPR);
+    cx.fillStyle=CVC.mark;cx.fillText(f.wipe,x+10*DPR,y+3*DPR);
     cx.fillStyle='#5AE9FF';cx.strokeStyle='#5AE9FF';
   }
   cx.restore();
@@ -2386,77 +2431,6 @@ function drawGuides(){
 }
 function toggleGuides(){guides=!guides;try{localStorage.setItem('oban-guides',guides?'1':'0')}catch(e){}}
 
-/* ---------- DOF: 奥行き定規（編集ビューのみ・書き出さない） ----------
- * 「いまピントがどこに合っていて、どのコマがどれだけ離れているか」を1本の線で見せる。
- * A（今の画）／B（次の画）／現在のピント／合焦の幅 を同じ軸に重ねるので、
- * “画面から取る” を押した結果がその場で分かる。 */
-function drawDofRuler(){
-  const d=PROJECT.dof;
-  if(!d||!d.on)return;
-  if(mode==='take'||mode==='place'||mode==='export')return;   // 定規は下部コンソール（FOCUS）へ移設
-  if(mode==='place')return;   // PLACE は下部コンソールの DEPTH 定規が主役（二重に出さない）
-  const W=cv.width,H=cv.height;
-  // キャンバスは CVOFF ぶん下へずれている＝下端が画面外に出る。実際に見えている底から測る
-  const w=Math.min(W*0.52,560*DPR),x0=(W-w)/2,y0=visBottomPx()-58*DPR;
-  const X=v=>x0+clamp(v,0,1)*w;
-  const f=focusAt(null);                                  // 編集中はHUDキャレット（＝dofPin）の位置
-  cx.save();
-  // プレビュー中も出す（dofPin が再生位置に追従するので、送りが目盛りで見える）。絵の邪魔をしないよう薄く
-  if(PV.on)cx.globalAlpha=0.42;
-  cx.font=`${9*DPR}px monospace`;cx.textAlign='left';cx.textBaseline='alphabetic';
-  cx.fillStyle='rgba(90,233,255,.16)';                    // 合焦帯（この幅に入っているコマはくっきり）
-  cx.fillRect(X(f-d.range),y0-8*DPR,X(f+d.range)-X(f-d.range),16*DPR);
-  cx.strokeStyle='rgba(242,238,252,.4)';cx.lineWidth=1*DPR;
-  cx.beginPath();cx.moveTo(x0,y0);cx.lineTo(x0+w,y0);cx.stroke();
-  cx.fillStyle='rgba(242,238,252,.45)';
-  cx.fillText('奥 0.00',x0,y0+17*DPR);
-  cx.textAlign='right';cx.fillText('1.00 手前',x0+w,y0+17*DPR);cx.textAlign='left';
-  for(const o of rootItems()){                            // コマの目盛り（ボケているものは薄く）
-    const px=X(o.depth??0.5),bl=dofBlurAtFocus(o.depth,f,H/DPR),on=(sel===o);
-    cx.strokeStyle=on?'#FF4FA8':'rgba(242,238,252,'+(bl>0.5?0.3:0.85)+')';
-    cx.lineWidth=(on?2:1)*DPR;
-    cx.beginPath();cx.moveTo(px,y0-6*DPR);cx.lineTo(px,y0+6*DPR);cx.stroke();
-    if(on){cx.fillStyle='#FF4FA8';cx.fillText(String(o.name).slice(0,14),px+5*DPR,y0-10*DPR);}
-  }
-  // 置いてある点の旗（選択中のKFの点は琥珀・他はアイス）
-  for(const pt of d.pts){
-    const px=X(pt.f),on=(pt.kf===selKf);
-    cx.fillStyle=on?'#FFC94F':'rgba(90,233,255,.75)';
-    cx.beginPath();cx.moveTo(px,y0-11*DPR);cx.lineTo(px+5*DPR,y0-19*DPR);cx.lineTo(px-5*DPR,y0-19*DPR);cx.closePath();cx.fill();
-    cx.textAlign='center';cx.fillText('#'+pad(pt.kf),px,y0-22*DPR);cx.textAlign='left';
-  }
-  // いまのピント＝ドラッグできるキャレット ▼（HUDが操作面。ここが「今ここ」を置く場所）
-  const cxp=X(f);
-  cx.strokeStyle='#F8EFFF';cx.lineWidth=2*DPR;
-  cx.beginPath();cx.moveTo(cxp,y0-9*DPR);cx.lineTo(cxp,y0+9*DPR);cx.stroke();
-  cx.fillStyle='#F8EFFF';
-  cx.beginPath();cx.moveTo(cxp,y0+13*DPR);cx.lineTo(cxp+6*DPR,y0+23*DPR);cx.lineTo(cxp-6*DPR,y0+23*DPR);cx.closePath();cx.fill();
-  cx.fillText(f.toFixed(2),cxp+9*DPR,y0+22*DPR);
-  cx.font=`${9*DPR}px monospace`;cx.textAlign='center';
-  cx.fillStyle=dofPick?'#FFC94F':'rgba(242,238,252,.5)';
-  /* 「いま ▼ を動かすと何が起きるか」をその場で言う（確認だけなのか、点が更新されるのか） */
-  const hint=PV.on?'PREVIEW — ピント送りを再生中'
-    :dofPick?'ピントを合わせたいコマをクリック（Escで取消）'
-    :(mode!=='take')?'▼ ＝ 見え方の確認だけ（KFへの登録は 2.TAKE カメラ で）'
-    :(selKf<0)?'▼ をドラッグ＝ピント調整（KFを選ぶと置けます）'
-    :(dofPtAt(selKf)>=0)?'▼ をドラッグ＝ #'+pad(selKf)+' の点をそのまま更新'
-    :'▼ で位置を決めて ◎ で #'+pad(selKf)+' に置く';
-  cx.fillText(hint,x0+w/2,y0-34*DPR);
-  cx.restore();
-}
-/* HUDキャレットのドラッグ判定（キャンバス上のポインタを乗っ取る）。
- * DOFがONで編集中のときだけ有効。定規の帯（上下24px）を掴んだらピント調整に入る */
-function dofRulerHit(cssX,cssY){
-  const d=PROJECT.dof;
-  if(!d||!d.on||PV.on||cleanView)return null;
-  if(mode==='take'||mode==='place'||mode==='export')return null;   // ▼ はコンソール側で持つ
-  const W=cv.width,H=cv.height;
-  const w=Math.min(W*0.52,560*DPR),x0=(W-w)/2,y0=visBottomPx()-58*DPR;
-  const px=cssX*DPR,py=cssY*DPR;
-  if(py<y0-26*DPR||py>y0+26*DPR)return null;
-  if(px<x0-10*DPR||px>x0+w+10*DPR)return null;
-  return clamp((px-x0)/w,0,1);
-}
 /* 各コマの「A/Bでどれだけボケるか」を絵の上に出す（数字で見せる＝推測させない） */
 function drawDofBadge(o,R){
   const d=PROJECT.dof,H=cv.height/DPR;   // 画面で見えるぶんのpxで出す（DPRで数字が2倍にならないように）
@@ -2619,7 +2593,7 @@ function reorder(o,dir){
   commit();
 }
 
-/* ---------- V2-A: KFフォーカス（↑↓で行き来） ---------- */
+/* ---------- V2-A: KFフォーカス（←→で行き来・↑↓も同じ） ---------- */
 function selectKf(i,go=true){
   const n=PROJECT.take.kf.length;
   if(!n){selKf=-1;renderCards();return;}
@@ -3705,16 +3679,6 @@ cv.addEventListener('pointerdown',e=>{
     }else toast('コマの上でクリックしてください（Escで取消）');
     return;
   }
-  /* DOF HUD: 定規の帯を掴んだらピント調整（選択中のKFに点があれば、その値も一緒に動く） */
-  {
-    const rv=dofRulerHit(evX(e),evY(e));
-    if(rv!=null){
-      setDofPin(rv,true);
-      drag={type:'dofpin'};
-      cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);
-      return;
-    }
-  }
   /* マスク編集: 4隅ハンドルのドラッグ */
   if(maskEdit.on&&maskEdit.f){
     const R=prect(maskEdit.f,VC);
@@ -3752,11 +3716,6 @@ addEventListener('pointermove',e=>{
   if(!drag)return;
   if(drag.type==='screen'){   // 画面ズラし（見え方だけ・構図も書き出しも変わらない）
     setViewOffset(drag.ox+(e.clientX-drag.sx),drag.oy+(e.clientY-drag.sy),true);
-    return;
-  }
-  if(drag.type==='dofpin'){
-    const W=cv.width,w=Math.min(W*0.52,560*DPR),x0=(W-w)/2;
-    setDofPin(clamp((evX(e)*DPR-x0)/w,0,1),true);
     return;
   }
   if(drag.type==='mask'){
@@ -4074,8 +4033,12 @@ addEventListener('keydown',e=>{
   else if((e.ctrlKey||e.metaKey)&&(e.key==='ArrowLeft'||e.key==='ArrowRight')&&mode==='take'&&selKf>=0){
     e.preventDefault();moveKf(selKf,selKf+(e.key==='ArrowLeft'?-1:1));   // 選択KFの順番を入れ替え
   }
-  else if(e.key==='ArrowUp'&&mode==='take'){e.preventDefault();selectKf(selKf<0?PROJECT.take.kf.length-1:selKf-1,true);}   // V2-A
-  else if(e.key==='ArrowDown'&&mode==='take'){e.preventDefault();selectKf(selKf<0?0:selKf+1,true);}
+  /* KFの並びが横一列（SHOTS ストリップ）になったので、選択の移動も ←/→ が主。
+     ↑/↓ は V2-A からの別名として残す＝手が覚えている方でも動く */
+  else if((e.key==='ArrowLeft'||e.key==='ArrowUp')&&mode==='take'){
+    e.preventDefault();selectKf(selKf<0?PROJECT.take.kf.length-1:selKf-1,true);}
+  else if((e.key==='ArrowRight'||e.key==='ArrowDown')&&mode==='take'){
+    e.preventDefault();selectKf(selKf<0?0:selKf+1,true);}
   else if(e.key==='['&&mode==='place'&&sel&&!isText(sel))reorder(sel,-1);   // V2-A: 背面へ（テキストは常に最前）
   else if(e.key===']'&&mode==='place'&&sel&&!isText(sel))reorder(sel,+1);   // V2-A: 前面へ
   else if((e.key==='m'||e.key==='M')&&mode==='place')toggleMask();   // V2-B
@@ -4171,6 +4134,15 @@ const FX_PJP={shutter:'シャッター',samples:'サンプル',rtStrength:'RT �
   bands:'帯の数',rgb:'色ズレ',speed:'速さ',focusZ:'ピント位置',range:'幅',maxBlur:'最大ボケ'};
 const FX_UNIT={shutter:'°',angle:'°',maxBlur:'px',radius:'px',size:'px',samples:'枚',bands:'本'};
 const FX_BIN={mode:['SCREEN','ADD'],mono:['COLOR','MONO']};
+/* §7-2: CHAIN を役割で3つに割る。CHAIN の実行順は fxp.chain のままで、見出しを挟むだけ。
+   新しいエフェクトを足したらここの keys にも入れる（入れ忘れても「その他」に出る） */
+const FX_SECTS=[
+  {en:'BLUR & LINE',jp:'ブレ・線・にじみ',keys:['mb','olm','diffusion']},
+  {en:'COLOR',      jp:'色を作る',        keys:['para','grade']},
+  {en:'FINISH',     jp:'仕上げ（粒・四隅・乱れ）',keys:['vignette','grain','glitch']},
+];
+const FX_FOLD=new Set();     // 畳んでいるエフェクトの t。セッション限り（PROJECTの保存形式は触らない）
+const FX_FOLD_SEEN=new Set();// 既定の畳み方を一度当てた t。以後はユーザーの開閉を尊重する
 const fxK=k=>'<span class="k'+(/^[\x20-\x7E]+$/.test(k)?' en':'')+'">'+escH(k)+'</span>';
 /* 選択肢は開かずに全部見せる（下部コンソール／DETAIL と同じ作法） */
 function fxSegRow(k,opts,get,set,title){
@@ -4244,34 +4216,72 @@ function buildFxUI(){
   buildDofUI(root);       // DOF/ピン送りはOBAN独自（レイヤー別ボケ）なのでコアと独立
   buildClickFxUI(root);   // V2-D: クリックFXはSATSUEIコアと独立に常時表示
   if(!hasCore){syncFxBadge();return;}
-  root.insertAdjacentHTML('beforeend',qdSect('CHAIN','掛ける順番（上から順に重なる）'));
-  for(const ent of fxp.chain){
-    const def=SFX.FX_DEFS[ent.t];if(!def)continue;   // 未知はUIにも出さない（前方互換）
-    if(def.tier==='layer')continue;   // レイヤー型（DOF）は全画面チェーンでは効かない。上の専用UIが担当
-    const g=document.createElement('div');g.className='fx-g'+(ent.on?'':' off');
-    const hd=document.createElement('div');hd.className='fx-hd';
-    hd.title=def.label+' ['+def.tier+']';
-    hd.innerHTML='<button class="qd-sb'+(ent.on?' on':'')+'">'+escH(def.label.replace(/\s*[（(].*$/,''))+'</button>'
-      +'<span class="qd-note">'+escH(FX_JP[ent.t]||'')+'</span>';
-    hd.querySelector('.qd-sb').addEventListener('click',ev=>{
-      ent.on=!ent.on;ev.currentTarget.classList.toggle('on',ent.on);g.classList.toggle('off',!ent.on);commitD();});
-    g.appendChild(hd);
-    for(const u of (def.ui||[])){
-      const lb=FX_PJP[u.k]||u.label;
-      if(u.min===0&&u.max===1&&u.step===1){
-        const o=FX_BIN[u.k]||['OFF','ON'];
-        g.appendChild(fxSegRow(lb,[{v:0,l:o[0]},{v:1,l:o[1]}],()=>ent.p[u.k],
-          v=>{ent.p[u.k]=+v;commitD();},u.label));
-      }else{
-        g.appendChild(fxNumRow({label:lb,title:u.label,unit:FX_UNIT[u.k],min:u.min,max:u.max,step:u.step,
-          get:()=>ent.p[u.k],set:v=>{ent.p[u.k]=v;commitD();}}));
-      }
-    }
-    for(const ck of (def.colors||[]))
-      g.appendChild(fxColRow(ck.toUpperCase(),()=>ent.p[ck],v=>{ent.p[ck]=v;commitD();}));
-    root.appendChild(g);
+  /* CHAIN は「掛ける順番」なので並びは動かせない。代わりに **役割で見出しを挟む**（§7-2）。
+     ここに無い t は最後の「その他」へ落ちるので、エフェクトを足しても迷子にならない */
+  const used=new Set();
+  for(const sec of FX_SECTS){
+    const ents=fxp.chain.filter(e=>sec.keys.indexOf(e.t)>=0);
+    if(!ents.length)continue;
+    ents.forEach(e=>used.add(e));
+    if(!buildFxSect(root,sec.en,sec.jp,ents))continue;
   }
+  const rest=fxp.chain.filter(e=>!used.has(e));
+  if(rest.length)buildFxSect(root,'OTHER','その他',rest);
   syncFxBadge();
+}
+/* CHAIN の1セクション。中身が全部 layer 型なら見出しごと出さない（空の見出しを作らない） */
+function buildFxSect(root,en,jp,ents){
+  const gs=[];
+  for(const ent of ents){
+    const g=buildFxGroup(ent);
+    if(g)gs.push(g);
+  }
+  if(!gs.length)return false;
+  root.insertAdjacentHTML('beforeend',qdSect(en,jp));
+  gs.forEach(g=>root.appendChild(g));
+  return true;
+}
+/* エフェクト1個ぶんの箱。OFF のものは畳んでおく＝縦に伸びるのを止める（§7-2）。
+   畳み状態は FX_FOLD（セッション限り）に持つ。PROJECT に足すと保存形式が変わるため */
+function buildFxGroup(ent){
+  const def=SFX.FX_DEFS[ent.t];if(!def)return null;   // 未知はUIにも出さない（前方互換）
+  if(def.tier==='layer')return null;   // レイヤー型（DOF）は全画面チェーンでは効かない。上の専用UIが担当
+  /* 既定は「OFF のものは畳む」。ただし当てるのは1回だけ＝OFF のまま開いておいた項目を、
+     パネルを閉じて開き直すたびに畳み直さない */
+  if(!FX_FOLD_SEEN.has(ent.t)){FX_FOLD_SEEN.add(ent.t);if(!ent.on)FX_FOLD.add(ent.t);}
+  const folded=FX_FOLD.has(ent.t);
+  const g=document.createElement('div');g.className='fx-g'+(ent.on?'':' off')+(folded?' fold':'');
+  const hd=document.createElement('div');hd.className='fx-hd';
+  hd.title=def.label+' ['+def.tier+']';
+  hd.innerHTML='<button class="qd-sb'+(ent.on?' on':'')+'">'+escH(def.label.replace(/\s*[（(].*$/,''))+'</button>'
+    +'<span class="qd-note">'+escH(FX_JP[ent.t]||'')+'</span>'
+    +'<button class="fx-fold" title="この項目の細かい設定を開く／畳む">▾</button>';
+  const bd=document.createElement('div');bd.className='fx-bd';
+  /* 主電源。OFF→ON にしたら畳んだままだと「押したのに何も出ない」ので必ず開く */
+  hd.querySelector('.qd-sb').addEventListener('click',ev=>{
+    ent.on=!ent.on;ev.currentTarget.classList.toggle('on',ent.on);g.classList.toggle('off',!ent.on);
+    if(ent.on&&g.classList.contains('fold')){g.classList.remove('fold');FX_FOLD.delete(ent.t);}
+    commitD();});
+  hd.querySelector('.fx-fold').addEventListener('click',()=>{
+    const f=!g.classList.contains('fold');
+    g.classList.toggle('fold',f);
+    if(f)FX_FOLD.add(ent.t);else FX_FOLD.delete(ent.t);});
+  g.appendChild(hd);
+  for(const u of (def.ui||[])){
+    const lb=FX_PJP[u.k]||u.label;
+    if(u.min===0&&u.max===1&&u.step===1){
+      const o=FX_BIN[u.k]||['OFF','ON'];
+      bd.appendChild(fxSegRow(lb,[{v:0,l:o[0]},{v:1,l:o[1]}],()=>ent.p[u.k],
+        v=>{ent.p[u.k]=+v;commitD();},u.label));
+    }else{
+      bd.appendChild(fxNumRow({label:lb,title:u.label,unit:FX_UNIT[u.k],min:u.min,max:u.max,step:u.step,
+        get:()=>ent.p[u.k],set:v=>{ent.p[u.k]=v;commitD();}}));
+    }
+  }
+  for(const ck of (def.colors||[]))
+    bd.appendChild(fxColRow(ck.toUpperCase(),()=>ent.p[ck],v=>{ent.p[ck]=v;commitD();}));
+  g.appendChild(bd);
+  return g;
 }
 /* ---------- DOF / ピン送り（ここは細かい詰めだけ） ----------
  * よく触る ON / ピント位置 / KFへ置く は下部コンソール（FOCUS 定規）にある。
@@ -4572,7 +4582,7 @@ const SET_GROUPS=[
   ]},
   {t:'2. TAKE カメラ',rows:[
     ['C','いまの構図を CAPTURE。<b>選択KFがあればその次に挿入</b>される'],
-    ['↑ / ↓','KFの選択を移動（カメラもそこへ飛ぶ）'],
+    ['← / →','KFの選択を移動（カメラもそこへ飛ぶ）。<b>↑ / ↓</b> でも同じ'],
     ['Ctrl+← / →','選択KFの<b>順番</b>を入れ替え（カード左の ⠿ ドラッグでも可）'],
     ['▸ GO','そのKFの構図へ。<b>プレビュー中は再生位置がそこへ飛ぶ</b>'],
     ['↻ UPD','いまの画面の構図でそのKFを上書き'],
@@ -4630,9 +4640,20 @@ function toggleSetModal(force){
 const THEMES=['GLOSS','SPOTLIGHT','ROUGE'];
 let THEME='GLOSS';
 try{const t=localStorage.getItem('oban-theme');if(THEMES.indexOf(t)>=0)THEME=t;}catch(e){}
+/* canvas は CSS 変数を直に読めない。テーマが変わった瞬間に実際の色を拾って持っておく＝
+   ハードコードの hex を canvas 側にも足さずに済む（--mark 以外を足すときもここに並べる） */
+const CVC={mark:'#FFC94F'};
+function syncCanvasColors(){
+  try{
+    const cs=getComputedStyle(document.body);
+    const m=cs.getPropertyValue('--mark').trim();
+    if(m)CVC.mark=m;
+  }catch(e){}
+}
 function applyTheme(t,quiet){
   THEME=(THEMES.indexOf(t)>=0)?t:'GLOSS';
   document.body.dataset.theme=THEME;
+  syncCanvasColors();
   try{if(!HARNESS_ON)localStorage.setItem('oban-theme',THEME);}catch(e){}
   if(document.body.classList.contains('setopen'))renderSettings();
   if(!quiet)toast('THEME — '+THEME);
@@ -5451,7 +5472,6 @@ function frameBody(nowMs){
   if(!cleanView){                           // クリーン表示中はガイド類（カメラ軌道/セーフフレーム/PREVIEW表記）を全部隠す
     drawTakePath(cam);
     drawGuides();
-    drawDofRuler();                         // DOFの奥行き定規（プレビュー中は薄く出して送りを見せる）
     drawOutFrame();                         // EXPORT: 選んだサイズで「ここが出る」枠
     if(VS!==1){                             // 表示ズーム中はキャンバスの縁と倍率を出す（縮んでいると分かるように）
       cx.save();
