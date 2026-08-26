@@ -64,7 +64,9 @@ button.act{
 button.act.on{border-color:var(--acid);color:var(--acid);background:#1c0c2e}
 button.act.danger{border-color:var(--ng);color:var(--ng)}
 #pad{
-  height:230px; background:var(--panel2); border:1px dashed var(--magenta);
+  /* 5本指が収まらず測れなかったので広げた（実機 2026-08-26）。
+     iPad横向きなら幅は足りるので、稼ぐのは高さ */
+  height:min(42vh,380px); min-height:300px; background:var(--panel2); border:1px dashed var(--magenta);
   border-radius:3px; touch-action:none; user-select:none; -webkit-user-select:none;
   display:flex; align-items:center; justify-content:center; text-align:center;
   color:var(--dim); font-size:11px; position:relative; overflow:hidden;
@@ -299,8 +301,18 @@ function envRows(){
     ['getCoalescedEvents', ('PointerEvent' in window && PointerEvent.prototype.getCoalescedEvents)
       ? '<span class="ok">あり</span>' : '<span class="ng">なし</span>'],
     ['EyeDropper', 'EyeDropper' in window ? 'あり' : 'なし（Safari は非対応）'],
-    ['ctx.filter', (function(){ try{ return 'filter' in document.createElement('canvas').getContext('2d')
-      ? '<span class="ok">あり</span>' : '<span class="ng">なし</span>'; }catch(e){ return '?'; } })()],
+    /* ★'filter' in ctx では当てにならない（プロパティは在るのに無視される環境がある）。
+       oban-builder の probeCanvasFilter と同じ「実際にぼかして外側へにじんだか」で見る */
+    ['ctx.filter', (function(){ try{
+      const c = document.createElement('canvas'); c.width = c.height = 32;
+      const g = c.getContext('2d');
+      if(!g || typeof g.filter !== 'string') return '<span class="ng">なし（プロパティ自体が無い）</span>';
+      g.clearRect(0, 0, 32, 32);
+      g.filter = 'blur(4px)'; g.fillStyle = '#000'; g.fillRect(10, 10, 12, 12); g.filter = 'none';
+      return g.getImageData(6, 16, 1, 1).data[3] > 4
+        ? '<span class="ok">あり（実際にぼけた）</span>'
+        : '<span class="warn">プロパティは在るが効かない</span>';
+    }catch(e){ return '? ' + e; } })()],
     ['userAgent', navigator.userAgent],
   ];
 }
@@ -397,7 +409,8 @@ function endPtr(e, cancelled){
   } else if(dt < TAP_MS && moved < TAP_SLOP){
     counts[maxN] = (counts[maxN] || 0) + 1;
     for(let i = 1; i <= 5; i++) $('#c' + i).textContent = counts[i] || 0;
-    log('ok', '✓ TAP  n=' + maxN + '  (' + Math.round(dt) + 'ms / ' + Math.round(moved) + 'px)');
+    log('ok', '✓ TAP  n=' + maxN + '  (' + Math.round(dt) + 'ms / ' + Math.round(moved) + 'px)' +
+              '  [pd:' + (usePD ? 'ON' : 'OFF') + ']');
   } else {
     log('dim', '  → n=' + maxN + ' はタップ判定外 (' + Math.round(dt) + 'ms / ' + Math.round(moved) + 'px)');
   }
@@ -445,7 +458,7 @@ function sizeInk(){
   const r = cv.getBoundingClientRect();
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, r.width, r.height);
 }
-function clearInk(){ sizeInk(); pts.length = 0; coalTotal = 0; coalCalls = 0; fillPen(); }
+function clearInk(){ sizeInk(); pts.length = 0; arc = 0; coalTotal = 0; coalCalls = 0; fillPen(); }
 addEventListener('resize', () => setTimeout(clearInk, 100));
 
 /* getCoalescedEvents のオブジェクトはプールされるので必ず値コピーで持つ（資料B） */
@@ -558,24 +571,31 @@ const scrLog = { a:[], b:[], c:[], d:[] };
   const el = $('#f-d');
   /* lastTap の初期値を 0 にすると performance.now() がまだ小さい「起動直後」に
      一発目が2連打と誤判定される（実際に踏んだ）。十分過去を入れておく */
-  let act=false, sx=0, sv=0, mv=false, lastTap=-1e9, lastMoved=false;
+  let act=false, sx=0, sv=0, mv=false, lastTap=-1e9, lastMoved=false, maxDx=0;
   el.addEventListener('pointerdown', e => {
     e.preventDefault();                                   // ★フォーカスを渡さない＝Scribble が起きない
     const t = now();
     // 直前がスクラブ（動かした）なら2連打と数えない（econte の◆と同じ切り分け）
     if(t - lastTap < 320 && !lastMoved){ lastTap = -1e9; toInput(); return; }
     lastTap = t;
-    act = true; mv = false; sx = e.clientX; sv = parseFloat(el.textContent) || 0;
+    act = true; mv = false; maxDx = 0; sx = e.clientX; sv = parseFloat(el.textContent) || 0;
     try{ el.setPointerCapture(e.pointerId); }catch(_){}
   }, { passive:false });
   el.addEventListener('pointermove', e => {
     if(!act) return;
     const dx = e.clientX - sx;
+    if(Math.abs(dx) > Math.abs(maxDx)) maxDx = dx;
     if(!mv && Math.abs(dx) < 3) return;
     mv = true; e.preventDefault();
     el.textContent = String(Math.round(sv + dx));
   }, { passive:false });
-  el.addEventListener('pointerup', () => { act = false; lastMoved = mv; });
+  el.addEventListener('pointerup', () => {
+    act = false;
+    /* ★3px だとふつうのタップの手ブレでもスクラブ扱いになり、
+       次のタップが2連打と数えられず打ち換えに入れなかった（実機 2026-08-26）。
+       「実際に値を動かしたと言える量」まで緩める */
+    lastMoved = Math.abs(maxDx) > 10;
+  });
   /* ★span は DOM に残したまま隠して、input を隣に足す。
      replaceWith で入れ替えると、フォーカスが入らなかった端末で blur が来ず、
      元の要素が外れたまま戻れなくなる（実際に踏んだ） */
@@ -588,6 +608,7 @@ const scrLog = { a:[], b:[], c:[], d:[] };
     el.style.display = 'none';
     el.parentNode.insertBefore(inp, el.nextSibling);
     inp.focus(); inp.select();
+    scrLog.d.push('→INPUT生成'); fillScr();
     /* remove() がその場で blur を誘発して done が二重に走るので、
        参照を先に外してから消す（Esc で確定と取消が両方走っていた） */
     const done = commit => {
@@ -596,6 +617,7 @@ const scrLog = { a:[], b:[], c:[], d:[] };
       if(commit) el.textContent = node.value || '0';
       node.remove();
       el.style.display = '';
+      scrLog.d.push(commit ? '→確定' : '→取消'); fillScr();
     };
     inp.addEventListener('blur', () => done(true), { once:true });
     inp.addEventListener('keydown', ev => {
