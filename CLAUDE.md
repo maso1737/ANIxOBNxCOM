@@ -64,7 +64,11 @@
   standalone は **`navigator.standalone` で見る**（`display-mode` は `browser` と出て当てにならない）・
   **`<link rel="manifest">` を張るとホーム画面追加が start_url をインストールしてしまう**／
   safe-area は top 32px / bottom 20px・**Fullscreen API は無いので ⛶ は消す**。
-  **P0 実装済み。P1＝composer をパイロット（数値欄・トラック並べ替え・4本指）→ P2 スキル化 → P3 横展開。**
+  **P0・P4 実装済み。P1＝composer をパイロット（数値欄・トラック並べ替え・4本指）→ P2 スキル化 → P3 横展開。**
+  **§4-5 = ANIMATOR の「線上に点々と残る太い粒」の真因**＝`pressureRadius` の `pressure || 0.5` が
+  **筆圧ちょうど0のサンプルを 0.5（中くらいの太さ）に化かしていた**（実測で1ストローク1363点中37点が0）。
+  左レール `PRS` の下に **`SM` トグル（RAW → EMA → EMA+）** を追加。**既定 RAW ＝従来と完全に同じ**なので、
+  描き比べて好きなほうを選べる（`localStorage['animator_pensmooth_v1']`）。
   §6 に「probe を作って実際に踏んだ落とし穴7件」（getCoalescedEvents が空配列を返す・setPointerCapture が投げる 等）
 - `SPEC_16_ECONTE_V4.md` — **ECONTE V4「枠ごとの画」。§1〜§3＋§5-B＋E1＋§5-C(C1〜C10) 実装済み（2026-08-18〜19）。残りは §5-D（iPad）だけ**。
   画は **枠（`cam[k]`）ごとに1枚**（`cut.fr[k] = {line 1280×720, plate 512×288, rect}`。`cam[]` と1対1・`ensureFr()` を必ず通す）。

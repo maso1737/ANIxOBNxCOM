@@ -1549,6 +1549,13 @@ input[type=range]::-moz-range-thumb{
       <button class="tb-stab-mode" id="tb-pcurve-btn"
         title="筆圧カーブを切替（クリックで LIN → SOFT → HARD）&#10;LIN: 線形&#10;SOFT: 軽い筆圧が細く出る（入り抜き強調）&#10;HARD: 軽い筆圧でもしっかり太い&#10;※PENダブルタップの筆圧モードON時に有効">LIN</button>
     </div>
+
+    <!-- 筆圧の均し（SPEC_18 §4-5・筆圧ペンON時に有効） -->
+    <div class="tb-stab" id="tb-psm">
+      <span class="lbl">SM</span>
+      <button class="tb-stab-mode" id="tb-psm-btn"
+        title="筆圧の均しを切替（クリックで RAW → EMA → EMA+）&#10;RAW: 従来どおり（筆圧の生値をそのまま使う）&#10;EMA: 筆圧のノイズを均す（線に点々と出る太い粒の対策）&#10;EMA+: EMA＋入りを弧長12pxで絞り、抜きも細くなれるようにする&#10;※PENダブルタップの筆圧モードON時に有効">RAW</button>
+    </div>
   </div>
 
   <!-- STAGE -->
@@ -2274,6 +2281,16 @@ const state = {
     try{ const v = localStorage.getItem('animator_pcurve_v1');
       if(v === 'soft' || v === 'hard' || v === 'linear') return v; }catch(e){}
     return 'linear';
+  })(),
+  /* 筆圧の均し（SPEC_18 §4-5）: 'raw' | 'ema' | 'ema+'
+     実機測定で分かったこと ——「着地スパイク」は無かった（1発目=中央値）。
+     代わりに1ストローク1363点中37点が pressure ちょうど0＝**センサーが実際に跳ねる**。
+     生値をそのまま半径に渡していると、高い側へ跳ねた1点が太い1点として線上に残る
+     （＝あの点在するインクの粒）。ema はそれを均すだけで、機能は増やさない。 */
+  penSmooth: (() => {
+    try{ const v = localStorage.getItem('animator_pensmooth_v1');
+      if(v === 'raw' || v === 'ema' || v === 'ema+') return v; }catch(e){}
+    return 'raw';                    // 既定は現状のまま＝入れても何も変わらない
   })(),
   // セル基準幅 (px)。Alt+ホイール で変更可能
   cellBaseW: 80,
@@ -5143,11 +5160,44 @@ function applyPressureCurve(p){
   if(state.pressureCurve === 'hard') return Math.pow(p, 0.55);  // 軽い筆圧でもしっかり太い
   return p;
 }
+/* ── 筆圧の均しと入りのテーパー（SPEC_18 §4-5）──
+   P_EMA_A: 研究稿A・Bが一致した 0.15〜0.30 の中央。小さいほど滑らかだが追従が遅れる。
+   TAPER_PX: 入りを絞る弧長。**時間ではなく弧長**で見るのでフレーム落ちに影響されない。
+   ※ 抜きのテーパーは入れていない。抜きを弧長で作るには「終端の12px分を描かずに溜めておく」
+     必要があり、描線が目に見えて遅れる。ema+ では代わりに半径の下限を下げて、
+     筆圧が落ちるぶんだけ自然に細くなるようにしてある。 */
+const P_EMA_A  = 0.25;
+const TAPER_PX = 12;
+let pSm = null;        // 平滑化した筆圧（ストロークごとに null へ戻す）
+let strokeArc = 0;     // ストローク開始からの弧長（作業座標px）
+function smoothPressure(pressure){
+  // 筆圧が来ていない環境（null/undefined）はそのまま通す。
+  // ここで 0 に潰すと pressureRadius 側の「未提供なら0.5」判定が死ぬ
+  if(pressure == null) return pressure;
+  const raw = Math.max(0, Math.min(1, pressure));
+  if(state.penSmooth === 'raw' || pSm === null){ pSm = raw; return raw; }
+  pSm += (raw - pSm) * P_EMA_A;
+  return pSm;
+}
+function taperK(){
+  if(state.penSmooth !== 'ema+') return 1;
+  return Math.min(1, strokeArc / TAPER_PX);
+}
 // 筆圧 → 半径（現在のペンサイズを最大半径とする）
 function pressureRadius(pressure){
   const maxR = state.penSize === 1 ? 3 : state.penSize === 2 ? 6 : state.penSize * 0.8;
-  const p = Math.max(0.08, Math.min(1, pressure || 0.5));
-  return Math.max(0.7, maxR * applyPressureCurve(p));
+  const plus = (state.penSmooth === 'ema+');
+  /* ★あの「線上に点々と残る太い粒」の正体はここだった。
+     `pressure || 0.5` は「筆圧が来ていない環境なら 0.5 とみなす」つもりの式だが、
+     **筆圧ちょうど 0 のサンプルまで 0.5（＝中くらいの太さ）に化かしてしまう**。
+     実機では1ストローク1363点中37点が pressure ちょうど0だった（SPEC_18 §2-4）＝
+     その37点が周囲の3倍近い太さのドットとして残る。
+     raw は互換のため従来式のまま。ema 以上では「0」と「未提供(null/undefined)」を区別する。 */
+  const src = (state.penSmooth === 'raw') ? (pressure || 0.5)
+                                          : (pressure == null ? 0.5 : pressure);
+  const p = Math.max(plus ? 0.02 : 0.08, Math.min(1, src));
+  const floor = plus ? 0.35 : 0.7;          // ema+ は抜きが細くなれるよう下限を下げる
+  return Math.max(floor, maxR * applyPressureCurve(p) * taperK());
 }
 let lastR = 1;
 // ── Shift 修飾（PSD準拠）──
@@ -5196,13 +5246,14 @@ function startStroke(clientX, clientY, pressure){
   lastX = dc.x; lastY = dc.y;
   lastWX = x; lastWY = y;                          // 作業座標（ミラー基準）
   stabResetTo(x, y);                               // 補正追従を作業座標で初期化
+  pSm = null; strokeArc = 0;                       // 筆圧の均しと入りテーパーを頭から始める
   drawing = true;
   const ctx = activeDrawCtx();
   const mp = (mx, my) => { const m = mirrorPt(mx, my); return em ? toFrameLocal(m.x, m.y) : m; };
   const usePressure = state.pressurePen && state.tool === 'pen';
   if(state.tool === 'pen'){
     if(usePressure){
-      lastR = pressureRadius(pressure);
+      lastR = pressureRadius(smoothPressure(pressure));
       drawDotRadius(ctx, dc.x, dc.y, lastR, inkStyle());
       if(state.mirrorOn){ const m = mp(x, y); drawDotRadius(ctx, m.x, m.y, lastR, inkStyle()); }
     } else {
@@ -5232,9 +5283,10 @@ function continueStroke(clientX, clientY, pressure, noSmooth){
     const b2 = em ? toFrameLocal(b.x, b.y) : b;
     return [a2, b2];
   };
+  strokeArc += Math.hypot(curWX - lastWX, curWY - lastWY);   // 入りテーパー用（作業座標で積む）
   if(state.tool === 'pen'){
     if(usePressure){
-      const r = pressureRadius(pressure);
+      const r = pressureRadius(smoothPressure(pressure));
       drawLineRadius(ctx, lastX, lastY, x, y, lastR, r, inkStyle());
       if(state.mirrorOn){ const [a,b] = mLine(); drawLineRadius(ctx, a.x, a.y, b.x, b.y, lastR, r, inkStyle()); }
       lastR = r;
@@ -8234,6 +8286,24 @@ pcurveBtn.addEventListener('click', () => {
   renderPCurve();
 });
 renderPCurve();
+
+// ===== 筆圧の均し切替（RAW → EMA → EMA+）SPEC_18 §4-5 =====
+// 既定は RAW ＝**入れても何も変わらない**。描き比べてから選べるようにするためのトグル。
+const PSM_ORDER = ['raw', 'ema', 'ema+'];
+const PSM_LABEL = { raw:'RAW', 'ema':'EMA', 'ema+':'EMA+' };
+const psmBtn = document.getElementById('tb-psm-btn');
+function renderPSm(){
+  psmBtn.textContent = PSM_LABEL[state.penSmooth];
+  psmBtn.classList.toggle('on', state.penSmooth !== 'raw');
+}
+psmBtn.addEventListener('click', () => {
+  const i = PSM_ORDER.indexOf(state.penSmooth);
+  state.penSmooth = PSM_ORDER[(i + 1) % PSM_ORDER.length];
+  try{ localStorage.setItem('animator_pensmooth_v1', state.penSmooth); }catch(e){}
+  renderPSm();
+  stageToast('筆圧の均し ' + PSM_LABEL[state.penSmooth]);
+});
+renderPSm();
 
 // TIME表示 タップで コマ ↔ 秒 切替 / Shift+タップで最大尺サイクル(15→30→60→120秒)
 document.getElementById('dur-info').addEventListener('click', e => {
