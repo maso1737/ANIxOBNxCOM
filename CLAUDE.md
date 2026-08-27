@@ -53,6 +53,19 @@
 - `SPEC_17_INPUT_GRAMMAR.md` — **操作文法の統一（INPUT GRAMMAR）**。ツールキーの押し方（単押し/2連打/長押し/Shift/バネ）と
   投げ縄の囲い方（ドラッグ=フリーハンド / クリック=多角形）の共通文法。**正準は `animator.html`**。
   **実装済み: animator（§2-2）／econte（§2-2b・差分つき）／manga-plate（§2-2c・差分つき）。残り: oban-builder のみ**
+- `SPEC_18_IPAD_GRAMMAR.md` — **iPad 操作文法の統一（IPAD GRAMMAR）**。SPEC_17 の iPad 版。
+  **第一原則＝指はナビとUI・ペンは描く面だけ。** 数値はここに書いてあるものが**実機の測定値**で、推測ではない
+  （測定器 `ipad-probe.html`・iPadOS 18.7 / Safari 26.6・2026-08-26〜27）。**仕様を変えるときは probe で測り直す。**
+  決着: **3本指タップは使える**（20回すべて到達・OSの取り消しは一度も発火せず＝OBANの旧コメントは誤り、訂正済み）／
+  **4本指=PREVIEW は安全**／**5本指はアプリ切替に化けるので割り当てない**／
+  **`preventDefault` は多指タップの到達には不要**（ピンチ・スクロール抑止のためだけ）／
+  数値欄は **div スクラブ（Wタップで input を動的生成）が唯一 Scribble を出さずスクラブもできる**
+  ——**`readonly` は実機では Scribble を止めたが研究資料2本の記述とは逆**、ただしスクラブと両立しないので正準にしない／
+  standalone は **`navigator.standalone` で見る**（`display-mode` は `browser` と出て当てにならない）・
+  **`<link rel="manifest">` を張るとホーム画面追加が start_url をインストールしてしまう**／
+  safe-area は top 32px / bottom 20px・**Fullscreen API は無いので ⛶ は消す**。
+  **P0 実装済み。P1＝composer をパイロット（数値欄・トラック並べ替え・4本指）→ P2 スキル化 → P3 横展開。**
+  §6 に「probe を作って実際に踏んだ落とし穴7件」（getCoalescedEvents が空配列を返す・setPointerCapture が投げる 等）
 - `SPEC_16_ECONTE_V4.md` — **ECONTE V4「枠ごとの画」。§1〜§3＋§5-B＋E1＋§5-C(C1〜C10) 実装済み（2026-08-18〜19）。残りは §5-D（iPad）だけ**。
   画は **枠（`cam[k]`）ごとに1枚**（`cut.fr[k] = {line 1280×720, plate 512×288, rect}`。`cam[]` と1対1・`ensureFr()` を必ず通す）。
   写真（`baseC`）だけ全枠で共有。パッチは **紙（ベイク空間）の上に `camBakeRect(cut,k)` の位置で置く**ので
