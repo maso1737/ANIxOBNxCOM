@@ -1882,6 +1882,10 @@ function setupApLive(){
       else gApSeen[id]=m.payload;   // 一覧用に最新だけ保持
       if(document.body.classList.contains('apopen'))renderApList();
     } else if(m.type==='animator-hello'){apAnnounce();}   // ANIMATOR後起動でも取りこぼさない
+    else if(m.type==='plate-text-ack'){                  // P2: 戻りが届いたかの返事
+      gBackAck=true;
+      toast(m.hit?'▶ MANGA PLATE に反映しました':'その文字は MANGA PLATE 側にもうありません（戻せませんでした）');
+    }
   };
   apAnnounce();
   setTimeout(apAnnounce,700);            // 起動直後のタブ生成レース対策（composerと同じ）
@@ -1964,7 +1968,9 @@ function plateWrap(p,rec){
       vert:t.vert!==false,font:'antique',
       /* MANGA PLATE のフチ幅(px)を、OBANの4方向シャドウのオフセット比に直す */
       ew:(t.edge&&t.edge.on)?+clamp(t.edge.w/Math.max(1,t.size/24),0,8).toFixed(2):0,
-      parent:f.id,kf:null});
+      parent:f.id,kf:null,
+      /* P2 戻り用の控え。これが無いと「どの文字を書き戻すか」を特定できない */
+      srcId:t.id||null,srcProj:rec.projectId||null});
     n++;
   });
   return n;
@@ -3489,7 +3495,7 @@ function duplicateSel(){
   const nx=+((sel.x??0)+off).toFixed(3),ny=+((sel.y??0)+off).toFixed(3);
   let dup;
   if(isText(sel)){
-    dup={...sel,id:'t'+(pid++),x:nx,y:ny};
+    dup={...sel,id:'t'+(pid++),x:nx,y:ny,srcId:null,srcProj:null};   // 複製は書き戻し先を継がない（2つが同じ文字を上書きし合う）
     PROJECT.texts.push(dup);
   }else if(isFrame(sel)){
     dup={...sel,id:'f'+(pid++),name:nextName(sel.name),ord:maxOrd+1,x:nx,y:ny,
@@ -3499,7 +3505,7 @@ function duplicateSel(){
     delete dup._wipeP;
     PROJECT.frames.push(dup);
     childrenOf(sel).forEach(c=>PROJECT.panels.push({...c,id:pid++,parent:dup.id,seq:c.seq?{...c.seq}:null,_t0:null}));
-    textsOf(sel).forEach(t=>PROJECT.texts.push({...t,id:'t'+(pid++),parent:dup.id}));
+    textsOf(sel).forEach(t=>PROJECT.texts.push({...t,id:'t'+(pid++),parent:dup.id,srcId:null,srcProj:null}));
   }else{
     dup={...sel,id:pid++,ord:maxOrd+1,x:nx,y:ny,seq:sel.seq?{...sel.seq}:null,_t0:null};
     PROJECT.panels.push(dup);
@@ -4029,11 +4035,26 @@ function openTextEditor(cssX,cssY,t,fsCssOpt){
     if(s!=null)commitText(t,s.replace(/\//g,'\n'),cssX,cssY);
   }
 }
+/* ---- P2: MANGA PLATE 由来の文字を直したら本家へ返す（SPEC_09 §v2-11） ----
+ * 返すのは **文字列だけ**。位置・サイズ・色・行間は MANGA PLATE 側を正とする
+ * （用紙座標へ逆変換すると誤差が乗る／OBANの色は白黒しか無くパレット色を潰すため）。
+ * OBANで新規に足した文字（srcId が無い）と、消した文字は送らない＝向こうを勝手に増減させない。
+ * 届いたかどうかは MANGA PLATE の ack で判定する（BroadcastChannel は投げっぱなしなので、
+ * ack を見ないと「閉じていて戻っていない」のを黙って見逃す）。 */
+let gBackAck=false,gBackT=null;
+function plateBack(t){
+  if(!t||!t.srcId||!gApChan)return;
+  gBackAck=false;
+  apPost({type:'plate-text-update',src:'oban-builder',projectId:t.srcProj||null,
+    texts:[{srcId:t.srcId,str:String(t.str)}]});
+  clearTimeout(gBackT);
+  gBackT=setTimeout(()=>{if(!gBackAck)toast('MANGA PLATE が開いていないので戻せませんでした — 開いた状態でもう一度確定してください');},800);
+}
 function commitText(t,str,cssX,cssY){
   str=String(str).replace(/\s+$/,'');
   if(t){   // 既存の再編集: 位置は維持。空にしたら削除
     if(!str){PROJECT.texts=PROJECT.texts.filter(x=>x!==t);if(sel===t){sel=null;renderChip();}}
-    else t.str=str;
+    else{const chg=(t.str!==str);t.str=str;if(chg)plateBack(t);}   // P2: 変わったときだけ返す
     commit();return;
   }
   if(!str)return;

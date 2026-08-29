@@ -414,6 +414,20 @@ cd verify && npm run verify:oban
 ANIMATOR からの普通のレコードは `plate` を持たないので**従来どおりパネル1枚**。
 仕様は `SPEC_09_MANGA_PLATE.md` §v2-9。
 
+### 直した読み文字を MANGA PLATE へ返す（2026-08-29 / SPEC_09 §v2-11）
+
+`plateWrap()` が取り込み時に **`srcId`（MANGA PLATE の item id）／`srcProj`（projectId）** を
+テキストに控える。`commitText()` で**文字が変わったときだけ** `plateBack()` が
+`{type:'plate-text-update',texts:[{srcId,str}]}` を `tdr_live` へ流す。
+
+- 返すのは **`str` だけ**。位置・サイズ・色は MANGA PLATE を正とする（向こうの版面を動かさない）
+- **ack（`plate-text-ack`）を800msだけ待つ。** BroadcastChannel は投げっぱなしなので、
+  待たないと「MANGA PLATE を閉じたまま直した＝戻っていない」を黙って見逃す。
+  ack の `hit` を見て「向こうで消された文字」も言い分ける
+- ⚠ **`duplicateSel()` は複製に `srcId:null` を入れる。** 継がせると
+  **2つの文字が原稿の同じ1文字を上書きし合う**（テキスト単体の複製・FRAMEごと複製の両方で消している）
+- OBAN で**新規に足した文字**（`srcId` 無し）と**消した文字**は送らない＝向こうを勝手に増減させない
+
 ### `pid`（id採番）はリロードで復元されていなかった — 2026-08-16 修正
 
 `let pid=1;` のままで、**保存から復元していなかった**。そのため

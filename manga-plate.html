@@ -2929,6 +2929,7 @@ function setupLive(){
       if(pid&&String(pid).indexOf('mp_')!==0)gSeen[pid]=m.payload;
       onAnimatorUpdate(pid,m.payload);
     }
+    else if(m.type==='plate-text-update'&&Array.isArray(m.texts))onPlateTextBack(m.texts);   // OBANで直した読み文字の戻り
     else if(m.type==='animator-hello')postLive({type:'composer-hello'});
   };
   /* ANIMATOR に「受け手が居る」と知らせて LIVE を立てる（composer/OBANと同じ作法） */
@@ -2958,6 +2959,28 @@ async function onAnimatorUpdate(pid,payload){
   }
   if(hit){edgeCache.clear();toneCache.clear();thumbCache={};save();render();renderItemList();renderItemParams();
     toast('● ANIMATOR の更新を反映しました（'+imgs.length+'コマ）');}
+}
+/* OBAN で直された読み文字を書き戻す（SPEC_09 §v2-11）。
+   反映するのは **文字だけ**。位置・サイズ・色・行間・フォントはこちらを正とする
+   （OBANの座標から用紙座標へ逆変換すると誤差が乗る／OBANの色は白黒しか無い）。
+   id が一致する既存の text アイテムだけを書き換える＝OBAN側の増減は持ち込まない。
+   届いたことは ack で返す（向こうは投げっぱなしなので、返事が無いと黙って消える）。 */
+function onPlateTextBack(texts){
+  const by={};
+  texts.forEach(x=>{if(x&&x.srcId)by[x.srcId]=String(x.str==null?'':x.str);});
+  let hit=0,n=0;const pages=[];
+  if(BOOK)BOOK.pages.forEach((pg,pi)=>pg.items.forEach(it=>{
+    if(it.type!=='text')return;
+    const v=by[it.id];if(v==null)return;
+    hit++;
+    if(!v.trim()||v===it.text)return;              // 空文字は無視（向こうの削除でこちらの原稿を消さない）
+    it.text=v;n++;if(pages.indexOf(pi)<0)pages.push(pi);
+  }));
+  postLive({type:'plate-text-ack',hit:hit,n:n});
+  if(!n)return;
+  commit();renderItemList();renderItemParams();
+  const other=pages.filter(i=>i!==curPageIdx).map(i=>'P'+(i+1));
+  toast('◀ OBAN の文字を '+n+'個 反映しました'+(other.length?'（'+other.join(' / ')+'）':'')+' — Ctrl+Z で戻せます');
 }
 /* ---- 送信元の矩形（選択コマ or 用紙内枠） ---- */
 function linkBox(){
