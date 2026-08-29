@@ -1368,6 +1368,7 @@ if(typeof window !== 'undefined'){
    ============================================================ */
 const $=s=>document.querySelector(s);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const H_MIN=0.05,H_MAX=4;   // コマ/フレームの SIZE(h) 可動域。新UI化で定義が抜けていた（oban-builder-classic.html 準拠で復元）
 const lerp=(a,b,t)=>a+(b-a)*t;
 const map=(v,a,b,c=0,d=1)=>c+(d-c)*clamp((v-a)/(b-a),0,1);
 const E={linear:t=>t,inout:t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,smooth:t=>t*t*(3-2*t),outCubic:t=>1-Math.pow(1-t,3),inCubic:t=>t*t*t};

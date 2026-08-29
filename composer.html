@@ -100,13 +100,17 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
 .insp-row .v.acid{color:var(--acid);}
 .kf-row{display:flex;align-items:center;gap:3px;padding:3px 0;}
 .kf-row .k{color:rgba(255,255,255,0.35);width:30px;flex-shrink:0;font-size:9px;letter-spacing:0.08em;cursor:ew-resize;}
-.kf-val{background:var(--panel2);border:1px solid var(--border);color:rgba(255,255,255,0.8);font-family:var(--mono);font-size:10px;width:54px;flex:1;min-width:0;padding:2px 4px;text-align:right;cursor:ew-resize;}
+/* SPEC_18 §4-1: 数値欄は <input> ではなく <div>。input だと iPadOS の Scribble（手書き入力）が
+   ペンで触れただけで起動して欄を乗っ取る。div ならスクラブもWタップ打ち換えも両立する（実測=SPEC_18 §2-2 表D） */
+.kf-val{background:var(--panel2);border:1px solid var(--border);color:rgba(255,255,255,0.8);font-family:var(--mono);font-size:10px;line-height:12px;height:18px;box-sizing:border-box;width:54px;flex:1;min-width:0;padding:2px 4px;text-align:right;cursor:ew-resize;overflow:hidden;white-space:nowrap;touch-action:none;user-select:none;-webkit-user-select:none;}
 /* ◀▶ ステッパ（blender風）。数値の前後に配置 */
 .num-step{width:13px;height:18px;flex-shrink:0;background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.4);font-family:var(--mono);font-size:7px;line-height:1;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;}
 .num-step:hover{border-color:var(--acid);color:var(--acid);background:rgba(255,79,168,0.08);}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
 input[type=number]{-moz-appearance:textfield;}
-.kf-val:focus{outline:none;border-color:var(--acid);color:var(--acid);}
+.kf-val.scrubbing,.kf-val.editing{border-color:var(--acid);color:var(--acid);}
+/* Wタップのときだけ動的生成される打ち換え用 <input>（確定/Escで即破棄する＝DOMに常駐させない） */
+.numv-edit{width:100%;box-sizing:border-box;background:transparent;border:none;outline:none;padding:0;margin:0;color:var(--acid);font-family:var(--mono);font-size:inherit;line-height:inherit;text-align:right;touch-action:auto;user-select:text;-webkit-user-select:text;}
 .kf-dot{width:10px;height:10px;border:1px solid var(--dim);cursor:pointer;flex-shrink:0;background:transparent;transition:all 0.1s;}
 .kf-dot.active{background:var(--neon);border-color:var(--neon);}
 .kf-dot:hover{border-color:var(--acid);}
@@ -244,7 +248,10 @@ input[type=number]{-moz-appearance:textfield;}
 .kf-row.prop-hidden{display:none;}
 
 /* DRAG HANDLE */
-.tl-drag-handle{width:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:grab;color:rgba(255,255,255,0.15);font-size:11px;letter-spacing:-2px;user-select:none;transition:color .1s;}
+.tl-drag-handle{width:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:grab;color:rgba(255,255,255,0.15);font-size:11px;letter-spacing:-2px;user-select:none;-webkit-user-select:none;transition:color .1s;position:relative;touch-action:none;}
+/* SPEC_18 §4-2: 指で掴めるように**当たり判定だけ**左（行の padding-left 14px 分）とタテに広げる。
+   見た目の幅12pxは LABEL_W(=164) の計算に入っているので変えないこと */
+.tl-drag-handle::before{content:'';position:absolute;top:0;bottom:0;left:-14px;right:-2px;}
 .tl-drag-handle:hover{color:rgba(255,79,168,0.5);}
 .tl-drag-handle:active{cursor:grabbing;}
 /* 位置は transform:translateY で動かす（top書き換えだと毎フレーム再レイアウトが走る）。top:0 が基準 */
@@ -380,6 +387,17 @@ input[type=number]{-moz-appearance:textfield;}
 .fx-row .k{color:rgba(255,255,255,0.45);width:26px;font-size:9px;letter-spacing:0.1em;flex-shrink:0;cursor:ew-resize;}
 .fx-row input{background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:var(--white);font-family:var(--mono);font-size:11px;width:60px;flex:1;min-width:0;padding:1px 3px;text-align:right;font-variant-numeric:tabular-nums;cursor:ew-resize;}
 .fx-row input:focus{outline:none;border-bottom-color:var(--acid);color:var(--acid);}
+.fx-row .fx-val{background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:var(--white);font-family:var(--mono);font-size:11px;line-height:15px;height:18px;box-sizing:border-box;width:60px;flex:1;min-width:0;padding:1px 3px;text-align:right;font-variant-numeric:tabular-nums;cursor:ew-resize;overflow:hidden;white-space:nowrap;touch-action:none;user-select:none;-webkit-user-select:none;}
+.fx-row .fx-val.scrubbing,.fx-row .fx-val.editing{border-bottom-color:var(--acid);color:var(--acid);}
+/* SPEC_18: 指（coarse pointer）のときだけ当たりを広げる。#inspector は幅216px固定なので
+   固定幅の合計が増えすぎないよう ステッパは 13→18px までに留める */
+@media (pointer:coarse){
+  .kf-val{height:28px;line-height:22px;font-size:11px;}
+  .fx-row .fx-val{height:26px;line-height:22px;}
+  .num-step{width:18px;height:28px;font-size:8px;}
+  .kf-dot{width:14px;height:14px;}
+  .fx-row .dot{width:13px;height:13px;}
+}
 .fx-row .dot{width:9px;height:9px;border:1px solid var(--dim);cursor:pointer;flex-shrink:0;background:transparent;transition:all .1s;}
 .fx-row .dot:hover{border-color:var(--acid);}
 .fx-row .dot.active{background:var(--neon);border-color:var(--neon);}
@@ -594,14 +612,14 @@ input[type=number]{-moz-appearance:textfield;}
     <div class="insp-section">
       <div class="insp-h">TRANSFORM &nbsp;<span id="kf-status" style="font-size:7px;color:rgba(255,255,255,0.3)">NO KF</span></div>
       <div class="kf-row" id="parent-row" style="display:none" title="親トラック（AEのペアレント相当）。親の移動/回転/拡縮に追従。付け外しの瞬間は「現フレームの見た目が変わらない」ようKFを自動補正します（親にKFがある場合、他フレームでは見え方が変わります）。Altを押しながら選ぶと補正なし"><span class="k">PRNT</span><select id="kf-parent"></select></div>
-      <div class="kf-row" data-prop="ax"><span class="k">AX</span><button class="num-step" data-step="ax" data-dir="-1">◀</button><input class="kf-val" id="kf-ax" type="number" value="0" step="1"><button class="num-step" data-step="ax" data-dir="1">▶</button><div class="kf-dot" id="dot-ax"></div></div>
-      <div class="kf-row" data-prop="ay"><span class="k">AY</span><button class="num-step" data-step="ay" data-dir="-1">◀</button><input class="kf-val" id="kf-ay" type="number" value="0" step="1"><button class="num-step" data-step="ay" data-dir="1">▶</button><div class="kf-dot" id="dot-ay"></div></div>
-      <div class="kf-row" data-prop="x" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span class="k">X</span><button class="num-step" data-step="x" data-dir="-1">◀</button><input class="kf-val" id="kf-x" type="number" value="0" step="1"><button class="num-step" data-step="x" data-dir="1">▶</button><div class="kf-dot" id="dot-x"></div></div>
-      <div class="kf-row" data-prop="y"><span class="k">Y</span><button class="num-step" data-step="y" data-dir="-1">◀</button><input class="kf-val" id="kf-y" type="number" value="0" step="1"><button class="num-step" data-step="y" data-dir="1">▶</button><div class="kf-dot" id="dot-y"></div></div>
-      <div class="kf-row" data-prop="z" title="Z軸（疑似3D・奥行き）。Z>0=奥, Z<0=手前"><span class="k">Z</span><button class="num-step" data-step="z" data-dir="-1">◀</button><input class="kf-val" id="kf-z" type="number" value="0" step="1"><button class="num-step" data-step="z" data-dir="1">▶</button><div class="kf-dot" id="dot-z"></div></div>
-      <div class="kf-row" data-prop="rot" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span class="k">ROT</span><button class="num-step" data-step="rot" data-dir="-1">◀</button><input class="kf-val" id="kf-rot" type="number" value="0" step="0.5"><button class="num-step" data-step="rot" data-dir="1">▶</button><div class="kf-dot" id="dot-rot"></div></div>
-      <div class="kf-row" data-prop="s" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span class="k">SCL</span><button class="num-step" data-step="s" data-dir="-1">◀</button><input class="kf-val" id="kf-s" type="number" value="1.000" step="0.01"><button class="num-step" data-step="s" data-dir="1">▶</button><div class="kf-dot" id="dot-s"></div></div>
-      <div class="kf-row" data-prop="op"><span class="k">OP</span><button class="num-step" data-step="op" data-dir="-1">◀</button><input class="kf-val" id="kf-op" type="number" value="1.000" step="0.01" min="0" max="1"><button class="num-step" data-step="op" data-dir="1">▶</button><div class="kf-dot" id="dot-op"></div></div>
+      <div class="kf-row" data-prop="ax"><span class="k">AX</span><button class="num-step" data-step="ax" data-dir="-1">◀</button><div class="kf-val" id="kf-ax">0</div><button class="num-step" data-step="ax" data-dir="1">▶</button><div class="kf-dot" id="dot-ax"></div></div>
+      <div class="kf-row" data-prop="ay"><span class="k">AY</span><button class="num-step" data-step="ay" data-dir="-1">◀</button><div class="kf-val" id="kf-ay">0</div><button class="num-step" data-step="ay" data-dir="1">▶</button><div class="kf-dot" id="dot-ay"></div></div>
+      <div class="kf-row" data-prop="x" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span class="k">X</span><button class="num-step" data-step="x" data-dir="-1">◀</button><div class="kf-val" id="kf-x">0</div><button class="num-step" data-step="x" data-dir="1">▶</button><div class="kf-dot" id="dot-x"></div></div>
+      <div class="kf-row" data-prop="y"><span class="k">Y</span><button class="num-step" data-step="y" data-dir="-1">◀</button><div class="kf-val" id="kf-y">0</div><button class="num-step" data-step="y" data-dir="1">▶</button><div class="kf-dot" id="dot-y"></div></div>
+      <div class="kf-row" data-prop="z" title="Z軸（疑似3D・奥行き）。Z>0=奥, Z<0=手前"><span class="k">Z</span><button class="num-step" data-step="z" data-dir="-1">◀</button><div class="kf-val" id="kf-z">0</div><button class="num-step" data-step="z" data-dir="1">▶</button><div class="kf-dot" id="dot-z"></div></div>
+      <div class="kf-row" data-prop="rot" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span class="k">ROT</span><button class="num-step" data-step="rot" data-dir="-1">◀</button><div class="kf-val" id="kf-rot">0</div><button class="num-step" data-step="rot" data-dir="1">▶</button><div class="kf-dot" id="dot-rot"></div></div>
+      <div class="kf-row" data-prop="s" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span class="k">SCL</span><button class="num-step" data-step="s" data-dir="-1">◀</button><div class="kf-val" id="kf-s">1.000</div><button class="num-step" data-step="s" data-dir="1">▶</button><div class="kf-dot" id="dot-s"></div></div>
+      <div class="kf-row" data-prop="op"><span class="k">OP</span><button class="num-step" data-step="op" data-dir="-1">◀</button><div class="kf-val" id="kf-op">1.000</div><button class="num-step" data-step="op" data-dir="1">▶</button><div class="kf-dot" id="dot-op"></div></div>
       <button class="kf-btn" id="btn-kf-add">+ ADD KEYFRAME HERE</button>
       <button class="kf-btn" id="btn-kf-clear">✕ CLEAR ALL KF</button>
       <!-- COPY/PASTE は Ctrl+C / Ctrl+V、EASE・HOLD はキーのWクリック送り、
@@ -711,14 +729,14 @@ input[type=number]{-moz-appearance:textfield;}
   </div>
   <div id="fx-hud-body">
     <div class="fx-row" id="fx-parent-row" style="display:none" title="親トラック（編集はインスペクターのPRNTで）"><span class="k">PRNT</span><span id="fx-parent" style="flex:1;text-align:right;color:var(--ice,#7fd4ff);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span></div>
-    <div class="fx-row" data-prop="ax"><span class="k">AX</span><button class="num-step" data-fxstep="ax" data-dir="-1">◀</button><input id="fx-ax" type="number" step="1"><button class="num-step" data-fxstep="ax" data-dir="1">▶</button><div class="dot" id="fx-dot-ax"></div></div>
-    <div class="fx-row" data-prop="ay"><span class="k">AY</span><button class="num-step" data-fxstep="ay" data-dir="-1">◀</button><input id="fx-ay" type="number" step="1"><button class="num-step" data-fxstep="ay" data-dir="1">▶</button><div class="dot" id="fx-dot-ay"></div></div>
-    <div class="fx-row" data-prop="x"><span class="k">X</span><button class="num-step" data-fxstep="x" data-dir="-1">◀</button><input id="fx-x" type="number" step="1"><button class="num-step" data-fxstep="x" data-dir="1">▶</button><div class="dot" id="fx-dot-x"></div></div>
-    <div class="fx-row" data-prop="y"><span class="k">Y</span><button class="num-step" data-fxstep="y" data-dir="-1">◀</button><input id="fx-y" type="number" step="1"><button class="num-step" data-fxstep="y" data-dir="1">▶</button><div class="dot" id="fx-dot-y"></div></div>
-    <div class="fx-row" data-prop="z"><span class="k">Z</span><button class="num-step" data-fxstep="z" data-dir="-1">◀</button><input id="fx-z" type="number" step="1"><button class="num-step" data-fxstep="z" data-dir="1">▶</button><div class="dot" id="fx-dot-z"></div></div>
-    <div class="fx-row" data-prop="rot"><span class="k">ROT</span><button class="num-step" data-fxstep="rot" data-dir="-1">◀</button><input id="fx-rot" type="number" step="0.5"><button class="num-step" data-fxstep="rot" data-dir="1">▶</button><div class="dot" id="fx-dot-rot"></div></div>
-    <div class="fx-row" data-prop="s"><span class="k">SCL</span><button class="num-step" data-fxstep="s" data-dir="-1">◀</button><input id="fx-s" type="number" step="0.01"><button class="num-step" data-fxstep="s" data-dir="1">▶</button><div class="dot" id="fx-dot-s"></div></div>
-    <div class="fx-row" data-prop="op"><span class="k">OP</span><button class="num-step" data-fxstep="op" data-dir="-1">◀</button><input id="fx-op" type="number" step="0.01" min="0" max="1"><button class="num-step" data-fxstep="op" data-dir="1">▶</button><div class="dot" id="fx-dot-op"></div></div>
+    <div class="fx-row" data-prop="ax"><span class="k">AX</span><button class="num-step" data-fxstep="ax" data-dir="-1">◀</button><div class="fx-val" id="fx-ax">0</div><button class="num-step" data-fxstep="ax" data-dir="1">▶</button><div class="dot" id="fx-dot-ax"></div></div>
+    <div class="fx-row" data-prop="ay"><span class="k">AY</span><button class="num-step" data-fxstep="ay" data-dir="-1">◀</button><div class="fx-val" id="fx-ay">0</div><button class="num-step" data-fxstep="ay" data-dir="1">▶</button><div class="dot" id="fx-dot-ay"></div></div>
+    <div class="fx-row" data-prop="x"><span class="k">X</span><button class="num-step" data-fxstep="x" data-dir="-1">◀</button><div class="fx-val" id="fx-x">0</div><button class="num-step" data-fxstep="x" data-dir="1">▶</button><div class="dot" id="fx-dot-x"></div></div>
+    <div class="fx-row" data-prop="y"><span class="k">Y</span><button class="num-step" data-fxstep="y" data-dir="-1">◀</button><div class="fx-val" id="fx-y">0</div><button class="num-step" data-fxstep="y" data-dir="1">▶</button><div class="dot" id="fx-dot-y"></div></div>
+    <div class="fx-row" data-prop="z"><span class="k">Z</span><button class="num-step" data-fxstep="z" data-dir="-1">◀</button><div class="fx-val" id="fx-z">0</div><button class="num-step" data-fxstep="z" data-dir="1">▶</button><div class="dot" id="fx-dot-z"></div></div>
+    <div class="fx-row" data-prop="rot"><span class="k">ROT</span><button class="num-step" data-fxstep="rot" data-dir="-1">◀</button><div class="fx-val" id="fx-rot">0</div><button class="num-step" data-fxstep="rot" data-dir="1">▶</button><div class="dot" id="fx-dot-rot"></div></div>
+    <div class="fx-row" data-prop="s"><span class="k">SCL</span><button class="num-step" data-fxstep="s" data-dir="-1">◀</button><div class="fx-val" id="fx-s">0</div><button class="num-step" data-fxstep="s" data-dir="1">▶</button><div class="dot" id="fx-dot-s"></div></div>
+    <div class="fx-row" data-prop="op"><span class="k">OP</span><button class="num-step" data-fxstep="op" data-dir="-1">◀</button><div class="fx-val" id="fx-op">0</div><button class="num-step" data-fxstep="op" data-dir="1">▶</button><div class="dot" id="fx-dot-op"></div></div>
   </div>
   <div id="fx-hud-meta"><span class="acid" id="fx-hud-frame">F0001</span><span>P/S/A/R/T/U · ESC</span></div>
 </div>
@@ -1272,6 +1290,23 @@ const PERSP_FOCAL = 1000; // Z軸疑似3Dの焦点距離
 const propDefOf = p => (p==='s'||p==='op') ? 1 : 0;
 function fmtProp(p,v){ if(p==='s'||p==='op') return v.toFixed(3); if(p==='rot') return v.toFixed(1); return String(Math.round(v)); }
 function clampProp(p,v){ if(PROP_MIN[p]!==undefined) v=Math.max(PROP_MIN[p],v); if(PROP_MAX[p]!==undefined) v=Math.min(PROP_MAX[p],v); return v; }
+// ── SPEC_18 §4-1: 数値欄の <div> に .value を生やす互換シム ──
+// 既存コード（updateKfUI / updateFxHud / bindPropInputs / スクラブ）は el.value を読み書きしている。
+// <input> を <div> に替えても**呼び出し側を一切変えずに済ませる**ためのアダプタ。
+//   ・_editing 中（Wタップで一時 <input> を出している間）は外からの書き込みを無視する
+//     ＝ 打っている最中に updateKfUI に上書きされない
+//   ・読み出しは編集中なら一時 <input> の中身を返す
+function makeNumField(el){
+  if(!el||el._numField) return el;
+  el._numField=true; el._editing=false;
+  Object.defineProperty(el,'value',{
+    configurable:true,
+    get(){ const i=el.firstElementChild; return (el._editing&&i)?i.value:el.textContent; },
+    set(v){ if(el._editing) return; el.textContent=v; },
+  });
+  return el;
+}
+ALL_PROPS.forEach(p=>{ makeNumField(document.getElementById('kf-'+p)); makeNumField(document.getElementById('fx-'+p)); });
 // SPEC_11 P4-2: トラックロック。選択はできるが編集系は拒否（true を返したら呼び出し側は中断）
 function lockedGuard(t){
   if(t&&t.locked){ flashLive('🔒 '+((t.name||'TRACK'))+' はロック中です'); return true; }
@@ -2528,6 +2563,12 @@ let gStripGesture=null;
 // この pointerdown で「縦ドラッグ＝並び替え」が待機しているか。
 // 待機していない場所（キー帯・CAMERA行・Alt併用）では縦ドラッグもマーキー選択に回す
 let gStripArmed=false;
+// SPEC_18 §4-2: 指を1本ラベルに置いたまま別の行をタップ ＝ 複数選択（econte SHEET と同じ手つき）。
+// 掴み（並べ替え）は ⠿ ハンドルに寄せてあるので、行本体の指はこちらに使える。
+let gHeldTrack=null;      // {pid, idx} いま置かれている1本目
+let gTrackMultiSel=false; // 「置いたままタップ」進行中＝並べ替えドラッグを起こさない
+window.addEventListener('pointerup',e=>{ if(gHeldTrack&&gHeldTrack.pid===e.pointerId){ gHeldTrack=null; gTrackMultiSel=false; } });
+window.addEventListener('pointercancel',e=>{ if(gHeldTrack&&gHeldTrack.pid===e.pointerId){ gHeldTrack=null; gTrackMultiSel=false; } });
 window.addEventListener('pointerdown',()=>{ gStripArmed=false; },true); // capture＝どのハンドラより先にリセット
 window.addEventListener('pointerup',()=>{ gStripArmed=false; });
 const KF_BAND_H=23; // .tl-track-strip::after のキー/マーカー帯の高さ（ここは並び替えで掴まない）
@@ -2588,6 +2629,18 @@ function buildTrackElement(idx){
     // ここで単体選択に畳んでしまい「複数選択でもボタンは1つずつ」になっていた
     if(e.target.closest&&e.target.closest('.tl-track-btns')){ if(inMultiSel(idx)) return; }
     const onLabel=!!(e.target.closest&&e.target.closest('.tl-track-label,.tl-drag-handle'));
+    // SPEC_18 §4-2: 指で「1本を置いたまま別の行をタップ」＝選択に足す（Shift/Ctrlクリックの指版）
+    if(e.pointerType==='touch'&&onLabel){
+      if(gHeldTrack&&gHeldTrack.idx!==idx){
+        gTrackMultiSel=true;
+        if(!inMultiSel(gHeldTrack.idx)) selectTrack(gHeldTrack.idx); // 押さえている行をまず基点にする
+        selectTrack(idx,'toggle');
+        flashLive('▣ '+gSelTids.length+' TRACKS 選択');
+        e.preventDefault();
+        return;
+      }
+      gHeldTrack={pid:e.pointerId,idx};
+    }
     if(onLabel&&e.shiftKey) selectTrack(idx,'range');
     else if(onLabel&&(e.ctrlKey||e.metaKey)) selectTrack(idx,'toggle');
     else if(e.shiftKey||e.ctrlKey||e.metaKey) return; // ストリップ上の修飾キーは pointerup で判定
@@ -2639,6 +2692,7 @@ function buildTrackElement(idx){
       updateDropIndicator(dhLastY);
     };
     const onMove=e=>{
+      if(gTrackMultiSel){ dhPending=false; return; } // 複数選択タップ中は並べ替えを起こさない
       if(dhPending&&gStripGesture!=='marquee'){
         const dy=Math.abs(e.clientY-dhStartY), dx=Math.abs(e.clientX-dhStartX);
         if(o.vOnly ? (dy>5&&dy>dx) : dy>4) dhBegin(); // 動いてからドラッグ確定
@@ -2667,6 +2721,8 @@ function buildTrackElement(idx){
       if(!immediate){
         // ボタン群や改名中の入力欄からはドラッグを始めない
         if(e.target.closest('.tl-track-btns')||e.target.tagName==='INPUT') return;
+        // SPEC_18 §4-2: 別の指が他の行を押さえている間は「複数選択のタップ」なので掴まない
+        if(e.pointerType==='touch'&&gHeldTrack&&gHeldTrack.idx!==idx) return;
       }
       if(o.guard&&!o.guard(e)) return;
       if(o.vOnly) gStripArmed=true; // マーキー側に「縦は並び替えに譲れ」と伝える
@@ -5327,11 +5383,9 @@ $('#btn-kf-clear').addEventListener('click',clearAllKf);
 function bindPropInputs(valPrefix, dotPrefix){
   ALL_PROPS.forEach(prop=>{
     const parseV=()=>{const v=parseFloat($(`#${valPrefix}${prop}`).value);return isNaN(v)?propDefOf(prop):v;};
-    // 数値変更で即キー（キーが無ければ現フレームに作成）
-    $(`#${valPrefix}${prop}`).addEventListener('change',()=>{
-      if(!selTrack()) return;
-      commitProp(prop,parseV());
-    });
+    // SPEC_18 §4-1: 値欄は <div> になったので 'change' は飛ばない。
+    // 打ち換えの確定（Wタップ→input→Enter/blur）は NUMERIC SCRUB 側の beginEdit が commitProp する。
+    // ここは ◆ドット（キーの打ち／消し）の配線だけを担当する。
     $(`#${dotPrefix}${prop}`).addEventListener('click',()=>{
       const t=selTrack(); if(!t||lockedGuard(t)) return;
       const f=curLocalFrame(), kfs=t.keyframes;
@@ -5441,21 +5495,23 @@ vpInner.addEventListener('pointerup',()=>{
   vp.addEventListener('dblclick',e=>{ if(state.width){ resetView(); } });
 })();
 
-// ── タッチジェスチャ: 1指=PAN / 2指=ピンチzoom+pan / 2指タップ=Undo / 3指タップ=Redo ──
+// ── タッチジェスチャ: 1指=PAN / 2指=ピンチzoom+pan ──
 // 指はキャンバス操作優先。トラック/アンカーの移動はペンで行う（vpInner/anchorHandleはtouch無視）。
+// 多指タップ（2=UNDO / 3=REDO / 4=PLAY）は下の「多指タップ」ブロックで**画面全体**を見る（SPEC_18 §4-3）。
+let cancelVpGesture=()=>{};
 (function(){
   const vp=$('#viewport');
   const ptrs=new Map();
   let pinching=false, startDist=0, startZoom=1, startCenter={x:0,y:0}, startPan={x:0,y:0};
   let panning=false, panId=null, panStart={x:0,y:0}, panStartView={x:0,y:0};
-  let tapStart=0, tapMax=0;
+  // 多指タップが成立したとき、直前のパン/ピンチを打ち切る（誤爆で視点がズレないように）
+  cancelVpGesture=()=>{ ptrs.clear(); pinching=false; panning=false; panId=null; };
   vp.addEventListener('pointerdown',e=>{
     if(e.pointerType!=='touch') return;
     if(!state.width) return; // 未読込時はタップ→読込(click)に任せる
     vp.setPointerCapture(e.pointerId);
     const now=performance.now();
     ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,st:now});
-    if(ptrs.size===1){ tapStart=now; tapMax=1; } else if(ptrs.size>tapMax) tapMax=ptrs.size;
     if(ptrs.size===1){
       panning=true; panId=e.pointerId;
       panStart={x:e.clientX,y:e.clientY}; panStartView={x:state.view.panX,y:state.view.panY};
@@ -5493,21 +5549,46 @@ vpInner.addEventListener('pointerup',()=>{
     ptrs.delete(e.pointerId);
     if(pinching && ptrs.size<2) pinching=false;
     if(panning && e.pointerId===panId) panning=false;
-    if(ptrs.size===0){
-      const dt=performance.now()-tapStart;
-      const moved=Math.hypot(p.x-p.sx,p.y-p.sy);
-      if(dt<300 && moved<14){
-        if(tapMax===2) undo();
-        else if(tapMax===3) redo();
-      }
-      tapMax=0;
-    }
   }
   vp.addEventListener('pointerup',end);
   vp.addEventListener('pointercancel',end);
   // 未読込時：プレビュー中央をタップ/クリックで読み込みダイアログ
   vp.addEventListener('click',()=>{ if(!state.width) $('#btn-import').click(); });
 })();
+
+// ── 多指タップ（SPEC_18 §3・全ツール共通の文法）──
+// 2本=UNDO / 3本=REDO / 4本=PREVIEW 再生停止。**5本は割り当てない**（アプリ切替に化ける・§2-1）。
+// 判定は「指が全部離れた瞬間」＋「その間の最大本数」＋「300ms以内」＋「14px以上動いていない」。
+// capture 段で拾うので、各パネルが pointerdown を preventDefault していても届く。
+// 3本指がOSに取られるという当時の観測は誤り（ipad-probe.html で20回中20回Webに到達・§2-1）。
+const gTap={pts:new Map(),t0:0,max:0,moved:false};
+function tapDown(e){
+  if(e.pointerType!=='touch') return;
+  if(!gTap.pts.size){ gTap.t0=performance.now(); gTap.max=0; gTap.moved=false; }
+  gTap.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(gTap.pts.size>gTap.max) gTap.max=gTap.pts.size;
+}
+function tapMove(e){
+  if(e.pointerType!=='touch') return;
+  const p=gTap.pts.get(e.pointerId);
+  if(p&&Math.hypot(e.clientX-p.x,e.clientY-p.y)>14) gTap.moved=true;
+}
+function tapUp(e){
+  if(e.pointerType!=='touch'||!gTap.pts.has(e.pointerId)) return;
+  gTap.pts.delete(e.pointerId);
+  if(gTap.pts.size) return;                       // まだ指が残っている
+  const n=gTap.max, dt=performance.now()-gTap.t0;
+  gTap.max=0;
+  if(gTap.moved||dt>300||n<2||n>4) return;
+  cancelVpGesture();                              // 直前のパン/ピンチを打ち切る
+  if(n===2){ undo(); flashLive('↶ UNDO（2本指タップ）'); }
+  else if(n===3){ redo(); flashLive('↷ REDO（3本指タップ）'); }
+  else { togglePlay(); flashLive(state.isPlaying?'▶ PREVIEW 再生（4本指タップ）':'⏸ PREVIEW 停止（4本指タップ）'); }
+}
+addEventListener('pointerdown',tapDown,true);
+addEventListener('pointermove',tapMove,true);
+addEventListener('pointerup',tapUp,true);
+addEventListener('pointercancel',tapUp,true);
 
 $('#btn-play').addEventListener('click',togglePlay);
 $('#btn-first').addEventListener('click',()=>{pause();seek(0);});
@@ -5585,6 +5666,15 @@ const FIXED_SHORTCUTS=[
   {cat:'表示',          label:'元に戻す / やり直す',        key:'Ctrl+Z / Ctrl+Shift+Z'},
   {cat:'表示',          label:'閉じる（QUICK TRANSFORM / FX / 選択解除）※SETTINGSは閉じません', key:'Esc'},
   {cat:'表示',          label:'SETTINGS を左右ドックに戻す', key:'ヘッダの ⇄'},
+  // SPEC_18: iPad の手つき（5本のツールで共通。5本指は割り当てない）
+  {cat:'iPad（指）',    label:'元に戻す',                   key:'2本指タップ'},
+  {cat:'iPad（指）',    label:'やり直す',                   key:'3本指タップ'},
+  {cat:'iPad（指）',    label:'PREVIEW 再生 / 停止',        key:'4本指タップ'},
+  {cat:'iPad（指）',    label:'視点の移動 / 拡大縮小',      key:'1本指ドラッグ / 2本指ピンチ'},
+  {cat:'iPad（指）',    label:'数値を変える',               key:'数値欄・ラベルを横ドラッグ'},
+  {cat:'iPad（指）',    label:'数値をキーボードで打ち換え', key:'数値欄をWタップ'},
+  {cat:'iPad（指）',    label:'トラックの並べ替え',         key:'⠿ を掴んで上下'},
+  {cat:'iPad（指）',    label:'トラックの複数選択',         key:'1本を行に置いたまま別の行をタップ'},
 ];
 // SPEC_11 P4-1: OPパンチ（フリッカー演出用）。O=現コマ op=1 → 次コマ op=0 ／ Shift+O=逆
 function opPunch(inv){
@@ -6014,42 +6104,88 @@ window.addEventListener('resize',()=>{if(state.width)setupViewport();drawRuler()
 })();
 drawRuler();
 
-// ── NUMERIC SCRUB (AE/Blender-style) ──
-// ラベル(.k)と数値そのものをドラッグで値変更。Shift=×10, Ctrl=×0.1。
-// 数値入力上ではドラッグ＝スクラブ、移動なしクリック＝編集フォーカス。
+// ── NUMERIC SCRUB (AE/Blender-style) ── SPEC_18 §4-1
+// 数値欄は <input> ではなく <div>（上の makeNumField で .value 互換にしてある）。
+// **旧実装との違い＝方針の反転**: 以前は「クリックで数値入力したいので preventDefault しない」だった。
+// それだと iPadOS でペンが触れた瞬間に Scribble が起動して欄が手書き専用になる（SPEC_18 §2-2）。
+// いまは pointerdown で必ず preventDefault ＝ フォーカスを渡さない。
+//   ・ドラッグ（指／ペン／マウス）= スクラブ。Shift=×10, Ctrl=×0.1
+//   ・Wタップ / Wクリック = そのときだけ <input> を生成して打ち換え（Enter/フォーカス外れ=確定, Esc=取消）
+//   ・ラベル(.k) は従来どおりスクラブのみ
 (function(){
-  function attachScrub(el,inputEl,prop,onInput){
-    if(!el||!inputEl) return;
-    let active=false, startX=0, startV=0, moved=false, committed=false;
-    el.addEventListener('pointerdown',e=>{
-      if(e.button!==0) return;
-      const raw=parseFloat(inputEl.value);
-      startV=isNaN(raw)?propDefOf(prop):raw;
-      startX=e.clientX; active=true; moved=false; committed=false;
-      // 入力欄はクリック=数値入力を許可するため、ここではcapture/preventDefaultしない（ドラッグ開始時にcapture）
-      if(!onInput){ el.setPointerCapture(e.pointerId); e.preventDefault(); }
+  const TAP_MS=300, TAP_PX=10, DTAP_MS=320;   // SPEC_18 §3 のしきい値（「動かさずに離した」は10px。3pxだと手ブレで潰れる）
+  function beginEdit(valEl,prop){
+    if(valEl._editing) return;
+    valEl._editing=true; valEl.classList.add('editing');
+    const inp=document.createElement('input');
+    inp.type='text'; inp.inputMode='decimal'; inp.className='numv-edit';
+    inp.value=valEl.textContent;
+    valEl.textContent=''; valEl.appendChild(inp);
+    inp.focus(); try{ inp.select(); }catch(_){}
+    let ref=inp, done=false;
+    const close=commit=>{
+      if(done) return; done=true;
+      const raw=ref?ref.value:'';
+      const el=ref; ref=null;                 // §6-5: remove() が blur を誘発するので**参照を先に切る**
+      if(el) el.remove();
+      valEl._editing=false; valEl.classList.remove('editing');
+      let v=parseFloat(raw); if(isNaN(v)) v=propDefOf(prop);
+      v=clampProp(prop,v);
+      valEl.textContent=fmtProp(prop,v);
+      if(commit&&selTrack()) commitProp(prop,v);
+      updateKfUI(); updateFxHud();
+    };
+    inp.addEventListener('keydown',ev=>{
+      ev.stopPropagation();                   // アプリのショートカット（Esc/1〜9 等）へ流さない
+      if(ev.key==='Enter'){ ev.preventDefault(); close(true); }
+      else if(ev.key==='Escape'){ ev.preventDefault(); close(false); }
     });
-    el.addEventListener('pointermove',e=>{
-      if(!active) return;
-      const dx=e.clientX-startX;
-      if(!moved&&Math.abs(dx)<3) return;
-      if(!moved){ moved=true; if(onInput){ inputEl.blur(); try{el.setPointerCapture(e.pointerId);}catch(_){} } }
-      e.preventDefault();
-      const multi=e.shiftKey?10:(e.ctrlKey||e.metaKey?0.1:1);
-      const v=clampProp(prop, startV+dx*PROP_STEP[prop]*multi);
-      inputEl.value=fmtProp(prop,v);
-      if(selTrack()){ commitProp(prop,v,false); committed=true; } // ドラッグ中は履歴記録しない
+    inp.addEventListener('blur',()=>close(true));
+    inp.addEventListener('pointerdown',ev=>ev.stopPropagation()); // 親のスクラブを起こさない
+  }
+  function attachScrub(node,valEl,prop,allowEdit){
+    if(!node||!valEl) return;
+    let active=false,pid=null,startX=0,startV=0,downT=0,moved=false,committed=false,lastTap=-1e9; // §6-4: lastTapは十分過去から
+    node.addEventListener('pointerdown',e=>{
+      if(e.pointerType==='mouse'&&e.button!==0) return;
+      if(valEl._editing) return;              // 打ち換え中の <input> には触らない
+      e.preventDefault();                     // ← ここが要。フォーカスを渡さない＝Scribbleもキーボードも出ない
+      try{ node.setPointerCapture(e.pointerId); }catch(_){}  // §6-2: 普通に例外を投げる
+      pid=e.pointerId; active=true; moved=false; committed=false;
+      downT=performance.now(); startX=e.clientX;
+      const raw=parseFloat(valEl.value); startV=isNaN(raw)?propDefOf(prop):raw;
     });
-    el.addEventListener('pointerup',e=>{
-      if(!active) return; active=false;
-      if(moved){
-        e.preventDefault();
-        if(committed) recordHistory();
-        // ドラッグ後のクリックでフォーカスが入るのを抑止
-        if(onInput){ const blk=ev=>{ev.stopPropagation();ev.preventDefault();}; inputEl.addEventListener('click',blk,{once:true,capture:true}); }
+    node.addEventListener('pointermove',e=>{
+      if(!active||e.pointerId!==pid) return;
+      if(!moved){
+        const th=(e.pointerType==='mouse')?3:TAP_PX;  // 指/ペンは10px（3pxだと手ブレでタップが潰れる・§3）
+        const d=e.clientX-startX;
+        if(Math.abs(d)<th) return;
+        // しきい値ぶん**だけ**吸収して残りはこの move から効かせる。
+        // 基準を e.clientX に引き直すと、moveが粗いとき（指・低頻度）に最初の移動量が丸ごと消える
+        moved=true; startX+=Math.sign(d)*th;
+        node.classList.add('scrubbing');
       }
+      e.preventDefault();
+      const multi=e.shiftKey?10:((e.ctrlKey||e.metaKey)?0.1:1);
+      const v=clampProp(prop, startV+(e.clientX-startX)*PROP_STEP[prop]*multi);
+      valEl.value=fmtProp(prop,v);
+      if(selTrack()){ commitProp(prop,v,false); committed=true; } // ドラッグ中は履歴を積まない
     });
-    el.addEventListener('pointercancel',()=>{ if(!active) return; active=false; if(moved&&committed) recordHistory(); });
+    function finish(e,cancelled){
+      if(!active||e.pointerId!==pid) return;
+      active=false; pid=null; node.classList.remove('scrubbing');
+      try{ node.releasePointerCapture(e.pointerId); }catch(_){}
+      if(moved){ if(committed) recordHistory(); return; }
+      if(cancelled) return;
+      // 動かさずに離した＝タップ。2回続けば打ち換え
+      const now=performance.now();
+      if(now-downT>TAP_MS) return;
+      if(allowEdit&&now-lastTap<DTAP_MS){ lastTap=-1e9; beginEdit(valEl,prop); }
+      else lastTap=now;
+    }
+    node.addEventListener('pointerup',e=>finish(e,false));
+    node.addEventListener('pointercancel',e=>finish(e,true));
   }
   ALL_PROPS.forEach(prop=>{
     const fxRow=document.querySelector(`#fx-hud .fx-row[data-prop="${prop}"]`);

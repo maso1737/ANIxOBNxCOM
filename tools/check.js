@@ -18,6 +18,7 @@ const scriptRe = () => /<script(?![^>]*\btype\s*=)[^>]*>([\s\S]*?)<\/script>/g;
 // JS内で動的に生成される等、実在チェックから除外するidプレフィックス
 const ID_IGNORE = [
   /^kf-/, /^fx-/, /^dot-/, /^tl-wa-/, /^i-/, // composerのプロパティ別・動的id
+  /^qd-/, // oban-builderのQUICK EDIT: id="qd-${act}" をテンプレート文字列で生成（qdNum()）
 ];
 
 let failures = 0;
