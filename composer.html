@@ -1699,7 +1699,7 @@ function renderGlobalMarkers(){
     el.dataset.label=m.label?(m.n+' '+m.label):('M'+m.n); // 出した順の番号を表示（数字キーで飛べる）
     el.title=`マーカー ${m.n}（数字キー ${m.n<=9?m.n:'—'}）  コマ${m.frame+1}${m.label?' — '+m.label:''}（ダブルクリックでメモ）`;
     let dragActive=false, wasDragged=false, ctrlStart=false;
-    el.addEventListener('pointerdown',e=>{ dragActive=true; wasDragged=false; ctrlStart=e.ctrlKey||e.metaKey; el.setPointerCapture(e.pointerId); e.stopPropagation(); e.preventDefault(); });
+    el.addEventListener('pointerdown',e=>{ dragActive=true; wasDragged=false; ctrlStart=e.ctrlKey||e.metaKey; try{ el.setPointerCapture(e.pointerId); }catch(_){} e.stopPropagation(); e.preventDefault(); });
     el.addEventListener('pointermove',e=>{
       if(!dragActive||ctrlStart) return;
       if(!e.buttons){ dragActive=false; return; } // ペン等でpointerupを取り逃した場合の保険
@@ -2655,6 +2655,9 @@ function buildTrackElement(idx){
   // 並び替えドラッグ。⠿ハンドルは即開始、ラベル(「01 TRACK」やその余白)は
   // 4px動かしてから開始＝クリック選択やダブルクリック改名と両立させる。
   let dhActive=false, dhPending=false, dhStartY=0, dhStartX=0, dhOrigR=null, dhGhost=null, dhRaf=0, dhLastY=0;
+  // SPEC_18 §4-2: 掴んでいる指のIDを覚える。これが無いと「行を押さえたまま**別の指**を動かした」だけで
+  // 押さえている行の並べ替えが始まってしまう（window で pointermove を追っているため）
+  let dhPid=null;
   function dhBegin(){
     dhActive=true; dhPending=false;
     gStripGesture='reorder'; // マーキー選択に「縦ドラッグは並び替え」と伝える
@@ -2692,6 +2695,7 @@ function buildTrackElement(idx){
       updateDropIndicator(dhLastY);
     };
     const onMove=e=>{
+      if(dhPid!==null&&e.pointerId!==dhPid) return;  // 掴んだ指以外の動きでは始めない／動かさない
       if(gTrackMultiSel){ dhPending=false; return; } // 複数選択タップ中は並べ替えを起こさない
       if(dhPending&&gStripGesture!=='marquee'){
         const dy=Math.abs(e.clientY-dhStartY), dx=Math.abs(e.clientX-dhStartX);
@@ -2703,6 +2707,8 @@ function buildTrackElement(idx){
       if(!dhRaf) dhRaf=requestAnimationFrame(dhPaint);
     };
     const onEnd=e=>{
+      if(dhPid!==null&&e.pointerId!==dhPid) return;  // 別の指が離れただけ
+      dhPid=null;
       window.removeEventListener('pointermove',onMove);
       window.removeEventListener('pointerup',onEnd);
       window.removeEventListener('pointercancel',onEnd);
@@ -2726,7 +2732,7 @@ function buildTrackElement(idx){
       }
       if(o.guard&&!o.guard(e)) return;
       if(o.vOnly) gStripArmed=true; // マーキー側に「縦は並び替えに譲れ」と伝える
-      dhStartY=e.clientY; dhStartX=e.clientX;
+      dhStartY=e.clientY; dhStartX=e.clientX; dhPid=e.pointerId;
       if(immediate){ e.stopPropagation(); e.preventDefault(); dhBegin(); }
       else dhPending=true; // 動き出すまでは通常のクリック扱い
       window.addEventListener('pointermove',onMove);
@@ -2947,7 +2953,7 @@ function buildTrackElement(idx){
       offStart=track.tOffset||0; offStartIn=track.tIn||0; offStartOut=(track.tOut==null?null:track.tOut);
       // 吸着候補を凍結。自分のKF/IN/OUTはレイヤーと一緒に動くので候補から外す（自己吸着で動かなくなる）
       offSnapCands=freezeSnapCands(gatherKfFrames(track).map(f=>f+offStart), track);
-      strip.setPointerCapture(e.pointerId); e.stopPropagation(); e.preventDefault();
+      try{ strip.setPointerCapture(e.pointerId); }catch(_){} e.stopPropagation(); e.preventDefault();
     });
     strip.addEventListener('pointermove',e=>{
       if(!offDrag) return;
@@ -3003,7 +3009,7 @@ function buildTrackElement(idx){
         // 吸着候補を凍結し、いま掴んでいる端だけ除外（残すと自分に張り付いて動かせない）
         trimSnapCands=freezeSnapCands([which==='in'?(track.tIn||0):(track.tOut==null?total:track.tOut)]);
         drag=true; moved=false; h.classList.add('active');
-        h.setPointerCapture(e.pointerId); e.stopPropagation(); e.preventDefault();
+        try{ h.setPointerCapture(e.pointerId); }catch(_){} e.stopPropagation(); e.preventDefault();
       });
       h.addEventListener('pointermove',e=>{
         if(!drag) return;
@@ -3153,7 +3159,7 @@ function renderKfDiamonds(trackIdx){
       }
       // 吸着候補はここで凍結（動かす当人は候補から外す＝自己吸着で動けなくなるのを防ぐ）
       snapCands = shiftStart ? freezeSnapCands(groupMode?gEdges:[f+off]) : null;
-      d.setPointerCapture(e.pointerId);
+      try{ d.setPointerCapture(e.pointerId); }catch(_){}
       e.stopPropagation(); e.preventDefault();
     });
     d.addEventListener('pointermove',e=>{
@@ -3230,7 +3236,7 @@ function renderMarkers(trackIdx){
       selectTrack(trackIdx); // 2026-07-26: 別トラックのマーカーを触ったらそのトラックが選択状態に
       if(lockedGuard(track)) return; // SPEC_11 P4-2
       dragActive=true; wasDragged=false;
-      el.setPointerCapture(e.pointerId);
+      try{ el.setPointerCapture(e.pointerId); }catch(_){}
       e.stopPropagation(); e.preventDefault();
     });
     el.addEventListener('pointermove',e=>{
@@ -5117,7 +5123,7 @@ function removeAudio(){
     if(!audio.buffer) return;
     audio._dragActive=true; audio._dragStartX=e.clientX;
     audio._dragStartOffset=audio.offsetFrames;
-    strip.setPointerCapture(e.pointerId); e.preventDefault();
+    try{ strip.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault();
   });
   strip.addEventListener('pointermove',e=>{
     if(!audio._dragActive||!state.totalFrames) return;
@@ -5419,7 +5425,7 @@ anchorHandle.addEventListener('pointerdown',e=>{
   const tr=getTransform(curLocalFrame(),t.keyframes);
   anchorDragStart={px:e.clientX,py:e.clientY};
   anchorDragKfStart={ax:tr.ax,ay:tr.ay};
-  anchorHandle.setPointerCapture(e.pointerId);
+  try{ anchorHandle.setPointerCapture(e.pointerId); }catch(_){}
   e.preventDefault(); e.stopPropagation();
 });
 anchorHandle.addEventListener('pointermove',e=>{
@@ -5445,7 +5451,7 @@ vpInner.addEventListener('pointerdown',e=>{
   const tr=getTransform(curLocalFrame(),t.keyframes);
   state.vpDragStart={px:e.clientX,py:e.clientY};
   state.vpDragKfStart={x:tr.x,y:tr.y};
-  vpInner.setPointerCapture(e.pointerId);
+  try{ vpInner.setPointerCapture(e.pointerId); }catch(_){}
   $('#viewport').classList.add('dragging');
   e.preventDefault();
 });
@@ -5479,7 +5485,7 @@ vpInner.addEventListener('pointerup',()=>{
     e.preventDefault();
     panning=true; startX=e.clientX; startY=e.clientY;
     startPanX=state.view.panX; startPanY=state.view.panY;
-    vp.setPointerCapture(e.pointerId); vp.classList.add('panning');
+    try{ vp.setPointerCapture(e.pointerId); }catch(_){} vp.classList.add('panning');
   });
   vp.addEventListener('pointermove',e=>{
     if(!panning) return;
@@ -5509,7 +5515,7 @@ let cancelVpGesture=()=>{};
   vp.addEventListener('pointerdown',e=>{
     if(e.pointerType!=='touch') return;
     if(!state.width) return; // 未読込時はタップ→読込(click)に任せる
-    vp.setPointerCapture(e.pointerId);
+    try{ vp.setPointerCapture(e.pointerId); }catch(_){}
     const now=performance.now();
     ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,st:now});
     if(ptrs.size===1){
@@ -5564,6 +5570,9 @@ let cancelVpGesture=()=>{};
 const gTap={pts:new Map(),t0:0,max:0,moved:false};
 function tapDown(e){
   if(e.pointerType!=='touch') return;
+  // pointerup/cancel を取り逃がすと pts に指が残り続けて多指タップが**永久に効かなくなる**。
+  // タップは300ms以内にしか成立しないので、2秒以上前のものは掃除してよい（実測で踏んだ）
+  if(gTap.pts.size && performance.now()-gTap.t0>2000) gTap.pts.clear();
   if(!gTap.pts.size){ gTap.t0=performance.now(); gTap.max=0; gTap.moved=false; }
   gTap.pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(gTap.pts.size>gTap.max) gTap.max=gTap.pts.size;
@@ -5872,7 +5881,7 @@ function makeFloatDrag(panel, head, skip){
     // ドック状態を解除してフリー配置へ（⇄ボタンの dockInspector が inline を全消しして戻す）
     panel.classList.add('floating'); panel.classList.remove('dock-left','dock-right');
     panel.style.left=ox+'px'; panel.style.top=oy+'px'; panel.style.right='auto'; panel.style.transform='none';
-    head.setPointerCapture(e.pointerId); e.preventDefault();
+    try{ head.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault();
   });
   head.addEventListener('pointermove',e=>{
     if(!dragging) return;
@@ -5982,7 +5991,7 @@ window.addEventListener('pointercancel',()=>{scrubbing=false;gScrubMode='abs';})
     el.title=(side==='in'?'ワークエリア IN（B）':'ワークエリア OUT（N）')+' — ダブルクリックでタイムライン'+(side==='in'?'先頭':'末尾')+'まで戻す';
     el.addEventListener('pointerdown',e=>{
       if(!state.totalFrames) return;
-      waDrag=side; el.setPointerCapture(e.pointerId);
+      waDrag=side; try{ el.setPointerCapture(e.pointerId); }catch(_){}
       e.stopPropagation(); e.preventDefault();
     });
     // 2026-07-27: ハンドルのダブルクリックで端まで開く（両方やれば全体に戻る）
@@ -6089,7 +6098,7 @@ window.addEventListener('resize',()=>{if(state.width)setupViewport();drawRuler()
     active=true; startY=e.clientY;
     const cur=getComputedStyle(app).getPropertyValue('--tl-h').trim();
     startH=parseInt(cur,10)||$('#timeline').clientHeight;
-    handle.classList.add('active'); handle.setPointerCapture(e.pointerId); e.preventDefault();
+    handle.classList.add('active'); try{ handle.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault();
   });
   function endDrag(){ if(!active) return; active=false; handle.classList.remove('active'); if(state.width) setupViewport(); }
   handle.addEventListener('pointermove',e=>{
@@ -6122,9 +6131,10 @@ drawRuler();
     inp.value=valEl.textContent;
     valEl.textContent=''; valEl.appendChild(inp);
     inp.focus(); try{ inp.select(); }catch(_){}
-    let ref=inp, done=false;
+    let ref=inp, done=false, onOutside=null;
     const close=commit=>{
       if(done) return; done=true;
+      if(onOutside) document.removeEventListener('pointerdown',onOutside,true);
       const raw=ref?ref.value:'';
       const el=ref; ref=null;                 // §6-5: remove() が blur を誘発するので**参照を先に切る**
       if(el) el.remove();
@@ -6142,6 +6152,10 @@ drawRuler();
     });
     inp.addEventListener('blur',()=>close(true));
     inp.addEventListener('pointerdown',ev=>ev.stopPropagation()); // 親のスクラブを起こさない
+    // よそを触ったら確定して閉じる。blur だけに頼ると、iPadOS で focus() が通らなかったときに
+    // 入力欄が開きっぱなしで閉じられなくなる（実測で踏んだ。フォーカスが body のままになる場面がある）
+    onOutside=ev=>{ if(ev.target!==inp&&ev.target!==valEl) close(true); };
+    setTimeout(()=>{ if(!done) document.addEventListener('pointerdown',onOutside,true); },0);
   }
   function attachScrub(node,valEl,prop,allowEdit){
     if(!node||!valEl) return;
@@ -6379,7 +6393,7 @@ function attachPanelResize(handleSel, bodySel, snapSel, opt){
   handle.addEventListener('pointerdown',e=>{
     active=true; startY=e.clientY; startH=body.clientHeight;
     const cm=o.clearMaxOn?$(o.clearMaxOn):body; if(cm) cm.style.maxHeight='none';
-    handle.classList.add('active'); handle.setPointerCapture(e.pointerId); e.preventDefault();
+    handle.classList.add('active'); try{ handle.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault();
   });
   handle.addEventListener('pointermove',e=>{
     if(!active) return;
