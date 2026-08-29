@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="OBAN">
 <title>OBAN BUILDER — motion comic take rig</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500&family=Shippori+Antique&display=swap">
 <style>
 
 /* ============================================================
@@ -1449,6 +1449,9 @@ function onResize(){VW=innerWidth;VH=innerHeight;DPR=Math.min(devicePixelRatio||
 /* バーの折り返し段数はフォント読み込みや中身（パンくず）で後から変わる。
    起動直後の1回だけだと CVOFF / --bartop が古いままになるので、確定したところで測り直す */
 try{if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>updateCvOff());}catch(e){}
+/* MANGA PLATE の読み文字用。**canvas は ctx.font に指定しただけでは Webフォントを取りに行かない**ので、
+   明示的に load しないと初回だけゴシックで描かれる（動画書き出しに焼き付くと直せない） */
+try{if(document.fonts&&document.fonts.load)document.fonts.load('64px "Shippori Antique"','\u3042\u4e9c\u30a2');}catch(e){}
 addEventListener('load',()=>updateCvOff());
 var bootedV2C=false;
 addEventListener('resize',onResize);onResize();
@@ -1524,6 +1527,9 @@ function migrate(p){
     if(t.col==null)t.col='#fff';
     if(t.parent===undefined)t.parent=null;
     if(t.kf===undefined)t.kf=null;
+    if(t.vert===undefined)t.vert=true;      // MANGA PLATE 連携で追加。既定=縦書き（従来と同じ）
+    if(t.font===undefined)t.font=null;      // null=ゴシック（従来） / 'antique'=しっぽりアンチック
+    if(t.ew===undefined)t.ew=1;             // 縁取りの太さ倍率（0=縁取りなし）
   });
   if(p.clickFx===undefined)p.clickFx='invert';                  // V2-D: ビューアのクリックFX
   /* DOF（被写界深度）とピン送り。OBANのFXは画面全体の後処理なので、レイヤー別のボケはここで別建て。
@@ -1567,6 +1573,14 @@ function migrate(p){
     (p.panels||[]).forEach(function(pp){ if(pp.parent) pp.depth=1-(pp.depth??0.5); });
     p.depthV2=true;
   }
+  /* id採番の続きを合わせる。id は 'f3' / 't7' / 数値(panels) の3種類。
+     これが無いとリロードのたびに pid が 1 から始まり、**新しいフレームが古いフレームと同じ id になる**
+     （childrenOf / textsOf が別のコマの中身を拾ってしまう）。2026-08-16 修正 */
+  var _mx=0, _num=function(v){var n=parseInt(String(v).replace(/^[A-Za-z]+/,''),10);return isFinite(n)?n:0;};
+  (p.panels||[]).forEach(function(o){_mx=Math.max(_mx,_num(o.id));});
+  (p.frames||[]).forEach(function(o){_mx=Math.max(_mx,_num(o.id));});
+  (p.texts||[]).forEach(function(o){_mx=Math.max(_mx,_num(o.id));});
+  if(pid<=_mx)pid=_mx+1;
   return p;
 }
 /* ---------- V2-B: 参照ヘルパ ---------- */
@@ -1918,16 +1932,54 @@ function renderApList(){
   }).join('')+'</div>'
     +'<div class="qd-note">PNG の書き出しなしでコマになります。取り込んだあとは ANIMATOR で保存するたびに自動で更新（絵は常に ANIMATOR が正）。</div>';
 }
+/* ---- MANGA PLATE の読み文字（申し送り P1） ----
+ * 送られてくるのは「画像の画素座標のアンカー」。OBAN 側は
+ *   フレーム子テキスト = 中心からの距離（単位はフレーム高）／ size = フレーム高1000基準
+ * なので、そこへ直すだけ。EN字幕(type:'sub')とは無関係。 */
+function nearBW(c){
+  const h=String(c||'#fff').replace('#','');
+  const n=h.length===3?h.split('').map(x=>parseInt(x+x,16)):[0,2,4].map(i=>parseInt(h.slice(i,i+2),16));
+  return (0.299*n[0]+0.587*n[1]+0.114*n[2])>140?'#fff':'#000';
+}
+/* 1ページ＝1フレームに包む。絵を子パネル・読み文字をフレーム子テキストにすると、
+   カメラを振っても **吹き出しが絵からズレない**（ルート置きだと視差係数が違って離れていく） */
+function plateWrap(p,rec){
+  const W=rec.plate.w||rec.width||1, H=rec.plate.h||rec.height||1, ar=p.ar||(W/H);
+  const maxOrd=rootItems().reduce((m,o)=>Math.max(m,o.ord??0),-1);
+  const f={id:'f'+(pid++),name:String(p.name).replace(/^AP:/,'').slice(0,16),
+    x:p.x,y:p.y,h:p.h,depth:p.depth??0.5,ord:maxOrd+1,ar:ar,
+    quad:[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}],par:0.6,
+    fx:{in:'none',drift:'none',amt:0.12,kf:null},wipe:null,line:{on:false,w:10}};
+  PROJECT.frames.push(f);
+  p.parent=f.id;p.x=0;p.y=0;p.h=1;p.ord=0;                     // 絵はフレームいっぱい
+  let n=0;
+  (rec.plate.texts||[]).forEach(t=>{
+    if(!t||!String(t.str||'').trim())return;
+    const size=+((t.size/H)*1000).toFixed(1);
+    PROJECT.texts.push({id:'t'+(pid++),type:'v',str:String(t.str),
+      x:+(((t.ax/W)-0.5)*ar).toFixed(4),
+      y:+((t.ay/H)-0.5).toFixed(4),
+      size:size,col:nearBW(t.col),
+      vert:t.vert!==false,font:'antique',
+      /* MANGA PLATE のフチ幅(px)を、OBANの4方向シャドウのオフセット比に直す */
+      ew:(t.edge&&t.edge.on)?+clamp(t.edge.w/Math.max(1,t.size/24),0,8).toFixed(2):0,
+      parent:f.id,kf:null});
+    n++;
+  });
+  return n;
+}
 function addApPanel(rec){
   if(!apIngest(rec)){toast('プロジェクトを読み込めませんでした');return;}
   const apId=rec.projectId,ap=AP[apId];
   pushPanel('AP:'+ap.name,{src:'ap',apId,n:ap.frameRefs.length||1,fps:rec.fps||24,mode:'loop',trigger:'always',apName:ap.name,apAt:ap.at});
   const p=PROJECT.panels[PROJECT.panels.length-1];
   if(ap.w&&ap.h)p.ar=ap.w/ap.h;
-  sel=p;qeOpen=true;renderChip();commit();
+  const nt=(rec.plate&&Array.isArray(rec.plate.texts)&&rec.plate.texts.length)?plateWrap(p,rec):0;
+  sel=nt?frameById(p.parent):p;qeOpen=true;renderChip();commit();
   $('#drop').classList.add('hide');
   toggleApModal(false);
-  toast('AP:'+ap.name+' を追加 — '+p.seq.n+'f / '+p.seq.fps+'fps loop（ANIMATOR保存で自動更新）');
+  toast(nt?('MANGA PLATE を追加 — 読み文字 '+nt+'個をフレームに入れました（Tで再編集）')
+    :('AP:'+ap.name+' を追加 — '+p.seq.n+'f / '+p.seq.fps+'fps loop（ANIMATOR保存で自動更新）'));
 }
 $('#b-ap').addEventListener('click',()=>toggleApModal());
 $('#ap-close').addEventListener('click',()=>toggleApModal(false));
@@ -2122,32 +2174,55 @@ function drawImgPanel(p,r,tS,dim,blurPx){
  * 1文字ずつ縦積みfillText。色は白/黒トグルのみ（にじみ縁取り=4方向シャドウ）。
  * ルートテキストは pf=1 / zi=cam.z（深度なしのオーバーレイ扱い）。ビューアにも同式を複製 */
 const VT_ROT='ーｰ―－‐〜~…‥()（）「」『』[]【】<>＜＞=＝';   // 縦書きで90°回転する字（長音ほか）
+/* MANGA PLATE 連携で追加: 書体と縦横。アンチックは元からその太さなので bold を掛けない */
+function vtFont(t,fs){
+  return (t&&t.font==='antique')
+    ? fs+'px "Shippori Antique","Hiragino Sans","Yu Gothic UI",sans-serif'
+    : 'bold '+fs+'px "Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
+}
 function drawVText(t,sx,sy,fs,alpha){
   if(alpha<=0.01||!t.str)return;
-  const cols=String(t.str).split('\n');
-  const adv=fs*1.08,colAdv=fs*1.18;
+  const lines=String(t.str).split('\n');
   const fg=t.col==='#000'?'#000':'#fff',bg=fg==='#000'?'#fff':'#000';
-  const o=Math.max(1,fs/24);   // size24でほぼ1px（仕様の4方向1pxシャドウ相当・大サイズは比例）
+  const ew=(t.ew==null?1:t.ew);
+  const o=ew<=0?0:Math.max(1,fs/24)*ew;   // size24でほぼ1px（仕様の4方向1pxシャドウ相当・大サイズは比例）
   cx.save();cx.globalAlpha*=alpha;
-  cx.font='bold '+fs+'px "Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
+  cx.font=vtFont(t,fs);
   cx.textAlign='center';cx.textBaseline='middle';
-  for(let ci=0;ci<cols.length;ci++){
-    const chars=[...cols[ci]],x=sx-fs/2-ci*colAdv;   // アンカー=1列目の右上。列は右→左
-    for(let k=0;k<chars.length;k++){
-      cx.save();cx.translate(x,sy+fs/2+k*adv);
-      if(VT_ROT.indexOf(chars[k])>=0)cx.rotate(Math.PI/2);
-      cx.fillStyle=bg;
-      cx.fillText(chars[k],-o,0);cx.fillText(chars[k],o,0);cx.fillText(chars[k],0,-o);cx.fillText(chars[k],0,o);
-      cx.fillStyle=fg;cx.fillText(chars[k],0,0);
-      cx.restore();
+  const put=(ch,x,y,rot)=>{
+    cx.save();cx.translate(x,y);if(rot)cx.rotate(Math.PI/2);
+    if(o>0){cx.fillStyle=bg;cx.fillText(ch,-o,0);cx.fillText(ch,o,0);cx.fillText(ch,0,-o);cx.fillText(ch,0,o);}
+    cx.fillStyle=fg;cx.fillText(ch,0,0);cx.restore();
+  };
+  if(t.vert===false){   // 横書き: アンカー=1行目の左上。行は上→下
+    const step=fs*1.18;
+    for(let li=0;li<lines.length;li++){
+      const chars=[...lines[li]];let x=sx;
+      for(let k=0;k<chars.length;k++){
+        const w=cx.measureText(chars[k]).width;
+        put(chars[k],x+w/2,sy+fs/2+li*step,false);
+        x+=w;
+      }
+    }
+  }else{                // 縦書き: アンカー=1列目の右上。列は右→左
+    const adv=fs*1.08,colAdv=fs*1.18;
+    for(let ci=0;ci<lines.length;ci++){
+      const chars=[...lines[ci]],x=sx-fs/2-ci*colAdv;
+      for(let k=0;k<chars.length;k++)put(chars[k],x,sy+fs/2+k*adv,VT_ROT.indexOf(chars[k])>=0);
     }
   }
   cx.restore();
 }
 function textBBox(t,sx,sy,fs){
-  const cols=String(t.str||'').split('\n');
-  const rows=cols.reduce((m,c)=>Math.max(m,[...c].length),1);
-  const w=cols.length*fs*1.18,h=Math.max(rows,1)*fs*1.08;
+  const lines=String(t.str||'').split('\n');
+  if(t.vert===false){
+    cx.save();cx.font=vtFont(t,fs);
+    const w=lines.reduce((m,l)=>Math.max(m,cx.measureText(l).width),1);
+    cx.restore();
+    return{x:sx,y:sy,w:w,h:Math.max(lines.length,1)*fs*1.18};
+  }
+  const rows=lines.reduce((m,c)=>Math.max(m,[...c].length),1);
+  const w=lines.length*fs*1.18,h=Math.max(rows,1)*fs*1.08;
   return{x:sx-w,y:sy,w,h};
 }
 function textAnchor(t,cam){
@@ -4754,7 +4829,8 @@ function viewerHTML(apBake){
   const proj=JSON.stringify({
     panels:PROJECT.panels.map(p=>({name:p.name,x:p.x,y:p.y,h:p.h,depth:p.depth??0.5,ord:p.ord??0,ar:p.ar||1.414,parent:p.parent||null,seq:p.seq||null})),
     frames:PROJECT.frames.map(f=>({id:f.id,name:f.name,x:f.x,y:f.y,h:f.h,depth:f.depth??0.5,ord:f.ord??0,ar:f.ar||1.777,quad:f.quad,par:f.par??0.6,fx:f.fx||null,wipe:f.wipe||null,line:f.line||null})),
-    texts:PROJECT.texts.map(t=>({type:t.type,str:t.str,x:t.x,y:t.y,size:t.size??24,col:t.col||'#fff',parent:t.parent||null,kf:t.kf??null})),   // V2-D
+    texts:PROJECT.texts.map(t=>({type:t.type,str:t.str,x:t.x,y:t.y,size:t.size??24,col:t.col||'#fff',parent:t.parent||null,kf:t.kf??null,
+                                vert:t.vert!==false,font:t.font||null,ew:t.ew==null?1:t.ew})),   // V2-D（vert/font/ew = MANGA PLATE 連携）
     clickFx:PROJECT.clickFx||'invert',
     dof:PROJECT.dof||null,   // DOF/ピン送り
     take:PROJECT.take});
@@ -4767,7 +4843,7 @@ function viewerHTML(apBake){
 <html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OBAN — ${PROJECT.name}</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600&family=Shippori+Antique&display=swap">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0c061d;overflow-x:hidden}
@@ -4789,6 +4865,8 @@ ${S}
 <script>
 'use strict';
 const PROJ=${proj};
+/* 読み文字がアンチック体のとき用。canvas は明示 load しないとフォールバックで焼かれる */
+try{if(document.fonts&&document.fonts.load)document.fonts.load('64px "Shippori Antique"','\u3042\u4e9c\u30a2');}catch(e){}
 const APB=${JSON.stringify(apBake||{})};   /* SPEC_07: ANIMATORベイク {apId:{cells:[dataURL],refs:[idx|-1]}} */
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -4939,24 +5017,40 @@ function dofBlurFor(depth,P,H){
 }
 /* ---- V2-D: 縦書きテキスト / EN字幕（ビルダーと同式） ---- */
 const VT_ROT='ーｰ―－‐〜~…‥()（）「」『』[]【】<>＜＞=＝';
+function vtFont(t,fs){
+  return (t&&t.font==='antique')
+    ? fs+'px "Shippori Antique","Hiragino Sans","Yu Gothic UI",sans-serif'
+    : 'bold '+fs+'px "Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
+}
 function drawVText(t,sx,sy,fs,alpha){
   if(alpha<=0.01||!t.str)return;
-  const cols=String(t.str).split('\\n');
-  const adv=fs*1.08,colAdv=fs*1.18;
+  const lines=String(t.str).split('\\n');
   const fg=t.col==='#000'?'#000':'#fff',bg=fg==='#000'?'#fff':'#000';
-  const o=Math.max(1,fs/24);
+  const ew=(t.ew==null?1:t.ew);
+  const o=ew<=0?0:Math.max(1,fs/24)*ew;
   cx.save();cx.globalAlpha*=alpha;
-  cx.font='bold '+fs+'px "Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
+  cx.font=vtFont(t,fs);
   cx.textAlign='center';cx.textBaseline='middle';
-  for(let ci=0;ci<cols.length;ci++){
-    const chars=Array.from(cols[ci]),x=sx-fs/2-ci*colAdv;
-    for(let k=0;k<chars.length;k++){
-      cx.save();cx.translate(x,sy+fs/2+k*adv);
-      if(VT_ROT.indexOf(chars[k])>=0)cx.rotate(Math.PI/2);
-      cx.fillStyle=bg;
-      cx.fillText(chars[k],-o,0);cx.fillText(chars[k],o,0);cx.fillText(chars[k],0,-o);cx.fillText(chars[k],0,o);
-      cx.fillStyle=fg;cx.fillText(chars[k],0,0);
-      cx.restore();
+  const put=function(ch,x,y,rot){
+    cx.save();cx.translate(x,y);if(rot)cx.rotate(Math.PI/2);
+    if(o>0){cx.fillStyle=bg;cx.fillText(ch,-o,0);cx.fillText(ch,o,0);cx.fillText(ch,0,-o);cx.fillText(ch,0,o);}
+    cx.fillStyle=fg;cx.fillText(ch,0,0);cx.restore();
+  };
+  if(t.vert===false){
+    const step=fs*1.18;
+    for(let li=0;li<lines.length;li++){
+      const chars=Array.from(lines[li]);let x=sx;
+      for(let k=0;k<chars.length;k++){
+        const w=cx.measureText(chars[k]).width;
+        put(chars[k],x+w/2,sy+fs/2+li*step,false);
+        x+=w;
+      }
+    }
+  }else{
+    const adv=fs*1.08,colAdv=fs*1.18;
+    for(let ci=0;ci<lines.length;ci++){
+      const chars=Array.from(lines[ci]),x=sx-fs/2-ci*colAdv;
+      for(let k=0;k<chars.length;k++)put(chars[k],x,sy+fs/2+k*adv,VT_ROT.indexOf(chars[k])>=0);
     }
   }
   cx.restore();

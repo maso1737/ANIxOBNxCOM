@@ -179,6 +179,11 @@ html,body{
   border-radius:50%;background:currentColor;
   margin-right:5px;display:block;flex-shrink:0;
 }
+/* 太ブラシスロットは押したまま上下スライドでサイズ可変（iPadの指操作）。
+   ページスクロールに取られないよう touch-action を殺す。 */
+#tb-pen-big{touch-action:none;}
+#tb-pen-big.sizing{border-color:#5AE9FF;color:#5AE9FF;background:rgba(90,233,255,0.10);}
+#tb-pen-big.snap{box-shadow:0 0 0 1px #5AE9FF inset,0 0 10px rgba(90,233,255,0.55);}
 
 /* INK COLOR 縦 */
 .tb-ink-stack{
@@ -337,6 +342,16 @@ html,body{
 }
 #ref-panel-close{cursor:pointer;color:rgba(255,255,255,0.4);font-size:12px;line-height:1;padding:0 2px;}
 #ref-panel-close:hover{color:var(--acid);}
+/* ── パネル最小化（タイトルバーだけ残して畳む。閉じるのとは別＝状態は保持）── */
+.panel-head-btns{display:flex;align-items:center;gap:9px;}
+.panel-min{cursor:pointer;color:rgba(255,255,255,0.4);font-size:13px;line-height:1;padding:0 3px;user-select:none;}
+.panel-min:hover{color:var(--acid);}
+#ref-panel.minified > #ref-panel-body,
+#ref-panel.minified > #ref-resize,
+#settings-panel.minified > #settings-panel-body,
+#settings-panel.minified > #settings-resize{display:none;}
+#ref-panel.minified > #ref-panel-head,
+#settings-panel.minified > #settings-panel-head{border-bottom:none;}
 #ref-panel-body{padding:8px 10px;max-height:60vh;overflow-y:auto;}
 #ref-panel-body::-webkit-scrollbar{width:4px;}
 #ref-panel-body::-webkit-scrollbar-thumb{background:rgba(255,79,168,0.3);}
@@ -1421,7 +1436,10 @@ input[type=range]::-moz-range-thumb{
 
 /* ── MIRROR 軸ガイド: 見た目は細い線、当たり判定は広く（iPadでドラッグ可能に）── */
 #mirror-guide{pointer-events:none;}
-#mirror-guide.on{pointer-events:auto;}
+/* 当たり判定は stage の capture 段階で行う（下の「MIRROR ガイド」参照）。
+   要素自体は常に pointer-events:none ＝ ペンで押しても軸を掴まず、線の上をそのまま描ける。 */
+#mirror-guide.on{pointer-events:none;}
+#mirror-guide.dragging::before{background:rgba(90,233,255,1);box-shadow:0 0 12px rgba(90,233,255,0.95);}
 #mirror-guide::before{content:'';position:absolute;background:rgba(90,233,255,0.7);box-shadow:0 0 6px rgba(90,233,255,0.6);}
 #mirror-guide.axis-v{cursor:ew-resize;}
 #mirror-guide.axis-v::before{left:50%;top:0;bottom:0;width:1px;transform:translateX(-50%);}
@@ -1446,7 +1464,7 @@ input[type=range]::-moz-range-thumb{
     </div>
     <div class="right">
       <button id="btn-flip" title="キャンバス左右反転（表示のみ・X）">FLIP</button>
-      <button id="btn-mirror" title="左右ミラー描画（M）">MIRROR</button>
+      <button id="btn-mirror" title="ミラー描画 ON/OFF（M）&#10;長押し: 垂直軸⇔水平軸を切替&#10;軸ラインは指/マウスでドラッグ移動（ペンでは動きません）">MIRROR</button>
       <span class="sep">/</span>
       <button id="btn-ref-panel" title="REF ANIMATORS / FRAMEレイヤー（R）">REF</button>
       <button id="btn-settings" title="設定（ショートカット変更）">⚙</button>
@@ -1678,7 +1696,10 @@ input[type=range]::-moz-range-thumb{
 <div id="ref-panel">
   <div id="ref-panel-head">
     <span>REF ANIMATORS</span>
-    <span id="ref-panel-close" title="閉じる">✕</span>
+    <span class="panel-head-btns">
+      <span class="panel-min" id="ref-panel-min" title="最小化 / 元に戻す（見出しのWクリックでも可）">–</span>
+      <span id="ref-panel-close" title="閉じる">✕</span>
+    </span>
   </div>
   <div id="ref-panel-body">
     <!-- 共通: 移動モード/中央（選択中の参照=画像/アニメ/FRAMEに作用） -->
@@ -1736,7 +1757,10 @@ input[type=range]::-moz-range-thumb{
 <div id="settings-panel">
   <div id="settings-panel-head">
     <span>SETTINGS</span>
-    <span id="settings-panel-close" title="閉じる">✕</span>
+    <span class="panel-head-btns">
+      <span class="panel-min" id="settings-panel-min" title="最小化 / 元に戻す（見出しのWクリックでも可）">–</span>
+      <span id="settings-panel-close" title="閉じる">✕</span>
+    </span>
   </div>
   <div id="settings-panel-body">
     <div class="ref-sect">
@@ -2722,6 +2746,32 @@ async function loadRefs(){
 // ── REF パネル イベント ──
 document.getElementById('btn-ref-panel').addEventListener('click', () => toggleRefPanel());
 document.getElementById('ref-panel-close').addEventListener('click', () => toggleRefPanel(false));
+
+// ============================================================
+// フローティングパネルの最小化（タイトルバーだけ残す）
+//   閉じる(✕)と違い、パネルの中身・位置・参照表示の状態はそのまま保持する。
+//   ボタン（–／＋）と、見出しのダブルクリック/ダブルタップの両方で切替。
+// ============================================================
+function minifyPanel(panelId, force){
+  const p = document.getElementById(panelId);
+  if(!p) return;
+  const min = (typeof force === 'boolean') ? force : !p.classList.contains('minified');
+  p.classList.toggle('minified', min);
+  const btn = document.getElementById(panelId + '-min');
+  if(btn){
+    btn.textContent = min ? '+' : '–';
+    btn.title = (min ? '元に戻す' : '最小化') + '（見出しのWクリックでも可）';
+  }
+}
+['ref-panel','settings-panel'].forEach(id => {
+  const btn = document.getElementById(id + '-min');
+  if(btn) btn.addEventListener('click', e => { e.stopPropagation(); minifyPanel(id); });
+  const head = document.getElementById(id + '-head');
+  if(head) onDoubleActivate(head, e => {
+    if(e && e.target && (e.target.id === id + '-close' || e.target.id === id + '-min')) return;
+    minifyPanel(id);
+  });
+});
 document.getElementById('ref-add-json').addEventListener('click', () => {
   document.getElementById('ref-json-input').click();
 });
@@ -2807,7 +2857,7 @@ document.getElementById('ref-add-saved').addEventListener('click', async () => {
   const head  = document.getElementById('ref-panel-head');
   let dragging=false, sx=0, sy=0, ox=0, oy=0;
   head.addEventListener('pointerdown', e => {
-    if(e.target.id === 'ref-panel-close') return;
+    if(e.target.id === 'ref-panel-close' || e.target.id === 'ref-panel-min') return;
     dragging = true;
     const r = panel.getBoundingClientRect();
     sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
@@ -5387,8 +5437,11 @@ function lassoEnd(){
   if(lassoPts.length >= 3){
     const em = state.frameLayer.editMode;
     // FRAMEレイヤー編集中（移動/拡縮あり）はフレーム内座標へ写像してから塗る
-    const poly = em ? lassoPts.map(p => toFrameLocal(p.x, p.y)) : lassoPts;
-    lassoFillPolygon(poly);
+    const toLocal = pts => em ? pts.map(p => toFrameLocal(p.x, p.y)) : pts;
+    lassoFillPolygon(toLocal(lassoPts));
+    // MIRROR ON なら反対側にも同じ形で塗る（ブラシ／消しゴムと同じ規則）。
+    // 鏡像は頂点の巻き方向が反転するが、塗りは偶奇規則なので影響なし。
+    if(state.mirrorOn) lassoFillPolygon(toLocal(lassoPts.map(p => mirrorPt(p.x, p.y))));
     if(em) pushFrameLayerHistory(); else pushHistory();
   }
   lassoPts = [];
@@ -5403,12 +5456,23 @@ function drawLassoPreview(){
   guideCtx.lineJoin = 'round';
   guideCtx.strokeStyle = 'rgba(90,233,255,0.95)';
   guideCtx.setLineDash([Math.max(4, lw * 4), Math.max(3, lw * 3)]);
-  guideCtx.beginPath();
-  guideCtx.moveTo(lassoPts[0].x, lassoPts[0].y);
-  for(let i = 1; i < lassoPts.length; i++) guideCtx.lineTo(lassoPts[i].x, lassoPts[i].y);
-  if(lassoPoly && lassoHover) guideCtx.lineTo(lassoHover.x, lassoHover.y);  // 次の一辺
-  guideCtx.closePath();         // 始点へ繋いで「囲い」を明示
-  guideCtx.stroke();
+  // 輪郭を1本引く（m=true でミラー側）。MIRROR ON のときは塗られる範囲を両方見せる。
+  const outline = (m) => {
+    const q = p => m ? mirrorPt(p.x, p.y) : p;
+    const a = q(lassoPts[0]);
+    guideCtx.beginPath();
+    guideCtx.moveTo(a.x, a.y);
+    for(let i = 1; i < lassoPts.length; i++){ const b = q(lassoPts[i]); guideCtx.lineTo(b.x, b.y); }
+    if(lassoPoly && lassoHover){ const h = q(lassoHover); guideCtx.lineTo(h.x, h.y); }  // 次の一辺
+    guideCtx.closePath();       // 始点へ繋いで「囲い」を明示
+    guideCtx.stroke();
+  };
+  outline(false);
+  if(state.mirrorOn){
+    guideCtx.globalAlpha = 0.55;
+    outline(true);
+    guideCtx.globalAlpha = 1;
+  }
   if(lassoPoly){
     // 打った頂点を点で見せる。始点だけ大きく＝「ここを押せば閉じる」
     guideCtx.setLineDash([]);
@@ -5775,6 +5839,60 @@ function refreshPenSizeUI(){
   });
 }
 refreshPenSizeUI();  // 保存済みの太ブラシ値をボタンに反映
+
+// ============================================================
+// 太ブラシスロットを「押したまま上下スライド」でサイズ変更（iPad想定・指/ペン/マウス共通）
+//   上へ = 太く / 下へ = 細く。3〜50px。20px 付近では 20 に吸着（スナップ）。
+//   右ドラッグ(CLIP STUDIO風)と同じ state を触るので、UIは refreshPenSizeUI() で同期。
+// ============================================================
+(function(){
+  const btn = document.getElementById('tb-pen-big');
+  if(!btn) return;
+  const STEP_PX  = 6;    // 1px 変えるのに必要な縦移動量
+  const SNAP_VAL = 20;   // 吸着先
+  const SNAP_TOL = 2;    // ±2px 以内なら 20 に吸着
+  const MOVE_TH  = 6;    // これ以上動いたら「スライド」とみなす（click抑止用）
+  let id = null, startY = 0, startSize = 0, moved = false;
+  function setSize(size, snapped){
+    size = Math.max(PEN_BIG_MIN, Math.min(PEN_BIG_MAX, size));
+    state.penBig = size; savePenBig();
+    if(state.tool === 'erase') state.eraseSize = size; else state.penSize = size;
+    refreshPenSizeUI();
+    btn.classList.toggle('snap', !!snapped);
+    stageToast('ブラシ ' + size + 'px' + (snapped ? ' [20 スナップ]' : ''));
+  }
+  btn.addEventListener('pointerdown', e => {
+    if(id !== null) return;
+    if(e.pointerType === 'mouse' && e.button !== 0) return;
+    id = e.pointerId; startY = e.clientY; startSize = state.penBig; moved = false;
+    try{ btn.setPointerCapture(e.pointerId); }catch(err){}
+    btn.classList.add('sizing');
+  });
+  btn.addEventListener('pointermove', e => {
+    if(id === null || e.pointerId !== id) return;
+    const dy = startY - e.clientY;                 // 上へ = プラス
+    if(!moved && Math.abs(dy) < MOVE_TH) return;
+    moved = true;
+    e.preventDefault();
+    let size = startSize + Math.round(dy / STEP_PX);
+    size = Math.max(PEN_BIG_MIN, Math.min(PEN_BIG_MAX, size));
+    const snapped = Math.abs(size - SNAP_VAL) <= SNAP_TOL;
+    setSize(snapped ? SNAP_VAL : size, snapped);
+  });
+  function end(e){
+    if(id === null || e.pointerId !== id) return;
+    id = null;
+    btn.classList.remove('sizing');
+    setTimeout(() => btn.classList.remove('snap'), 500);
+    if(moved){
+      // スライドで確定したときは直後の click（＝スロット選択）を無効化しない：
+      // 太ブラシを選択状態にしたいので click はそのまま通す（サイズは dataset と一致）。
+      moved = false;
+    }
+  }
+  btn.addEventListener('pointerup', end);
+  btn.addEventListener('pointercancel', end);
+})();
 
 // 長押しリセットが成立した直後の click（＝スロット選択）を食うための時刻
 let gInkLongPressUntil = 0;
@@ -8334,37 +8452,55 @@ document.getElementById('btn-flip').addEventListener('click', e => {
   applyZoom();
   stageToast('FLIP ' + (state.flipped ? 'ON' : 'OFF'));
 });
+// MIRROR: クリック/タップ = ON/OFF、長押し(500ms) = 垂直軸⇔水平軸。
+//   以前は Wタップで軸切替だったが、2回のタップが ON→OFF とも解釈されて競合するため
+//   軸切替は長押しへ移した（iPadでの誤爆対策）。
+let gMirrorHoldUntil = 0;   // 長押し成立直後の click を食う
 document.getElementById('btn-mirror').addEventListener('click', e => {
+  if(performance.now() < gMirrorHoldUntil) return;
   state.mirrorOn = !state.mirrorOn;
-  e.target.classList.toggle('on', state.mirrorOn);
+  e.currentTarget.classList.toggle('on', state.mirrorOn);
   updateMirrorGuide();
   stageToast('MIRROR ' + (state.mirrorOn ? 'ON' : 'OFF'));
 });
-// MIRROR ダブルクリック/ダブルタップ → 垂直/水平 軸トグル（iPad対応）
-onDoubleActivate(document.getElementById('btn-mirror'), () => {
+onLongPress(document.getElementById('btn-mirror'), () => {
+  gMirrorHoldUntil = performance.now() + 600;   // 指を離したときの click（=OFF）を無効化
   state.mirrorAxis = state.mirrorAxis === 'h' ? 'v' : 'h';
   // 切替時に軸位置を中央に再設定すると分かりやすい
   if(state.mirrorAxis === 'h') state.mirrorAxisY = CFG.WORK_H / 2;
   else state.mirrorAxisX = CFG.WORK_W / 2;
-  if(!state.mirrorOn){ state.mirrorOn = true; document.getElementById('btn-mirror').classList.add('on'); }
+  const btn = document.getElementById('btn-mirror');
+  if(!state.mirrorOn){ state.mirrorOn = true; btn.classList.add('on'); }
   updateMirrorGuide();
   markMetaDirty(); scheduleSave();
   stageToast('MIRROR 軸 ' + (state.mirrorAxis === 'h' ? '水平' : '垂直'));
 });
 
 // MIRROR ガイドラインをドラッグして軸位置を移動
+//   指(touch)／マウスのみ。**ペンでは掴めない**＝軸ラインの上をそのまま描ける。
+//   ガイド要素は pointer-events:none のままにして、stage の capture 段階で当たり判定する
+//   （要素で受けると、ペンの pointerdown をガイドが食って線が引けなくなるため）。
 (function(){
   const guide = document.getElementById('mirror-guide');
   if(!guide) return;
-  let dragging = false;
-  guide.addEventListener('pointerdown', e => {
-    if(!state.mirrorOn) return;
-    dragging = true;
-    guide.setPointerCapture(e.pointerId);
-    e.preventDefault(); e.stopPropagation();
-  });
-  guide.addEventListener('pointermove', e => {
-    if(!dragging) return;
+  let dragId = null;
+  function overGuide(cx, cy){
+    if(!state.mirrorOn || guide.style.display === 'none') return false;
+    const r = guide.getBoundingClientRect();
+    return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
+  }
+  stage.addEventListener('pointerdown', e => {
+    if(e.pointerType === 'pen') return;                     // ペンは素通り＝描画へ
+    if(e.pointerType === 'mouse' && e.button !== 0) return; // 右ドラッグはブラシサイズ
+    if(dragId !== null) return;
+    if(!overGuide(e.clientX, e.clientY)) return;
+    dragId = e.pointerId;
+    guide.classList.add('dragging');
+    e.preventDefault();
+    e.stopPropagation();   // 描画・パン・ピンチへ渡さない（stage側の指ハンドラも走らない）
+  }, {capture:true, passive:false});
+  window.addEventListener('pointermove', e => {
+    if(dragId === null || e.pointerId !== dragId) return;
     const { x, y } = toCanvasCoord(e.clientX, e.clientY);
     if(state.mirrorAxis === 'h'){
       state.mirrorAxisY = Math.max(0, Math.min(CFG.WORK_H, y));
@@ -8372,12 +8508,16 @@ onDoubleActivate(document.getElementById('btn-mirror'), () => {
       state.mirrorAxisX = Math.max(0, Math.min(CFG.WORK_W, x));
     }
     updateMirrorGuide();
-  });
-  guide.addEventListener('pointerup', () => {
-    if(!dragging) return; dragging = false;
+    e.preventDefault();
+  }, {passive:false});
+  function end(e){
+    if(dragId === null || e.pointerId !== dragId) return;
+    dragId = null;
+    guide.classList.remove('dragging');
     markMetaDirty(); scheduleSave();
-  });
-  guide.addEventListener('pointercancel', () => { dragging = false; });
+  }
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
 })();
 
 // FRAMEレイヤー UI
@@ -8829,7 +8969,7 @@ document.getElementById('shortcut-reset').addEventListener('click', async ()=>{
   const head=document.getElementById('settings-panel-head');
   let dragging=false, sx=0, sy=0, ox=0, oy=0;
   head.addEventListener('pointerdown', e=>{
-    if(e.target.id==='settings-panel-close') return;
+    if(e.target.id==='settings-panel-close' || e.target.id==='settings-panel-min') return;
     dragging=true;
     const r=panel.getBoundingClientRect();
     sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;

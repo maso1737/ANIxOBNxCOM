@@ -1033,6 +1033,7 @@ function renderPage(g,pg,o){
   /* 1) コマに割り当てた素材＝コマ内でカット */
   for(const it of ord){
     if(!it.visible||!it.panelId)continue;
+    if(o.skipText&&it.type==='text')continue;      // OBANへ送るときは文字を焼かない（向こうで文字のまま編集する）
     const k=findPanel(pg,it.panelId);if(!k)continue;
     g.save();pathPoly(g,dispPoly(k));g.clip();drawItemComposited(g,it);g.restore();
   }
@@ -1047,6 +1048,7 @@ function renderPage(g,pg,o){
   /* 3) コマに属さない素材＝枠の上（擬音・飛び出し） */
   for(const it of ord){
     if(!it.visible||it.panelId)continue;
+    if(o.skipText&&it.type==='text')continue;
     drawItemComposited(g,it);
   }
 }
@@ -2962,7 +2964,7 @@ function linkBox(){
   return selPanel?polyBounds(dispPoly(selPanel)):{x:PAPER.bas.x,y:PAPER.bas.y,w:PAPER.bas.w,h:PAPER.bas.h};
 }
 /* ---- 連携用に「そのコマを ANIMATOR 解像度へレターボックス」した画像を作る ---- */
-function linkCanvas(w,h){
+function linkCanvas(w,h,opt){
   const b=linkBox(), pg=curPage();
   const c=document.createElement('canvas');c.width=w;c.height=h;
   const g=c.getContext('2d');
@@ -2971,20 +2973,49 @@ function linkCanvas(w,h){
   const ox=(w-b.w*s)/2, oy=(h-b.h*s)/2;
   g.save();g.translate(ox,oy);g.scale(s,s);g.translate(-b.x,-b.y);
   g.beginPath();g.rect(b.x,b.y,b.w,b.h);g.clip();
-  renderPage(g,pg,{});
+  renderPage(g,pg,{skipText:!!(opt&&opt.exText)});
   g.restore();
   return {canvas:c,box:b,scale:s,ox:ox,oy:oy};
 }
-function linkRecord(pid,name,w,h){
-  const L=linkCanvas(w,h);
-  return {rec:{
+/* ---- 読み文字を「文字のまま」OBANへ渡す（申し送り P0） ----
+   送った画像の画素座標に直して渡す。向こうは自前のレイアウトで組み直すので、
+   ブロックの中心ではなく **書き出し位置（アンカー）** を送る＝1文字目の位置が必ず一致する。
+   縦書き=1列目の右上 / 横書き=1行目の左上（OBAN の drawVText と同じ約束）。 */
+function plateTexts(L,w,h){
+  const pg=curPage(), out=[];
+  const P2X=x=>(x-L.box.x)*L.scale+L.ox, P2Y=y=>(y-L.box.y)*L.scale+L.oy;
+  for(const it of pg.items){
+    if(it.type!=='text'||!it.visible||!String(it.text||'').trim())continue;
+    const X=P2X(it.x), Y=P2Y(it.y);
+    if(X<-w*0.5||X>w*1.5||Y<-h*0.5||Y>h*1.5)continue;      // 画面外まで離れているものは送らない
+    const bx=textBox(it), bw=bx.w*L.scale, bh=bx.h*L.scale;
+    out.push({
+      id:it.id, str:it.text,
+      ax:+((it.vertical?X+bw/2:X-bw/2)).toFixed(1),         // アンカー（縦=右上 / 横=左上）
+      ay:+((Y-bh/2)).toFixed(1),
+      cx:+X.toFixed(1), cy:+Y.toFixed(1), bw:+bw.toFixed(1), bh:+bh.toFixed(1),
+      size:+(it.size*L.scale).toFixed(2),
+      vert:!!it.vertical, col:it.color, font:it.font|0,
+      lh:it.lh, ls:it.ls,
+      edge:{on:!!(it.edge&&it.edge.on), w:+(((it.edge&&it.edge.w)||0)*L.scale).toFixed(2),
+            color:(it.edge&&it.edge.color)||'#FFFFFF'}
+    });
+  }
+  return out;
+}
+function linkRecord(pid,name,w,h,opt){
+  const L=linkCanvas(w,h,opt);
+  const rec={
     format:'PROJECT_v1',projectId:pid,name:name,scene:name,
     exportedAt:new Date().toISOString(),
     fps:24,durationUnit:'frames',width:w,height:h,bgBright:100,
     workArea:{startFrame:0,endFrame:0},
     cellCount:1,
     cells:[{id:'c1',kind:'draw',duration:1,image:L.canvas.toDataURL('image/png')}],
-    composer:null},L:L};
+    composer:null};
+  /* 既存の読み手（ANIMATOR/COMPOSER）は知らないフィールドを無視するので、足すだけで安全 */
+  if(opt&&opt.exText)rec.plate={v:1,src:'manga-plate',w:w,h:h,texts:plateTexts(L,w,h)};
+  return {rec:rec,L:L};
 }
 $('#lk-to-ani').addEventListener('click',async()=>{
   const w=BOOK.link.w, h=BOOK.link.h;
@@ -3052,7 +3083,7 @@ async function sendPageTo(target){
   const pid='mp_'+target+'_'+BOOK.title.replace(/[^\w\-]/g,'')+'_p'+(curPageIdx+1);
   const name='MP P'+(curPageIdx+1)+' '+BOOK.title;
   const sp=selPanel;selPanel=null;                    // ページ全体を送る
-  const {rec}=linkRecord(pid,name,w,h);
+  const {rec}=linkRecord(pid,name,w,h,{exText:target==='oban'});   // OBANへは文字を焼かずにデータで渡す
   selPanel=sp;
   try{await exPut(rec);}catch(e){toast('✗ 共有DBに書けませんでした');return;}
   postLive({type:'project-update',projectId:pid,payload:rec});
@@ -3061,7 +3092,10 @@ async function sendPageTo(target){
     toast('▶ COMPOSER をトラック付きで開きました');
   }else{
     window.open('oban-builder.html','_blank');
-    modalAlert('OBAN へ送りました。\n\nOBAN 側の  ＋ FROM ANIMATOR  を開くと\n「'+name+'」が候補に出ます。それを選ぶとパネルになります。');
+    const nt=(rec.plate&&rec.plate.texts.length)||0;
+    modalAlert('OBAN へ送りました。\n\nOBAN 側の  ＋ FROM ANIMATOR  を開くと\n「'+name+'」が候補に出ます。'
+      +(nt?('\n\n読み文字 '+nt+'個は絵に焼かずに送っています。\nOBAN 側では文字のまま編集できます（フレームに入った状態で届きます）。')
+          :'\nそれを選ぶとパネルになります。'));
   }
 }
 $('#lk-to-comp').addEventListener('click',()=>sendPageTo('comp'));
