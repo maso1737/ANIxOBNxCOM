@@ -1612,6 +1612,7 @@ input[type=range]::-moz-range-thumb{
     <div class="pnl" id="palette-pnl">
       <div class="pnl-h" id="palette-head">
         <span class="pnl-h-r">
+          <button class="pnl-detach" id="btn-pal-eyedrop" style="display:none;" title="画面全体スポイト（Chrome / Edge）&#10;UIの外・他アプリの色も拾えます。行き先は絵の上のスポイトと同じ">◎</button>
           <button class="pnl-detach" id="btn-pal-add" title="色スロットを追加（選択してスポイトで色を取り込み）">＋</button>
           <button class="pnl-detach" id="btn-pal-del" title="選択中の色スロットを削除">−</button>
           <button class="pnl-detach" id="btn-pal-save" title="パレットをJSONで書き出し">⇩</button>
@@ -3785,26 +3786,7 @@ function sampleCompositeColor(cx, cy){
   // どのレイヤーも透明 → 背景（白基調）
   return '#FFFFFF';
 }
-// スポイトで色を取得して FILL PALETTE に取り込む
-function eyedropAt(clientX, clientY){
-  const {x, y} = toCanvasCoord(clientX, clientY);
-  const hex = sampleCompositeColor(x, y);
-  if(!hex) return;
-  state.fillColor = hex;
-  // 選択中のパレットスロットへ上書き（カスタムパレット化）
-  if(typeof gPalette !== 'undefined' && gPalSlot >= 0 && gPalSlot < gPalette.length){
-    gPalette[gPalSlot] = hex;
-    savePalette();
-    renderPalette();
-  }
-}
-// スポイト: 下書/指示/トーンインクが選択中なら、そのインク色を取り込む
-function eyedropInk(clientX, clientY){
-  const {x, y} = toCanvasCoord(clientX, clientY);
-  const hex = sampleCompositeColor(x, y);
-  if(!hex) return;
-  setActiveInkColor(hex);
-}
+// （色の取り込み先は applyPickedColor() に集約。ここは座標→色のサンプリングだけ）
 // 下書/指示/トーンインクが選択中か（主線=blackは除外）。
 // FILLでもAltスポイトでインク色を取れるよう fill を含める。
 function inkPickActive(){
@@ -3820,20 +3802,37 @@ function focusRoughInk(hex){
   const btn = document.querySelector('.tb-ink[data-c="blue"]');
   if(btn){ btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 420); }
 }
-// ONIONカラーチップが選択中なら、その側のティント色を取り込む
-function eyedropOnion(clientX, clientY){
-  const {x, y} = toCanvasCoord(clientX, clientY);
-  const hex = sampleCompositeColor(x, y);
+// 拾った色(hex)の行き先を一元決定する。
+//   Altクリック / スポイトツール / 指の長押し / 画面全体スポイト（EyeDropper API）が共有する。
+function applyPickedColor(hex){
   if(!hex) return;
-  setOnionColor(gOniSlot, hex);
+  if(gOniSlot){ setOnionColor(gOniSlot, hex); return; }          // ONIONチップ選択中が最優先
+  if(inkPickActive()){ setActiveInkColor(hex); return; }         // 下書/指示/トーン
+  // FILL PALETTE の選択スロットへ取り込み（＝カスタムパレット化）
+  state.fillColor = hex;
+  if(typeof gPalette !== 'undefined' && gPalSlot >= 0 && gPalSlot < gPalette.length){
+    gPalette[gPalSlot] = hex;
+    savePalette();
+    renderPalette();
+  }
+  // 主線(黒)のときだけ、続けて下書スロットへフォーカス＋色入れ
+  if(state.inkColor === 'black' && state.tool !== 'erase') focusRoughInk(state.fillColor);
 }
 // Altクリック / スポイトツールの行き先を一元決定する
 function eyedropDispatch(clientX, clientY){
-  if(gOniSlot){ eyedropOnion(clientX, clientY); return; }        // ONIONチップ選択中が最優先
-  if(inkPickActive()){ eyedropInk(clientX, clientY); return; }   // 下書/指示/トーン
-  eyedropAt(clientX, clientY);                                    // FILL PALETTE へ取り込み
-  // 主線(黒)のときだけ、続けて下書スロットへフォーカス＋色入れ
-  if(state.inkColor === 'black' && state.tool !== 'erase') focusRoughInk(state.fillColor);
+  const {x, y} = toCanvasCoord(clientX, clientY);
+  applyPickedColor(sampleCompositeColor(x, y));
+}
+// 画面全体スポイト（EyeDropper API）。Chrome / Edge のみ。ブラウザの外の色も拾える。
+//   ★ユーザー操作から直接呼ぶ必要がある（setTimeout 越しだと弾かれる）
+function screenEyedrop(){
+  if(!window.EyeDropper){
+    stageToast('画面全体スポイトは Chrome / Edge のみ（絵の上なら Alt+クリック）');
+    return;
+  }
+  new EyeDropper().open()
+    .then(r => { if(r && r.sRGBHex){ applyPickedColor(r.sRGBHex.toUpperCase()); stageToast('スポイト ' + r.sRGBHex.toUpperCase()); } })
+    .catch(() => {});   // Esc で閉じただけ＝黙って戻る
 }
 
 // ============================================================
@@ -5069,6 +5068,39 @@ let tPanning = false, tPanId = null;
 let tPanStartClient = {x:0,y:0}, tPanStartPan = {x:0,y:0};
 let tTapSessionStart = 0, tTapMaxFingers = 0;
 
+// ── 指の長押しスポイト（iPad）──────────────────────────────
+//   指1本で絵の上を長押し（600ms・動かさない）＝ Alt+クリックと同じスポイト。
+//   **ペンは対象外**（ペンは描くための道具なので、長押ししても描画のまま）。
+//   拾った色の行き先は applyPickedColor() が一元管理（ONIONチップ→インク→パレット）。
+const TOUCH_EYE_MS = 600;      // 長押し成立
+const TOUCH_EYE_MOVE = 12;     // これ以上動いたら中止（＝パンの意思）
+let tEyeTimer = null, tEyeAt = null;
+function touchEyedropClear(){
+  if(tEyeTimer){ clearTimeout(tEyeTimer); tEyeTimer = null; }
+  tEyeAt = null;
+}
+function touchEyedropArm(cx, cy){
+  touchEyedropClear();
+  if(refImgActive()) return;                 // 参照の移動モード中は掴む方を優先
+  const r = drawCanvas.getBoundingClientRect();
+  if(cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) return;  // 絵の上だけ
+  tEyeAt = {x:cx, y:cy};
+  tEyeTimer = setTimeout(() => {
+    tEyeTimer = null;
+    if(!tEyeAt) return;
+    const { x, y } = toCanvasCoord(tEyeAt.x, tEyeAt.y);
+    const hex = sampleCompositeColor(x, y);
+    tPanning = false;                        // 拾ったあとに画面が流れないように
+    applyPickedColor(hex);
+    stageToast('スポイト ' + (hex || ''));
+    tEyeAt = null;
+  }, TOUCH_EYE_MS);
+}
+function touchEyedropMove(cx, cy){
+  if(!tEyeAt) return;
+  if(Math.hypot(cx - tEyeAt.x, cy - tEyeAt.y) > TOUCH_EYE_MOVE) touchEyedropClear();
+}
+
 stage.addEventListener('pointerdown', e => {
   if(e.pointerType !== 'touch') return;
   e.preventDefault();
@@ -5092,9 +5124,11 @@ stage.addEventListener('pointerdown', e => {
       tPanning = true; tPanId = e.pointerId;
       tPanStartClient = {x:e.clientX, y:e.clientY};
       tPanStartPan = {x:state.panX, y:state.panY};
+      touchEyedropArm(e.clientX, e.clientY);   // 指で長押し＝スポイト（Alt+クリックと同じ行き先）
     }
   } else if(touchPtrs.size === 2){
     // 2本指: ピンチ開始
+    touchEyedropClear();
     if(drawing) endStroke();
     tPanning = false;
     const pts = Array.from(touchPtrs.values());
@@ -5112,6 +5146,7 @@ stage.addEventListener('pointerdown', e => {
     }
   } else {
     // 3本以上: 全動作停止（タップ判定は継続）
+    touchEyedropClear();
     if(drawing) endStroke();
     tPinching = false; tPanning = false;
   }
@@ -5122,6 +5157,7 @@ stage.addEventListener('pointermove', e => {
   const p = touchPtrs.get(e.pointerId);
   if(!p) return;
   p.x = e.clientX; p.y = e.clientY;
+  touchEyedropMove(e.clientX, e.clientY);   // 動いたら長押しスポイトは中止
 
   if(refDragging && touchPtrs.size === 1){ refDragMove(e.clientX, e.clientY); return; }
   if(refPinching && touchPtrs.size >= 2){
@@ -5158,6 +5194,7 @@ function stageTouchEnd(e){
   const p = touchPtrs.get(e.pointerId);
   if(!p) return;
   touchPtrs.delete(e.pointerId);
+  touchEyedropClear();
 
   if(refDragging){ refDragEnd(); }
   if(refPinching && touchPtrs.size < 2) refPinchEnd();
@@ -5604,8 +5641,23 @@ document.querySelectorAll('.tool').forEach(btn => {
     // ペン↔消しゴムでサイズUIを更新
     refreshPenSizeUI();
     applyInkUIForTool();
+    if(t === 'fill') syncFillInkFocus();
   });
 });
+
+// FILL（バケツ / 投げ縄）に入るときの色の辻褄合わせ。
+//   主線(黒)が選ばれたままパレット色が黒以外だと「主線ONなのに別の色で塗られる」ので、
+//   ペンでパレットを触ったときと同じく **下書スロットへ移してそこへ色を入れる**。
+//   ・パレット色が黒 → 主線のまま（黒ベタ塗りは正当な用途）
+//   ・投げ縄透明消し → 色は関係ないので触らない
+function syncFillInkFocus(){
+  if(state.tool !== 'fill') return;
+  if(state.fillErase) return;
+  if(state.inkColor !== 'black') return;
+  const hex = (state.fillColor || '').toUpperCase();
+  if(!hex || hex === '#000000') return;
+  focusRoughInk(state.fillColor);
+}
 
 // ERASE中はインクボタンを「主線のみON」表示（消しゴムは色を使わない）。
 // それ以外は state.inkColor を反映。state.inkColor 自体は変更しない。
@@ -5704,16 +5756,22 @@ if(paletteFloatBtn){
   });
 })();
 
-// iPad対応: dblclick が発火しない端末向けに、手動ダブルタップ検出を併設する汎用ヘルパー
+// iPad対応: dblclick が発火しない端末向けに、手動ダブルタップ検出を併設する汎用ヘルパー。
+//   **指(touch)だけでなく Apple Pencil(pen) も見る**（iPad Safari はペンの dblclick を出さない）。
+//   マウスは OS のダブルクリック設定に従いたいので dblclick に任せる。
 function onDoubleActivate(el, handler){
   if(!el) return;
-  el.addEventListener('dblclick', handler);
-  let lastT = 0, lastX = 0, lastY = 0;
+  let lastT = 0, lastX = 0, lastY = 0, swallowUntil = 0;
+  el.addEventListener('dblclick', e => {
+    if(performance.now() < swallowUntil) return;   // pointerup 側で処理済み（二重発火よけ）
+    handler(e);
+  });
   el.addEventListener('pointerup', e => {
-    if(e.pointerType !== 'touch') return;
+    if(e.pointerType === 'mouse') return;          // マウスは dblclick に任せる
     const now = performance.now();
     if(now - lastT < 350 && Math.hypot(e.clientX - lastX, e.clientY - lastY) < 28){
       lastT = 0;
+      swallowUntil = now + 500;
       e.preventDefault();
       handler(e);
     } else {
@@ -5760,6 +5818,7 @@ function fillToggleLasso(){
   }
   if(state.tool !== 'fill') fillToolBtn.click();
   applyFillModeUI();
+  syncFillInkFocus();
   stageToast(fillModeName());
 }
 // 投げ縄透明消し(lasso+erase) ⇔ バケツ(flood)
@@ -6019,6 +6078,15 @@ document.addEventListener('pointerdown', e => {
 loadPalette();
 state.fillColor = gPalette[gPalSlot] || '#000000';
 renderPalette();
+
+// 画面全体スポイト（Chrome / Edge のみ。Safari・iPad には EyeDropper API が無いのでボタンごと隠す）
+(function(){
+  const btn = document.getElementById('btn-pal-eyedrop');
+  if(!btn) return;
+  if(!window.EyeDropper) return;          // 非対応環境ではボタンを出さない
+  btn.style.display = '';
+  btn.addEventListener('click', screenEyedrop);   // ★ユーザー操作から直接呼ぶ
+})();
 
 // ＋ スロット追加
 document.getElementById('btn-pal-add').addEventListener('click', () => {
@@ -8801,6 +8869,7 @@ const SHORTCUT_ACTIONS = [
   { id:'nextFrame', label:'次のコマ',           def:'ArrowRight', prevent:true, run:()=>document.getElementById('strip-next')?.click() },
   { id:'delFrame',  label:'フレーム削除',       def:'Delete',     prevent:true, run:()=>{ if(state.selectedFrameIds && state.selectedFrameIds.size>0) deleteSelectedFrames(); else deleteCurrentFrame(); } },
   { id:'fit',       label:'FIT（ズーム合わせ／2回で100%）',def:'F', run:()=>fitAction() },
+  { id:'screenPick',label:'画面全体スポイト（Chrome/Edge）', def:'', run:()=>screenEyedrop() },
   { id:'mirror',    label:'MIRROR',             def:'M',          run:()=>document.getElementById('btn-mirror')?.click() },
   { id:'flip',      label:'FLIP',               def:'X',          run:()=>document.getElementById('btn-flip')?.click() },
   { id:'refPanel',  label:'REFパネル',          def:'R',          run:()=>toggleRefPanel() },

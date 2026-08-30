@@ -116,6 +116,14 @@ input[type=number]{-moz-appearance:textfield;}
 .kf-dot:hover{border-color:var(--acid);}
 .kf-btn{width:100%;background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.5);font-family:var(--mono);font-size:8px;letter-spacing:0.1em;padding:3px 6px;cursor:pointer;margin-top:3px;}
 .kf-btn:hover{border-color:var(--border-bright);color:var(--acid);}
+/* ADD KF / RESET KF ＝ INSPECTOR で一番よく押す2つ。横並び・2行ぶんの高さで少し目立たせる */
+.kf-btn-row{display:flex;gap:5px;margin-top:7px;}
+.kf-btn-row .kf-btn{margin-top:0;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:34px;font-size:9px;letter-spacing:0.14em;border-color:var(--border-bright);color:rgba(255,255,255,0.72);}
+.kf-btn-row .kf-btn .kb{font-size:7px;letter-spacing:0.18em;color:rgba(255,255,255,0.3);}
+.kf-btn-row .kf-btn:hover{background:rgba(255,79,168,0.08);}
+.kf-btn-row .kf-btn:hover .kb{color:var(--acid);}
+.kf-btn-row .kf-btn.warn:hover{border-color:rgba(255,68,68,0.55);color:#ff8080;background:rgba(255,68,68,0.06);}
+.kf-btn-row .kf-btn.warn:hover .kb{color:#ff8080;}
 .kf-btn.on{border-color:var(--acid);color:var(--acid);background:rgba(255,79,168,0.10);}
 .tc-input.len{color:var(--neon);border-color:var(--neon);}
 .kf-btn:disabled{opacity:0.3;cursor:default;}
@@ -301,9 +309,10 @@ input[type=number]{-moz-appearance:textfield;}
 .ease-range{-webkit-appearance:none;appearance:none;width:64px;height:3px;background:rgba(255,255,255,0.18);outline:none;cursor:pointer;border-radius:2px;}
 .ease-range::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:14px;background:var(--acid);cursor:pointer;border-radius:1px;box-shadow:0 0 4px rgba(255,79,168,0.6);}
 .ease-range::-moz-range-thumb{width:10px;height:14px;background:var(--acid);cursor:pointer;border:none;border-radius:1px;}
-.ease-num{width:34px;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--acid);font-family:var(--mono);font-size:9px;padding:1px 2px;outline:none;text-align:right;}
-.ease-num:focus{border-color:var(--border-bright);}
-.ease-num::-webkit-inner-spin-button{opacity:.35;}
+/* SPEC_18 §4-1: ここも <input> だとペンで Scribble が起動した（発注者報告）。div スクラブへ */
+.ease-num{width:34px;height:16px;line-height:12px;box-sizing:border-box;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--acid);font-family:var(--mono);font-size:9px;padding:1px 2px;outline:none;text-align:right;cursor:ew-resize;overflow:hidden;white-space:nowrap;touch-action:none;user-select:none;-webkit-user-select:none;}
+.ease-num.scrubbing,.ease-num.editing{border-color:var(--acid);box-shadow:0 0 5px rgba(255,79,168,0.4);}
+.ease-num.inherit{color:rgba(255,79,168,0.45);}  /* ez由来の推定値＝まだ手で決めていない */
 
 /* EXPORT OVERLAY */
 #export-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
@@ -392,6 +401,11 @@ input[type=number]{-moz-appearance:textfield;}
 /* SPEC_18: 指（coarse pointer）のときだけ当たりを広げる。#inspector は幅216px固定なので
    固定幅の合計が増えすぎないよう ステッパは 13→18px までに留める */
 @media (pointer:coarse){
+  /* 下端のリサイズ枠：見た目の線はそのままに、掴める帯だけ太くする（発注者報告: 指で掴めない） */
+  #inspector-resize,#settings-resize,#sfx-resize{height:26px;}
+  #tl-resize{top:-20px;height:21px;}      /* 上（ビューポート側）へだけ伸ばす。ルーラーの目盛りは削らない */
+  #tl-resize::after{top:19px;}            /* 見た目の線の位置は据え置き */
+  .ease-num{width:44px;height:26px;line-height:22px;font-size:11px;}
   .kf-val{height:28px;line-height:22px;font-size:11px;}
   .fx-row .fx-val{height:26px;line-height:22px;}
   .num-step{width:18px;height:28px;font-size:8px;}
@@ -620,8 +634,10 @@ input[type=number]{-moz-appearance:textfield;}
       <div class="kf-row" data-prop="rot" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span class="k">ROT</span><button class="num-step" data-step="rot" data-dir="-1">◀</button><div class="kf-val" id="kf-rot">0</div><button class="num-step" data-step="rot" data-dir="1">▶</button><div class="kf-dot" id="dot-rot"></div></div>
       <div class="kf-row" data-prop="s" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span class="k">SCL</span><button class="num-step" data-step="s" data-dir="-1">◀</button><div class="kf-val" id="kf-s">1.000</div><button class="num-step" data-step="s" data-dir="1">▶</button><div class="kf-dot" id="dot-s"></div></div>
       <div class="kf-row" data-prop="op"><span class="k">OP</span><button class="num-step" data-step="op" data-dir="-1">◀</button><div class="kf-val" id="kf-op">1.000</div><button class="num-step" data-step="op" data-dir="1">▶</button><div class="kf-dot" id="dot-op"></div></div>
-      <button class="kf-btn" id="btn-kf-add">+ ADD KEYFRAME HERE</button>
-      <button class="kf-btn" id="btn-kf-clear">✕ CLEAR ALL KF</button>
+      <div class="kf-btn-row">
+        <button class="kf-btn big" id="btn-kf-add" title="現フレームに全プロパティのキーを追加（複数選択中は選択トラックすべて）">+ ADD KF<span class="kb">D</span></button>
+        <button class="kf-btn big warn" id="btn-kf-clear" title="選択トラックのキーを全消去（複数選択中はまとめて）。取り消しは Ctrl+Z">✕ RESET KF<span class="kb">ALT+D</span></button>
+      </div>
       <!-- COPY/PASTE は Ctrl+C / Ctrl+V、EASE・HOLD はキーのWクリック送り、
            イーズ量はトランスポートバーの EASE スライダーへ移動したのでボタンは廃止 -->
     </div>
@@ -704,10 +720,10 @@ input[type=number]{-moz-appearance:textfield;}
         <span class="badge">EASE</span>
         <span class="tc-dim">IN</span>
         <input type="range" id="ease-in-range" class="ease-range" min="0" max="100" step="1" value="0">
-        <input type="number" id="ease-in-num" class="ease-num" min="0" max="100" step="1" placeholder="—">
+        <div id="ease-in-num" class="ease-num" title="横ドラッグで増減／Wタップ・Wクリックでキーボード入力。0でリニアに戻ります">—</div>
         <span class="tc-dim">OUT</span>
         <input type="range" id="ease-out-range" class="ease-range" min="0" max="100" step="1" value="0">
-        <input type="number" id="ease-out-num" class="ease-num" min="0" max="100" step="1" placeholder="—">
+        <div id="ease-out-num" class="ease-num" title="横ドラッグで増減／Wタップ・Wクリックでキーボード入力。0でリニアに戻ります">—</div>
       </span>
     </div>
     <div class="g">
@@ -1307,6 +1323,7 @@ function makeNumField(el){
   return el;
 }
 ALL_PROPS.forEach(p=>{ makeNumField(document.getElementById('kf-'+p)); makeNumField(document.getElementById('fx-'+p)); });
+['ease-in-num','ease-out-num'].forEach(id=>makeNumField(document.getElementById(id)));  // イーズ量もdiv（Scribble対策）
 // SPEC_11 P4-2: トラックロック。選択はできるが編集系は拒否（true を返したら呼び出し側は中断）
 function lockedGuard(t){
   if(t&&t.locked){ flashLive('🔒 '+((t.name||'TRACK'))+' はロック中です'); return true; }
@@ -1477,7 +1494,7 @@ function clearAllKf(){
   if(!idxs.length){ flashLive(selTrackIdxs().length?'🔒 ロック中です':'トラック未選択'); return; }
   idxs.forEach(i=>{ state.tracks[i].keyframes=makeEmptyKfs(); });
   recordHistory(); idxs.forEach(i=>renderKfDiamonds(i)); drawCurrentFrame(); updateKfUI();
-  flashLive('✕ CLEAR ALL KF'+(idxs.length>1?(' × '+idxs.length+' トラック'):''));
+  flashLive('✕ RESET KF'+(idxs.length>1?(' × '+idxs.length+' トラック'):''));
 }
 
 // ── KF 選択モデル（複数選択 / TRACKまたぎ） ──
@@ -1574,7 +1591,7 @@ function applyInfluence(field,val,live){
     });
     tracksInv.add(s.t);
   });
-  if(!n){ flashLive('対象キーがありません'); return; }
+  if(!n){ if(!live) flashLive('対象キーがありません'); return; }
   recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses();
   drawCurrentFrame(); renderGraph();
   flashLive('∿ INF '+(field==='ei'?'IN':'OUT')+(val==null?' CLEAR':'='+Math.round(val)+'%'));
@@ -1589,15 +1606,23 @@ function updateInfluenceUI(){
   let src=null;
   if(kfSel.length===1) src=kfSel[0];
   else if(!kfSel.length && selTrack()) src={t:state.selectedTrack,f:curLocalFrame()};
-  let ei=null,eo=null;
+  let ei=null,eo=null,ez=0,hold=false,found=false;
   if(src){
     const t=state.tracks[src.t];
-    if(t) for(const p of ALL_PROPS){ const k=t.keyframes[p].find(k=>k.f===src.f); if(k){ ei=k.ei!=null?k.ei:null; eo=k.eo!=null?k.eo:null; break; } }
+    if(t) for(const p of ALL_PROPS){ const k=t.keyframes[p].find(k=>k.f===src.f); if(k){ ei=k.ei!=null?k.ei:null; eo=k.eo!=null?k.eo:null; ez=k.ez||0; hold=!!k.hold; found=true; break; } }
   }
-  if(document.activeElement!==inEl)  inEl.value = ei==null?'':Math.round(ei);
-  if(document.activeElement!==outEl) outEl.value= eo==null?'':Math.round(eo);
-  if(document.activeElement!==inR)   inR.value  = ei==null?0:Math.round(ei);
-  if(document.activeElement!==outR)  outR.value = eo==null?0:Math.round(eo);
+  // ez（キーのWクリック送り LINEAR/EASE）は getKfValue の中で **influence ez*33.3% として効いている**。
+  // 手で入れた ei/eo が無いときはその換算値を薄い色で見せる＝送りで切り替えたらスライダーも一緒に動く。
+  // HOLD は区間ごと固定なのでイーズの出番が無い＝「—」。
+  const inh=Math.round(ez*33.3);
+  const iv = hold?null:(ei!=null?Math.round(ei):(found?inh:null));
+  const ov = hold?null:(eo!=null?Math.round(eo):(found?inh:null));
+  inEl.value  = iv==null?'—':String(iv);
+  outEl.value = ov==null?'—':String(ov);
+  inEl.classList.toggle('inherit', ei==null&&iv!=null);
+  outEl.classList.toggle('inherit', eo==null&&ov!=null);
+  if(document.activeElement!==inR)   inR.value  = iv==null?0:iv;
+  if(document.activeElement!==outR)  outR.value = ov==null?0:ov;
 }
 
 // ── KFナビゲーション（J/K） ──
@@ -2340,25 +2365,31 @@ function selectTrackStep(dir, toEnd){
 }
 // Ctrl+↑↓ で選択トラックを上下移動（並び替え）。Shiftで一番上/一番下。
 // UI上=前面=state末尾なので dir>0(↑)=末尾方向へ。CAMERAは最上固定なので越えない/自身は不動。
+// 複数選択中は**選んだぶん全部**をひとかたまりで動かす（並び順は保ったまま）。
+// CAMERA は常に最上段固定なので対象から外す
 function moveTrack(dir, toEnd){
   const N=state.tracks.length; if(!N) return;
-  let cur=state.selectedTrack; if(cur<0||cur>=N) return;
-  const track=state.tracks[cur];
-  if(track.type==='camera'){ flashLive('CAMERAは常に最上段（移動不可）'); return; }
-  const camExists=state.tracks.some(t=>t.type==='camera');
-  const maxIdx=camExists?N-2:N-1; // カメラの1つ下まで
-  let target = toEnd ? (dir>0?maxIdx:0) : cur+dir;
-  target=Math.max(0,Math.min(maxIdx,target));
-  if(target===cur) return;
-  state.tracks.splice(cur,1);
-  state.tracks.splice(target,0,track);
+  const sel=selTrackIdxs();
+  const idxs=sel.filter(i=>state.tracks[i]&&state.tracks[i].type!=='camera').sort((a,b)=>a-b);
+  if(!idxs.length){ flashLive(sel.length?'CAMERAは常に最上段（移動不可）':'トラック未選択'); return; }
+  const primary=state.tracks[state.selectedTrack]||state.tracks[idxs[idxs.length-1]];
+  const moving=idxs.map(i=>state.tracks[i]);
+  const rest=state.tracks.filter(t=>!moving.includes(t));
+  const camExists=rest.some(t=>t.type==='camera');
+  const maxIns=rest.length-(camExists?1:0);       // カメラの手前まで
+  const base=idxs[0];                             // 残り配列から見た「いまの塊の位置」
+  let target = toEnd ? (dir>0?maxIns:0) : base+dir;
+  target=Math.max(0,Math.min(maxIns,target));
+  if(target===base) return;
+  state.tracks=[...rest.slice(0,target),...moving,...rest.slice(target)];
   pinCameraTop();
-  state.selectedTrack=state.tracks.indexOf(track);
+  state.selectedTrack=state.tracks.indexOf(primary);
   rebuildAllTrackUI();
   const el=document.querySelector(`#tl-tracks .tl-track[data-track="${state.selectedTrack}"]`);
   if(el) el.scrollIntoView({block:'nearest'});
+  refreshTrackSelClasses();   // 複数選択（tid基準）はそのまま維持される
   recordHistory();
-  flashLive(dir>0?'TRACK ▲':'TRACK ▼');
+  flashLive((dir>0?'TRACK ▲':'TRACK ▼')+(moving.length>1?(' × '+moving.length):''));
 }
 
 function toggleTrackVis(idx){
@@ -2699,7 +2730,9 @@ function buildTrackElement(idx){
       if(gTrackMultiSel){ dhPending=false; return; } // 複数選択タップ中は並べ替えを起こさない
       if(dhPending&&gStripGesture!=='marquee'){
         const dy=Math.abs(e.clientY-dhStartY), dx=Math.abs(e.clientX-dhStartX);
-        if(o.vOnly ? (dy>5&&dy>dx) : dy>4) dhBegin(); // 動いてからドラッグ確定
+        // ストリップ上（vOnly）は「はっきり縦」でないと並べ替えを始めない。
+        // 5px/dy>dx だと、キーを矩形選択しようとした斜めの入りで並べ替えが暴発していた（発注者報告）
+        if(o.vOnly ? (dy>9&&dy>dx*2) : dy>4) dhBegin(); // 動いてからドラッグ確定
       }
       if(!dhActive) return;
       e.preventDefault();
@@ -2872,8 +2905,9 @@ function buildTrackElement(idx){
     aniBtn.title=reBtn.title='NULLはANIMATORと連携しません';
   }
   btns.appendChild(visBtn);
+  if(track.type!=='camera') btns.appendChild(soloBtn); // ◉ の隣は S（表示まわりを並べる）
   btns.appendChild(lockBtn); // SPEC_11 P4-2
-  if(track.type!=='camera'){ btns.appendChild(soloBtn); btns.appendChild(pngBtn); btns.appendChild(aniBtn); btns.appendChild(reBtn); } // カメラは PRNT が代わりに入る
+  if(track.type!=='camera'){ btns.appendChild(pngBtn); btns.appendChild(aniBtn); btns.appendChild(reBtn); } // カメラは PRNT が代わりに入る
   if(camParentSel) btns.appendChild(camParentSel); // 削除ボタンの左隣（余白いっぱいに伸びる）
   btns.appendChild(delBtn);
   label.appendChild(nameEl); label.appendChild(btns);
@@ -3117,12 +3151,14 @@ function renderKfDiamonds(trackIdx){
     if(holdOn) d.classList.add('ez-hold');
     else if(ezAmt>=0.99) d.classList.add('ez-max'); else if(ezAmt>0) d.classList.add('ez-mid');
     d.style.left=(frameFrac(f+off)*100)+'%'; d.title=`F${f+off+1}`+(holdOn?' (HOLD)':ezAmt>=0.99?' (EASE最大)':ezAmt>0?' (EASE中)':' (LINEAR)')
-      +'\nCtrl+クリック / ダブルクリック = LINEAR→EASE→HOLD 送り\nShift+ドラッグ = 吸着（インジケータ/他トラックのキー・IN/OUT）\nAlt+ドラッグ = 複製';
+      +'\nCtrl+クリック / Wクリック・Wタップ（指・ペンも可）= LINEAR→EASE→HOLD 送り（複数選択中はまとめて）\nShift+ドラッグ = 吸着（インジケータ/他トラックのキー・IN/OUT）\nAlt+ドラッグ = 複製';
     // この frame の各プロパティ値（単一移動/複製で持ち回る）
     const kfVals={}, kfEz={}, kfInf={}, kfHold={};
     ALL_PROPS.forEach(p=>{const k=track.keyframes[p].find(k=>k.f===f);if(k){kfVals[p]=k.v;kfEz[p]=k.ez||0;kfInf[p]={ei:k.ei,eo:k.eo};if(k.hold)kfHold[p]=true;}});
     let dragActive=false, wasDragged=false, origF=f, shiftStart=false, ctrlStart=false, altStart=false, copyF=f;
     let groupMode=false, groupSnap=null, lastDelta=0, gMin=0, gMax=total-1, gEdges=null, snapCands=null;
+    let groupEls=null;        // グループ移動中に一緒に動かすダイヤのDOM（掴んだ瞬間に控える）
+    let lastKfTap=-1e9;       // Wタップ判定。§6-4: 起動直後の誤判定を避けて十分過去から
     function putKeys(targetF,removeF){
       ALL_PROPS.forEach(p=>{
         if(!(p in kfVals)) return;
@@ -3143,6 +3179,8 @@ function renderKfDiamonds(trackIdx){
       groupSnap.forEach(it=>{ const t=state.tracks[it.t]; const from=it.f+lastDelta; it.props.forEach(pr=>{ t.keyframes[pr.p]=t.keyframes[pr.p].filter(k=>k.f!==from); }); });
       groupSnap.forEach(it=>{ const t=state.tracks[it.t]; const to=it.f+delta; it.props.forEach(pr=>{ if(!t.keyframes[pr.p].some(k=>k.f===to)){ const nk={f:to,v:pr.v,ez:pr.ez}; if(pr.ei!=null)nk.ei=pr.ei; if(pr.eo!=null)nk.eo=pr.eo; if(pr.hold)nk.hold=true; t.keyframes[pr.p].push(nk); t.keyframes[pr.p].sort((a,b)=>a.f-b.f);} }); });
       lastDelta=delta;
+      // 見た目も同時に動かす（データだけ動かして描き直しを待つと「1個ずつ動く」ように見える）
+      if(groupEls) groupEls.forEach(g=>{ if(g.el){ g.el.style.left=(frameFrac(g.f+delta+g.off)*100)+'%'; g.el.title=`F${g.f+delta+g.off+1}`; } });
     }
     d.addEventListener('pointerdown',e=>{
       selectTrack(trackIdx); // 2026-07-26: 別トラックのキーを触ったらそのトラックが選択状態になる
@@ -3156,6 +3194,11 @@ function renderKfDiamonds(trackIdx){
         gMin=Math.min(...groupSnap.map(it=>it.f)); gMax=Math.max(...groupSnap.map(it=>it.f));
         // Shiftスナップ用：グループ各キーのコンポ時間（トラックごとに tOffset が違うので個別に足す）
         gEdges=groupSnap.map(it=>it.f+trackOff(state.tracks[it.t]));
+        // 選択ぶんのダイヤを控えておく。これが無いと「掴んだ1個だけ動いて、離してから残りがパッと飛ぶ」
+        groupEls=groupSnap.map(it=>({
+          f:it.f, off:trackOff(state.tracks[it.t]),
+          el:document.querySelector(`.tl-kf-d[data-track="${it.t}"][data-f="${it.f}"]`),
+        }));
       }
       // 吸着候補はここで凍結（動かす当人は候補から外す＝自己吸着で動けなくなるのを防ぐ）
       snapCands = shiftStart ? freezeSnapCands(groupMode?gEdges:[f+off]) : null;
@@ -3199,13 +3242,20 @@ function renderKfDiamonds(trackIdx){
     }
     d.addEventListener('pointerup',()=>{
       if(!dragActive) return; dragActive=false;
-      if(wasDragged){ endKfDrag(); }
-      else if(ctrlStart){ cycleEase(trackIdx,origF); } // Ctrl+クリックでイーズ順送り(AE準拠)
-      else if(shiftStart){ kfSelToggle(trackIdx,origF); }
-      else { kfSelSet(trackIdx,origF); seek(origF+off); }
+      if(wasDragged){ endKfDrag(); return; }
+      if(ctrlStart){ cycleEase(trackIdx,origF); return; }   // Ctrl+クリックでイーズ順送り(AE準拠)
+      if(shiftStart){ kfSelToggle(trackIdx,origF); return; }
+      // Wタップ / Wクリック = イーズ送り。pointerdown で preventDefault しているので
+      // ブラウザの dblclick は飛んでこない（＝指でもペンでも効かなかった）。自前で数える
+      const now=performance.now();
+      if(now-lastKfTap<320){ lastKfTap=-1e9; cycleEase(trackIdx,origF); return; }
+      lastKfTap=now;
+      // 複数選択に入っているキーを1回触っただけでは選択を畳まない
+      // ＝直後のWタップが「選択ぶん全部のイーズ変更」になる（applyKeyModeToFrame が選択を見る）
+      if(!(kfSel.length>1&&kfSelHas(trackIdx,origF))) kfSelSet(trackIdx,origF);
+      seek(origF+off);
     });
     d.addEventListener('pointercancel',()=>{ if(!dragActive) return; dragActive=false; if(wasDragged) endKfDrag(); });
-    d.addEventListener('dblclick',e=>{ e.stopPropagation(); cycleEase(trackIdx,origF); }); // iPad用ダブルタップでも切替
     row.appendChild(d);
   }
 }
@@ -3213,8 +3263,10 @@ function renderKfDiamonds(trackIdx){
 // ── キーの順送り（Ctrl+クリック / ダブルクリック・ダブルタップ）：LINEAR → EASE → HOLD → LINEAR ──
 function cycleEase(trackIdx,f){
   const next=(getFrameKeyMode(trackIdx,f)+1)%3;
+  // applyKeyModeToFrame は「触ったキーが複数選択に入っていれば選択ぶん全部」に効く（＝一括イーズ変更）
+  const bulk = kfSel.length>1 && kfSelHas(trackIdx,f);
   applyKeyModeToFrame(trackIdx,f,next);
-  flashLive(['◆ LINEAR','● EASE 最大','◻ HOLD（次のキーまで固定）'][next]);
+  flashLive(['◆ LINEAR','● EASE 最大','◻ HOLD（次のキーまで固定）'][next]+(bulk?(' × '+kfSel.length+' キー'):''));
 }
 function closeEaseMenu(){} // 旧メニュー互換のno-op（Escハンドラから呼ばれる）
 
@@ -5237,19 +5289,17 @@ $('#btn-camera').addEventListener('click',addCameraTrack);
 $('#btn-null').addEventListener('click',addNullTrack);
 // イーズ量（influence%）— スライダーと数値は同じ値を編集。0 と 空欄 は「解除＝リニアへ」
 // 100超は意味がないので range/number とも max=100 でクランプ
+// 数値欄側は div スクラブ（NUMERIC SCRUB 側で配線）。ここは共通処理とスライダーの分だけ
+function applyEaseInput(field,raw,live){
+  const v = (raw===''||raw==null) ? null : Math.max(0,Math.min(100,parseFloat(raw)));
+  applyInfluence(field, (v==null||v===0)?null:v, live);
+}
 (function(){
-  const clamp=v=>Math.max(0,Math.min(100,v));
-  const apply=(field,raw,live)=>{
-    const v = (raw===''||raw==null) ? null : clamp(parseFloat(raw));
-    applyInfluence(field, (v==null||v===0)?null:v, live);
-  };
   // range は input 中は履歴を積まず（live=true）、離した時に確定
-  $('#ease-in-range').addEventListener('input',e=>apply('ei',e.target.value,true));
-  $('#ease-out-range').addEventListener('input',e=>apply('eo',e.target.value,true));
-  $('#ease-in-range').addEventListener('change',e=>apply('ei',e.target.value,false));
-  $('#ease-out-range').addEventListener('change',e=>apply('eo',e.target.value,false));
-  $('#ease-in-num').addEventListener('change',e=>apply('ei',e.target.value.trim(),false));
-  $('#ease-out-num').addEventListener('change',e=>apply('eo',e.target.value.trim(),false));
+  $('#ease-in-range').addEventListener('input',e=>applyEaseInput('ei',e.target.value,true));
+  $('#ease-out-range').addEventListener('input',e=>applyEaseInput('eo',e.target.value,true));
+  $('#ease-in-range').addEventListener('change',e=>{applyEaseInput('ei',e.target.value,false);updateInfluenceUI();});
+  $('#ease-out-range').addEventListener('change',e=>{applyEaseInput('eo',e.target.value,false);updateInfluenceUI();});
 })();
 $('#btn-graph').addEventListener('click',toggleGraph);
 $('#btn-export-jsx').addEventListener('click',exportAeJsx);
@@ -5626,6 +5676,9 @@ const SHORTCUT_ACTIONS=[
   {cat:'キーフレーム',  id:'nextKey',  label:'次のキーへ（インジケータ吸着）', def:'K',  prevent:true, run:()=>seekNextKey()},
   {cat:'キーフレーム',  id:'delKey',   label:'キー削除／無ければトラック削除', def:'Delete', prevent:true, run:()=>deleteKfOrTrack()},
   {cat:'キーフレーム',  id:'opPunch',  label:'OPパンチ 1→0（Shift=逆）', def:'Q',     run:e=>opPunch(e&&e.shiftKey)},
+  // ◆ = ダイヤ。INSPECTOR の ADD KF / RESET KF と同じ（消す方は誤爆しないよう Alt 必須）
+  {cat:'キーフレーム',  id:'kfAdd',    label:'ADD KF（現フレームにキー追加）',   def:'D', prevent:true, run:()=>addKfAtCurrent()},
+  {cat:'キーフレーム',  id:'kfReset',  label:'RESET KF（選択トラックのキー全消去）', def:'D', alt:true, prevent:true, run:()=>clearAllKf()},
 
   {cat:'トラック',      id:'trackUp',  label:'選択を上へ（Shift=最上）', def:'ArrowUp',  prevent:true, run:e=>selectTrackStep(+1, e&&e.shiftKey)},
   {cat:'トラック',      id:'trackDn',  label:'選択を下へ（Shift=最下）', def:'ArrowDown',prevent:true, run:e=>selectTrackStep(-1, e&&e.shiftKey)},
@@ -5909,6 +5962,9 @@ let scrubbing=false;
 //          相対にすると「動かさなければ絶対に動かない」＝クリック/Wクリックと両立し、
 //          線の位置のサブピクセル誤差にも影響されない。
 let gScrubMode='abs', gScrubX0=0, gScrubF0=0;
+// 掴んだポインタのID。ペンは「浮かせた指」のような hover move も飛ばしてくるので、
+// 追いかける相手を1本に固定しないとスクラブが途中で抜ける（＝タップで飛ぶだけに見える）
+let gScrubPid=null;
 function rulerScrub(e){
   const rect=$('#tl-ruler').getBoundingClientRect();
   const aw=rect.width-LABEL_W;
@@ -5924,7 +5980,13 @@ function rulerScrub(e){
   if(e.shiftKey&&state.totalFrames) f=snapFrame(Math.min(f,state.totalFrames-1),aw/tlSpan());
   pause(); seek(f);
 }
-$('#tl-ruler').addEventListener('pointerdown',e=>{gScrubMode='abs';scrubbing=true;rulerScrub(e);});
+$('#tl-ruler').addEventListener('pointerdown',e=>{
+  gScrubMode='abs'; scrubbing=true; gScrubPid=e.pointerId;
+  // ペン対策: capture して以後のmoveを必ず受け取る。preventDefault はマーカー等の個別要素の上では**しない**
+  try{ $('#tl-ruler').setPointerCapture(e.pointerId); }catch(_){}
+  if(e.target===$('#tl-ruler')||e.target===$('#tl-ruler-canvas')) e.preventDefault();
+  rulerScrub(e);
+});
 // SPEC_11 P7-5 Step3: Alt+ホイール＝カーソル基点でズーム / Shift・横ホイール＝横スクロール
 // 素のホイールは #tl-tracks の縦スクロールに残す（preventDefaultしない）
 $('#btn-tl-zoom').addEventListener('click',toggleTlZoomWa);
@@ -5958,7 +6020,9 @@ let gWaPrev=null;
     // 掴んだ瞬間は動かさない（クリック＝現状維持／Wクリック＝WAトグルを邪魔しない）。
     // ドラッグに入ったときだけ、掴んだコマからの**相対**で動かす
     gScrubMode='rel'; gScrubX0=e.clientX; gScrubF0=state.currentFrame;
-    scrubbing=true;
+    scrubbing=true; gScrubPid=e.pointerId;
+    // capture だけ取る。preventDefault すると Wクリック（ワークエリア トグル）が死ぬので**しない**
+    try{ grab.setPointerCapture(e.pointerId); }catch(_){}
   });
   grab.addEventListener('dblclick',e=>{
     e.stopPropagation(); e.preventDefault();
@@ -5973,9 +6037,18 @@ let gWaPrev=null;
     flashLive('⟺ WORK AREA '+(w.startFrame+1)+'–'+w.endFrame+((w.startFrame===0&&w.endFrame>=total)?'（全体）':''));
   });
 })();
-window.addEventListener('pointermove',e=>{if(scrubbing){ if(!e.buttons){scrubbing=false;return;} rulerScrub(e);} });
-window.addEventListener('pointerup',()=>{scrubbing=false;gScrubMode='abs';});
-window.addEventListener('pointercancel',()=>{scrubbing=false;gScrubMode='abs';});
+function endRulerScrub(e){
+  if(gScrubPid!=null&&e&&e.pointerId!==gScrubPid) return;   // 別のポインタが離れただけ
+  scrubbing=false; gScrubMode='abs'; gScrubPid=null;
+}
+window.addEventListener('pointermove',e=>{
+  if(!scrubbing) return;
+  if(gScrubPid!=null&&e.pointerId!==gScrubPid) return;      // ペンのホバー等で抜けない
+  if(e.pointerType==='mouse'&&!e.buttons){ endRulerScrub(e); return; } // マウスだけ「ボタンが離れた」を保険に使う
+  rulerScrub(e);
+});
+window.addEventListener('pointerup',endRulerScrub);
+window.addEventListener('pointercancel',endRulerScrub);
 
 // Work area handle drag
 (function(){
@@ -6029,9 +6102,10 @@ window.addEventListener('pointercancel',()=>{scrubbing=false;gScrubMode='abs';})
     if(gStripGesture==='reorder') return; // 縦ドラッグは並び替えに譲る
     const w=Math.abs(e.clientX-sx), h=Math.abs(e.clientY-sy);
     if(w<=3&&h<=3) return;
-    // 並び替えが待機中（＝掴める場所を押している）で縦優勢なら、まだマーキーを出さない。
-    // キー帯やCAMERA行など待機していない場所では縦ドラッグもマーキーになる（死角を作らない）
-    if(!gStripGesture&&gStripArmed&&h>w) return;
+    // 並び替えが待機中（＝掴める場所を押している）で**はっきり縦**なら、まだマーキーを出さない。
+    // 判定は並び替え側（dy>dx*2）と必ず揃えること。h>w で譲っていた頃は、斜めに入ると
+    // 「並び替えも始まらない・マーキーも出ない」死角ができていた
+    if(!gStripGesture&&gStripArmed&&h>w*2) return;
     gStripGesture='marquee';
     moved=true;
     const box=$('#tl-marquee');
@@ -6113,99 +6187,130 @@ window.addEventListener('resize',()=>{if(state.width)setupViewport();drawRuler()
 })();
 drawRuler();
 
-// ── NUMERIC SCRUB (AE/Blender-style) ── SPEC_18 §4-1
-// 数値欄は <input> ではなく <div>（上の makeNumField で .value 互換にしてある）。
+// ── NUMERIC SCRUB ── SPEC_18 §4-1（汎用化: TRANSFORM と EASE量の両方がこれを使う）
+// 数値欄は <input> ではなく <div>（makeNumField で .value 互換にしてある）。
 // **旧実装との違い＝方針の反転**: 以前は「クリックで数値入力したいので preventDefault しない」だった。
 // それだと iPadOS でペンが触れた瞬間に Scribble が起動して欄が手書き専用になる（SPEC_18 §2-2）。
 // いまは pointerdown で必ず preventDefault ＝ フォーカスを渡さない。
 //   ・ドラッグ（指／ペン／マウス）= スクラブ。Shift=×10, Ctrl=×0.1
 //   ・Wタップ / Wクリック = そのときだけ <input> を生成して打ち換え（Enter/フォーカス外れ=確定, Esc=取消）
-//   ・ラベル(.k) は従来どおりスクラブのみ
-(function(){
-  const TAP_MS=300, TAP_PX=10, DTAP_MS=320;   // SPEC_18 §3 のしきい値（「動かさずに離した」は10px。3pxだと手ブレで潰れる）
-  function beginEdit(valEl,prop){
-    if(valEl._editing) return;
-    valEl._editing=true; valEl.classList.add('editing');
-    const inp=document.createElement('input');
-    inp.type='text'; inp.inputMode='decimal'; inp.className='numv-edit';
-    inp.value=valEl.textContent;
-    valEl.textContent=''; valEl.appendChild(inp);
-    inp.focus(); try{ inp.select(); }catch(_){}
-    let ref=inp, done=false, onOutside=null;
-    const close=commit=>{
-      if(done) return; done=true;
-      if(onOutside) document.removeEventListener('pointerdown',onOutside,true);
-      const raw=ref?ref.value:'';
-      const el=ref; ref=null;                 // §6-5: remove() が blur を誘発するので**参照を先に切る**
-      if(el) el.remove();
-      valEl._editing=false; valEl.classList.remove('editing');
-      let v=parseFloat(raw); if(isNaN(v)) v=propDefOf(prop);
-      v=clampProp(prop,v);
-      valEl.textContent=fmtProp(prop,v);
-      if(commit&&selTrack()) commitProp(prop,v);
-      updateKfUI(); updateFxHud();
-    };
-    inp.addEventListener('keydown',ev=>{
-      ev.stopPropagation();                   // アプリのショートカット（Esc/1〜9 等）へ流さない
-      if(ev.key==='Enter'){ ev.preventDefault(); close(true); }
-      else if(ev.key==='Escape'){ ev.preventDefault(); close(false); }
-    });
-    inp.addEventListener('blur',()=>close(true));
-    inp.addEventListener('pointerdown',ev=>ev.stopPropagation()); // 親のスクラブを起こさない
-    // よそを触ったら確定して閉じる。blur だけに頼ると、iPadOS で focus() が通らなかったときに
-    // 入力欄が開きっぱなしで閉じられなくなる（実測で踏んだ。フォーカスが body のままになる場面がある）
-    onOutside=ev=>{ if(ev.target!==inp&&ev.target!==valEl) close(true); };
-    setTimeout(()=>{ if(!done) document.addEventListener('pointerdown',onOutside,true); },0);
-  }
-  function attachScrub(node,valEl,prop,allowEdit){
-    if(!node||!valEl) return;
-    let active=false,pid=null,startX=0,startV=0,downT=0,moved=false,committed=false,lastTap=-1e9; // §6-4: lastTapは十分過去から
-    node.addEventListener('pointerdown',e=>{
-      if(e.pointerType==='mouse'&&e.button!==0) return;
-      if(valEl._editing) return;              // 打ち換え中の <input> には触らない
-      e.preventDefault();                     // ← ここが要。フォーカスを渡さない＝Scribbleもキーボードも出ない
-      try{ node.setPointerCapture(e.pointerId); }catch(_){}  // §6-2: 普通に例外を投げる
-      pid=e.pointerId; active=true; moved=false; committed=false;
-      downT=performance.now(); startX=e.clientX;
-      const raw=parseFloat(valEl.value); startV=isNaN(raw)?propDefOf(prop):raw;
-    });
-    node.addEventListener('pointermove',e=>{
-      if(!active||e.pointerId!==pid) return;
-      if(!moved){
-        const th=(e.pointerType==='mouse')?3:TAP_PX;  // 指/ペンは10px（3pxだと手ブレでタップが潰れる・§3）
-        const d=e.clientX-startX;
-        if(Math.abs(d)<th) return;
-        // しきい値ぶん**だけ**吸収して残りはこの move から効かせる。
-        // 基準を e.clientX に引き直すと、moveが粗いとき（指・低頻度）に最初の移動量が丸ごと消える
-        moved=true; startX+=Math.sign(d)*th;
-        node.classList.add('scrubbing');
-      }
-      e.preventDefault();
-      const multi=e.shiftKey?10:((e.ctrlKey||e.metaKey)?0.1:1);
-      const v=clampProp(prop, startV+(e.clientX-startX)*PROP_STEP[prop]*multi);
-      valEl.value=fmtProp(prop,v);
-      if(selTrack()){ commitProp(prop,v,false); committed=true; } // ドラッグ中は履歴を積まない
-    });
-    function finish(e,cancelled){
-      if(!active||e.pointerId!==pid) return;
-      active=false; pid=null; node.classList.remove('scrubbing');
-      try{ node.releasePointerCapture(e.pointerId); }catch(_){}
-      if(moved){ if(committed) recordHistory(); return; }
-      if(cancelled) return;
-      // 動かさずに離した＝タップ。2回続けば打ち換え
-      const now=performance.now();
-      if(now-downT>TAP_MS) return;
-      if(allowEdit&&now-lastTap<DTAP_MS){ lastTap=-1e9; beginEdit(valEl,prop); }
-      else lastTap=now;
+// o = { get():number, live(v):bool, done(), edit(v), fmt(v):string, clamp(v):number, step:number, allowEdit:bool }
+const NUMSCRUB_TAP_MS=300, NUMSCRUB_TAP_PX=10, NUMSCRUB_DTAP_MS=320; // SPEC_18 §3 のしきい値
+function numFieldEdit(valEl,o){
+  if(valEl._editing) return;
+  valEl._editing=true; valEl.classList.add('editing');
+  const inp=document.createElement('input');
+  inp.type='text'; inp.inputMode='decimal'; inp.className='numv-edit';
+  inp.value=valEl.textContent==='—'?'':valEl.textContent;
+  valEl.textContent=''; valEl.appendChild(inp);
+  inp.focus(); try{ inp.select(); }catch(_){}
+  let ref=inp, done=false, onOutside=null;
+  const close=commit=>{
+    if(done) return; done=true;
+    if(onOutside) document.removeEventListener('pointerdown',onOutside,true);
+    const raw=ref?ref.value:'';
+    const el=ref; ref=null;                 // §6-5: remove() が blur を誘発するので**参照を先に切る**
+    if(el) el.remove();
+    valEl._editing=false; valEl.classList.remove('editing');
+    let v=parseFloat(raw); if(isNaN(v)) v=o.get();
+    v=o.clamp(v);
+    valEl.textContent=o.fmt(v);
+    if(commit) o.edit(v);
+  };
+  inp.addEventListener('keydown',ev=>{
+    ev.stopPropagation();                   // アプリのショートカット（Esc/1〜9 等）へ流さない
+    if(ev.key==='Enter'){ ev.preventDefault(); close(true); }
+    else if(ev.key==='Escape'){ ev.preventDefault(); close(false); }
+  });
+  inp.addEventListener('blur',()=>close(true));
+  inp.addEventListener('pointerdown',ev=>ev.stopPropagation()); // 親のスクラブを起こさない
+  // よそを触ったら確定して閉じる。blur だけに頼ると、iPadOS で focus() が通らなかったときに
+  // 入力欄が開きっぱなしで閉じられなくなる（実測で踏んだ。フォーカスが body のままになる場面がある）
+  onOutside=ev=>{ if(ev.target!==inp&&ev.target!==valEl) close(true); };
+  setTimeout(()=>{ if(!done) document.addEventListener('pointerdown',onOutside,true); },0);
+}
+function attachNumScrub(node,valEl,o){
+  if(!node||!valEl) return;
+  let active=false,pid=null,startX=0,startV=0,downT=0,moved=false,committed=false,lastTap=-1e9; // §6-4: lastTapは十分過去から
+  node.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse'&&e.button!==0) return;
+    if(valEl._editing) return;              // 打ち換え中の <input> には触らない
+    e.preventDefault();                     // ← ここが要。フォーカスを渡さない＝Scribbleもキーボードも出ない
+    try{ node.setPointerCapture(e.pointerId); }catch(_){}  // §6-2: 普通に例外を投げる
+    pid=e.pointerId; active=true; moved=false; committed=false;
+    downT=performance.now(); startX=e.clientX; startV=o.get();
+  });
+  node.addEventListener('pointermove',e=>{
+    if(!active||e.pointerId!==pid) return;
+    if(!moved){
+      const th=(e.pointerType==='mouse')?3:NUMSCRUB_TAP_PX;  // 指/ペンは10px（3pxだと手ブレでタップが潰れる・§3）
+      const d=e.clientX-startX;
+      if(Math.abs(d)<th) return;
+      // しきい値ぶん**だけ**吸収して残りはこの move から効かせる。
+      // 基準を e.clientX に引き直すと、moveが粗いとき（指・低頻度）に最初の移動量が丸ごと消える
+      moved=true; startX+=Math.sign(d)*th;
+      node.classList.add('scrubbing');
     }
-    node.addEventListener('pointerup',e=>finish(e,false));
-    node.addEventListener('pointercancel',e=>finish(e,true));
+    e.preventDefault();
+    const multi=e.shiftKey?10:((e.ctrlKey||e.metaKey)?0.1:1);
+    const v=o.clamp(startV+(e.clientX-startX)*o.step*multi);
+    if(o.live(v)) committed=true;
+  });
+  function finish(e,cancelled){
+    if(!active||e.pointerId!==pid) return;
+    active=false; pid=null; node.classList.remove('scrubbing');
+    try{ node.releasePointerCapture(e.pointerId); }catch(_){}
+    if(moved){ if(committed) o.done(); return; }
+    if(cancelled) return;
+    // 動かさずに離した＝タップ。2回続けば打ち換え
+    const now=performance.now();
+    if(now-downT>NUMSCRUB_TAP_MS) return;
+    if(o.allowEdit&&now-lastTap<NUMSCRUB_DTAP_MS){ lastTap=-1e9; numFieldEdit(valEl,o); }
+    else lastTap=now;
   }
+  node.addEventListener('pointerup',e=>finish(e,false));
+  node.addEventListener('pointercancel',e=>finish(e,true));
+}
+// TRANSFORM（INSPECTOR / QUICK TRANSFORM）
+(function(){
+  const optOf=(valEl,prop)=>({
+    step:PROP_STEP[prop],
+    fmt:v=>fmtProp(prop,v),
+    clamp:v=>clampProp(prop,v),
+    get:()=>{ const r=parseFloat(valEl.value); return isNaN(r)?propDefOf(prop):r; },
+    live:v=>{ valEl.value=fmtProp(prop,v); if(!selTrack()) return false; commitProp(prop,v,false); return true; }, // ドラッグ中は履歴を積まない
+    done:()=>recordHistory(),
+    edit:v=>{ valEl.value=fmtProp(prop,v); if(selTrack()) commitProp(prop,v); updateKfUI(); updateFxHud(); },
+    allowEdit:true,
+  });
   ALL_PROPS.forEach(prop=>{
     const fxRow=document.querySelector(`#fx-hud .fx-row[data-prop="${prop}"]`);
-    if(fxRow){ attachScrub(fxRow.querySelector('.k'),$(`#fx-${prop}`),prop,false); attachScrub($(`#fx-${prop}`),$(`#fx-${prop}`),prop,true); }
+    if(fxRow){ const v=$(`#fx-${prop}`); attachNumScrub(fxRow.querySelector('.k'),v,{...optOf(v,prop),allowEdit:false}); attachNumScrub(v,v,optOf(v,prop)); }
     const inRow=document.querySelector(`#inspector .kf-row[data-prop="${prop}"]`);
-    if(inRow){ attachScrub(inRow.querySelector('.k'),$(`#kf-${prop}`),prop,false); attachScrub($(`#kf-${prop}`),$(`#kf-${prop}`),prop,true); }
+    if(inRow){ const v=$(`#kf-${prop}`); attachNumScrub(inRow.querySelector('.k'),v,{...optOf(v,prop),allowEdit:false}); attachNumScrub(v,v,optOf(v,prop)); }
+  });
+})();
+// EASE 量（influence%）。ペンが触れると Scribble が起きていた欄（発注者報告）＝同じ div スクラブへ寄せる
+(function(){
+  [['ei','#ease-in-num','#ease-in-range'],['eo','#ease-out-num','#ease-out-range']].forEach(([field,vs,rs])=>{
+    const valEl=$(vs), rangeEl=$(rs); if(!valEl) return;
+    attachNumScrub(valEl,valEl,{
+      step:1,
+      fmt:v=>String(Math.round(v)),
+      clamp:v=>Math.max(0,Math.min(100,v)),
+      get:()=>{ const r=parseFloat(valEl.value); return isNaN(r)?0:r; },  // 「—」は0から
+      live:v=>{
+        const n=Math.round(v);
+        applyEaseInput(field,n,true);
+        updateInfluenceUI();                       // 先に真の状態へ戻してから…
+        valEl.value=String(n); valEl.classList.remove('inherit'); // …スクラブ中の値で上書き（0で解除されても0のまま見せる）
+        if(rangeEl) rangeEl.value=String(n);
+        return true;
+      },
+      done:()=>{ recordHistory(); updateInfluenceUI(); },
+      edit:v=>{ applyEaseInput(field,Math.round(v),false); updateInfluenceUI(); },
+      allowEdit:true,
+    });
   });
 })();
 
