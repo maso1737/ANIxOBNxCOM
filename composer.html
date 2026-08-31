@@ -2728,7 +2728,7 @@ function buildTrackElement(idx){
     const onMove=e=>{
       if(dhPid!==null&&e.pointerId!==dhPid) return;  // 掴んだ指以外の動きでは始めない／動かさない
       if(gTrackMultiSel){ dhPending=false; return; } // 複数選択タップ中は並べ替えを起こさない
-      if(dhPending&&gStripGesture!=='marquee'){
+      if(dhPending&&!gStripGesture){   // 'marquee' でも 'offset' でも並べ替えは始めない
         const dy=Math.abs(e.clientY-dhStartY), dx=Math.abs(e.clientX-dhStartX);
         // ストリップ上（vOnly）は「はっきり縦」でないと並べ替えを始めない。
         // 5px/dy>dx だと、キーを矩形選択しようとした斜めの入りで並べ替えが暴発していた（発注者報告）
@@ -2975,21 +2975,39 @@ function buildTrackElement(idx){
   // トリム(tIn/tOut)も一緒に平行移動する＝レイヤーバーごと掴んで動かす（[ / ] と同じ挙動）。
   // 素のドラッグは既存のマーキー選択に譲る（#tl-tracks 側は altKey で早期return）
   if(track.type!=='camera'){
-    strip.title='Alt+ドラッグ = このトラックを時間方向にずらす（絵・KF・IN/OUTトリムが一緒に動きます）\nAlt+Shift+ドラッグ = インジケータ／他トラックのIN・OUT・キーへ吸着';
+    strip.title='Alt+ドラッグ / 指で長押し = このトラックを時間方向にずらす（絵・KF・IN/OUTトリムが一緒に動きます）\nAlt+Shift+ドラッグ = インジケータ／他トラックのIN・OUT・キーへ吸着';
     let offDrag=false, offStartX=0, offStart=0, offStartIn=0, offStartOut=null, offMoved=false, offSnapCands=null;
-    strip.addEventListener('pointerdown',e=>{
-      if(!e.altKey) return;
-      if(e.target.closest('.tl-kf-d,.tl-marker,.tl-trim-handle')) return; // 個別要素が優先
+    let offHoldT=0, offHoldPid=null, offHoldX=0, offHoldY=0;
+    const OFF_HOLD_MS=350, OFF_HOLD_SLOP=10; // SPEC_18 §3: 掴みの長押しは350ms / 10pxでキャンセル
+    function beginOff(clientX,pointerId){
       selectTrack(idx); // ずらす対象が選択状態になる（別トラックを触ったら選択が移る）
       if(track.locked){ flashLive('🔒 ロック中です'); return; }
-      offDrag=true; offMoved=false; offStartX=e.clientX;
+      offDrag=true; offMoved=false; offStartX=clientX;
+      gStripGesture='offset'; // 並べ替え／マーキーに「この指はもらった」と伝える
       // 開始時の値を控えて毎回そこからの差分で決める（クランプしても戻せば元に復帰する）
       offStart=track.tOffset||0; offStartIn=track.tIn||0; offStartOut=(track.tOut==null?null:track.tOut);
       // 吸着候補を凍結。自分のKF/IN/OUTはレイヤーと一緒に動くので候補から外す（自己吸着で動かなくなる）
       offSnapCands=freezeSnapCands(gatherKfFrames(track).map(f=>f+offStart), track);
-      try{ strip.setPointerCapture(e.pointerId); }catch(_){} e.stopPropagation(); e.preventDefault();
+      try{ strip.setPointerCapture(pointerId); }catch(_){}
+    }
+    function cancelHold(){ if(offHoldT){ clearTimeout(offHoldT); offHoldT=0; } offHoldPid=null; }
+    strip.addEventListener('pointerdown',e=>{
+      if(e.target.closest('.tl-kf-d,.tl-marker,.tl-trim-handle')) return; // 個別要素が優先
+      if(e.altKey){ beginOff(e.clientX,e.pointerId); e.stopPropagation(); e.preventDefault(); return; }
+      // SPEC_18 §4-2: iPad では Alt が押せない。**指の長押し**を横移動の入口にする
+      if(e.pointerType!=='touch') return;
+      cancelHold();
+      offHoldPid=e.pointerId; offHoldX=e.clientX; offHoldY=e.clientY;
+      const pid=e.pointerId, cx=e.clientX;
+      offHoldT=setTimeout(()=>{
+        offHoldT=0;
+        beginOff(cx,pid);
+        if(offDrag) flashLive('⇄ 横移動（そのまま左右へ）');
+      },OFF_HOLD_MS);
     });
     strip.addEventListener('pointermove',e=>{
+      // 長押しが決まる前に動いた＝スクロール/選択のつもりなので掴むのをやめる
+      if(offHoldT&&e.pointerId===offHoldPid&&Math.hypot(e.clientX-offHoldX,e.clientY-offHoldY)>OFF_HOLD_SLOP) cancelHold();
       if(!offDrag) return;
       if(!e.buttons){ offDrag=false; if(offMoved) endOff(); return; }
       const rect=strip.getBoundingClientRect();
@@ -3023,8 +3041,16 @@ function buildTrackElement(idx){
       const tr=(track.tIn||track.tOut!=null)?('  IN '+((track.tIn||0)+1)+' / OUT '+(track.tOut==null?'—':track.tOut)):'';
       flashLive('⇄ OFFSET '+((track.tOffset||0)>=0?'+':'')+(track.tOffset||0)+' コマ'+tr);
     };
-    strip.addEventListener('pointerup',()=>{ if(!offDrag) return; offDrag=false; if(offMoved) endOff(); });
-    strip.addEventListener('pointercancel',()=>{ if(!offDrag) return; offDrag=false; if(offMoved) endOff(); });
+    const finishOff=()=>{
+      cancelHold(); if(!offDrag) return; offDrag=false;
+      // gStripGesture は**次のタスクで**戻す。このハンドラは strip 側＝window のマーキー用
+      // pointerup より先に走るので、ここで即 null にすると「動かさず離した＝クリック」と誤解され、
+      // 横移動のたびにインジケータがその位置へ飛ぶ
+      if(gStripGesture==='offset') setTimeout(()=>{ if(gStripGesture==='offset') gStripGesture=null; },0);
+      if(offMoved) endOff();
+    };
+    strip.addEventListener('pointerup',finishOff);
+    strip.addEventListener('pointercancel',finishOff);
   }
 
   // SPEC_11 P3b-1: IN/OUTトリムのハンドル（絵を持つトラックのみ。camera/nullは対象外）
@@ -3453,6 +3479,51 @@ function fitAction(){
   _lastFitAt=now; resetView(); flashLive('VIEW FIT');
 }
 // 画面座標→キャンバス内px の換算係数（pan/zoom込み）。ドラッグ移動量の補正に使用
+// ── 画面座標 → 「そこに写っているトラック」──
+// 判定用の 1×1 キャンバスに、押した点が (0,0) に来るようずらして**本番と同じ描画関数**を通し、
+// 出てきた α を読む。こうしておけば親子・カメラ・Z透視・トリム・SOLO・OP が全部そのまま効く
+let gHitC=null, gHit2d=null;
+function compPointAt(clientX,clientY){
+  const r=canvas.getBoundingClientRect();
+  if(!r.width||!r.height||!state.width) return null;
+  return {x:(clientX-r.left)/r.width*state.width, y:(clientY-r.top)/r.height*state.height};
+}
+function trackAlphaAt(track,clientX,clientY){
+  const p=compPointAt(clientX,clientY); if(!p) return 0;
+  if(!gHitC){ gHitC=document.createElement('canvas'); gHitC.width=1; gHitC.height=1; gHit2d=gHitC.getContext('2d',{willReadFrequently:true}); }
+  const cam=getCamAt(state.currentFrame);
+  const hasSolo=state.tracks.some(t=>t.solo&&t.type!=='camera');
+  gHit2d.clearRect(0,0,1,1);
+  gHit2d.save();
+  gHit2d.translate(-p.x,-p.y);   // 押した点をキャンバスの (0,0) へ
+  applyCamWrap(gHit2d,state.width,state.height,cam);
+  drawOneTrack(gHit2d,state.width,state.height,state.currentFrame,track,hasSolo,cam);
+  gHit2d.restore();
+  return gHit2d.getImageData(0,0,1,1).data[3];
+}
+// 手前から順に見て、最初に「絵がある」トラックの index。無ければ -1
+function trackIdxAtPoint(clientX,clientY){
+  if(!state.width) return -1;
+  const cam=getCamAt(state.currentFrame);
+  const order=tracksInDrawOrder(state.currentFrame,cam);
+  for(let i=order.length-1;i>=0;i--){
+    const t=order[i];
+    if(t.type==='camera'||t.type==='null') continue;
+    if(trackAlphaAt(t,clientX,clientY)>8) return state.tracks.indexOf(t);
+  }
+  return -1;
+}
+// 画面のこの点で、そこに写っているトラックを選ぶ。選んだら true
+function selectTrackAtPoint(clientX,clientY){
+  const i=trackIdxAtPoint(clientX,clientY);
+  if(i<0) return false;
+  if(i!==state.selectedTrack||gSelTids.length>1){
+    selectTrack(i);
+    const t=state.tracks[i];
+    flashLive('▣ '+((t.name||'TRACK').toUpperCase())+(t.locked?'（🔒ロック中）':''));
+  }
+  return true;
+}
 function screenToCanvasScale(){
   const inner=$('#viewport-inner');
   return {
@@ -5496,6 +5567,10 @@ const vpInner=$('#viewport-inner');
 vpInner.addEventListener('pointerdown',e=>{
   if(e.pointerType==='touch') return; // 指はキャンバス操作（pan/zoom）優先。トラック移動はペンで
   if(e.button!==0) return; // 左/ペン接触のみ（中ボタンはPANに使う）
+  // 触った場所に写っているトラックをまず選ぶ（＝見たまま掴める）。
+  // 何も写っていない余白なら選択は変えない＝従来どおり「選択中のトラックを動かす」。
+  // ◈ハンドルは「選択中トラックを動かす」ための取っ手なので、その上では選択を変えない
+  if(!(e.target.closest&&e.target.closest('#drag-handle,#anchor-handle'))) selectTrackAtPoint(e.clientX,e.clientY);
   const t=selTrack(); if(!t||lockedGuard(t)) return;
   pause(); state.vpDragging=true;
   const tr=getTransform(curLocalFrame(),t.keyframes);
@@ -5560,30 +5635,64 @@ let cancelVpGesture=()=>{};
   const ptrs=new Map();
   let pinching=false, startDist=0, startZoom=1, startCenter={x:0,y:0}, startPan={x:0,y:0};
   let panning=false, panId=null, panStart={x:0,y:0}, panStartView={x:0,y:0};
+  // SPEC_18 §3: ピンチは「対象の上＝その対象 / 余白＝視点」。
+  // 選択中トラックの**絵の上**で始めたピンチは、視点ではなくそのトラックの SCL を変える
+  let pinchTrack=null, pinchStartS=1, pinchMoved=false;
+  let viewAtDown={zoom:1,panX:0,panY:0};      // 3本目が乗ったとき（＝タイムライン伸縮）に巻き戻す先
+  let tapT0=0, tapMaxN=0, tapX=0, tapY=0;     // 1本指タップ＝トラック選択の判定用
+  function revertPinch(){
+    if(pinching){ state.view.zoom=viewAtDown.zoom; state.view.panX=viewAtDown.panX; state.view.panY=viewAtDown.panY; applyView(); }
+    if(pinchTrack){ if(pinchMoved) commitProp('s',pinchStartS,false); pinchTrack=null; pinchMoved=false; }
+  }
   // 多指タップが成立したとき、直前のパン/ピンチを打ち切る（誤爆で視点がズレないように）
-  cancelVpGesture=()=>{ ptrs.clear(); pinching=false; panning=false; panId=null; };
+  cancelVpGesture=()=>{ ptrs.clear(); pinching=false; panning=false; panId=null; pinchTrack=null; pinchMoved=false; };
   vp.addEventListener('pointerdown',e=>{
     if(e.pointerType!=='touch') return;
     if(!state.width) return; // 未読込時はタップ→読込(click)に任せる
     try{ vp.setPointerCapture(e.pointerId); }catch(_){}
     const now=performance.now();
     ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,st:now});
+    if(ptrs.size>tapMaxN) tapMaxN=ptrs.size;
     if(ptrs.size===1){
       panning=true; panId=e.pointerId;
       panStart={x:e.clientX,y:e.clientY}; panStartView={x:state.view.panX,y:state.view.panY};
+      viewAtDown={zoom:state.view.zoom,panX:state.view.panX,panY:state.view.panY};
+      tapT0=now; tapMaxN=1; tapX=e.clientX; tapY=e.clientY;
     } else if(ptrs.size===2){
-      panning=false; pinching=true;
+      panning=false;
       const p=[...ptrs.values()];
       startDist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
       startCenter={x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2};
-      startZoom=state.view.zoom; startPan={x:state.view.panX,y:state.view.panY};
-    } else { pinching=false; panning=false; }
+      // 選択中トラックの絵の上で始めたか？ 上なら素材スケール、余白なら視点ズーム
+      const t=selTrack();
+      if(t&&t.type!=='camera'&&t.visible!==false&&trackAlphaAt(t,startCenter.x,startCenter.y)>8&&!t.locked){
+        pinchTrack=t; pinchMoved=false; pinching=false;
+        pinchStartS=getKfValue('s',curLocalFrame(),t.keyframes);
+        flashLive('⤢ '+((t.name||'TRACK').toUpperCase())+' SCALE');
+      } else {
+        pinchTrack=null; pinching=true;
+        startZoom=state.view.zoom; startPan={x:state.view.panX,y:state.view.panY};
+      }
+    } else {
+      // 3本目以降＝タイムライン伸縮などの多指ジェスチャ。
+      // 指が同時に着かない間に動いてしまったぶんを巻き戻してから手を引く
+      revertPinch();
+      pinching=false; panning=false;
+    }
   });
   vp.addEventListener('pointermove',e=>{
     if(e.pointerType!=='touch') return;
     const p=ptrs.get(e.pointerId); if(!p) return;
     p.x=e.clientX; p.y=e.clientY;
-    if(pinching && ptrs.size>=2){
+    if(pinchTrack && ptrs.size>=2){
+      // 選択トラックの SCL をピンチ倍率で変える（ドラッグ中は履歴を積まない）
+      const a=[...ptrs.values()];
+      const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+      if(startDist>0&&selTrack()===pinchTrack){
+        const v=clampProp('s',pinchStartS*(d/startDist));
+        commitProp('s',v,false); pinchMoved=true;
+      }
+    } else if(pinching && ptrs.size>=2){
       const a=[...ptrs.values()];
       const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
       const c={x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2};
@@ -5604,7 +5713,17 @@ let cancelVpGesture=()=>{};
     const p=ptrs.get(e.pointerId); if(!p) return;
     ptrs.delete(e.pointerId);
     if(pinching && ptrs.size<2) pinching=false;
+    if(pinchTrack && ptrs.size<2){
+      if(pinchMoved){ recordHistory(); flashLive('⤢ SCALE '+fmtProp('s',getKfValue('s',curLocalFrame(),pinchTrack.keyframes))); }
+      pinchTrack=null; pinchMoved=false;
+    }
     if(panning && e.pointerId===panId) panning=false;
+    if(ptrs.size===0){
+      // 1本指で動かさずに離した＝そこに写っているトラックを選ぶ（多指タップとは別枠）
+      const dt=performance.now()-tapT0, moved=Math.hypot(p.x-p.sx,p.y-p.sy);
+      if(tapMaxN===1&&dt<300&&moved<10&&state.width) selectTrackAtPoint(p.x,p.y);
+      tapMaxN=0;
+    }
   }
   vp.addEventListener('pointerup',end);
   vp.addEventListener('pointercancel',end);
@@ -5648,6 +5767,38 @@ addEventListener('pointerdown',tapDown,true);
 addEventListener('pointermove',tapMove,true);
 addEventListener('pointerup',tapUp,true);
 addEventListener('pointercancel',tapUp,true);
+
+// ── 3本指の左右ドラッグ = タイムラインの伸縮（Procreate Dreams の手つき）──
+// 右へ＝伸ばす（拡大）/ 左へ＝縮める。基点はインジケータ。
+// 3本指**タップ**（＝動かさない）は REDO のままなので、14px 動くまでは何も起こらない
+(function(){
+  const pts=new Map(); let active=false, lastX=0, acc=0;
+  const avgX=()=>{ let s=0; pts.forEach(p=>s+=p.x); return s/Math.max(1,pts.size); };
+  addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='touch') return;
+    pts.set(e.pointerId,{x:e.clientX});
+    if(pts.size===3){ active=true; lastX=avgX(); acc=0; }
+    else if(pts.size>3) active=false;   // 4本＝PREVIEW再生なので伸縮はしない
+  },true);
+  addEventListener('pointermove',e=>{
+    if(e.pointerType!=='touch') return;
+    const p=pts.get(e.pointerId); if(!p) return;
+    p.x=e.clientX;
+    if(!active||pts.size!==3||!state.totalFrames) return;
+    const x=avgX(); acc+=x-lastX; lastX=x;
+    if(Math.abs(acc)<14) return;        // 3本指タップ(REDO)と食い合わないよう、動いたと認めるまで待つ
+    tlZoomAt(Math.exp(-acc/240), state.currentFrame);
+    acc=0;
+    flashLive('⤢ TIMELINE '+(tlZoomed()?(tlSpan()+' コマ表示'):'全体'));
+  },true);
+  function up(e){
+    if(e.pointerType!=='touch'||!pts.has(e.pointerId)) return;
+    pts.delete(e.pointerId);
+    if(pts.size<3) active=false;
+  }
+  addEventListener('pointerup',up,true);
+  addEventListener('pointercancel',up,true);
+})();
 
 $('#btn-play').addEventListener('click',togglePlay);
 $('#btn-first').addEventListener('click',()=>{pause();seek(0);});
@@ -5732,7 +5883,11 @@ const FIXED_SHORTCUTS=[
   {cat:'iPad（指）',    label:'元に戻す',                   key:'2本指タップ'},
   {cat:'iPad（指）',    label:'やり直す',                   key:'3本指タップ'},
   {cat:'iPad（指）',    label:'PREVIEW 再生 / 停止',        key:'4本指タップ'},
-  {cat:'iPad（指）',    label:'視点の移動 / 拡大縮小',      key:'1本指ドラッグ / 2本指ピンチ'},
+  {cat:'iPad（指）',    label:'視点の移動 / 拡大縮小',      key:'1本指ドラッグ / 2本指ピンチ（余白で）'},
+  {cat:'iPad（指）',    label:'素材のスケール',             key:'選択中トラックの絵の上で2本指ピンチ'},
+  {cat:'iPad（指）',    label:'トラックを選ぶ',             key:'画面の絵をタップ'},
+  {cat:'iPad（指）',    label:'タイムラインの伸縮',         key:'3本指を左右へ'},
+  {cat:'iPad（指）',    label:'トラックを時間方向にずらす', key:'ストリップを長押し→左右'},
   {cat:'iPad（指）',    label:'数値を変える',               key:'数値欄・ラベルを横ドラッグ'},
   {cat:'iPad（指）',    label:'数値をキーボードで打ち換え', key:'数値欄をWタップ'},
   {cat:'iPad（指）',    label:'トラックの並べ替え',         key:'⠿ を掴んで上下'},
@@ -6099,7 +6254,7 @@ window.addEventListener('pointercancel',endRulerScrub);
   });
   window.addEventListener('pointermove',e=>{
     if(!active) return;
-    if(gStripGesture==='reorder') return; // 縦ドラッグは並び替えに譲る
+    if(gStripGesture==='reorder'||gStripGesture==='offset') return; // 縦=並び替え / 長押し=横移動 に譲る
     const w=Math.abs(e.clientX-sx), h=Math.abs(e.clientY-sy);
     if(w<=3&&h<=3) return;
     // 並び替えが待機中（＝掴める場所を押している）で**はっきり縦**なら、まだマーキーを出さない。
@@ -6114,11 +6269,11 @@ window.addEventListener('pointercancel',endRulerScrub);
     box.style.width=w+'px'; box.style.height=h+'px';
   });
   window.addEventListener('pointerup',e=>{
-    const wasReorder=(gStripGesture==='reorder');
-    gStripGesture=null;
+    const wasOther=(gStripGesture==='reorder'||gStripGesture==='offset');
+    if(gStripGesture!=='offset') gStripGesture=null; // offset の後始末は strip 側の finishOff
     if(!active) return; active=false;
     $('#tl-marquee').style.display='none';
-    if(wasReorder) return; // 並び替えの後始末は attachTrackDrag 側
+    if(wasOther) return; // 並び替え／横移動の後始末はそれぞれのハンドラ側
     if(!moved){
       // クリック確定：ストリップならトラック選択＋インジケータをその位置へ
       if(downOnStrip&&downTrack>=0){
