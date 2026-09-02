@@ -152,6 +152,8 @@ select{width:100%}
 .btn.gold{border-color:rgba(255,210,122,.55);color:var(--gold)}
 .btn.gold:hover{background:rgba(255,210,122,.1);box-shadow:0 0 8px rgba(255,210,122,.4)}
 .btn.gold.on{background:linear-gradient(135deg,#FFD27A,#FF9A3C);border-color:transparent;color:#2a1600}
+.btn.rouge{border-color:rgba(255,79,168,.55);color:var(--rouge)}
+.btn.rouge:hover{background:rgba(255,79,168,.1);box-shadow:0 0 8px rgba(255,79,168,.4)}
 .btn.ice{border-color:rgba(90,233,255,.55);color:var(--ice)}
 .btn.ice:hover{background:rgba(90,233,255,.1);box-shadow:0 0 8px rgba(90,233,255,.4)}
 .btn:disabled{opacity:.28;cursor:default;box-shadow:none;background:transparent}
@@ -166,6 +168,13 @@ select{width:100%}
 .el-row .el-nm{flex:1;letter-spacing:.06em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .el-row .el-ty{font-size:8px;color:var(--lavender);letter-spacing:.14em}
 .el-row .el-pin{font-size:8px;color:var(--gold);letter-spacing:.1em}
+/* 奥行き（転送用のタグ。原稿の重なり順は変えない） */
+.el-row .el-z{font-size:8px;letter-spacing:.1em;cursor:pointer;width:15px;text-align:center;
+  border:1px solid transparent;padding:0 1px}
+.el-row .el-z.zbg{color:var(--ice);border-color:rgba(90,233,255,.45)}
+.el-row .el-z.zmid{color:rgba(181,142,255,.75);border-color:rgba(181,142,255,.3)}
+.el-row .el-z.zfg{color:var(--rouge);border-color:rgba(255,79,168,.5)}
+.el-row .el-z:hover{background:rgba(255,255,255,.07)}
 .el-row .el-ud{color:var(--gold);cursor:pointer;padding:0 1px}
 .el-row .el-x{color:rgba(255,79,168,.6);cursor:pointer;padding:0 1px;font-size:10px}
 .el-row .el-x:hover{color:var(--rouge)}
@@ -191,6 +200,9 @@ select{width:100%}
   padding:1px 4px;white-space:nowrap}
 .el-sep.tgt{background:rgba(255,210,122,.13)}
 .el-sep.tgt span.gl{color:var(--gold)}
+.el-sep span.gl.rn{border-bottom:1px dotted rgba(181,142,255,.5)}     /* Wクリックで番号を打ち替えられる見出し */
+.el-sep span.gl.rn:hover{color:var(--gold);border-bottom-color:var(--gold)}
+.el-sep .gman{font-size:7px;letter-spacing:.1em;color:var(--rouge);white-space:nowrap}
 .el-sep.drop{background:rgba(90,233,255,.18);box-shadow:inset 0 0 0 1px rgba(90,233,255,.5)}
 .el-sep .gmv{font-size:7px;letter-spacing:.12em;color:var(--ice);border:1px solid rgba(90,233,255,.55);
   padding:1px 4px;white-space:nowrap}
@@ -349,6 +361,7 @@ select{width:100%}
       </div>
       <div class="btnrow">
         <button class="btn ice" id="pn-merge" title="直前の分割を戻す（隣のコマと結合）">⤺ 分割を戻す</button>
+        <button class="btn" id="pn-no" title="このコマの番号を打ち替える（◆Items の「コマ N」の Wクリック / Wタップと同じ）">№ 番号</button>
       </div>
     </div></details>
 
@@ -392,9 +405,20 @@ select{width:100%}
         <button class="btn gold" id="lk-from-ani">◀ ANIMATOR 取込</button>
       </div>
       <div class="btnrow">
+        <button class="btn rouge" id="lk-fill" title="選択コマを のりしろ付き で ANIMATOR へ。パララックスで動かすと足りなくなる「コマ枠の外」を描き足すための往復">▶ 描き足し（のりしろ付き）</button>
+      </div>
+      <div class="btnrow">
         <button class="btn ice" id="lk-to-comp">▶ COMPOSER</button>
         <button class="btn ice" id="lk-to-oban">▶ OBAN</button>
       </div>
+      <div class="tr"><span class="lb">レイヤー送り<br><span style="opacity:.6">選択コマのみ</span></span>
+        <span class="lb">のりしろ</span>
+        <input type="range" id="lk-pad" min="100" max="180" step="5"><span class="vv" id="lk-pad-v">115%</span></div>
+      <div class="btnrow">
+        <button class="btn rouge" id="lk-lay-comp" title="選択コマを 奥/中間/手前 に分けたまま COMPOSER へ（1レイヤー=1トラック）">▶▶ COMPOSER レイヤー</button>
+        <button class="btn rouge" id="lk-lay-oban" title="選択コマを 奥/中間/手前 に分けたまま OBAN へ（1コマ=1フレーム＋子パネル＝コマ内パララックス）">▶▶ OBAN レイヤー</button>
+      </div>
+      <div class="note" id="lk-lay-note">コマを選ぶとレイヤー構成が出ます。</div>
       <div class="note" id="lk-note">選択コマを上の解像度に合わせて送ります。ANIMATOR側は <b>REF ▸ ＋ FROM SAVED</b> で拾えます。戻りは <b>◀ ANIMATOR 取込</b>、以後は保存のたび自動更新（LIVE）。</div>
     </div></details>
 
@@ -532,7 +556,7 @@ function newPage(name){
 function newBook(){
   return {version:2,title:'name-01',paper:'B4_600',bg:'#FFFFFF',
     gut:{lr:60,tb:180},lw:18,bindRight:true,
-    link:{w:1920,h:1080},              // ANIMATOR側の作業解像度
+    link:{w:1920,h:1080,pad:1.15},     // ANIMATOR側の作業解像度／pad=レイヤー送りののりしろ
     links:{},                          // projectId → {pageId,panelId,box}
     pages:[newPage()]};
 }
@@ -547,6 +571,7 @@ function migrate(b){
   b.lw=b.lw||d.lw;
   if(b.bindRight===undefined)b.bindRight=true;
   b.link=Object.assign({},d.link,b.link||{});
+  if(!(b.link.pad>=1))b.link.pad=d.link.pad;   // S2: のりしろ（レイヤー送りでコマ枠より外まで送る倍率）
   if(!b.links||typeof b.links!=='object')b.links={};
   if(!Array.isArray(b.pages)||!b.pages.length)b.pages=[newPage()];
   b.pages.forEach(pg=>{
@@ -568,6 +593,8 @@ function migrate(b){
       if(it.panelId===undefined)it.panelId=null;
       if(!it.name)it.name=it.type.toUpperCase();
       if(it.type==='focus'&&it.core===undefined)it.core=0;   // 既存の集中線は真円のまま（新規だけ既定で崩す）
+      if(Z_DEPTH[it.z]===undefined)it.z='mid';               // S1: 既存の素材はぜんぶ「中間」から始める
+      if(it.type==='focus'||it.type==='stream')it.pk=Object.assign({},PK_DEF,it.pk||{});   // S3: ぱかぱか
       const def=defaultsFor(it.type,PAPER.bas);
       for(const k in def)if(it[k]===undefined)it[k]=def[k];
       if(it.type==='img'){
@@ -599,6 +626,14 @@ const ITEM_DEFS={img:1,tone:1,focus:1,stream:1,frame:1,white:1,text:1,brush:1};
    同じ段の中では ◆Items の並び（▲▼・ドラッグ）どおり。 */
 const ITEM_BAND={img:0,frame:1,tone:1,focus:1,stream:1,text:2,brush:2,white:2};
 const INK_MULTIPLY={tone:1,focus:1,stream:1,frame:1};   // 乗算で乗せる＝黒い線を潰さない
+/* 奥行き（S1）— **転送用のタグ**。OBAN/COMPOSER でコマ内パララックスを組むときの前後を
+   原稿の側で当てておくためだけのもので、**原稿の重なり順（ITEM_BAND と ◆Items の並び）は変えない**。
+   値を OBAN の depth へ写すときは childRect() の実効レンジ lerp(0.15,0.85,d) に合わせる。 */
+const Z_DEFS=[['bg','奥','奥'],['mid','中','中間'],['fg','前','手前']];
+const Z_DEPTH={bg:0.15,mid:0.5,fg:0.85};
+function zOf(it){return Z_DEPTH[it&&it.z]!==undefined?it.z:'mid';}
+function zDepth(it){return Z_DEPTH[zOf(it)];}
+function zLabel(it,long){const d=Z_DEFS.find(a=>a[0]===zOf(it));return long?d[2]:d[1];}
 const TEXT_FONTS=[['アンチック',"'Shippori Antique'"],['アンチックB1',"'Shippori Antique B1'"],['ゴシック',"'Noto Sans JP'"]];
 function fontStack(i){return (TEXT_FONTS[i]||TEXT_FONTS[0])[1]+",'Noto Sans JP',serif";}
 function defaultsFor(type,box){
@@ -617,9 +652,9 @@ function defaultsFor(type,box){
                              dot:Math.round(16*S),gap:Math.round(22*S),angle:45,shape:'dot',color:'#000000'};
   if(type==='focus') return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,r0:Math.round(Math.min(box.w,box.h)*0.22),
                              r1:Math.round(Math.hypot(box.w,box.h)*0.62),count:110,lw:Math.round(7*S),
-                             taper:0.9,jitter:0.35,core:0.25,seed:1,color:'#000000'};
+                             taper:0.9,jitter:0.35,core:0.25,seed:1,color:'#000000',pk:Object.assign({},PK_DEF)};
   if(type==='stream')return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,w:Math.round(box.w),h:Math.round(box.h),
-                             count:34,lw:Math.round(6*S),taper:0.85,jitter:0.3,seed:1,color:'#000000'};
+                             count:34,lw:Math.round(6*S),taper:0.85,jitter:0.3,seed:1,color:'#000000',pk:Object.assign({},PK_DEF)};
   return {x:box.x+box.w/2,y:box.y+box.h/2,rot:0,w:Math.round(box.w),h:Math.round(box.h),lw:Math.round(14*S),color:'#000000'};
 }
 const DEFS={
@@ -684,8 +719,11 @@ function dispPoly(k){
   }
   return poly;
 }
-/* 読み順（右綴じ=右上から）で並べ替え。コマ番号表示用 */
+/* 読み順（右綴じ=右上から）で並べ替え。コマ番号表示用。
+   ただし ◆Items で番号を打ち替えたページ（pg.manualOrder）は触らない
+   ＝変則コマ・入れ子コマで「読む順」が右上→左下と違うときは手動が正 */
 function sortPanels(pg){
+  if(!pg||pg.manualOrder)return;
   const band=PAPER.h/26, dir=BOOK.bindRight?-1:1;
   pg.panels.sort((a,b)=>{
     const A=polyBounds(a.poly),B=polyBounds(b.poly);
@@ -693,6 +731,13 @@ function sortPanels(pg){
     if(ra!==rb)return ra-rb;
     return (A.cx-B.cx)*dir;
   });
+}
+/* 多角形を重心から広げる（S2 のりしろ）。f=1 なら同じものを返す */
+function padPoly(poly,f){
+  if(!(f>1)||!poly||poly.length<3)return poly;
+  let cx=0,cy=0;for(const q of poly){cx+=q.x;cy+=q.y;}
+  cx/=poly.length;cy/=poly.length;
+  return poly.map(q=>({x:cx+(q.x-cx)*f,y:cy+(q.y-cy)*f}));
 }
 function cutD(c){return c.nx*c.ax+c.ny*c.ay;}
 function gapFor(nx,ny){return BOOK.gut.lr*Math.abs(nx)+BOOK.gut.tb*Math.abs(ny);}
@@ -792,8 +837,9 @@ function mergePanel(pg,k){
   if(!rebuildPanel(nk))return null;
   const ids=[k.id,mate.id];
   pg.items.forEach(it=>{if(ids.indexOf(it.panelId)>=0)it.panelId=nk.id;});
+  const at=Math.min(pg.panels.indexOf(k),pg.panels.indexOf(mate));   // 末尾に足すと手動順の番号が飛ぶ
   pg.panels=pg.panels.filter(o=>o!==k&&o!==mate);
-  pg.panels.push(nk);sortPanels(pg);
+  pg.panels.splice(Math.max(0,at),0,nk);sortPanels(pg);
   return nk;
 }
 
@@ -944,8 +990,35 @@ function drawTone(g,it){
     else{g.beginPath();g.arc(px,py,r,0,TAU);g.fill();}
   }
 }
+/* ============================================================
+   S3: ぱかぱか（集中線・流線を 3〜4 種のブレでアニメさせる）
+   ------------------------------------------------------------
+   ・絵は seed の決定論のまま。**コマ番号（gPkFrame）から追加の乱数列を作る**ので
+     再生・書き出し・送信のどこで描いても同じ絵になる（Math.random は使わない）。
+   ・mode 'jitter'（既定）= 骨格は seed のまま、線の位置・長さ・太さだけ揺らす
+     ＝「同じ絵が震える」。mode 'all' = seed そのものを送る＝毎コマ別の絵。
+   ・紙の書き出し・サムネはいつも gPkFrame=0 ＝ 1枚目。
+   ============================================================ */
+let gPkFrame=0;                       // いま描いているぱかぱかのコマ番号
+const PK_DEF={on:false,n:3,step:2,amp:0.5,mode:'jitter'};
+function pkOn(it){return !!(it&&it.pk&&it.pk.on&&(it.type==='focus'||it.type==='stream'));}
+function pkN(it){return pkOn(it)?clamp(it.pk.n|0,2,8):1;}
+function pkStep(it){return pkOn(it)?clamp(it.pk.step|0,1,6):1;}
+/* この素材の「いまのコマ」用の揺らし乱数。ぱかぱかOFF・1枚目は null＝従来と1pxも変わらない */
+function pkWob(it){
+  if(!pkOn(it)||it.pk.mode==='all')return null;
+  const f=((gPkFrame%pkN(it))+pkN(it))%pkN(it);
+  if(!f)return null;
+  return mulberry32((it.seed|0)*7919+f*104729+17);
+}
+/* mode 'all' のときだけ seed そのものをずらす */
+function pkSeed(it){
+  if(!pkOn(it)||it.pk.mode!=='all')return it.seed|0;
+  return (it.seed|0)+(((gPkFrame%pkN(it))+pkN(it))%pkN(it));
+}
 function drawFocus(g,it){
-  const rnd=mulberry32(it.seed|0);
+  const rnd=mulberry32(pkSeed(it));
+  const wob=pkWob(it), amp=wob?clamp((it.pk.amp||0),0,1):0;
   /* 芯くずし（core）: 白場が真円すぎるのを崩す。
      低周波のうねり（2〜5山＋倍音）で全体を歪ませ、そこへ1本ごとのばらつきを足す。
      乱数列は本体（rnd）と別に持つので、core=0 のときの絵は今までと1pxも変わらない。 */
@@ -953,10 +1026,14 @@ function drawFocus(g,it){
   const cr=mulberry32((it.seed|0)*7919+13);
   const lobes=2+Math.floor(cr()*4), ph=cr()*TAU, lobes2=lobes*2+1, ph2=cr()*TAU;
   for(let i=0;i<it.count;i++){
-    const a=(i/it.count)*TAU+(rnd()-0.5)*(TAU/it.count)*it.jitter*2;
+    /* ぱかぱか: 角度を「隣との間隔の半分まで」・長さと太さを控えめに揺らす＝骨格は動かさない */
+    const ja=wob?(wob()-0.5)*(TAU/it.count)*amp:0;
+    const jl=wob?1+(wob()-0.5)*amp*0.12:1;
+    const jw=wob?1+(wob()-0.5)*amp*0.5:1;
+    const a=(i/it.count)*TAU+(rnd()-0.5)*(TAU/it.count)*it.jitter*2+ja;
     const r0=core?Math.max(0,it.r0*(1+(Math.sin(a*lobes+ph)*0.30+Math.sin(a*lobes2+ph2)*0.14+(cr()-0.5)*0.46)*core)):it.r0;
-    const len=Math.max(r0+4,it.r1*(1-rnd()*it.jitter*0.4));
-    const w0=(it.lw*(0.6+rnd()*0.8))/2, w1=w0*(1-it.taper);
+    const len=Math.max(r0+4,it.r1*(1-rnd()*it.jitter*0.4)*jl);
+    const w0=(it.lw*(0.6+rnd()*0.8))*jw/2, w1=w0*(1-it.taper);
     const ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca;
     g.beginPath();
     g.moveTo(ca*r0+px*w0, sa*r0+py*w0);
@@ -967,12 +1044,17 @@ function drawFocus(g,it){
   }
 }
 function drawStream(g,it){
-  const rnd=mulberry32(it.seed|0);
+  const rnd=mulberry32(pkSeed(it));
+  const wob=pkWob(it), amp=wob?clamp((it.pk.amp||0),0,1):0;
   for(let i=0;i<it.count;i++){
-    const yy=-it.h/2+((i+0.5)/it.count+(rnd()-0.5)*it.jitter/it.count)*it.h;
-    const x0=-it.w/2+(rnd()-0.5)*it.jitter*it.w*0.5;
+    /* ぱかぱか: 上下は「線の間隔の半分まで」・頭の位置と太さを揺らす */
+    const jy=wob?(wob()-0.5)*amp*0.5:0;
+    const jx=wob?(wob()-0.5)*amp*0.04:0;
+    const jw=wob?1+(wob()-0.5)*amp*0.5:1;
+    const yy=-it.h/2+((i+0.5)/it.count+((rnd()-0.5)*it.jitter+jy)/it.count)*it.h;
+    const x0=-it.w/2+((rnd()-0.5)*it.jitter*0.5+jx)*it.w;
     const x1=it.w/2*(1-rnd()*it.jitter*0.3);
-    const w0=(it.lw*(0.5+rnd()))/2, w1=w0*(1-it.taper);
+    const w0=(it.lw*(0.5+rnd()))*jw/2, w1=w0*(1-it.taper);
     g.beginPath();
     g.moveTo(x0,yy-w0);g.lineTo(x1,yy-w1);g.lineTo(x1,yy+w1);g.lineTo(x0,yy+w0);
     g.closePath();g.fill();
@@ -1025,30 +1107,55 @@ function drawItemComposited(g,it){
   drawItem(g,it);
   if(mul)g.globalCompositeOperation='source-over';
 }
+/* ぱかぱかの確認再生（ステージだけ動かす。止めると必ず1枚目へ戻す） */
+let gPkPlay=false, gPkTimer=null;
+function pkStart(it){
+  pkStop();
+  const step=pkStep(it), n=pkN(it);
+  if(n<2)return;
+  gPkPlay=true;gPkFrame=0;
+  const ms=1000/24*step;
+  gPkTimer=setInterval(()=>{gPkFrame=(gPkFrame+1)%n;render();},ms);
+  renderItemParams();render();
+  toast('▷ ぱかぱか確認中（'+n+'種 / '+step+'コマ打ち）— もう一度押すと止まります');
+}
+function pkStop(){
+  if(gPkTimer){clearInterval(gPkTimer);gPkTimer=null;}
+  if(!gPkPlay)return;
+  gPkPlay=false;gPkFrame=0;renderItemParams();render();
+}
 /* ---- ページ1枚を描く（唯一の真実。ステージ/書き出し/サムネが共用） ---- */
 function renderPage(g,pg,o){
   o=o||{};
-  const lw=BOOK.lw, ord=drawOrder(pg.items);
-  if(BOOK.bg!=='transparent'){g.fillStyle=BOOK.bg;g.fillRect(0,0,PAPER.w,PAPER.h);}
+  /* o.only     : 描く素材を絞る述語（S2 レイヤー送り。省略＝全部）
+     o.noBg     : 用紙の地を塗らない（レイヤーPNGは透過）
+     o.noBorder : コマ枠線を描かない（OBAN側は frame.line が持つ）
+     o.clipPad  : コマ内カットの多角形を中心から広げる倍率（のりしろ。1=いままで通り） */
+  const lw=BOOK.lw, ord=drawOrder(pg.items), only=o.only||null, pad=o.clipPad||1;
+  if(!o.noBg&&BOOK.bg!=='transparent'){g.fillStyle=BOOK.bg;g.fillRect(0,0,PAPER.w,PAPER.h);}
   /* 1) コマに割り当てた素材＝コマ内でカット */
   for(const it of ord){
     if(!it.visible||!it.panelId)continue;
     if(o.skipText&&it.type==='text')continue;      // OBANへ送るときは文字を焼かない（向こうで文字のまま編集する）
+    if(only&&!only(it))continue;
     const k=findPanel(pg,it.panelId);if(!k)continue;
-    g.save();pathPoly(g,dispPoly(k));g.clip();drawItemComposited(g,it);g.restore();
+    g.save();pathPoly(g,padPoly(dispPoly(k),pad));g.clip();drawItemComposited(g,it);g.restore();
   }
   /* 2) コマ枠線（絵の上に乗る） */
-  g.strokeStyle='#000';g.lineJoin='miter';g.lineWidth=lw;
-  for(const k of pg.panels){
-    if(!k.border)continue;
-    g.save();pathPoly(g,dispPoly(k));
-    /* 断ち切り部分は用紙外へ出るので、線は仕上がりの外まで自然に切れる */
-    g.stroke();g.restore();
+  if(!o.noBorder){
+    g.strokeStyle='#000';g.lineJoin='miter';g.lineWidth=lw;
+    for(const k of pg.panels){
+      if(!k.border)continue;
+      g.save();pathPoly(g,dispPoly(k));
+      /* 断ち切り部分は用紙外へ出るので、線は仕上がりの外まで自然に切れる */
+      g.stroke();g.restore();
+    }
   }
   /* 3) コマに属さない素材＝枠の上（擬音・飛び出し） */
   for(const it of ord){
     if(!it.visible||it.panelId)continue;
     if(o.skipText&&it.type==='text')continue;
+    if(only&&!only(it))continue;
     drawItemComposited(g,it);
   }
 }
@@ -1434,17 +1541,22 @@ function syncToolLabels(){
 }
 /* iPadは dblclick が飛ばないことがあるので、タッチのダブルタップも自前で拾う
    （animator-brush-ops スキルの正準。350ms/28px。両方から来ても1回しか効かせない） */
-function onDoubleActivate(el,handler){
+/* Wクリック / Wタップ。key を渡すと状態を **要素ではなくキー** で持つので、
+   1回目のクリックでリストを描き直す行（◆Items の行・コマ欄の見出し）でも2回目を拾える
+   ＝作り直された要素に前回の時刻が残る。マウスは dblclick が来ない場合の保険として
+   click(detail>=2) も見る（どちらが先に来ても 400ms のガードで1回だけ発火）。 */
+const gDblState={};
+function onDoubleActivate(el,handler,key){
   if(!el)return;
-  let guard=0;
-  const fire=e=>{const now=performance.now();if(now-guard<400)return;guard=now;handler(e);};
+  const st=key?(gDblState[key]||(gDblState[key]={g:0,t:0,x:0,y:0})):{g:0,t:0,x:0,y:0};
+  const fire=e=>{const now=performance.now();if(now-st.g<400)return;st.g=now;handler(e);};
   el.addEventListener('dblclick',fire);
-  let lastT=0,lastX=0,lastY=0;
+  el.addEventListener('click',e=>{if(e.detail>=2)fire(e);});
   el.addEventListener('pointerup',e=>{
     if(e.pointerType!=='touch')return;
     const now=performance.now();
-    if(now-lastT<350&&Math.hypot(e.clientX-lastX,e.clientY-lastY)<28){lastT=0;e.preventDefault();fire(e);}
-    else{lastT=now;lastX=e.clientX;lastY=e.clientY;}
+    if(now-st.t<350&&Math.hypot(e.clientX-st.x,e.clientY-st.y)<28){st.t=0;e.preventDefault();fire(e);}
+    else{st.t=now;st.x=e.clientX;st.y=e.clientY;}
   });
 }
 /* SEL の Wクリック: コマ選択 ⇔ 素材選択（トーン・流線が下敷きになっても掴める） */
@@ -2004,15 +2116,17 @@ function renderPanelSec(){
   const pg=curPage(), on=!!selPanel;
   const i=on?pg.panels.indexOf(selPanel)+1:0;
   $('#pn-info').innerHTML=on
-    ? 'コマ <b style="color:var(--rouge)">'+i+'</b> / '+pg.panels.length+'　'+
+    ? 'コマ <b style="color:var(--rouge)">'+i+'</b> / '+pg.panels.length
+      +(pg.manualOrder?' <span style="color:var(--rouge)">手動順</span>':'')+'　'+
       Math.round(polyBounds(selPanel.poly).w)+'×'+Math.round(polyBounds(selPanel.poly).h)+' px'+
       '　頂点 '+selPanel.poly.length
     : 'コマを選択してください。<br>分割は左のツール <b>╱ DIV</b>。';
-  ['#pn-border','#pn-bleed','#pn-del','#pn-merge'].forEach(s=>{$(s).disabled=!on;});
+  ['#pn-border','#pn-bleed','#pn-del','#pn-merge','#pn-no'].forEach(s=>{$(s).disabled=!on;});
   $('#pn-border').classList.toggle('on',on&&selPanel.border);
   $('#pn-bleed').classList.toggle('on',on&&selPanel.bleed);
   updateLinkNote();
 }
+$('#pn-no').addEventListener('click',()=>{if(selPanel)renumberPanel(selPanel.id);});
 $('#pn-border').addEventListener('click',()=>{if(!selPanel)return;selPanel.border=!selPanel.border;commit();renderPanelSec();});
 $('#pn-bleed').addEventListener('click',()=>{if(!selPanel)return;selPanel.bleed=!selPanel.bleed;commit();renderPanelSec();});
 $('#pn-del').addEventListener('click',()=>{
@@ -2049,6 +2163,7 @@ function syncUI(){
   $('#lw').value=BOOK.lw;$('#lw-v').textContent=BOOK.lw;
   $('#bind-r').classList.toggle('on',BOOK.bindRight);
   $('#lk-w').value=BOOK.link.w;$('#lk-h').value=BOOK.link.h;
+  $('#lk-pad').value=Math.round(BOOK.link.pad*100);$('#lk-pad-v').textContent=Math.round(BOOK.link.pad*100)+'%';
   $('#t-shade').classList.toggle('on',showShade);
   $('#t-guide').classList.toggle('on',showGuide);
 }
@@ -2095,7 +2210,7 @@ function addItem(type,srcId,linkId){
   const k=addTarget?findPanel(pg,addTarget):null;
   const box=k?polyBounds(dispPoly(k)):PAPER.bas;
   const it=Object.assign({id:uid('i_'),type:type,visible:true,
-      panelId:k?k.id:null,
+      panelId:k?k.id:null, z:'mid',                            // S1: 奥行きは「中間」から
       name:(type==='img'?'IMG':type.toUpperCase())+' '+(pg.items.length+1)},
     JSON.parse(JSON.stringify(defaultsFor(type,box))));
   if(type==='img'){
@@ -2225,6 +2340,37 @@ function syncMultiSel(){
 }
 function selAll(){return selItems.length?selItems.slice():(selItem?[selItem]:[]);}
 function isSel(it){return it===selItem||selItems.indexOf(it)>=0;}
+/* コマ番号の打ち替え（◆Items の「コマ N」を Wクリック / Wタップ、または ◆Panel の № 番号）。
+   既定は読み順の自動並べ替え（sortPanels）だが、変則コマ・入れ子コマだと
+   「右上→左下」では読む順にならないことがある。手で決めたら pg.manualOrder を立てて
+   以後そのページは自動で並べ替えない（分割・結合・綴じ方向の切替でも動かない）。
+   番号＝pg.panels の並びそのものなので、素材のコマ欄・PIN色・追加先チップも一緒に付いてくる。 */
+function renumberPanel(pid){
+  const pg=curPage();
+  const from=pg.panels.findIndex(k=>k.id===pid);
+  if(from<0)return;
+  const n=pg.panels.length;
+  if(n<2){toast('コマが1つしかありません');return;}
+  const list=[];
+  for(let i=0;i<n;i++)list.push({
+    label:'コマ '+(i+1)+(i===from?'（いま）':''),
+    sub:i===from?'このまま':(i<from?'ここへ繰り上げ':'ここへ繰り下げ'),
+    value:i});
+  if(pg.manualOrder)list.push({label:'⟲ 自動（読み順）に戻す',
+    sub:(BOOK.bindRight?'右上':'左上')+'から読む順で番号を振り直す',value:'auto'});
+  modalPick('コマ '+(from+1)+' を何番目にしますか？',list,v=>{
+    if(v==='auto'){pg.manualOrder=false;sortPanels(pg);}
+    else{
+      const to=v|0;
+      if(to===from)return;
+      pg.panels.splice(to,0,pg.panels.splice(from,1)[0]);
+      pg.manualOrder=true;                                  // 手で決めた＝以後この順が正
+    }
+    normalizeItems(pg);
+    commit();renderItemList();renderPanelSec();render();
+    toast(pg.manualOrder?('コマ '+(from+1)+' → コマ '+((v|0)+1)+'（このページは手動順）'):'読み順（自動）に戻しました');
+  });
+}
 /* ＋で追加する入れ先。コマを選ぶ操作と連動させておく（選んでから足す＝そこに入る） */
 function setAddTarget(pid,quiet){
   const pg=curPage();
@@ -2250,6 +2396,7 @@ function renderAddTarget(){
     c.innerHTML=(color?'<i class="dot" style="background:'+color+'"></i>':'')+esc(label);
     c.title=(pid?label+' の中に入れる':'コマに入れず枠の上に置く（擬音・飛び出し）')+'（クリックで追加先に）';
     c.addEventListener('click',()=>setAddTarget(pid));
+    if(pid)onDoubleActivate(c,()=>renumberPanel(pid),'mpchip:'+pid);
     box.appendChild(c);
   };
   mk(null,'枠の上','rgba(255,210,122,.7)');
@@ -2265,6 +2412,13 @@ function assignItemsTo(list,pid){
   normalizeItems(pg);
   commit();renderItemList();renderItemParams();render();
   toast(list.length+' 個を '+(pid?('コマ '+(pg.panels.findIndex(k=>k.id===pid)+1)):'枠の上')+' へ移しました');
+}
+/* 選択中の素材にまとめて奥行きを当てる（S1）。転送用のタグなので **見た目は変わらない** */
+function setItemsZ(list,z){
+  if(!list.length||Z_DEPTH[z]===undefined)return;
+  list.forEach(it=>{it.z=z;});
+  commit();renderItemList();renderItemParams();
+  toast(list.length+' 個を '+Z_DEFS.find(a=>a[0]===z)[2]+' へ（OBAN/COMPOSER へ送るときの前後。紙の見た目は変わりません）');
 }
 /* グループ内だけで前後させる（コマ欄そのものは動かない） */
 function moveItemIn(it,dir,toEnd){
@@ -2296,8 +2450,11 @@ function renderItemList(){
     const sep=document.createElement('div');
     sep.className='el-sep'+((g.pid||null)===(addTarget||null)?' tgt':'');
     sep.dataset.gid=g.pid||'';
-    sep.innerHTML='<span class="gl" style="color:'+g.color+'">'+esc(g.label)+'</span>'
-      +'<span class="gc">'+(list.length||'—')+'</span><i></i>'
+    sep.innerHTML='<span class="gl'+(g.pid?' rn':'')+'" style="color:'+g.color+'"'
+      +(g.pid?' title="Wクリック / Wタップ で番号を打ち替え"':'')+'>'+esc(g.label)+'</span>'
+      +'<span class="gc">'+(list.length||'—')+'</span>'
+      +(g.pid&&pg.manualOrder?'<span class="gman" title="このページは手で決めた順（読み順の自動並べ替えをしない）">手動</span>':'')
+      +'<i></i>'
       +(nSel?'<span class="gmv" data-g="mv" title="選択中の '+nSel+' 個をここへ移す">⇥移動</span>':'')
       +'<span class="gadd" data-g="add" title="ここを追加先にする（＋で足した素材がここに入る）">'
       +((g.pid||null)===(addTarget||null)?'◉追加先':'＋ここ')+'</span>';
@@ -2305,6 +2462,12 @@ function renderItemList(){
       if(ev.target.dataset&&ev.target.dataset.g==='mv'){assignItemsTo(selAll(),g.pid);return;}
       setAddTarget(g.pid);
     });
+    /* 見出しの「コマ N」を Wクリック / Wタップ = 番号の打ち替え。
+       1回目のクリックで setAddTarget がリストを作り直すので、状態はキーで持つ（onDoubleActivate の key） */
+    if(g.pid)onDoubleActivate(sep,ev=>{
+      if(ev.target&&ev.target.dataset&&ev.target.dataset.g)return;   // ＋ここ / ⇥移動 の上では出さない
+      renumberPanel(g.pid);
+    },'mpgrp:'+g.pid);
     box.appendChild(sep);
     if(!list.length){
       const e=document.createElement('div');e.className='el-empty';e.dataset.gid=g.pid||'';
@@ -2319,6 +2482,7 @@ function renderItemList(){
         +'<span class="el-lk'+(it.locked?' on':'')+'" data-a="lock" title="ロック: キャンバス上で選べなくする（誤って動かさないため）">'+(it.locked?'▪':'▫')+'</span>'
         +'<span class="el-nm" title="Wクリックで名前を変更／つかんで上下に並べ替え（別のコマ欄へ放り込めば移動）">'+esc(it.name)+'</span>'
         +'<span class="el-pin">'+(kIdx?'▣'+kIdx:'上')+'</span>'
+        +'<span class="el-z z'+zOf(it)+'" data-a="z" title="奥行き（OBAN/COMPOSER へ送るときの前後）: 奥 → 中間 → 手前 の順に送り。&#10;紙の重なり順は変わりません">'+zLabel(it)+'</span>'
         +'<span class="el-ty">'+it.type.toUpperCase()+'</span>'
         +((it.type==='brush'||it.type==='white')
            ?'<span class="el-mg'+(mergeTargetOf(it)?'':' off')+'" data-a="merge" title="下の1つと結合（同じコマ・同じ種類のみ）">▼結</span>':'')
@@ -2334,6 +2498,9 @@ function renderItemList(){
         if(a==='lock'){const t=isSel(it)?selAll():[it];const v=!it.locked;t.forEach(o=>{o.locked=v;});
           if(v){selItems=[];if(selItem&&selItem.locked)selItem=null;}
           commit();renderItemList();renderItemParams();render();return;}
+        if(a==='z'){const t=isSel(it)?selAll():[it];
+          const n=(Z_DEFS.findIndex(d=>d[0]===zOf(it))+1)%Z_DEFS.length;
+          setItemsZ(t,Z_DEFS[n][0]);return;}
         if(a==='merge'){mergeDown(it);return;}
         if(a==='up'){if(moveItemIn(it,1,false)){commit();renderItemList();}else toast('このコマ欄の一番上です');return;}
         if(a==='dn'){if(moveItemIn(it,-1,false)){commit();renderItemList();}else toast('このコマ欄の一番下です');return;}
@@ -2356,11 +2523,12 @@ function renderItemList(){
         if(selMode!=='item'){selMode='item';syncToolLabels();}  // リストで選んだら掴める状態にしておく
         renderItemList();renderItemParams();renderPanelSec();render();
       });
-      /* 名前の変更は Wクリック。iPadのダブルタップでも入れるよう共通ヘルパで張る */
+      /* 名前の変更は Wクリック。iPadのダブルタップでも入れるよう共通ヘルパで張る。
+         1タップ目の選択で行が作り直されるので、状態はキー（素材id）で持つ */
       onDoubleActivate(row,ev=>{
         if(ev.target.dataset&&ev.target.dataset.a)return;
         startRename(row,it);
-      });
+      },'mprow:'+it.id);
       /* 行の本体をつかんで並べ替え。別のコマ欄まで持っていけば、そのコマへ移る。
          複数選択しているものを掴んだら、まとめて動く。
          move/up は window 側に張ってある（行を作り直すと行のイベントが死ぬため） */
@@ -2433,6 +2601,7 @@ function moveItem(dir,toEnd){
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function renderItemParams(){
   const box=$('#item-params'), pr=$('#presets');box.innerHTML='';pr.innerHTML='';
+  if(gPkPlay&&!pkOn(selItem))pkStop();      // ぱかぱか確認は「その素材を選んでいる間」だけ
   if(!selItem){renderPalette();return;}
   if(selItem.locked){
     const w=document.createElement('div');w.className='note';
@@ -2465,6 +2634,29 @@ function renderItemParams(){
   mkc(null,'枠の上','rgba(255,210,122,.7)');
   pg.panels.forEach((k,i)=>mkc(k.id,'コマ '+(i+1),PIN_COLORS[i%PIN_COLORS.length]));
   box.appendChild(chp);
+  /* 奥行き（S1）— OBAN / COMPOSER でコマ内パララックスを組むときの前後を先に当てておく。
+     **紙の見た目には効かない**（重なりは上の「配置」と ◆Items の並びが正） */
+  const rowZ=document.createElement('div');rowZ.className='tr';
+  rowZ.innerHTML='<span class="lb">奥行き'+(multi?'（'+tg.length+'個）':'')+'<br>'
+    +'<span style="opacity:.6">転送用</span></span>';
+  box.appendChild(rowZ);
+  const chz=document.createElement('div');chz.className='chips gchips';
+  const sameZ=tg.every(o=>zOf(o)===zOf(it));
+  const ZC={bg:'var(--ice)',mid:'rgba(181,142,255,.8)',fg:'var(--rouge)'};
+  Z_DEFS.forEach(([z,,long])=>{
+    const c=document.createElement('span');
+    c.className='fp'+(sameZ&&zOf(it)===z?' on':'');
+    c.innerHTML='<i class="dot" style="background:'+ZC[z]+'"></i>'+long;
+    c.title=long+'（OBAN の DEPTH '+Z_DEPTH[z].toFixed(2)+' で届く）。紙の重なり順は変わりません';
+    c.addEventListener('click',()=>setItemsZ(selAll(),z));
+    chz.appendChild(c);
+  });
+  box.appendChild(chz);
+  const zn=document.createElement('div');zn.className='note';
+  zn.innerHTML='◈ 奥行きは<b>送るときだけ</b>効きます（紙の見た目は変わりません）。いまの主は <b>'
+    +zLabel(it,1)+'</b>＝OBAN の DEPTH <b>'+zDepth(it).toFixed(2)+'</b>。'
+    +'◆Items の行の <b>'+zLabel(it)+'</b> をクリックしても 奥→中→手前 と送れます。';
+  box.appendChild(zn);
   /* 文字は「打つ欄」が先頭。ここに打つと即反映される */
   if(it.type==='text'){
     const ta=document.createElement('textarea');
@@ -2499,6 +2691,43 @@ function renderItemParams(){
       commitD();});
     box.appendChild(row);
   });
+  /* ぱかぱか（S3）— 集中線・流線だけ。紙は 1枚目のまま、送ると連番になる */
+  if(it.type==='focus'||it.type==='stream'){
+    const pk=it.pk=Object.assign({},PK_DEF,it.pk||{});
+    const r1=document.createElement('div');r1.className='tr';
+    r1.innerHTML='<span class="lb">ぱかぱか<br><span style="opacity:.6">送ると連番</span></span>'
+      +'<button class="btn rouge'+(pk.on?' on':'')+'" style="flex:1">'+(pk.on?'ON':'OFF')+'</button>'
+      +'<button class="btn ice" id="pk-play" style="flex:none;width:52px"'+(pk.on?'':' disabled')+'>'
+      +(gPkPlay?'■停止':'▷ 見る')+'</button>';
+    r1.querySelectorAll('button')[0].addEventListener('click',()=>{
+      pk.on=!pk.on;if(!pk.on)pkStop();commit();renderItemParams();render();});
+    r1.querySelector('#pk-play').addEventListener('click',()=>{gPkPlay?pkStop():pkStart(it);});
+    box.appendChild(r1);
+    if(pk.on){
+      const mk=(lb,key,mn,mx,st,fmt)=>{
+        const r=document.createElement('div');r.className='tr';
+        r.innerHTML='<span class="lb">'+lb+'</span><input type="range" min="'+mn+'" max="'+mx+'" step="'+st+'" value="'+pk[key]+'"><span class="vv">'+fmt(pk[key])+'</span>';
+        const rg=r.querySelector('input'), vv=r.querySelector('.vv');
+        rg.addEventListener('input',()=>{pk[key]=st<1?parseFloat(rg.value):parseInt(rg.value);
+          vv.textContent=fmt(pk[key]);commitD();render();});
+        box.appendChild(r);
+      };
+      mk('種類','n',2,6,1,v=>v+' 種');
+      mk('コマ打ち','step',1,4,1,v=>v+' コマ打ち（'+(24/v).toFixed(0)+'回/秒）');
+      mk('ブレ幅','amp',0,1,0.05,v=>Number(v).toFixed(2));
+      const r4=document.createElement('div');r4.className='tr';
+      r4.innerHTML='<span class="lb">ブレ方</span><button class="btn gold" style="flex:1">'
+        +(pk.mode==='all'?'全とっかえ（毎コマ別の絵）':'ブレだけ（同じ絵が震える）')+'</button>';
+      r4.querySelector('button').addEventListener('click',()=>{
+        pk.mode=pk.mode==='all'?'jitter':'all';commit();renderItemParams();render();});
+      box.appendChild(r4);
+      const nt=document.createElement('div');nt.className='note';
+      nt.innerHTML='◈ 紙の書き出しは<b>いつも1枚目</b>です。'
+        +'<b>▶▶ OBAN / COMPOSER レイヤー</b> で送ると '+pk.n+'種 × '+pk.step+'コマ打ち＝'
+        +'<b>'+(pk.n*pk.step)+'フレームのループ</b>（24fps）になります。';
+      box.appendChild(nt);
+    }
+  }
   if(it.type==='tone'){
     const row=document.createElement('div');row.className='tr';
     row.innerHTML='<span class="lb">形</span><select><option value="dot">丸</option><option value="square">角</option></select><span class="vv" id="tone-cov"></span>';
@@ -2988,15 +3217,32 @@ function linkBox(){
 }
 /* ---- 連携用に「そのコマを ANIMATOR 解像度へレターボックス」した画像を作る ---- */
 function linkCanvas(w,h,opt){
-  const b=linkBox(), pg=curPage();
+  opt=opt||{};
+  const b=opt.box||linkBox(), pg=curPage();
   const c=document.createElement('canvas');c.width=w;c.height=h;
   const g=c.getContext('2d');
-  g.fillStyle='#FFFFFF';g.fillRect(0,0,w,h);
+  if(!opt.transparent){g.fillStyle='#FFFFFF';g.fillRect(0,0,w,h);}   // レイヤーPNGは透過で重ねる
   const s=Math.min(w/b.w,h/b.h);
   const ox=(w-b.w*s)/2, oy=(h-b.h*s)/2;
   g.save();g.translate(ox,oy);g.scale(s,s);g.translate(-b.x,-b.y);
   g.beginPath();g.rect(b.x,b.y,b.w,b.h);g.clip();
-  renderPage(g,pg,{skipText:!!(opt&&opt.exText)});
+  if(opt.guidePanel){                                 // S4: 描き足し用REF＝どこが「枠の中」かを見せる
+    renderPage(g,pg,{skipText:!!opt.exText});
+    const k=opt.guidePanel, lw2=Math.max(2,BOOK.lw*0.6);
+    g.save();
+    g.lineWidth=lw2;g.strokeStyle='rgba(255,79,168,.85)';
+    pathPoly(g,dispPoly(k));g.stroke();                // ここより外は紙に出ない＝でも動かすと出てくる
+    /* のりしろの端＝送っている画の端。線幅ぶん内側に引かないと半分しか見えない */
+    g.setLineDash([BOOK.lw*3,BOOK.lw*2]);g.strokeStyle='rgba(90,233,255,.75)';
+    g.strokeRect(b.x+lw2/2,b.y+lw2/2,b.w-lw2,b.h-lw2);
+    g.restore();
+  }else if(opt.paperOnly){                            // 「地」レイヤー＝のりしろ込みのコマの形を紙色で塗る
+    g.fillStyle=BOOK.bg==='transparent'?'#FFFFFF':BOOK.bg;
+    pathPoly(g,padPoly(dispPoly(opt.paperOnly),opt.clipPad||1));g.fill();
+  }else{
+    renderPage(g,pg,{skipText:!!opt.exText,only:opt.only||null,
+                     noBg:!!opt.transparent,noBorder:!!opt.noBorder,clipPad:opt.clipPad||1});
+  }
   g.restore();
   return {canvas:c,box:b,scale:s,ox:ox,oy:oy};
 }
@@ -3004,11 +3250,12 @@ function linkCanvas(w,h,opt){
    送った画像の画素座標に直して渡す。向こうは自前のレイアウトで組み直すので、
    ブロックの中心ではなく **書き出し位置（アンカー）** を送る＝1文字目の位置が必ず一致する。
    縦書き=1列目の右上 / 横書き=1行目の左上（OBAN の drawVText と同じ約束）。 */
-function plateTexts(L,w,h){
+function plateTexts(L,w,h,only){
   const pg=curPage(), out=[];
   const P2X=x=>(x-L.box.x)*L.scale+L.ox, P2Y=y=>(y-L.box.y)*L.scale+L.oy;
   for(const it of pg.items){
     if(it.type!=='text'||!it.visible||!String(it.text||'').trim())continue;
+    if(only&&!only(it))continue;
     const X=P2X(it.x), Y=P2Y(it.y);
     if(X<-w*0.5||X>w*1.5||Y<-h*0.5||Y>h*1.5)continue;      // 画面外まで離れているものは送らない
     const bx=textBox(it), bw=bx.w*L.scale, bh=bx.h*L.scale;
@@ -3055,6 +3302,48 @@ $('#lk-to-ani').addEventListener('click',async()=>{
   modalConfirm('ANIMATOR へ送りました（'+w+'×'+h+'）。\n\nANIMATOR を開いて  REF ▸ ＋ FROM SAVED  から\n「'+name+'」を選ぶと下敷きに乗ります。\n\nANIMATOR を新しいタブで開きますか？',
     ()=>{window.open('animator.html','_blank');});
 });
+/* S4: 描き足し（のりしろ付きで ANIMATOR へ）
+   ・パララックスで層を動かすと、コマ枠の外・下の層の足りない所が抜ける。
+     そこを描き足すための往復。**新しいアプリは作らない**——絵は ANIMATOR の領分のまま。
+   ・送るのは「コマ全部の合成＋枠のガイド」。どこまでが枠の中かが見えないと描き足せないため。
+     ガイドは REF に焼くだけで、戻ってくるのは ANIMATOR が描いた線だけ（kind:'draw'）。
+   ・戻り先の層（奥/中間/手前）を先に決めておく＝取り込んだ絵にそのまま z が付く。 */
+async function sendFillToAnimator(z){
+  const pg=curPage(), k=selPanel;
+  if(!k){modalAlert(LAY_NEEDPANEL);return;}
+  const G=layerGeom(k);
+  const kIdx=pg.panels.indexOf(k)+1;
+  const pid='mp_'+BOOK.title.replace(/[^\w\-]/g,'')+'_p'+(curPageIdx+1)+'_k'+kIdx+'_fill'+z;
+  const zl=Z_DEFS.find(a=>a[0]===z)[2];
+  const name='MP '+(curPageIdx+1)+'-'+kIdx+' 描き足し '+zl;
+  const L=linkCanvas(G.w,G.h,{box:G.P,guidePanel:k,clipPad:G.pad});
+  const rec={format:'PROJECT_v1',projectId:pid,name:name,scene:name,
+    exportedAt:new Date().toISOString(),
+    fps:24,durationUnit:'frames',width:G.w,height:G.h,bgBright:100,
+    workArea:{startFrame:0,endFrame:0},cellCount:1,
+    cells:[{id:'c1',kind:'draw',duration:1,image:L.canvas.toDataURL('image/png')}],composer:null};
+  BOOK.links[pid]={pageId:pg.id,panelId:k.id,
+    box:{x:G.P.x,y:G.P.y,w:G.P.w,h:G.P.h},scale:L.scale,ox:L.ox,oy:L.oy,w:G.w,h:G.h,z:z};
+  try{await exPut(rec);}catch(e){toast('✗ 共有DBに書けませんでした');return;}
+  postLive({type:'project-update',projectId:pid,payload:rec});
+  commit();
+  modalConfirm('ANIMATOR へ のりしろ付き で送りました（'+G.w+'×'+G.h+'）。\n\n'
+    +'  ・桃の実線 がコマ枠。ここより内側が紙に出ます\n'
+    +'  ・水色の破線 までがのりしろ '+Math.round(G.pad*100)+'%。動かすとここが出てきます\n'
+    +'  ・その隙間を描き足してください\n\n'
+    +'ANIMATOR で  REF ▸ ＋ FROM SAVED  から「'+name+'」を選んで下敷きにし、\n'
+    +'描いたら  ◀ ANIMATOR 取込  で戻すと「'+zl+'」の層に入ります。\n\n'
+    +'ANIMATOR を新しいタブで開きますか？',
+    ()=>{window.open('animator.html','_blank');});
+}
+$('#lk-fill').addEventListener('click',()=>{
+  if(!selPanel){modalAlert(LAY_NEEDPANEL);return;}
+  modalPick('描き足した絵は、どの層に入れますか？',
+    Z_DEFS.map(([z,,long])=>({label:long,
+      sub:'OBAN の DEPTH '+Z_DEPTH[z].toFixed(2)+(z==='bg'?'（いちばん動かない）':(z==='fg'?'（いちばん動く＝いちばん欠けやすい）':'')),
+      value:z})),
+    z=>sendFillToAnimator(z));
+});
 $('#lk-from-ani').addEventListener('click',async()=>{
   postLive({type:'composer-hello'});                 // 開いているANIMATORへ最新を要求
   await new Promise(r=>setTimeout(r,350));
@@ -3076,9 +3365,11 @@ $('#lk-from-ani').addEventListener('click',async()=>{
       const it=await addImage(imgs,String(r.name||'ANI').slice(0,16),r.projectId);
       placeLinked(it,r);
       commit();renderItemList();renderItemParams();
-      toast(imgs.length>1
+      const lz=(BOOK.links[r.projectId]||{}).z;
+      toast((imgs.length>1
         ?'◀ '+imgs.length+'コマ取り込みました（◆Items の コマ送り で切替）'
-        :'◀ 取り込みました（以後 ANIMATOR の保存で自動更新）');
+        :'◀ 取り込みました（以後 ANIMATOR の保存で自動更新）')
+        +(lz?('　層＝'+Z_DEFS.find(a=>a[0]===lz)[2]):''));
     });
 });
 /* 送った時の矩形が残っていれば、そのコマにピッタリ戻す */
@@ -3093,6 +3384,7 @@ function placeLinked(it,rec){
   const tp=curPage();
   const k=lk.panelId?findPanel(tp,lk.panelId):null;
   it.panelId=k?k.id:null;
+  if(lk.z&&Z_DEPTH[lk.z]!==undefined)it.z=lk.z;   // S4: 描き足しで送った層へ戻す
   const im=MATIMG[it.srcId];
   if(im&&im.width){
     it.scale=1/lk.scale;                       // 送った倍率の逆
@@ -3121,6 +3413,177 @@ async function sendPageTo(target){
           :'\nそれを選ぶとパネルになります。'));
   }
 }
+/* ============================================================
+   S2: レイヤー送り（選択コマを 地/奥/中間/手前/枠の上 に分けたまま渡す）
+   ------------------------------------------------------------
+   ・幾何: コマの外形 B を「のりしろ」pad で広げた P を PNG にする。
+     OBAN 側は **B をフレーム**（＝マスク）、レイヤーを **h=pad の子パネル** として置く。
+     子はフレームでクリップされるので、動かすと のりしろ の中身が出てくる＝欠けない。
+   ・OBAN へ: 1レイヤー=1レコード（PROJECT_v1）を tdr_exchange に N 本＋束ねる manifest。
+     manifest の cells[0] は従来どおりの平ら1枚なので、**古い OBAN で選んでも今までの動き**になる。
+   ・COMPOSER へ: PROJECT_v2 の tracks[] に同じ絵を並べる（奥→手前の順＝後ろほど前面）。
+   ・読み文字は従来どおり焼かずに plate.texts で渡す。座標は **フレーム B の画素**（のりしろ抜き）。
+   ============================================================ */
+let curPanelForPaper=null;   // 「地」レイヤーの形に使うコマ（linkCanvas の引数を増やさないための受け渡し）
+function layerGeom(k){
+  const pad=Math.max(1,BOOK.link.pad||1);
+  const B=polyBounds(dispPoly(k));
+  const P={x:B.cx-B.w*pad/2, y:B.cy-B.h*pad/2, w:B.w*pad, h:B.h*pad, cx:B.cx, cy:B.cy};
+  const L=Math.max(BOOK.link.w,BOOK.link.h);
+  const sc=L/Math.max(P.w,P.h);
+  return {B:B,P:P,pad:pad,scale:sc,
+          w:Math.max(16,Math.round(P.w*sc)), h:Math.max(16,Math.round(P.h*sc)),
+          fw:Math.max(16,Math.round(B.w*sc)), fh:Math.max(16,Math.round(B.h*sc))};
+}
+/* 枠の上（擬音・飛び出し）でこのコマに掛かるもの＝中心がのりしろ矩形に入るもの */
+function overItemsOf(pg,k,G){
+  const P=G.P;
+  return pg.items.filter(it=>it.visible&&!it.panelId
+    &&it.x>=P.x&&it.x<=P.x+P.w&&it.y>=P.y&&it.y<=P.y+P.h);
+}
+/* レイヤー構成。中身が無い層は作らない（空PNGを送らない） */
+function panelLayerSpecs(pg,k,G,opt){
+  const skipText=!!(opt&&opt.skipText);
+  const live=it=>it.visible&&!(skipText&&it.type==='text');
+  const specs=[];
+  if(BOOK.bg!=='transparent')specs.push({key:'paper',label:'地',depth:0,paper:true});
+  Z_DEFS.forEach(([z,,long])=>{
+    if(!pg.items.some(it=>live(it)&&it.panelId===k.id&&zOf(it)===z))return;
+    specs.push({key:z,label:long,depth:Z_DEPTH[z],
+      only:it=>it.panelId===k.id&&zOf(it)===z});
+  });
+  const over=overItemsOf(pg,k,G).filter(live);
+  if(over.length)specs.push({key:'over',label:'枠の上',depth:1,
+    only:it=>!it.panelId&&over.indexOf(it)>=0});
+  specs.forEach((sp,i)=>{sp.ord=i;});
+  return specs;
+}
+/* この層に「ぱかぱか」の素材が居るか。居れば連番になる（n=種類 / step=何コマ打ち） */
+function layerPk(pg,sp){
+  let n=1, step=1;
+  if(sp.only)for(const it of pg.items){
+    if(!it.visible||!pkOn(it)||!sp.only(it))continue;
+    n=Math.max(n,pkN(it));step=Math.max(step,pkStep(it));
+  }
+  return {n:n,step:n>1?step:1};
+}
+/* 1レイヤーぶんの画像。ぱかぱかが居れば n 枚を duration=step で並べる
+   ＝ OBAN 側は apIngest() が duration ぶん展開するので 24fps の「step コマ打ち」になる */
+function layerCells(sp,G,exText,pk){
+  pk=pk||{n:1,step:1};
+  const cells=[], keep=gPkFrame;
+  for(let f=0;f<pk.n;f++){
+    gPkFrame=f;
+    const L=linkCanvas(G.w,G.h,{box:G.P,transparent:true,noBorder:true,
+      clipPad:G.pad,exText:exText,only:sp.only,paperOnly:sp.paper?curPanelForPaper:null});
+    cells.push({id:'c'+(f+1),kind:'draw',duration:pk.step,image:L.canvas.toDataURL('image/png')});
+  }
+  gPkFrame=keep;
+  return cells;
+}
+function layerRecord(pid,name,cells,w,h,layerOf){
+  return {format:'PROJECT_v1',projectId:pid,name:name,scene:name,
+    plateLayerOf:layerOf||undefined,     // 付いていると OBAN の一覧には出ない（親から芋づるで入る）
+    exportedAt:new Date().toISOString(),
+    fps:24,durationUnit:'frames',width:w,height:h,bgBright:100,
+    workArea:{startFrame:0,endFrame:0},
+    cellCount:cells.length,cells:cells,composer:null};
+}
+/* 送信本体。target='oban' | 'comp' */
+async function sendPanelLayers(target){
+  const pg=curPage(), k=selPanel;
+  if(!k){modalAlert(LAY_NEEDPANEL);return;}
+  const exText=(target==='oban');
+  const G=layerGeom(k);
+  curPanelForPaper=k;
+  const specs=panelLayerSpecs(pg,k,G,{skipText:exText});
+  if(!specs.length){curPanelForPaper=null;toast('このコマには送るものがありません');return;}
+  const kIdx=pg.panels.indexOf(k)+1;
+  const base='mp_'+target+'L_'+BOOK.title.replace(/[^\w\-]/g,'')+'_p'+(curPageIdx+1)+'_k'+kIdx;
+  const nm='MP '+(curPageIdx+1)+'-'+kIdx+' '+BOOK.title;
+  const built=specs.map((sp,i)=>{
+    const pk=layerPk(pg,sp);
+    return {sp:sp,pid:base+'_L'+i,pk:pk,cells:layerCells(sp,G,exText,pk)};
+  });
+  curPanelForPaper=null;
+  /* 読み文字は「のりしろ抜きの枠」座標で渡す＝OBAN 側の換算式がそのまま使える */
+  const overIds=overItemsOf(pg,k,G).map(it=>it.id);
+  const FT={box:G.B,scale:G.scale,ox:0,oy:0};
+  const texts=exText?plateTexts(FT,G.fw,G.fh,
+      it=>it.panelId===k.id||overIds.indexOf(it.id)>=0):[];
+
+  if(target==='comp'){
+    const rec={format:'PROJECT_v2',projectId:base,name:nm,scene:nm,
+      exportedAt:new Date().toISOString(),fps:24,width:G.w,height:G.h,bgBright:100,
+      tracks:built.map(b=>Object.assign(layerRecord(b.pid,nm+' '+b.sp.label,b.cells,G.w,G.h),
+        {type:'anim',tid:b.pid}))};
+    try{await exPut(rec);}catch(e){toast('✗ 共有DBに書けませんでした');return;}
+    postLive({type:'project-update',projectId:base,payload:rec});
+    window.open('composer.html?id='+encodeURIComponent(base),'_blank');
+    const tot=built.reduce((a,b)=>a+b.cells.reduce((x,c)=>x+c.image.length,0),0);
+    toast('▶▶ COMPOSER へ '+built.length+' レイヤー（奥→手前の順にトラック・'
+      +(tot/1024/1024).toFixed(1)+'MB）');
+    return;
+  }
+  /* OBAN: レイヤーを1本ずつ＋束ねる manifest */
+  const flat=linkCanvas(G.fw,G.fh,{box:G.B,exText:exText});
+  const man=layerRecord(base,nm,
+    [{id:'c1',kind:'draw',duration:1,image:flat.canvas.toDataURL('image/png')}],G.fw,G.fh);
+  man.plate={v:2,src:'manga-plate',w:G.fw,h:G.fh,texts:texts,
+    layers:built.map(b=>({projectId:b.pid,name:b.sp.label,depth:b.sp.depth,ord:b.sp.ord})),
+    frame:{ar:+(G.B.w/G.B.h).toFixed(4), childH:+G.pad.toFixed(4),
+           line:{on:!!k.border, w:+(BOOK.lw/G.B.h*1000).toFixed(1)}}};
+  try{
+    for(const b of built)await exPut(layerRecord(b.pid,nm+' '+b.sp.label,b.cells,G.w,G.h,base));
+    await exPut(man);
+  }catch(e){toast('✗ 共有DBに書けませんでした');return;}
+  postLive({type:'project-update',projectId:base,payload:man});
+  window.open('oban-builder.html','_blank');
+  const MB=x=>(x/1024/1024).toFixed(1)+'MB';
+  const tot=built.reduce((a,b)=>a+b.cells.reduce((x,c)=>x+c.image.length,0),0);
+  modalAlert('OBAN へ「レイヤーのまま」送りました。\n\n'
+    +built.map((b,i)=>'  '+(i+1)+'. '+b.sp.label+'（DEPTH '+b.sp.depth.toFixed(2)+'）'
+        +(b.pk.n>1?('  ぱかぱか '+b.pk.n+'種 / '+b.pk.step+'コマ打ち'):'')
+        +'  '+MB(b.cells.reduce((x,c)=>x+c.image.length,0))).join('\n')
+    +'\n  ── 合計 '+MB(tot)+(tot>40*1024*1024?'（重いです。解像度かぱかぱかの種類を減らすと軽くなります）':'')
+    +'\n\nOBAN 側の  ＋ FROM ANIMATOR  で「'+nm+'」を選ぶと、\n'
+    +'1コマ＝1フレーム＋子パネル '+built.length+'枚 で入ります（＝コマ内パララックス）。\n'
+    +'のりしろ '+Math.round(G.pad*100)+'% ぶん外まで送ってあるので、少し動かしても欠けません。'
+    +(texts.length?('\n\n読み文字 '+texts.length+'個は焼かずに渡しています。'):''));
+}
+const LAY_NEEDPANEL='レイヤー送りは「1コマ単位」です。\n\nまずコマを選んでください（SEL でコマをクリック）。';
+/* レイヤー構成の下見（コマを選ぶたびに出す） */
+function updateLayerNote(){
+  const el=$('#lk-lay-note');if(!el)return;
+  const pg=curPage(), k=selPanel, on=!!k;
+  ['#lk-lay-comp','#lk-lay-oban','#lk-fill'].forEach(sel=>{const b=$(sel);if(b)b.disabled=!on;});
+  if(!on){el.innerHTML='コマを選ぶとレイヤー構成が出ます（レイヤー送りは<b>1コマ単位</b>）。';return;}
+  const G=layerGeom(k);
+  const sp=panelLayerSpecs(pg,k,G,{skipText:true});          // OBAN基準（文字は焼かない）
+  const spC=panelLayerSpecs(pg,k,G,{skipText:false});        // COMPOSER基準（文字も焼く）
+  /* のりしろが効く範囲（実測式）。子は枠より (pad-1) だけ大きく、カメラを振ると
+     childRect() が k=lerp(0.15,0.85,depth) の割合でずれる。はみ出しを食い潰すまでが安全域。
+     OBAN の PAN（frame.par）は既定 0.6 として出す。 */
+  const kMax=0.15+0.7*Math.max.apply(null,sp.map(x=>x.depth));
+  const ar=G.B.w/G.B.h, half=(G.pad-1)/2, den=Math.max(0.001,0.6*kMax);
+  const okX=(ar*half/den), okY=(half/den);
+  el.innerHTML='<b style="color:var(--rouge)">'+sp.length+' レイヤー</b>: '
+    +sp.map(x=>{const q=layerPk(pg,x);
+      return x.label+'<span style="opacity:.55">('+x.depth.toFixed(2)+')</span>'
+        +(q.n>1?'<b style="color:var(--ice)">▷'+q.n+'/'+q.step+'打</b>':'');}).join(' → ')
+    +(spC.length!==sp.length?'　<span style="opacity:.6">（COMPOSER へは文字も焼くので '+spC.length+' 枚）</span>':'')
+    +'<br>PNG '+G.w+'×'+G.h+'（枠 '+G.fw+'×'+G.fh+' ＋のりしろ '+Math.round((G.pad-1)*100)+'%）'
+    +'　のりしろが保つ振り幅 ≒ <b>横±'+okX.toFixed(2)+' / 縦±'+okY.toFixed(2)+'</b>'
+    +'<span style="opacity:.6">（OBAN の PAN 0.60 のとき。これを超えると手前の層に欠けが出る）</span>'
+    +'<br>奥行きは ◆Items の <b>奥 / 中間 / 手前</b> で決まります。'
+    +'<span style="opacity:.6">寄り（T.U.）では層は分かれません＝奥行きが出るのは<b>振り</b>です。</span>';
+}
+$('#lk-pad').addEventListener('input',ev=>{
+  BOOK.link.pad=parseInt(ev.target.value)/100;
+  $('#lk-pad-v').textContent=Math.round(BOOK.link.pad*100)+'%';
+  save();updateLayerNote();});
+$('#lk-lay-oban').addEventListener('click',()=>sendPanelLayers('oban'));
+$('#lk-lay-comp').addEventListener('click',()=>sendPanelLayers('comp'));
 $('#lk-to-comp').addEventListener('click',()=>sendPageTo('comp'));
 $('#lk-to-oban').addEventListener('click',()=>sendPageTo('oban'));
 function setLinkWH(w,h){
@@ -3133,6 +3596,7 @@ function fitLinkToPanel(){
   setLinkWH(b.w*s,b.h*s);
 }
 function updateLinkNote(){
+  updateLayerNote();
   const b=linkBox(), w=BOOK.link.w, h=BOOK.link.h;
   const s=Math.min(w/b.w,h/b.h);
   const use=Math.round((b.w*s*b.h*s)/(w*h)*100);
@@ -3234,12 +3698,17 @@ const HELP_GROUPS=[
     ['色の選び方','<b>何も選んでいないとき</b>の下の色チップ＝「次に置くものの色」。素材を選んでいるとその素材の色'],
     ['フチ','文字・ペンの両方に付けられる（白フチ＝絵の上でも読める／黒フチ＝白い線の縁取り）'],
     ['重なり','この3つは<b>いつも一番上</b>。トーン・集中線・流線は<b>乗算</b>なので、下の線画を塗り潰さない'],
+    ['奥行き','◆Items の行の <b>前 / 中 / 奥</b>（クリックで送り）と ◆Item の <b>奥 / 中間 / 手前</b>。'
+      +'<b>紙の見た目は変わりません</b>——OBAN / COMPOSER へ<b>レイヤーで送るときの前後</b>だけを決めるタグ'],
   ]],
   ['コマを割る（DIV）',[
     ['ドラッグ','線を引いた位置で分割。コマ間隔は線の向きで 左右／上下 が自動で選ばれる'],
     ['用紙の外から','クリスタの定規と同じ。<b>上下の外から引くと横線・左右の外から引くと縦線</b>になり、向きボタンも自動で切替わる。<b>斜のあいだは切り替わらない</b>（斜のまま引ける）'],
     ['Shift','斜めのとき15°ずつスナップ'],
     ['コマ選択中','そのコマだけを分割。未選択なら線が横切る全コマ'],
+    ['番号の打ち替え','◆Items の見出し「<b>コマ N</b>」を <b>Wクリック / Wタップ</b>（◆Panel の <b>№ 番号</b> でも同じ）。'
+      +'既定は読み順の自動並べ替えだが、変則コマで流れが違うときは手で決める。'
+      +'手で決めたページは「<b>手動</b>」と出て、以後は分割・結合・綴じ方向を変えても番号が動かない（⟲で自動に戻せる）'],
   ]],
   ['コマ線をあとから直す（EDIT / 線）',[
     ['■ 中央','分割線を平行移動。両側のコマが同時に追従する'],
@@ -3287,7 +3756,20 @@ const HELP_GROUPS=[
     ['▶ ANIMATOR REF','選択コマを送る。ANIMATOR側は <b>REF ▸ ＋FROM SAVED</b>。1コマなので全ティックで出しっぱなしになる'],
     ['◀ ANIMATOR 取込','送った位置にピタリ戻る。複数コマなら <b>コマ送り</b> が出る'],
     ['—','以後 ANIMATOR で保存するたび自動で差し替わる（LIVE）'],
-    ['▶ COMPOSER / OBAN','ページを送って向こうで開く'],
+    ['▶ COMPOSER / OBAN','ページを送って向こうで開く（1枚に焼いた絵）'],
+    ['▶▶ ○○ レイヤー','<b>選択コマを層のまま送る</b>（地 / 奥 / 中間 / 手前 / 枠の上）。'
+      +'OBAN では <b>1コマ＝1フレーム＋子パネル</b> になり、層ごとに動く＝<b>コマ内パララックス</b>。'
+      +'層の前後は ◆Items の <b>奥 / 中間 / 手前</b> で決める'],
+    ['のりしろ','コマ枠より外まで送る倍率（既定115%）。フレームがマスクなので、動かすとここが出てくる＝欠けない。'
+      +'保つ振り幅は ◆Link の下見に数字で出る'],
+    ['—','奥行きが出るのは<b>振り（PAN）</b>です。<b>寄り（T.U.）では層は分かれません</b>（OBANの仕様）'],
+    ['ぱかぱか','集中線・流線の ◆Item で ON。<b>紙はいつも1枚目</b>のまま、レイヤー送りしたときだけ'
+      +'<b>n種 × 何コマ打ち</b>の連番になる（24fps）。<b>▷ 見る</b> でその場で確認'],
+    ['ブレ方','<b>ブレだけ</b>＝骨格はそのままで線が震える（ぱかぱからしいのはこちら）／'
+      +'<b>全とっかえ</b>＝SEEDごと変えて毎コマ別の絵'],
+    ['▶ 描き足し','パララックスで動かすと足りなくなる<b>コマ枠の外</b>を描くための往復。'
+      +'のりしろ付きで ANIMATOR へ送り（桃の実線＝コマ枠／水色の破線＝のりしろの端）、'
+      +'<b>◀ ANIMATOR 取込</b> で選んでおいた層に戻る'],
   ]],
   ['表示・その他',[
     ['S','選択コマ以外を青くする ON/OFF'],

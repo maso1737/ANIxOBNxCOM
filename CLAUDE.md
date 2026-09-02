@@ -32,7 +32,15 @@
 - `SPEC_07_ANIMATOR_OBAN_BRIDGE.md` — animator⇄OBAN 連番往復ブリッジ仕様
 - `SPEC_09_MANGA_PLATE.md` — MANGA PLATE 仕様。**v1=パラメトリック素材（P0〜P4実装済）／§v2=ページ・コマ割りツール（2026-08-13 実装済）**。
   v2の要点: コマ＝多角形＋半平面クリップ分割（間隔は線の向きで lr/tb を補間）・`panelId` の有無だけで「コマ内マスク／枠の上」が決まる・
-  **連携は `tdr_exchange`＋`tdr_live` に相乗りするだけで animator/composer/oban の改修ゼロ**・保存はIndexedDB（dataURLのため）
+  **連携は `tdr_exchange`＋`tdr_live` に相乗りするだけで animator/composer/oban の改修ゼロ**・保存はIndexedDB（dataURLのため）／
+  **§v2-12（2026-09-02）= コマ番号の打ち替え**（◆Items の「コマ N」を Wクリック/Wタップ・`pg.manualOrder` を立てたページは `sortPanels()` が触らない。
+  `onDoubleActivate` は**キー付き**になった＝1タップ目でリストを描き直しても2回目を拾える）／
+  **§v2-13（同日）= レイヤー送り・奥行き・ぱかぱか・描き足し**。
+  `it.z`(bg/mid/fg)＝**転送用のタグで紙の見た目は変えない**／`▶▶ OBAN レイヤー`＝選択コマを 地/奥/中間/手前/枠の上 に分けて
+  **1レイヤー=1レコード＋束ねる manifest**（`plate.layers[]`）で送り、OBAN は **フレーム＋子パネル**にする（`childRect` の depth 差＝コマ内パララックス）。
+  **奥行きが出るのは PAN だけで T.U. では出ない**（実測表は SPEC）／のりしろ `BOOK.link.pad` がフレームのマスクからはみ出す分＝欠け防止／
+  `it.pk` の**ぱかぱか**は `cells` を n枚・`duration=step` にするだけで **OBAN 側の改修ゼロ**（`apIngest` が展開して2コマ打ちになる）。
+  **紙の書き出しは常に `gPkFrame=0`＝従来と1pxも変わらない**／描き足しは**別アプリを作らず** ANIMATOR 往復にのりしろと枠ガイドを足した
 - `SPEC_10_ECONTE.md` — プリプロツール仕様（cuts[]単一データ・BOARD/SHEET/TIMELINE設計。P0+P1実装済み、P2=animator連携/カラースクリプト）
 - `SPEC_13_ECONTE_V2.md` — ECONTE V2「STUDIO」仕様（1画面統合・BOARD強化・**大判カメラ枠列＋可変ベイク**・MP4書き出し・カラースクリプト・iPad操作。**V2-A〜D3・E1・E2(a〜d) 実装済み（2026-08-09）／E3 フォトバッシュも 2026-08-19 に片付いた——ただし §9c の `cut.layers[]` ではなく SPEC_15 P2「浮いた選択」で**）。※§5は2026-07に差し替え済み（旧「のりしろ1.2x固定＋カメラプリセット」は廃止）。**画面の役割（STUDIO=プレビュー+コラージュ／EDIT=単票+カラースクリプト一覧）は §9 で確定済み。着手前に §9 を読む**
 - `SPEC_15_ECONTE_V3.md` — **ECONTE V3「ペイントの一本化」。P1＋P3-1（2026-08-18）／P3-2〜P3-4 は SPEC_16 §5-B ／P2 フォトバッシュ（2026-08-19）＝すべて実装済み・残タスクなし**。

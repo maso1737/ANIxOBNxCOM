@@ -1910,10 +1910,13 @@ async function openApList(){
 }
 function apCandidates(){
   const by={};
-  (gApExList||[]).forEach(r=>{if(r&&r.projectId&&Array.isArray(r.cells)&&r.cells.length)by[r.projectId]=r;});
+  /* MANGA PLATE のレイヤー実体（plateLayerOf 付き）は一覧に出さない。
+     選ぶのは束ねている親（manifest）1つだけ＝押すとレイヤーごと入る */
+  const ok=r=>r&&r.projectId&&Array.isArray(r.cells)&&r.cells.length&&!r.plateLayerOf;
+  (gApExList||[]).forEach(r=>{if(ok(r))by[r.projectId]=r;});
   Object.keys(gApSeen).forEach(id=>{
     const r=gApSeen[id];
-    if(!r||!Array.isArray(r.cells)||!r.cells.length)return;
+    if(!ok(r))return;
     if(!by[id]||String(r.exportedAt||'')>=String(by[id].exportedAt||''))by[id]=r;   // 新しい方を採用
   });
   return Object.values(by).sort((a,b)=>String(b.exportedAt||'').localeCompare(String(a.exportedAt||'')));
@@ -1948,15 +1951,50 @@ function nearBW(c){
 }
 /* 1ページ＝1フレームに包む。絵を子パネル・読み文字をフレーム子テキストにすると、
    カメラを振っても **吹き出しが絵からズレない**（ルート置きだと視差係数が違って離れていく） */
-function plateWrap(p,rec){
-  const W=rec.plate.w||rec.width||1, H=rec.plate.h||rec.height||1, ar=p.ar||(W/H);
+/* SPEC_09 §v2-13: MANGA PLATE が「レイヤーのまま」送ってきたとき（plate.layers[]）。
+ * 平ら1枚の代わりに、レイヤーごとの記録（別 projectId）を1本ずつ取り込んで
+ * **フレームの子パネル**として並べる。子の depth 差がそのまま childRect() の
+ * フレーム内パララックスになる＝コマの中で奥行きが出る。
+ * 子の h は childH（＝MANGA PLATE 側の「のりしろ」倍率）。フレームがマスクなので、
+ * はみ出したぶんは動かしたときに出てくる＝欠けない。 */
+async function plateLayers(f,rec){
+  const list=rec.plate.layers||[];
+  const childH=(rec.plate.frame&&rec.plate.frame.childH)||1;
+  let n=0;
+  for(const ly of list){
+    if(!ly||!ly.projectId)continue;
+    let lrec=gApSeen[ly.projectId]||null;
+    if(!lrec){try{lrec=await exGet(ly.projectId);}catch(e){}}
+    if(!lrec||!apIngest(lrec))continue;
+    const ap=AP[ly.projectId];
+    PROJECT.panels.push({id:pid++,name:String(ly.name||('L'+n)).slice(0,16),
+      x:0,y:0,h:childH,depth:clamp(ly.depth??0.5,0,1),ord:(ly.ord??n),
+      ar:(ap.w&&ap.h)?(ap.w/ap.h):(f.ar||1.777),parent:f.id,
+      seq:{src:'ap',apId:ly.projectId,n:ap.frameRefs.length||1,fps:lrec.fps||24,
+           mode:'loop',trigger:'always',apName:ap.name,apAt:ap.at}});
+    n++;
+  }
+  return n;
+}
+async function plateWrap(p,rec){
+  const W=rec.plate.w||rec.width||1, H=rec.plate.h||rec.height||1;
+  const fr=rec.plate.frame||null;
+  const ar=(fr&&fr.ar)||p.ar||(W/H);
   const maxOrd=rootItems().reduce((m,o)=>Math.max(m,o.ord??0),-1);
   const f={id:'f'+(pid++),name:String(p.name).replace(/^AP:/,'').slice(0,16),
     x:p.x,y:p.y,h:p.h,depth:p.depth??0.5,ord:maxOrd+1,ar:ar,
     quad:[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}],par:0.6,
-    fx:{in:'none',drift:'none',amt:0.12,kf:null},wipe:null,line:{on:false,w:10}};
+    fx:{in:'none',drift:'none',amt:0.12,kf:null},wipe:null,
+    line:(fr&&fr.line)?{on:!!fr.line.on,w:Math.max(1,fr.line.w||10)}:{on:false,w:10}};
   PROJECT.frames.push(f);
-  p.parent=f.id;p.x=0;p.y=0;p.h=1;p.ord=0;                     // 絵はフレームいっぱい
+  let nLay=0;
+  if(Array.isArray(rec.plate.layers)&&rec.plate.layers.length){
+    PROJECT.panels=PROJECT.panels.filter(q=>q!==p);            // 平ら1枚は使わない
+    nLay=await plateLayers(f,rec);
+    if(!nLay){PROJECT.panels.push(p);p.parent=f.id;p.x=0;p.y=0;p.h=1;p.ord=0;}  // 1枚も拾えなければ従来通り
+  }else{
+    p.parent=f.id;p.x=0;p.y=0;p.h=1;p.ord=0;                   // 絵はフレームいっぱい
+  }
   let n=0;
   (rec.plate.texts||[]).forEach(t=>{
     if(!t||!String(t.str||'').trim())return;
@@ -1973,19 +2011,24 @@ function plateWrap(p,rec){
       srcId:t.id||null,srcProj:rec.projectId||null});
     n++;
   });
-  return n;
+  return {frame:f,texts:n,layers:nLay};
 }
-function addApPanel(rec){
+async function addApPanel(rec){
   if(!apIngest(rec)){toast('プロジェクトを読み込めませんでした');return;}
   const apId=rec.projectId,ap=AP[apId];
   pushPanel('AP:'+ap.name,{src:'ap',apId,n:ap.frameRefs.length||1,fps:rec.fps||24,mode:'loop',trigger:'always',apName:ap.name,apAt:ap.at});
   const p=PROJECT.panels[PROJECT.panels.length-1];
   if(ap.w&&ap.h)p.ar=ap.w/ap.h;
-  const nt=(rec.plate&&Array.isArray(rec.plate.texts)&&rec.plate.texts.length)?plateWrap(p,rec):0;
-  sel=nt?frameById(p.parent):p;qeOpen=true;renderChip();commit();
+  const isPlate=!!(rec.plate&&((Array.isArray(rec.plate.texts)&&rec.plate.texts.length)
+                             ||(Array.isArray(rec.plate.layers)&&rec.plate.layers.length)));
+  const R=isPlate?await plateWrap(p,rec):null;
+  sel=R?R.frame:p;qeOpen=true;renderChip();commit();
   $('#drop').classList.add('hide');
   toggleApModal(false);
-  toast(nt?('MANGA PLATE を追加 — 読み文字 '+nt+'個をフレームに入れました（Tで再編集）')
+  const bits=[];
+  if(R&&R.layers)bits.push('レイヤー '+R.layers+'枚（コマ内パララックス）');
+  if(R&&R.texts)bits.push('読み文字 '+R.texts+'個（Tで再編集）');
+  toast(bits.length?('MANGA PLATE を追加 — '+bits.join(' ／ '))
     :('AP:'+ap.name+' を追加 — '+p.seq.n+'f / '+p.seq.fps+'fps loop（ANIMATOR保存で自動更新）'));
 }
 $('#b-ap').addEventListener('click',()=>toggleApModal());
