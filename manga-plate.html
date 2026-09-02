@@ -414,6 +414,8 @@ select{width:100%}
       <div class="tr"><span class="lb">レイヤー送り<br><span style="opacity:.6">選択コマのみ</span></span>
         <span class="lb">のりしろ</span>
         <input type="range" id="lk-pad" min="100" max="180" step="5"><span class="vv" id="lk-pad-v">115%</span></div>
+      <div class="tr"><span class="lb">ぱかぱか層<br><span style="opacity:.6">の解像度</span></span>
+        <input type="range" id="lk-pkres" min="40" max="100" step="5"><span class="vv" id="lk-pkres-v">70%</span></div>
       <div class="btnrow">
         <button class="btn rouge" id="lk-lay-comp" title="選択コマを 奥/中間/手前 に分けたまま COMPOSER へ（1レイヤー=1トラック）">▶▶ COMPOSER レイヤー</button>
         <button class="btn rouge" id="lk-lay-oban" title="選択コマを 奥/中間/手前 に分けたまま OBAN へ（1コマ=1フレーム＋子パネル＝コマ内パララックス）">▶▶ OBAN レイヤー</button>
@@ -556,7 +558,7 @@ function newPage(name){
 function newBook(){
   return {version:2,title:'name-01',paper:'B4_600',bg:'#FFFFFF',
     gut:{lr:60,tb:180},lw:18,bindRight:true,
-    link:{w:1920,h:1080,pad:1.15},     // ANIMATOR側の作業解像度／pad=レイヤー送りののりしろ
+    link:{w:1920,h:1080,pad:1.15,pkRes:0.7},   // ANIMATOR側の作業解像度／pad=のりしろ／pkRes=ぱかぱか層だけ落とす倍率
     links:{},                          // projectId → {pageId,panelId,box}
     pages:[newPage()]};
 }
@@ -572,6 +574,7 @@ function migrate(b){
   if(b.bindRight===undefined)b.bindRight=true;
   b.link=Object.assign({},d.link,b.link||{});
   if(!(b.link.pad>=1))b.link.pad=d.link.pad;   // S2: のりしろ（レイヤー送りでコマ枠より外まで送る倍率）
+  if(!(b.link.pkRes>0))b.link.pkRes=d.link.pkRes;   // S3b: ぱかぱか層だけ画素を落とす（重さ対策）
   if(!b.links||typeof b.links!=='object')b.links={};
   if(!Array.isArray(b.pages)||!b.pages.length)b.pages=[newPage()];
   b.pages.forEach(pg=>{
@@ -2164,6 +2167,7 @@ function syncUI(){
   $('#bind-r').classList.toggle('on',BOOK.bindRight);
   $('#lk-w').value=BOOK.link.w;$('#lk-h').value=BOOK.link.h;
   $('#lk-pad').value=Math.round(BOOK.link.pad*100);$('#lk-pad-v').textContent=Math.round(BOOK.link.pad*100)+'%';
+  $('#lk-pkres').value=Math.round(BOOK.link.pkRes*100);$('#lk-pkres-v').textContent=Math.round(BOOK.link.pkRes*100)+'%';
   $('#t-shade').classList.toggle('on',showShade);
   $('#t-guide').classList.toggle('on',showGuide);
 }
@@ -3467,14 +3471,24 @@ function layerPk(pg,sp){
   }
   return {n:n,step:n>1?step:1};
 }
+/* ぱかぱか層だけ画素を落とす倍率（S3b）。密な流線は1枚2.5MBあり、n枚ぶん丸ごと効いてくる。
+   **送る箱の大きさ（width/height）は full のまま**にして、中の PNG だけ小さくする＝
+   OBAN も COMPOSER も宣言された寸法へ引き伸ばして描くので、**位置も倍率もずれない**。
+   （OBAN の cx は補間あり＝なめらか／COMPOSER は imageSmoothingEnabled=false ＝ニアレストなので
+     線がジャギる。詰めに使うなら 100% に戻すこと——下見ノートにも出している） */
+function layerPixels(G,pk){
+  const r=(pk&&pk.n>1)?clamp(BOOK.link.pkRes||1,0.2,1):1;
+  return {w:Math.max(16,Math.round(G.w*r)), h:Math.max(16,Math.round(G.h*r)), r:r};
+}
 /* 1レイヤーぶんの画像。ぱかぱかが居れば n 枚を duration=step で並べる
    ＝ OBAN 側は apIngest() が duration ぶん展開するので 24fps の「step コマ打ち」になる */
 function layerCells(sp,G,exText,pk){
   pk=pk||{n:1,step:1};
+  const px=layerPixels(G,pk);
   const cells=[], keep=gPkFrame;
   for(let f=0;f<pk.n;f++){
     gPkFrame=f;
-    const L=linkCanvas(G.w,G.h,{box:G.P,transparent:true,noBorder:true,
+    const L=linkCanvas(px.w,px.h,{box:G.P,transparent:true,noBorder:true,
       clipPad:G.pad,exText:exText,only:sp.only,paperOnly:sp.paper?curPanelForPaper:null});
     cells.push({id:'c'+(f+1),kind:'draw',duration:pk.step,image:L.canvas.toDataURL('image/png')});
   }
@@ -3543,7 +3557,8 @@ async function sendPanelLayers(target){
   const tot=built.reduce((a,b)=>a+b.cells.reduce((x,c)=>x+c.image.length,0),0);
   modalAlert('OBAN へ「レイヤーのまま」送りました。\n\n'
     +built.map((b,i)=>'  '+(i+1)+'. '+b.sp.label+'（DEPTH '+b.sp.depth.toFixed(2)+'）'
-        +(b.pk.n>1?('  ぱかぱか '+b.pk.n+'種 / '+b.pk.step+'コマ打ち'):'')
+        +(b.pk.n>1?('  ぱかぱか '+b.pk.n+'種 / '+b.pk.step+'コマ打ち'
+            +(BOOK.link.pkRes<1?(' / 画素 '+Math.round(BOOK.link.pkRes*100)+'%'):'')):'')
         +'  '+MB(b.cells.reduce((x,c)=>x+c.image.length,0))).join('\n')
     +'\n  ── 合計 '+MB(tot)+(tot>40*1024*1024?'（重いです。解像度かぱかぱかの種類を減らすと軽くなります）':'')
     +'\n\nOBAN 側の  ＋ FROM ANIMATOR  で「'+nm+'」を選ぶと、\n'
@@ -3557,7 +3572,10 @@ function updateLayerNote(){
   const el=$('#lk-lay-note');if(!el)return;
   const pg=curPage(), k=selPanel, on=!!k;
   ['#lk-lay-comp','#lk-lay-oban','#lk-fill'].forEach(sel=>{const b=$(sel);if(b)b.disabled=!on;});
-  if(!on){el.innerHTML='コマを選ぶとレイヤー構成が出ます（レイヤー送りは<b>1コマ単位</b>）。';return;}
+  const pkr=$('#lk-pkres');
+  if(!on){
+    if(pkr)pkr.disabled=true;
+    el.innerHTML='コマを選ぶとレイヤー構成が出ます（レイヤー送りは<b>1コマ単位</b>）。';return;}
   const G=layerGeom(k);
   const sp=panelLayerSpecs(pg,k,G,{skipText:true});          // OBAN基準（文字は焼かない）
   const spC=panelLayerSpecs(pg,k,G,{skipText:false});        // COMPOSER基準（文字も焼く）
@@ -3567,20 +3585,39 @@ function updateLayerNote(){
   const kMax=0.15+0.7*Math.max.apply(null,sp.map(x=>x.depth));
   const ar=G.B.w/G.B.h, half=(G.pad-1)/2, den=Math.max(0.001,0.6*kMax);
   const okX=(ar*half/den), okY=(half/den);
+  let nPk=0;
   el.innerHTML='<b style="color:var(--rouge)">'+sp.length+' レイヤー</b>: '
-    +sp.map(x=>{const q=layerPk(pg,x);
+    +sp.map(x=>{const q=layerPk(pg,x);if(q.n>1)nPk++;
+      const px=layerPixels(G,q);
       return x.label+'<span style="opacity:.55">('+x.depth.toFixed(2)+')</span>'
-        +(q.n>1?'<b style="color:var(--ice)">▷'+q.n+'/'+q.step+'打</b>':'');}).join(' → ')
+        +(q.n>1?'<b style="color:var(--ice)">▷'+q.n+'/'+q.step+'打'
+            +(px.r<1?('·'+Math.round(px.r*100)+'%'):'')+'</b>':'');}).join(' → ')
     +(spC.length!==sp.length?'　<span style="opacity:.6">（COMPOSER へは文字も焼くので '+spC.length+' 枚）</span>':'')
     +'<br>PNG '+G.w+'×'+G.h+'（枠 '+G.fw+'×'+G.fh+' ＋のりしろ '+Math.round((G.pad-1)*100)+'%）'
     +'　のりしろが保つ振り幅 ≒ <b>横±'+okX.toFixed(2)+' / 縦±'+okY.toFixed(2)+'</b>'
     +'<span style="opacity:.6">（OBAN の PAN 0.60 のとき。これを超えると手前の層に欠けが出る）</span>'
+    +(nPk&&BOOK.link.pkRes<1
+      ?('<br><span style="color:var(--ice)">ぱかぱか層だけ '+layerPixels(G,{n:2}).w+'×'+layerPixels(G,{n:2}).h
+        +'（1辺 '+Math.round(BOOK.link.pkRes*100)+'% ＝ 画素数 約'
+        +Math.round(BOOK.link.pkRes*BOOK.link.pkRes*100)+'%。'
+        +'線画のPNGは画素数どおりには縮まないので、データは実測で 1辺70%→6割ほど）。</span>'
+        +'<span style="opacity:.6">向こうで元の寸法へ引き伸ばすので位置はずれません。'
+        +'OBAN はなめらかに拡大／COMPOSER はニアレストなので線がジャギります（詰めに使うなら 100% に）。</span>')
+      :'')
+    +(nPk?'':'<br><span style="opacity:.6">このコマに<b>ぱかぱか</b>の層はありません'
+        +'（集中線・流線の ◆Item で ON にすると連番になります）。</span>')
     +'<br>奥行きは ◆Items の <b>奥 / 中間 / 手前</b> で決まります。'
-    +'<span style="opacity:.6">寄り（T.U.）では層は分かれません＝奥行きが出るのは<b>振り</b>です。</span>';
+    +'<span style="opacity:.6">寄り（T.U.）でも層が分かれます（OBAN のフレーム <b>Z</b>。'
+    +'レイヤーで送ったフレームは 1.00 で届く・0 にすると従来どおり一緒に拡大）。</span>';
+  if(pkr)pkr.disabled=!nPk;
 }
 $('#lk-pad').addEventListener('input',ev=>{
   BOOK.link.pad=parseInt(ev.target.value)/100;
   $('#lk-pad-v').textContent=Math.round(BOOK.link.pad*100)+'%';
+  save();updateLayerNote();});
+$('#lk-pkres').addEventListener('input',ev=>{
+  BOOK.link.pkRes=parseInt(ev.target.value)/100;
+  $('#lk-pkres-v').textContent=Math.round(BOOK.link.pkRes*100)+'%';
   save();updateLayerNote();});
 $('#lk-lay-oban').addEventListener('click',()=>sendPanelLayers('oban'));
 $('#lk-lay-comp').addEventListener('click',()=>sendPanelLayers('comp'));
@@ -3762,11 +3799,16 @@ const HELP_GROUPS=[
       +'層の前後は ◆Items の <b>奥 / 中間 / 手前</b> で決める'],
     ['のりしろ','コマ枠より外まで送る倍率（既定115%）。フレームがマスクなので、動かすとここが出てくる＝欠けない。'
       +'保つ振り幅は ◆Link の下見に数字で出る'],
-    ['—','奥行きが出るのは<b>振り（PAN）</b>です。<b>寄り（T.U.）では層は分かれません</b>（OBANの仕様）'],
+    ['—','振り（PAN）は OBAN のフレーム <b>PAR</b>、寄り（T.U.）は <b>Z</b> で効き幅を変えられます。'
+      +'レイヤーで送ったフレームは <b>Z=1.00</b> で届きます（0 にすると層が一緒に拡大＝従来どおり）。'
+      +'Z は<b>一番奥を基準に手前ほど大きく迫る</b>ので、寄っても欠けは増えません'],
     ['ぱかぱか','集中線・流線の ◆Item で ON。<b>紙はいつも1枚目</b>のまま、レイヤー送りしたときだけ'
       +'<b>n種 × 何コマ打ち</b>の連番になる（24fps）。<b>▷ 見る</b> でその場で確認'],
     ['ブレ方','<b>ブレだけ</b>＝骨格はそのままで線が震える（ぱかぱからしいのはこちら）／'
       +'<b>全とっかえ</b>＝SEEDごと変えて毎コマ別の絵'],
+    ['ぱかぱか層の解像度','ぱかぱかは同じ絵を n 枚送るので重くなります。<b>その層だけ</b>画素を落とせます'
+      +'（既定70%＝データ約6割）。向こうで元の寸法へ引き伸ばすので<b>位置も倍率もずれません</b>。'
+      +'OBAN はなめらかに拡大しますが、<b>COMPOSER はニアレストなので線がジャギります</b>——詰めに使うなら 100% に'],
     ['▶ 描き足し','パララックスで動かすと足りなくなる<b>コマ枠の外</b>を描くための往復。'
       +'のりしろ付きで ANIMATOR へ送り（桃の実線＝コマ枠／水色の破線＝のりしろの端）、'
       +'<b>◀ ANIMATOR 取込</b> で選んでおいた層に戻る'],

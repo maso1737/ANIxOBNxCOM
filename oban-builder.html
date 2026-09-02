@@ -1514,6 +1514,7 @@ function migrate(p){
     if(f.ord===undefined)f.ord=i;
     if(!f.quad)f.quad=[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}];
     if(f.par===undefined)f.par=0.6;
+    if(f.zpar===undefined)f.zpar=0;   // §v2-14: 既存フレームは 0＝寄りの奥行き無し（従来の見た目を保つ）
     if(!f.fx)f.fx={in:'none',drift:'none',amt:0.12,kf:null};   // V2-C: IN演出/ドリフト
     if(f.wipe===undefined)f.wipe=null;                          // V2-C: カバーワイプ
     if(!f.line)f.line={on:false,w:10};                          // SPEC_09 P4: コマ枠線（quad準拠・ONで書き出し対象）
@@ -1984,6 +1985,9 @@ async function plateWrap(p,rec){
   const f={id:'f'+(pid++),name:String(p.name).replace(/^AP:/,'').slice(0,16),
     x:p.x,y:p.y,h:p.h,depth:p.depth??0.5,ord:maxOrd+1,ar:ar,
     quad:[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}],par:0.6,
+    /* レイヤーで届いたときだけ「寄りの奥行き」を最初から入れておく。
+       MANGA PLATE の層は 地=DEPTH 0 が必ず居るので、基準（縮まない面）がそろっている */
+    zpar:(Array.isArray(rec.plate.layers)&&rec.plate.layers.length)?1:0,
     fx:{in:'none',drift:'none',amt:0.12,kf:null},wipe:null,
     line:(fr&&fr.line)?{on:!!fr.line.on,w:Math.max(1,fr.line.w||10)}:{on:false,w:10}};
   PROJECT.frames.push(f);
@@ -2094,11 +2098,25 @@ function grid(cam){
   cx.restore();
 }
 /* ---------- V2-B: フレーム内の子パネル矩形（内部パララックス） ---------- */
+/* SPEC_09 §v2-14: フレーム内の「寄り」のマルチプレーン（f.zpar＝Z）。
+ * ルートの planeZoom は eff=0.5 を基準にするが、**フレームの中では奥（DEPTH 0）を基準**にする。
+ *   cz = spread ^ (2 * depth * zpar)      spread = 1 + max(0, z-1)*DEPTH_SPREAD
+ * ・z<=1 では spread=1 ＝ cz=1 ＝ **PLACE と完全に一致**（従来と1pxも変わらない）
+ * ・zpar=0（＝既存プロジェクトと手置きフレームの既定）でも cz=1 ＝ 従来どおり
+ * ・0.5基準にすると奥の層が縮んでフレームのマスクから欠けるので、**奥は縮めない**。
+ *   cz>=1 なので「のりしろ」の余裕は寄るほど増える＝寄りで欠けが出ることはない */
+function childZoom(c,f,cam){
+  const zp=f.zpar??0;
+  if(!zp||cam.z<=1)return 1;
+  const s=1+Math.max(0,cam.z-1)*DEPTH_SPREAD;
+  return s===1?1:Math.pow(s,2*(c.depth??0.5)*zp);
+}
 function childRect(c,f,R,cam){
   const lx=(cam.x-f.x)*(f.par??0.6), ly=(cam.y-f.y)*(f.par??0.6);   // ローカルカメラ
   const k=lerp(0.15,0.85,(c.depth??0.5));   // DEPTH統一(depthV2): 大=手前=よく動く。旧1-depthはmigrateで値反転済み
-  const th=c.h*R.h, tw=th*(c.ar||1.414);
-  return{x:R.x+R.w/2+(c.x-lx*k)*R.h-tw/2, y:R.y+R.h/2+(c.y-ly*k)*R.h-th/2, w:tw, h:th};
+  const cz=childZoom(c,f,cam);              // 寄りのマルチプレーン（位置も同じ倍率で開く＝面ごと拡大）
+  const th=c.h*R.h*cz, tw=th*(c.ar||1.414);
+  return{x:R.x+R.w/2+(c.x-lx*k)*R.h*cz-tw/2, y:R.y+R.h/2+(c.y-ly*k)*R.h*cz-th/2, w:tw, h:th};
 }
 function quadPath(f,R){
   cx.beginPath();
@@ -2914,6 +2932,9 @@ function renderChip(){
         'コマの形（四隅）をドラッグで変える');
       s+=qdRow('PAR',qdMr('par',o.par??0.6)+qdNum('par','',(o.par??0.6).toFixed(2),''),
         '窓の中の絵がカメラに合わせてずれる量（＝コマの中の視差）。0でぴたり固定');
+      s+=qdRow('Z',qdMr('zpar',o.zpar??0)+qdNum('zpar','',(o.zpar??0).toFixed(2),''),
+        '寄った(z>1)ときに、窓の中の手前の絵ほど大きく迫る量。0で従来どおり全部いっしょに拡大。'
+        +'基準は一番奥(DEPTH 0)なので、奥が縮んで欠けることはありません');
       const fx=o.fx||(o.fx={in:'none',drift:'none',amt:0.12,kf:null});
       s+=qdSect('ENTRANCE','登場の演出');
       s+=qdRow('KF',qdKfSeg('fkf',fx.kf,'自動 #'+(frameKfIdx(o)==null?'-':pad(frameKfIdx(o)))),
@@ -3600,6 +3621,7 @@ const QD_SCR={
   h:{g:o=>o.h??1,s:(o,v)=>{o.h=+clamp(v,H_MIN,H_MAX).toFixed(3);},k:0.006,f:v=>v.toFixed(2),dock:1},
   depth:{g:o=>o.depth??0.5,s:(o,v)=>{o.depth=+clamp(v,0,1).toFixed(2);},k:0.004,f:v=>v.toFixed(2),dock:1},
   par:{g:o=>o.par??0.6,s:(o,v)=>{o.par=+clamp(v,0,1).toFixed(2);},k:0.004,f:v=>v.toFixed(2)},
+  zpar:{g:o=>o.zpar??0,s:(o,v)=>{o.zpar=+clamp(v,0,1).toFixed(2);},k:0.004,f:v=>v.toFixed(2)},
   flw:{g:o=>(o.line&&o.line.w)||10,s:(o,v)=>{if(!o.line)o.line={on:true,w:10};o.line.w=Math.round(clamp(v,2,40));},k:0.09,f:v=>String(Math.round(v))},
   famt:{g:o=>(o.fx&&o.fx.amt!=null)?o.fx.amt:0.12,s:(o,v)=>{o.fx.amt=+clamp(v,0,0.4).toFixed(2);},k:0.0016,f:v=>v.toFixed(2),wipe:1},
   fps:{g:o=>(o.seq&&o.seq.fps)||12,s:(o,v)=>{o.seq.fps=Math.round(clamp(v,4,30));},k:0.09,f:v=>String(Math.round(v))},
@@ -4026,7 +4048,7 @@ $('#b-frame').addEventListener('click',()=>{
   const maxOrd=rootItems().reduce((m,p)=>Math.max(m,p.ord??0),-1);
   const f={id:'f'+(pid++),name:'FRAME '+String(PROJECT.frames.length+1).padStart(2,'0'),
     x:+VC.x.toFixed(3),y:+VC.y.toFixed(3),h:0.8,depth:0.5,ord:maxOrd+1,ar:1.777,
-    quad:[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}],par:0.6,
+    quad:[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}],par:0.6,zpar:0,
     fx:{in:'none',drift:'none',amt:0.12,kf:null},wipe:null,line:{on:false,w:10}};
   PROJECT.frames.push(f);
   sel=f;qeOpen=true;renderChip();commit();
@@ -4893,7 +4915,7 @@ function apBakeData(){
 function viewerHTML(apBake){
   const proj=JSON.stringify({
     panels:PROJECT.panels.map(p=>({name:p.name,x:p.x,y:p.y,h:p.h,depth:p.depth??0.5,ord:p.ord??0,ar:p.ar||1.414,parent:p.parent||null,seq:p.seq||null})),
-    frames:PROJECT.frames.map(f=>({id:f.id,name:f.name,x:f.x,y:f.y,h:f.h,depth:f.depth??0.5,ord:f.ord??0,ar:f.ar||1.777,quad:f.quad,par:f.par??0.6,fx:f.fx||null,wipe:f.wipe||null,line:f.line||null})),
+    frames:PROJECT.frames.map(f=>({id:f.id,name:f.name,x:f.x,y:f.y,h:f.h,depth:f.depth??0.5,ord:f.ord??0,ar:f.ar||1.777,quad:f.quad,par:f.par??0.6,zpar:f.zpar??0,fx:f.fx||null,wipe:f.wipe||null,line:f.line||null})),
     texts:PROJECT.texts.map(t=>({type:t.type,str:t.str,x:t.x,y:t.y,size:t.size??24,col:t.col||'#fff',parent:t.parent||null,kf:t.kf??null,
                                 vert:t.vert!==false,font:t.font||null,ew:t.ew==null?1:t.ew})),   // V2-D（vert/font/ew = MANGA PLATE 連携）
     clickFx:PROJECT.clickFx||'invert',
@@ -5008,12 +5030,18 @@ function rect(o,cam,W,H){
   const th=o.h*H*zi,tw=th*(o.ar||1.414);
   return{x:W/2+(o.x-cam.x*pf)*W*zi-tw/2,y:H/2+(o.y-cam.y*pf)*H*zi-th/2,w:tw,h:th};
 }
+function childZoom(c,f,cam){   /* SPEC_09 §v2-14: ビルダーと同式（奥=DEPTH 0 が基準） */
+  const zp=f.zpar==null?0:f.zpar;
+  if(!zp||cam.z<=1)return 1;
+  const s=1+Math.max(0,cam.z-1)*DEPTH_SPREAD;
+  return s===1?1:Math.pow(s,2*(c.depth==null?0.5:c.depth)*zp);
+}
 function childRect(c,f,R,cam){
   const lx=(cam.x-f.x)*(f.par??0.6),ly=(cam.y-f.y)*(f.par??0.6);
   const k=lerp(0.15,0.85,(c.depth??0.5));   // DEPTH統一(depthV2): 大=手前
-
-  const th=c.h*R.h,tw=th*(c.ar||1.414);
-  return{x:R.x+R.w/2+(c.x-lx*k)*R.h-tw/2,y:R.y+R.h/2+(c.y-ly*k)*R.h-th/2,w:tw,h:th};
+  const cz=childZoom(c,f,cam);
+  const th=c.h*R.h*cz,tw=th*(c.ar||1.414);
+  return{x:R.x+R.w/2+(c.x-lx*k)*R.h*cz-tw/2,y:R.y+R.h/2+(c.y-ly*k)*R.h*cz-th/2,w:tw,h:th};
 }
 function visFrac(r,W,H){
   const ix=Math.max(0,Math.min(r.x+r.w,W)-Math.max(r.x,0));
