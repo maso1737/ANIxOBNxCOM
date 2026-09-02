@@ -22,7 +22,13 @@
   --tp-h:26px; /* #transport の高さ。#tl-resize の bottom 計算がこれに乗るので必ず一致させること */
 }
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{width:100%;height:100%;background:var(--black);color:var(--white);font-family:var(--mono);font-size:11px;overflow:hidden;-webkit-user-select:none;user-select:none;}
+/* SPEC_18 §5-I: `user-scalable=no` は iOS 10 以降**無視される**ので、
+   ・`touch-action:manipulation` … ブラウザの**Wタップ拡大**を切る
+     （キーのWタップのたびに画面全体がヒュッと上がって、もう一度で戻っていた真因）
+   ・`overscroll-behavior:none` … 端まで来たときのページのゴムバウンドを切る
+     （タイムラインの中身が収まっているとき、上下ドラッグでUI全体が揺れていた真因）
+   ピンチ拡大は manipulation でも許可されるので、ビューポートの操作感は変わらない */
+html,body{width:100%;height:100%;background:var(--black);color:var(--white);font-family:var(--mono);font-size:11px;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:manipulation;overscroll-behavior:none;}
 /* インスペクタはフローティング化したので右カラムは廃止。iPad Safariの下端切れ対策に dvh を併用（再生バー対策） */
 #app{position:relative;display:grid;grid-template-columns:1fr;grid-template-rows:32px 1fr var(--tl-h,200px) var(--tp-h);height:100vh;height:100dvh;width:100vw;}
 
@@ -118,6 +124,9 @@ input[type=number]{-moz-appearance:textfield;}
 .kf-btn{width:100%;background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.5);font-family:var(--mono);font-size:8px;letter-spacing:0.1em;padding:3px 6px;cursor:pointer;margin-top:3px;}
 .kf-btn:hover{border-color:var(--border-bright);color:var(--acid);}
 /* ADD KF / RESET KF ＝ INSPECTOR で一番よく押す2つ。横並び・2行ぶんの高さで少し目立たせる */
+/* SPEC_18 §5-M: INSPECTOR 最上段。上マージンは要らない（TRANSFORM の下にあった頃の名残） */
+#insp-kfbtns{margin-bottom:10px;}
+#insp-kfbtns .kf-btn-row{margin-top:0;}
 .kf-btn-row{display:flex;gap:5px;margin-top:7px;}
 .kf-btn-row .kf-btn{margin-top:0;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:34px;font-size:9px;letter-spacing:0.14em;border-color:var(--border-bright);color:rgba(255,255,255,0.72);}
 .kf-btn-row .kf-btn .kb{font-size:7px;letter-spacing:0.18em;color:rgba(255,255,255,0.3);}
@@ -144,7 +153,8 @@ input[type=number]{-moz-appearance:textfield;}
 #tl-ruler{position:relative;border-bottom:1px solid var(--border);background:var(--panel2);cursor:pointer;overflow:hidden;padding-left:164px;box-sizing:border-box;}
 #tl-ruler-canvas{display:block;width:100%;height:100%;}
 /* スクロールバーは非表示（幅を取るとストリップがルーラーより狭くなりKF/セルが左へずれるため。ホイール/タッチでスクロール可） */
-#tl-tracks{position:relative;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;}
+/* overscroll-behavior:contain ＝ 中身が収まっていても親（ページ）へスクロールを伝播させない */
+#tl-tracks{position:relative;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;overscroll-behavior:contain;}
 #tl-tracks::-webkit-scrollbar{display:none;} /* スクロールバーが幅を食うとstrip幅≠ルーラー幅で座標がずれる（SPEC_11 P0） */
 #tl-tracks::-webkit-scrollbar{display:none;}
 .tl-track{position:relative;height:var(--track-h,54px);border-bottom:1px solid rgba(255,255,255,0.16);display:flex;align-items:center;padding-left:14px;cursor:pointer;transition:background 0.1s;}
@@ -249,7 +259,10 @@ input[type=number]{-moz-appearance:textfield;}
 .tl-marker::after{content:attr(data-label);position:absolute;top:0;left:7px;font-size:7px;color:var(--acid);white-space:nowrap;letter-spacing:0.05em;line-height:11px;pointer-events:none;text-shadow:0 0 3px rgba(0,0,0,0.8);}
 .tl-marker:hover::before{background:var(--neon);box-shadow:0 0 8px rgba(255,210,122,0.8);}
 #tl-wa-band{position:absolute;top:0;bottom:0;background:rgba(255,79,168,0.07);border-left:1px solid rgba(255,79,168,0.25);border-right:1px solid rgba(255,79,168,0.25);pointer-events:none;z-index:1;display:none;}
-.tl-wa-handle{position:absolute;top:0;bottom:0;width:8px;transform:translateX(-50%);cursor:ew-resize;z-index:4;display:none;}
+/* SPEC_18 §5-J: ワークエリアの IN/OUT は**ルーラーの指1本＝伸縮より優先**（pointerdown で stopPropagation）。
+   その分だけ当たりを広く取る。見た目の3px線は ::after のまま動かさない */
+.tl-wa-handle{position:absolute;top:0;bottom:0;width:8px;transform:translateX(-50%);cursor:ew-resize;z-index:6;display:none;}
+.tl-wa-handle::before{content:'';position:absolute;top:0;bottom:0;left:-8px;right:-8px;}
 .tl-wa-handle::after{content:'';position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);width:3px;background:rgba(255,79,168,0.5);transition:background .1s;}
 .tl-wa-handle:hover::after{background:rgba(255,79,168,0.9);}
 #tl-ruler-markers{position:absolute;inset:0;pointer-events:none;z-index:6;}
@@ -424,9 +437,13 @@ input[type=number]{-moz-appearance:textfield;}
 @media (pointer:coarse){
   /* 下端のリサイズ枠：見た目の線はそのままに、掴める帯だけ太くする（発注者報告: 指で掴めない） */
   #inspector-resize,#settings-resize,#sfx-resize{height:26px;}
-  /* 上（ビューポート側）へ伸ばす。#app 直下に出したのでもうクリップされない（§5-A） */
-  #tl-resize{bottom:calc(var(--tl-h,200px) + var(--tp-h) - 4px);height:30px;}
-  #tl-resize::after{bottom:4px;}          /* 見た目の線の位置は据え置き */
+  /* 上（ビューポート側）へ伸ばす。#app 直下に出したのでもうクリップされない（§5-A）。
+     2026-08-31: 左手の指で掴むのでもうひと回り太く（30→38px・タイムライン側へも4→6px） */
+  #tl-resize{bottom:calc(var(--tl-h,200px) + var(--tp-h) - 6px);height:38px;}
+  #tl-resize::after{bottom:6px;}          /* 見た目の線の位置は据え置き */
+  /* ワークエリアの IN/OUT を指のサイズへ（見た目の3px線は変えない・§5-J） */
+  .tl-wa-handle{width:14px;}
+  .tl-wa-handle::before{left:-11px;right:-11px;}
   /* SPEC_18 §5-C: ペンが触れただけでインスペクタの見出し文字（TRANSFORM 等）が
      選択状態になる（発注者報告）。指の端末では本文のテキスト選択そのものを切る。
      打ち換え用の <input>（.numv-edit）だけは選択できる必要があるので戻す */
@@ -657,6 +674,14 @@ input[type=number]{-moz-appearance:textfield;}
     <div id="inspector-body">
     <!-- PROJECT/OUTPUT は削除。FPS/解像度はトップバーとキャンバス四隅、尺は設定パネル(⚙)、
          出力仕様は SEQ PNG ボタンのツールチップへ集約した（INSPECTORは選択トラックの編集に専念） -->
+    <!-- SPEC_18 §5-M: ADD KF / RESET KF は **INSPECTOR の一番上**。独立した .insp-section なので
+         下端のリサイズがこの真下でスナップする＝「指で小さく畳んで、右上でパッと押す」ができる -->
+    <div class="insp-section" id="insp-kfbtns">
+      <div class="kf-btn-row">
+        <button class="kf-btn big" id="btn-kf-add" title="現フレームに全プロパティのキーを追加（複数選択中は選択トラックすべて）">+ ADD KF<span class="kb">D</span></button>
+        <button class="kf-btn big warn" id="btn-kf-clear" title="選択トラックのキーを全消去（複数選択中はまとめて）。取り消しは Ctrl+Z">✕ RESET KF<span class="kb">ALT+D</span></button>
+      </div>
+    </div>
     <div class="insp-section">
       <div class="insp-h">TRANSFORM &nbsp;<span id="kf-status" style="font-size:7px;color:rgba(255,255,255,0.3)">NO KF</span></div>
       <div class="kf-row" id="parent-row" style="display:none" title="親トラック（AEのペアレント相当）。親の移動/回転/拡縮に追従。付け外しの瞬間は「現フレームの見た目が変わらない」ようKFを自動補正します（親にKFがある場合、他フレームでは見え方が変わります）。Altを押しながら選ぶと補正なし"><span class="k">PRNT</span><select id="kf-parent"></select></div>
@@ -668,11 +693,8 @@ input[type=number]{-moz-appearance:textfield;}
       <div class="kf-row" data-prop="rot" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span class="k">ROT</span><button class="num-step" data-step="rot" data-dir="-1">◀</button><div class="kf-val" id="kf-rot">0</div><button class="num-step" data-step="rot" data-dir="1">▶</button><div class="kf-dot" id="dot-rot"></div></div>
       <div class="kf-row" data-prop="s" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"><span class="k">SCL</span><button class="num-step" data-step="s" data-dir="-1">◀</button><div class="kf-val" id="kf-s">1.000</div><button class="num-step" data-step="s" data-dir="1">▶</button><div class="kf-dot" id="dot-s"></div></div>
       <div class="kf-row" data-prop="op"><span class="k">OP</span><button class="num-step" data-step="op" data-dir="-1">◀</button><div class="kf-val" id="kf-op">1.000</div><button class="num-step" data-step="op" data-dir="1">▶</button><div class="kf-dot" id="dot-op"></div></div>
-      <div class="kf-btn-row">
-        <button class="kf-btn big" id="btn-kf-add" title="現フレームに全プロパティのキーを追加（複数選択中は選択トラックすべて）">+ ADD KF<span class="kb">D</span></button>
-        <button class="kf-btn big warn" id="btn-kf-clear" title="選択トラックのキーを全消去（複数選択中はまとめて）。取り消しは Ctrl+Z">✕ RESET KF<span class="kb">ALT+D</span></button>
-      </div>
-      <!-- COPY/PASTE は Ctrl+C / Ctrl+V、EASE・HOLD はキーのWクリック送り、
+      <!-- ADD KF / RESET KF は §5-M で最上段（#insp-kfbtns）へ移した。
+           COPY/PASTE は Ctrl+C / Ctrl+V、EASE・HOLD はキーのWクリック送り、
            イーズ量はトランスポートバーの EASE スライダーへ移動したのでボタンは廃止 -->
     </div>
     <!-- SPEC_11 P7-6: INSPECTOR = トラック編集 ＋ 最下段の OUTPUT（コンポ全体設定）。SETTINGSが一杯のためこちらへ -->
@@ -1759,10 +1781,12 @@ function renderGlobalMarkers(){
     el.dataset.label=m.label?(m.n+' '+m.label):('M'+m.n); // 出した順の番号を表示（数字キーで飛べる）
     el.title=`マーカー ${m.n}（数字キー ${m.n<=9?m.n:'—'}）  コマ${m.frame+1}${m.label?' — '+m.label:''}（ダブルクリックでメモ）`;
     let dragActive=false, wasDragged=false, ctrlStart=false;
-    el.addEventListener('pointerdown',e=>{ dragActive=true; wasDragged=false; ctrlStart=e.ctrlKey||e.metaKey; try{ el.setPointerCapture(e.pointerId); }catch(_){} e.stopPropagation(); e.preventDefault(); });
+    let gmPid=null;
+    el.addEventListener('pointerdown',e=>{ dragActive=true; wasDragged=false; gmPid=e.pointerId; ctrlStart=e.ctrlKey||e.metaKey; try{ el.setPointerCapture(e.pointerId); }catch(_){} e.stopPropagation(); e.preventDefault(); });
     el.addEventListener('pointermove',e=>{
       if(!dragActive||ctrlStart) return;
-      if(!e.buttons){ dragActive=false; return; } // ペン等でpointerupを取り逃した場合の保険
+      if(gmPid!=null&&e.pointerId!==gmPid) return;                       // §6-14
+      if(e.pointerType==='mouse'&&!e.buttons){ dragActive=false; return; } // 保険はマウスだけ
       wasDragged=true;
       let f=Math.round(Math.max(0,Math.min(total-1,pxToFrame(e.clientX-$('#tl-ruler').getBoundingClientRect().left-LABEL_W,aw))));
       if(e.shiftKey) f=snapFrame(f,aw/tlSpan(),m,true);
@@ -2635,8 +2659,9 @@ let gHeldTrack=null;      // {pid, idx} いま置かれている1本目
 let gTrackMultiSel=false; // 「置いたままタップ」進行中＝並べ替えドラッグを起こさない
 // gTrackMultiSel は**次のタスクまで**残す。マーキー側の window pointerup（後から登録＝後で走る）が
 // 「動かさず離した＝クリック」と解釈して選択を1本に畳んでしまうため（gStripGesture と同じ理由）
-window.addEventListener('pointerup',e=>{ if(gHeldTrack&&gHeldTrack.pid===e.pointerId){ gHeldTrack=null; setTimeout(()=>{gTrackMultiSel=false;},0); } });
-window.addEventListener('pointercancel',e=>{ if(gHeldTrack&&gHeldTrack.pid===e.pointerId){ gHeldTrack=null; gTrackMultiSel=false; } });
+// §5-L: 「指で行を押さえたままペンでキーをタップ」＝キーの追加選択も、押さえている指を離した時点で終わる
+window.addEventListener('pointerup',e=>{ if(gHeldTrack&&gHeldTrack.pid===e.pointerId){ gHeldTrack=null; setTimeout(()=>{gTrackMultiSel=false;gKfMultiSel=false;},0); } });
+window.addEventListener('pointercancel',e=>{ if(gHeldTrack&&gHeldTrack.pid===e.pointerId){ gHeldTrack=null; gTrackMultiSel=false; gKfMultiSel=false; } });
 // SPEC_18 §5-G: キーの複数選択も同じ型（1本を置いたまま別のキーをタップ）。矩形はマウス専用にした
 let gHeldKf=null, gKfMultiSel=false;
 window.addEventListener('pointerup',e=>{ if(gHeldKf&&gHeldKf.pid===e.pointerId){ gHeldKf=null; setTimeout(()=>{gKfMultiSel=false;},0); } });
@@ -2644,9 +2669,11 @@ window.addEventListener('pointercancel',e=>{ if(gHeldKf&&gHeldKf.pid===e.pointer
 window.addEventListener('pointerdown',()=>{ gStripArmed=false; },true); // capture＝どのハンドラより先にリセット
 window.addEventListener('pointerup',()=>{ gStripArmed=false; });
 const KF_BAND_H=23; // .tl-track-strip::after のキー/マーカー帯の高さ（ここは並び替えで掴まない）
-// SPEC_18 §5-F: ストリップ上のドラッグで「個別要素に譲る」相手。
-// **指のときだけトリムハンドルを外す** ＝ トリム＝ペン専任 / トラック移動＝指専任 の住み分け
-function stripSkipSel(e){ return e.pointerType==='touch' ? '.tl-kf-d,.tl-marker' : '.tl-kf-d,.tl-marker,.tl-trim-handle'; }
+// ストリップ上のドラッグで「個別要素に譲る」相手。
+// SPEC_18 §5-K（2026-08-31 改）: **トリムは指でも掴めるように戻した。**
+// 横移動が「指1本の長押し」から「2本指ドラッグ」になって、指1本が空いたため。
+// （§5-F の「指のときトリムを外す」は撤回。引数は呼び出し側の互換のため残す）
+function stripSkipSel(_e){ return '.tl-kf-d,.tl-marker,.tl-trim-handle'; }
 // 多指タップ（2=UNDO/3=REDO/4=PLAY）の判定を打ち切る。「押しながらタップ」で複数選択したときに使う
 function killTapGesture(){ gTap.moved=true; } // gTap は下方で定義（呼ばれるのはイベント時なのでTDZに触れない）
 // SPEC_18 §5-D: 行の引き出し（⧉複製/✕削除）は同時に1つだけ。よそを触ったら閉じる
@@ -2740,7 +2767,7 @@ function buildTrackElement(idx){
         e.preventDefault();
         return;
       }
-      gHeldTrack={pid:e.pointerId,idx};
+      gHeldTrack={pid:e.pointerId,idx,t:performance.now()};
     }
     rowDownPid=e.pointerId; rowDownX=e.clientX; rowDownY=e.clientY; rowDownLabel=onLabel;
     if(onLabel&&e.shiftKey) selectTrack(idx,'range');
@@ -3108,10 +3135,13 @@ function buildTrackElement(idx){
   // トリム(tIn/tOut)も一緒に平行移動する＝レイヤーバーごと掴んで動かす（[ / ] と同じ挙動）。
   // 素のドラッグは既存のマーキー選択に譲る（#tl-tracks 側は altKey で早期return）
   if(track.type!=='camera'){
-    strip.title='Alt+ドラッグ / 指で長押し = このトラックを時間方向にずらす（絵・KF・IN/OUTトリムが一緒に動きます）\nAlt+Shift+ドラッグ = インジケータ／他トラックのIN・OUT・キーへ吸着';
+    strip.title='Alt+ドラッグ / 指2本で左右 = このトラックを時間方向にずらす（絵・KF・IN/OUTトリムが一緒に動きます）\nAlt+Shift+ドラッグ = インジケータ／他トラックのIN・OUT・キーへ吸着';
     let offDrag=false, offStartX=0, offStart=0, offStartIn=0, offStartOut=null, offMoved=false, offSnapCands=null;
-    let offHoldT=0, offHoldPid=null, offHoldX=0, offHoldY=0;
-    const OFF_HOLD_MS=350, OFF_HOLD_SLOP=10; // SPEC_18 §3: 掴みの長押しは350ms / 10pxでキャンセル
+    // SPEC_18 §5-K: 横移動は **2本指ドラッグ**（旧: 指1本の長押し350ms）。
+    // 長押しをやめたことで「指1本＝トリムを掴む」が空き、トラック端のバーが指で選べるようになる（発注者要望）。
+    // 2本指を保持する。1本目が乗った時点では何もせず、同じストリップに2本目が乗ったら掴む
+    const offPts=new Map();
+    const offAvgX=()=>{ let s=0,n=0; offPts.forEach(p=>{s+=p.x;n++;}); return n?s/n:0; };
     function beginOff(clientX,pointerId){
       selectTrack(idx); // ずらす対象が選択状態になる（別トラックを触ったら選択が移る）
       if(track.locked){ flashLive('🔒 ロック中です'); return; }
@@ -3121,34 +3151,40 @@ function buildTrackElement(idx){
       offStart=track.tOffset||0; offStartIn=track.tIn||0; offStartOut=(track.tOut==null?null:track.tOut);
       // 吸着候補を凍結。自分のKF/IN/OUTはレイヤーと一緒に動くので候補から外す（自己吸着で動かなくなる）
       offSnapCands=freezeSnapCands(gatherKfFrames(track).map(f=>f+offStart), track);
-      try{ strip.setPointerCapture(pointerId); }catch(_){}
+      // 2本指なので capture は取らない（片方の指が行の外へ出ても追えるよう window で追う）
+      if(pointerId!=null){ try{ strip.setPointerCapture(pointerId); }catch(_){} }
+      window.addEventListener('pointermove',offMove);
+      window.addEventListener('pointerup',offUp);
+      window.addEventListener('pointercancel',offUp);
     }
-    function cancelHold(){ if(offHoldT){ clearTimeout(offHoldT); offHoldT=0; } offHoldPid=null; }
+    function offUp(e){ offPts.delete(e.pointerId); if(offDrag&&offPts.size<2) finishOff(); }
     strip.addEventListener('pointerdown',e=>{
-      if(e.target.closest(stripSkipSel(e))) return; // 個別要素が優先（指のときトリムは除外＝§5-F）
-      if(e.altKey){ beginOff(e.clientX,e.pointerId); e.stopPropagation(); e.preventDefault(); return; }
-      // SPEC_18 §4-2: iPad では Alt が押せない。**指の長押し**を横移動の入口にする
+      if(e.target.closest(stripSkipSel(e))) return; // 個別要素（キー/マーカー/トリム）が優先
+      if(e.altKey){ beginOff(e.clientX,null); e.stopPropagation(); e.preventDefault(); return; }
       if(e.pointerType!=='touch') return;
       // §5-E: 別の指が他の行を押さえている＝複数選択のタップなので掴まない
       if(gHeldTrack&&gHeldTrack.idx!==idx) return;
-      cancelHold();
-      offHoldPid=e.pointerId; offHoldX=e.clientX; offHoldY=e.clientY;
-      const pid=e.pointerId, cx=e.clientX;
-      offHoldT=setTimeout(()=>{
-        offHoldT=0;
-        if(gTrackMultiSel) return;   // 押しながら別トラックをタップしていた＝横移動ではない
-        beginOff(cx,pid);
-        if(offDrag) flashLive('⇄ 横移動（そのまま左右へ）');
-      },OFF_HOLD_MS);
+      // 行の外で指を離すと pointerup を取り逃がして Map に残る＝次の1本目で誤発火する。
+      // 2本指は同時に置くものなので、古い（4秒以上前の）ものは掃除してよい（gTap と同じ型・§6-9）
+      const now=performance.now();
+      offPts.forEach((p,id)=>{ if(now-p.t>4000) offPts.delete(id); });
+      offPts.set(e.pointerId,{x:e.clientX,t:now});
+      if(offPts.size===2&&!offDrag){
+        beginOff(offAvgX(),null);
+        if(offDrag){ killTapGesture(); flashLive('⇄ 2本指で横移動'); }
+      }
     });
-    strip.addEventListener('pointermove',e=>{
-      // 長押しが決まる前に動いた＝スクロール/選択のつもりなので掴むのをやめる
-      if(offHoldT&&e.pointerId===offHoldPid&&Math.hypot(e.clientX-offHoldX,e.clientY-offHoldY)>OFF_HOLD_SLOP) cancelHold();
+    strip.addEventListener('pointerup',e=>{ if(!offDrag) offPts.delete(e.pointerId); });
+    strip.addEventListener('pointercancel',e=>{ if(!offDrag) offPts.delete(e.pointerId); });
+    function offMove(e){
+      const p=offPts.get(e.pointerId); if(p) p.x=e.clientX;
       if(!offDrag) return;
-      if(!e.buttons){ offDrag=false; if(offMoved) endOff(); return; }
+      // ペンやマウスの Alt+ドラッグは1本なので clientX、指は2本の平均で決める
+      const cx=offPts.size?offAvgX():e.clientX;
+      if(e.pointerType==='mouse'&&!e.buttons){ finishOff(); return; } // 保険はマウスだけ（§6-14）
       const rect=strip.getBoundingClientRect();
       const ppf=rect.width/tlSpan(); // SPEC_11 P7-5: ズーム中は1コマの幅が変わる
-      let d=Math.round((e.clientX-offStartX)/ppf);
+      let d=Math.round((cx-offStartX)/ppf);
       // 2026-07-26: Alt+Shift+ドラッグ＝レイヤーの頭/尻をインジケータ・他トラックのIN/OUT・キーへ吸着
       if(e.shiftKey){
         const hasTrim=offStartIn!==0||offStartOut!=null;
@@ -3171,22 +3207,23 @@ function buildTrackElement(idx){
         });
         drawCurrentFrame();
       }
-    });
+    }
     const endOff=()=>{
       recordHistory(); updateKfUI();
       const tr=(track.tIn||track.tOut!=null)?('  IN '+((track.tIn||0)+1)+' / OUT '+(track.tOut==null?'—':track.tOut)):'';
       flashLive('⇄ OFFSET '+((track.tOffset||0)>=0?'+':'')+(track.tOffset||0)+' コマ'+tr);
     };
-    const finishOff=()=>{
-      cancelHold(); if(!offDrag) return; offDrag=false;
-      // gStripGesture は**次のタスクで**戻す。このハンドラは strip 側＝window のマーキー用
-      // pointerup より先に走るので、ここで即 null にすると「動かさず離した＝クリック」と誤解され、
+    function finishOff(){
+      if(!offDrag) return; offDrag=false;
+      window.removeEventListener('pointermove',offMove);
+      window.removeEventListener('pointerup',offUp);
+      window.removeEventListener('pointercancel',offUp);
+      // gStripGesture は**次のタスクで**戻す。この後始末は window のマーキー用 pointerup より
+      // 先に走るので、ここで即 null にすると「動かさず離した＝クリック」と誤解され、
       // 横移動のたびにインジケータがその位置へ飛ぶ
       if(gStripGesture==='offset') setTimeout(()=>{ if(gStripGesture==='offset') gStripGesture=null; },0);
       if(offMoved) endOff();
-    };
-    strip.addEventListener('pointerup',finishOff);
-    strip.addEventListener('pointercancel',finishOff);
+    }
   }
 
   // SPEC_11 P3b-1: IN/OUTトリムのハンドル（絵を持つトラックのみ。camera/nullは対象外）
@@ -3198,22 +3235,24 @@ function buildTrackElement(idx){
         ? 'IN トリム（ドラッグ／Alt+[ で現フレーム）— ここより前は表示されません'
         : 'OUT トリム（ドラッグ／Alt+] で現フレーム）— ここ以降は表示されません')
         +'\nShift+ドラッグ = インジケータ／他トラックのIN・OUT・キーへ吸着'
-        +'\n※ペン／マウス専用（指はトラックの移動・並べ替えに使います）';
-      let drag=false, moved=false, trimSnapCands=null;
+        +'\n指でもペンでも掴めます（トラックの横移動は指2本）';
+      let drag=false, moved=false, trimSnapCands=null, trimPid=null;
       h.addEventListener('pointerdown',e=>{
-        // SPEC_18 §5-F: **トリムはペン（とマウス）専任。** 指はストリップへ素通りさせて
-        // 長押し＝横移動 / 縦＝並べ替え に使う（発注者報告「トリムを掴めず長押しで移動になる」）
-        if(e.pointerType==='touch') return;
+        // SPEC_18 §5-K: 指も掴める（横移動が2本指になって指1本が空いたため。§5-F の「ペン専任」は撤回）
         selectTrack(idx); // 2026-07-26: トリムバーを触ったらそのトラックが選択状態になる
         if(track.locked){ flashLive('🔒 ロック中です'); return; }
         // 吸着候補を凍結し、いま掴んでいる端だけ除外（残すと自分に張り付いて動かせない）
         trimSnapCands=freezeSnapCands([which==='in'?(track.tIn||0):(track.tOut==null?total:track.tOut)]);
-        drag=true; moved=false; h.classList.add('active');
+        drag=true; moved=false; trimPid=e.pointerId; h.classList.add('active');
         try{ h.setPointerCapture(e.pointerId); }catch(_){} e.stopPropagation(); e.preventDefault();
       });
       h.addEventListener('pointermove',e=>{
         if(!drag) return;
-        if(!e.buttons){ drag=false; h.classList.remove('active'); if(moved) endTrim(); return; }
+        // SPEC_18 §6-14: **追う相手は pointerId で固定し、`buttons` の保険はマウスだけ。**
+        // ペンはホバーの move（buttons=0）も飛ばすので、素の !e.buttons で抜けると
+        // ドラッグが途中で切れる＝「ペンだとトリムが動かしづらい」の真因（発注者報告）
+        if(trimPid!=null&&e.pointerId!==trimPid) return;
+        if(e.pointerType==='mouse'&&!e.buttons){ drag=false; h.classList.remove('active'); if(moved) endTrim(); return; }
         const rect=strip.getBoundingClientRect();
         let f=Math.round(Math.max(0,Math.min(total,pxToFrame(e.clientX-rect.left,rect.width))));
         // 2026-07-26: Shift＝インジケータ・他トラックのIN/OUT・キー・マーカーへ吸着（自分のIN/OUTは除外）
@@ -3224,8 +3263,8 @@ function buildTrackElement(idx){
         refreshTrimUI(idx); // ドラッグ中は再構築せず位置とグレーだけ更新
       });
       const endTrim=()=>{ recordHistory(); drawCurrentFrame(); flashLive(which==='in'?('◧ IN = F'+((track.tIn||0)+1)):('◨ OUT = '+(track.tOut==null?'—':'F'+track.tOut))); };
-      h.addEventListener('pointerup',()=>{ if(!drag) return; drag=false; h.classList.remove('active'); if(moved) endTrim(); });
-      h.addEventListener('pointercancel',()=>{ if(!drag) return; drag=false; h.classList.remove('active'); if(moved) endTrim(); });
+      h.addEventListener('pointerup',e=>{ if(!drag||(trimPid!=null&&e.pointerId!==trimPid)) return; drag=false; trimPid=null; h.classList.remove('active'); if(moved) endTrim(); });
+      h.addEventListener('pointercancel',e=>{ if(!drag||(trimPid!=null&&e.pointerId!==trimPid)) return; drag=false; trimPid=null; h.classList.remove('active'); if(moved) endTrim(); });
       return h;
     };
     // 範囲外ベール（IN/OUT位置ちょうどで切る。ハンドルより下・KFダイヤより上には出さない）
@@ -3325,6 +3364,7 @@ function renderKfDiamonds(trackIdx){
     let groupMode=false, groupSnap=null, lastDelta=0, gMin=0, gMax=total-1, gEdges=null, snapCands=null;
     let groupEls=null;        // グループ移動中に一緒に動かすダイヤのDOM（掴んだ瞬間に控える）
     let lastKfTap=-1e9;       // Wタップ判定。§6-4: 起動直後の誤判定を避けて十分過去から
+    let kfPid=null;           // §6-14: 追いかけるポインタを1本に固定（ペンのホバーmoveで抜けない）
     function putKeys(targetF,removeF){
       ALL_PROPS.forEach(p=>{
         if(!(p in kfVals)) return;
@@ -3349,7 +3389,19 @@ function renderKfDiamonds(trackIdx){
       if(groupEls) groupEls.forEach(g=>{ if(g.el){ g.el.style.left=(frameFrac(g.f+delta+g.off)*100)+'%'; g.el.title=`F${g.f+delta+g.off+1}`; } });
     }
     d.addEventListener('pointerdown',e=>{
-      // SPEC_18 §5-G: 指／ペンは「1つ押さえたまま別のキーをタップ」で複数選択（矩形はマウス専用にした）。
+      // SPEC_18 §5-L: **指でトラック（ラベル／ストリップ）を1本押さえたまま、ペンでキーを次々タップ＝追加選択。**
+      // 細かいキーは指で押さえると指自身に隠れるので、押さえる側はトラックの好きな場所でよい（発注者要望）
+      // pointerup を取り逃がして gHeldTrack が残ると、以後ペンのタップが全部「追加選択」に
+      // 化けて**キーが選べなくなる**。押しっぱなしは長くても十数秒なので古いものは捨てる（§6-9 と同じ型）
+      if(gHeldTrack&&performance.now()-(gHeldTrack.t||0)>15000){ gHeldTrack=null; gKfMultiSel=false; }
+      if(e.pointerType!=='mouse'&&gHeldTrack){
+        if(!gKfMultiSel){ gKfMultiSel=true; killTapGesture(); }
+        kfSelToggle(trackIdx,f);
+        flashLive('◆ '+kfSel.length+' KEYS 選択');
+        e.stopPropagation(); e.preventDefault();
+        return;
+      }
+      // SPEC_18 §5-G: 指／ペンは「1つ押さえたまま別のキーをタップ」でも複数選択できる（矩形はマウス専用）。
       // 押さえる側と足す側でポインタ種別が違ってよい（指で押さえてペンでタップ、が実用上いちばん通る）
       if(e.pointerType!=='mouse'){
         if(gHeldKf&&!(gHeldKf.t===trackIdx&&gHeldKf.f===f)){
@@ -3381,13 +3433,18 @@ function renderKfDiamonds(trackIdx){
       }
       // 吸着候補はここで凍結（動かす当人は候補から外す＝自己吸着で動けなくなるのを防ぐ）
       snapCands = shiftStart ? freezeSnapCands(groupMode?gEdges:[f+off]) : null;
+      kfPid=e.pointerId;
       try{ d.setPointerCapture(e.pointerId); }catch(_){}
       e.stopPropagation(); e.preventDefault();
     });
     d.addEventListener('pointermove',e=>{
       if(!dragActive) return;
       if(gKfMultiSel) return;   // 「押さえたまま別のキーをタップ」中は動かさない
-      if(!e.buttons){ dragActive=false; if(wasDragged) endKfDrag(); return; } // ペン等の保険
+      // SPEC_18 §6-14 / §5-K: 追う相手は pointerId で固定し、`buttons` の保険は**マウスだけ**。
+      // ペンはホバーの move（buttons=0）も飛ばすので、素の !e.buttons で抜けると
+      // 「タップしても選ばれない」「左右に動かせない」になる（発注者報告の真因）
+      if(kfPid!=null&&e.pointerId!==kfPid) return;
+      if(e.pointerType==='mouse'&&!e.buttons){ dragActive=false; if(wasDragged) endKfDrag(); return; }
       const rect=strip.getBoundingClientRect();
       const ppf=rect.width/tlSpan(); // 1コマあたりpx（P7-5: ズーム中はspan基準）
       let compF=Math.round(Math.max(0,Math.min(total-1,pxToFrame(e.clientX-rect.left,rect.width))));
@@ -3423,8 +3480,10 @@ function renderKfDiamonds(trackIdx){
       else if(altStart){ kfSel=[{t:trackIdx,f:copyF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); } // 複製→新キーを選択
       else { kfSel=[{t:trackIdx,f:origF}]; recordHistory(); renderKfDiamonds(trackIdx); refreshKfSelClasses(); seek(origF+off); } // 移動後も選択（直後に削除可）
     }
-    d.addEventListener('pointerup',()=>{
-      if(!dragActive) return; dragActive=false;
+    d.addEventListener('pointerup',e=>{
+      if(!dragActive) return;
+      if(kfPid!=null&&e&&e.pointerId!==kfPid) return; // 別のポインタが離れただけ
+      dragActive=false; kfPid=null;
       if(gKfMultiSel) return;   // 複数選択タップの基点だった＝選択を畳まない・インジケータも飛ばさない
       if(wasDragged){ endKfDrag(); return; }
       if(ctrlStart){ cycleEase(trackIdx,origF); return; }   // Ctrl+クリックでイーズ順送り(AE準拠)
@@ -3439,7 +3498,7 @@ function renderKfDiamonds(trackIdx){
       if(!(kfSel.length>1&&kfSelHas(trackIdx,origF))) kfSelSet(trackIdx,origF);
       seek(origF+off);
     });
-    d.addEventListener('pointercancel',()=>{ if(!dragActive) return; dragActive=false; if(wasDragged) endKfDrag(); });
+    d.addEventListener('pointercancel',()=>{ if(!dragActive) return; dragActive=false; kfPid=null; if(wasDragged) endKfDrag(); });
     row.appendChild(d);
   }
 }
@@ -3467,17 +3526,18 @@ function renderMarkers(trackIdx){
     el.style.left=(frameFrac(m.frame+off)*100)+'%';
     el.dataset.label=m.label||('M'+(track.markers.indexOf(m)+1));
     el.title=`コマ${m.frame+off+1}${m.label?' — '+m.label:''}`;
-    let dragActive=false, wasDragged=false;
+    let dragActive=false, wasDragged=false, mkPid=null;
     el.addEventListener('pointerdown',e=>{
       selectTrack(trackIdx); // 2026-07-26: 別トラックのマーカーを触ったらそのトラックが選択状態に
       if(lockedGuard(track)) return; // SPEC_11 P4-2
-      dragActive=true; wasDragged=false;
+      dragActive=true; wasDragged=false; mkPid=e.pointerId;
       try{ el.setPointerCapture(e.pointerId); }catch(_){}
       e.stopPropagation(); e.preventDefault();
     });
     el.addEventListener('pointermove',e=>{
       if(!dragActive) return;
-      if(!e.buttons){ dragActive=false; return; } // ペン等でpointerupを取り逃した場合の保険
+      if(mkPid!=null&&e.pointerId!==mkPid) return;                        // §6-14
+      if(e.pointerType==='mouse'&&!e.buttons){ dragActive=false; return; } // 保険はマウスだけ
       wasDragged=true;
       const rect=strip.getBoundingClientRect();
       let newF=Math.round(Math.max(0,Math.min(total-1,pxToFrame(e.clientX-rect.left,rect.width))));
@@ -6019,14 +6079,16 @@ const FIXED_SHORTCUTS=[
   {cat:'iPad（指）',    label:'トラックを選ぶ',             key:'画面の絵をタップ'},
   {cat:'iPad（指）',    label:'タイムラインの伸縮',         key:'目盛りバーを指1本で左右へこする'},
   {cat:'iPad（指）',    label:'インジケータを飛ばす',       key:'目盛りバーをタップ'},
-  {cat:'iPad（指）',    label:'トラックを時間方向にずらす', key:'ストリップを長押し→左右'},
+  {cat:'iPad（指）',    label:'トラックを時間方向にずらす', key:'ストリップに指2本を置いて左右へ'},
+  {cat:'iPad（指）',    label:'ワークエリアの IN / OUT',    key:'目盛りバーの端のバーをドラッグ（伸縮より優先）'},
   {cat:'iPad（指）',    label:'数値を変える',               key:'数値欄・ラベルを横ドラッグ'},
   {cat:'iPad（指）',    label:'数値をキーボードで打ち換え', key:'数値欄をWタップ'},
   {cat:'iPad（指）',    label:'トラックの並べ替え',         key:'⠿ を掴んで上下（複数選択中はまとめて）'},
   {cat:'iPad（指）',    label:'トラックの複数選択',         key:'1本を行（ラベル／ストリップ）に置いたまま別の行をタップ'},
-  {cat:'iPad（指）',    label:'キーの複数選択',             key:'1つ押さえたまま別のキーをタップ'},
+  {cat:'iPad（指）',    label:'キーの複数選択',             key:'キーを1つ押さえたまま別のキーをタップ'},
+  {cat:'iPad（指＋ペン）',label:'キーの複数選択（推奨）',   key:'指でトラックを押さえたまま、ペンでキーを次々タップ'},
   {cat:'iPad（指）',    label:'トラックの複製 / 削除',      key:'ラベル帯を左へスワイプ'},
-  {cat:'iPad（ペン）',  label:'IN / OUT トリム',            key:'トリムバーをドラッグ（指では動きません）'},
+  {cat:'iPad（ペン）',  label:'IN / OUT トリム',            key:'トリムバーをドラッグ（指でも掴めます）'},
   {cat:'iPad（ペン）',  label:'イーズ送り',                 key:'キーをWクリック'},
 ];
 // SPEC_11 P4-1: OPパンチ（フリッカー演出用）。O=現コマ op=1 → 次コマ op=0 ／ Shift+O=逆
@@ -6382,7 +6444,7 @@ window.addEventListener('pointercancel',endRulerScrub);
 
 // Work area handle drag
 (function(){
-  let waDrag=null;
+  let waDrag=null, waPid=null;
   function waMove(e){
     if(!waDrag||!state.workArea) return;
     const rect=$('#tl-ruler').getBoundingClientRect();
@@ -6394,7 +6456,8 @@ window.addEventListener('pointercancel',endRulerScrub);
     el.title=(side==='in'?'ワークエリア IN（B）':'ワークエリア OUT（N）')+' — ダブルクリックでタイムライン'+(side==='in'?'先頭':'末尾')+'まで戻す';
     el.addEventListener('pointerdown',e=>{
       if(!state.totalFrames) return;
-      waDrag=side; try{ el.setPointerCapture(e.pointerId); }catch(_){}
+      // SPEC_18 §5-J: ルーラーの「指1本＝伸縮」より**ワークエリアの端が優先**（ここで止める）
+      waDrag=side; waPid=e.pointerId; try{ el.setPointerCapture(e.pointerId); }catch(_){}
       e.stopPropagation(); e.preventDefault();
     });
     // 2026-07-27: ハンドルのダブルクリックで端まで開く（両方やれば全体に戻る）
@@ -6407,9 +6470,15 @@ window.addEventListener('pointercancel',endRulerScrub);
       flashLive('⟺ WORK AREA '+(wa.startFrame+1)+'–'+wa.endFrame
         +((wa.startFrame===0&&wa.endFrame===state.totalFrames)?'（全体）':''));
     });
-    el.addEventListener('pointermove',e=>{ if(waDrag&&!e.buttons){waDrag=null;return;} waMove(e); });
-    el.addEventListener('pointerup',()=>{waDrag=null;});
-    el.addEventListener('pointercancel',()=>{waDrag=null;});
+    // §6-14: 追う相手は pointerId 固定・`buttons` の保険はマウスだけ（ペンだと途中で抜けていた）
+    el.addEventListener('pointermove',e=>{
+      if(!waDrag) return;
+      if(waPid!=null&&e.pointerId!==waPid) return;
+      if(e.pointerType==='mouse'&&!e.buttons){ waDrag=null; waPid=null; return; }
+      waMove(e);
+    });
+    el.addEventListener('pointerup',()=>{waDrag=null;waPid=null;});
+    el.addEventListener('pointercancel',()=>{waDrag=null;waPid=null;});
   });
 })();
 
@@ -6424,9 +6493,8 @@ window.addEventListener('pointercancel',endRulerScrub);
     if(e.altKey) return; // SPEC_11 P3b-2: Alt+ドラッグはトラックのずらし（ストリップ側が処理）
     if(gTrackMultiSel) return; // §5-E: 「押しながらタップ」で複数選択している最中
     // ラベル帯（⠿/名前/ボタン/余白）は並び替えドラッグの領分。マーキーはストリップ上だけで始める
-    // 指のときだけトリムハンドルを除く（§5-F: トリム＝ペン専任なので指はストリップ扱い）
-    const skip='.tl-kf-d,.tl-marker,.tl-drag-handle,.tl-tbtn,.tl-track-label,.tl-track-name,.tl-audio-btn,#tl-audio-strip,.tl-track-actions'
-      +(e.pointerType==='touch'?'':',.tl-trim-handle');
+    // §5-K: トリムは指でも掴めるので、ポインタ種別によらず個別要素に譲る
+    const skip='.tl-kf-d,.tl-marker,.tl-drag-handle,.tl-tbtn,.tl-track-label,.tl-track-name,.tl-audio-btn,#tl-audio-strip,.tl-track-actions,.tl-trim-handle';
     if(e.target.closest(skip)) return;
     active=true; moved=false; movedFar=false; sx=e.clientX; sy=e.clientY; addMode=e.shiftKey; ctrlMode=e.ctrlKey||e.metaKey;
     downType=e.pointerType;
