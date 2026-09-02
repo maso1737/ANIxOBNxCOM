@@ -26,6 +26,8 @@
 - `ECONTE_HANDOVER.md` — econte 実装メモ（cuts[]共有ペイント・TIMELINE書き出しの注意点）
 - `MOTION_COMIC_SPEC.md` / `EXPORT_WEB_SPEC.md` — モーションコミック／WEB書き出し仕様
 - `PIPELINE.md` — 3ツールの入口/出口フォーマット表。**入出力を変えたら必ず更新**。新ルート探しはまずここ
+- `GUIDE_MANGA_LINKS.md` — ANIMATOR⇄MANGA PLATE⇄OBAN/COMPOSER の**手順書**（人間向け・ボタン名で追える）。
+  仕組みは SPEC_09、入出力の一覧表は PIPELINE.md、実際に押す手順はここ。連携ボタンの表記を変えたら更新すること
 - `SPEC_01_OBAN_TAKE_RIG.md` — 大判カメラTAKE化の元仕様（SPEC_01 P2 = OBAN BUILDER）
 - `SPEC_05_OBAN_BUILDER_V2.md` — OBAN BUILDER V2 拡張仕様
 - `SPEC_06_SATSUEI_KIT.md` — 撮影処理キット（fx共通スキーマ・composer/OBAN統合）
