@@ -30,6 +30,15 @@
    別名として残し、既存パネルのCSSがそのまま新色に乗るようにしている。
    ============================================================ */
 :root{
+  /* SPEC_18 P0 — iPad standalone の安全域。black-translucent + viewport-fit=cover で
+     本文が画面の最上部(0,0)から描かれるので、ステータスバー(時計/バッテリー)と
+     ホームインジケータのぶんだけ中身を押し下げ／持ち上げる。
+     実測 top=32px / bottom=20px（iPadOS 18.7・SPEC_18 §2-3）。
+     ブラウザ表示や PC では 0px になるので**見た目は1pxも変わらない**。
+     ★ 正準は oban-builder.html の #bar。値を使う側は必ずこの2つを通すこと */
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+
   /* 面と線（テーマ不変の器） */
   --bg:#08090C;--black:#05060A;--ink:#E8ECF2;--white:#E8ECF2;
   --panel:rgba(10,12,16,.95);--panel2:#0D0F14;--cell:rgba(232,236,242,.03);
@@ -92,7 +101,7 @@ body[data-theme="ROUGE"]{
 *::-webkit-scrollbar-corner{background:transparent}
 @supports not selector(::-webkit-scrollbar){*{scrollbar-width:thin;scrollbar-color:rgba(var(--accRGB),.5) rgba(232,236,242,.04)}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden}
+html,body{height:100%;overflow:hidden;touch-action:manipulation;overscroll-behavior:none}  /* SPEC_18 §5-N（正準 composer） */
 body{
   background:
     radial-gradient(ellipse 70% 60% at 50% 46%,transparent 40%,rgba(4,5,7,.72) 100%),
@@ -133,7 +142,7 @@ body.panning #void,body.panning canvas#cv{cursor:grabbing}
 
 /* corner viewfinder ticks — KINETIC stage gate (gold→rouge brackets) */
 #ticks{
-  position:fixed;left:0;right:0;top:calc(64px + env(safe-area-inset-top,0px));bottom:0;z-index:5;pointer-events:none;opacity:.75;
+  position:fixed;left:0;right:0;top:calc(64px + var(--safe-t));bottom:0;z-index:5;pointer-events:none;opacity:.75;
   background:
     linear-gradient(90deg,var(--gold),var(--acid)) 12px 12px/14px 1px no-repeat,
     linear-gradient(270deg,var(--gold),var(--acid)) calc(100% - 12px) 12px/14px 1px no-repeat,
@@ -152,7 +161,7 @@ body.panning #void,body.panning canvas#cv{cursor:grabbing}
      ステータスバー(時計/日付/バッテリー)の高さぶんだけ中身を押し下げる。
      背景は上まで届いたまま＝全画面の見た目を保ったまま、ロゴだけが重ならない。SPEC_18 P0 */
   flex-wrap:nowrap;overflow:hidden;
-  height:calc(64px + env(safe-area-inset-top,0px));padding:env(safe-area-inset-top,0px) 16px 0;
+  height:calc(64px + var(--safe-t));padding:var(--safe-t) 16px 0;
   background:linear-gradient(to bottom,rgba(6,7,10,.94),rgba(6,7,10,.68) 70%,rgba(6,7,10,.2));
   backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
   border-bottom:1px solid var(--line);
@@ -673,7 +682,7 @@ body.setopen #set-ovl{display:flex}
    ============================================================ */
 #dock{
   position:fixed;left:0;right:0;bottom:0;z-index:45;pointer-events:none;
-  padding:30px 18px 14px;display:none;flex-direction:column;gap:12px;
+  padding:30px 18px calc(14px + var(--safe-b));display:none;flex-direction:column;gap:12px;  /* SPEC_18 P0: ホームインジケータぶん持ち上げる */
   background:linear-gradient(to top,rgba(6,7,10,.95),rgba(6,7,10,.72) 52%,rgba(6,7,10,0));
   font-family:var(--mono);
 }

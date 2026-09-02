@@ -2,11 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<!-- iPad: ホーム画面に追加すると Safari のバーごと消えた「アプリ」として起動する（SPEC_18 P0・正準は animator.html）
-     status-bar-style は指定しない＝既定の不透明バー。時刻・日付・バッテリーだけが上に出て、本文はその下から始まる。
-     black-translucent にすると本文がバーの下へ潜るので safe-area の手当てが要る（OBAN だけそちら。P1 で揃えるか決める） -->
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<!-- iPad: ホーム画面に追加すると Safari のバーごと消えた「アプリ」として起動する（SPEC_18 P0）
+     2026-09-02 に5本とも black-translucent + viewport-fit=cover へ統一した（正準は oban-builder.html）。
+     本文が画面の最上部(0,0)から描かれるので **safe-area の手当てとセット**。
+     片方だけ入れるとステータスバーがトップバーに重なる → CSS の --safe-t / --safe-b を必ず通すこと。
+     ★ <link rel="manifest"> は張らない。張るとホーム画面追加が start_url をインストールしてしまう（SPEC_18 §2-3） -->
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ANI SUITE">
 <title>GEN-EX Animation Suite</title>
@@ -22,6 +25,15 @@
   font-display:swap;
 }
 :root{
+  /* SPEC_18 P0 — iPad standalone の安全域。black-translucent + viewport-fit=cover で
+     本文が画面の最上部(0,0)から描かれるので、ステータスバー(時計/バッテリー)と
+     ホームインジケータのぶんだけ中身を押し下げ／持ち上げる。
+     実測 top=32px / bottom=20px（iPadOS 18.7・SPEC_18 §2-3）。
+     ブラウザ表示や PC では 0px になるので**見た目は1pxも変わらない**。
+     ★ 正準は oban-builder.html の #bar。値を使う側は必ずこの2つを通すこと */
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+
   --acid:#FF4FA8; --magenta:#B850FF; --ice:#5AE9FF; --gold:#FFD27A;
   --bg:#07030f; --panel:#100722; --fg:#F8EFFF; --dim:#9d8db3;
   --border:rgba(255,210,122,0.14);
@@ -30,7 +42,7 @@
   --jp:-apple-system,'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;}
+html,body{height:100%;touch-action:manipulation;overscroll-behavior:none;}  /* SPEC_18 §5-N（正準 composer） */
 body{
   background:
     radial-gradient(ellipse 85% 60% at 88% -12%, rgba(184,80,255,0.22), transparent 60%),
@@ -41,7 +53,7 @@ body{
   font-family:var(--mono);
   -webkit-user-select:none;user-select:none;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:44px;padding:24px;
+  gap:44px;padding:calc(24px + var(--safe-t)) 24px calc(24px + var(--safe-b));  /* SPEC_18 P0 */
   overflow:hidden;position:relative;
 }
 /* corner ticks */
@@ -178,6 +190,25 @@ footer{font-size:10px;color:var(--dim);letter-spacing:0.3em;display:flex;gap:18p
       <div class="tags">
         <span class="tag">LAB</span>
         <span class="tag">WARP</span>
+      </div>
+    </a>
+    <a class="card" href="link-map.html">
+      <span class="ord">07</span>
+      <div class="name">LINK MAP</div>
+      <div class="desc">アプリ間の行き来 ぜんぶ<br>どのボタンで何が届くか</div>
+      <div class="tags">
+        <span class="tag">GUIDE</span>
+        <span class="tag">ROUTES</span>
+      </div>
+    </a>
+    <a class="card" href="brush-lab.html">
+      <span class="ord">08</span>
+      <div class="name">BRUSH LAB</div>
+      <div class="desc">筆先と重さの実験室<br>ECONTE に入れる前に決める</div>
+      <div class="tags">
+        <span class="tag">LAB</span>
+        <span class="tag">BRUSH</span>
+        <span class="tag">BENCH</span>
       </div>
     </a>
   </div>

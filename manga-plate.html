@@ -2,11 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<!-- iPad: ホーム画面に追加すると Safari のバーごと消えた「アプリ」として起動する（SPEC_18 P0・正準は animator.html）
-     status-bar-style は指定しない＝既定の不透明バー。時刻・日付・バッテリーだけが上に出て、本文はその下から始まる。
-     black-translucent にすると本文がバーの下へ潜るので safe-area の手当てが要る（OBAN だけそちら。P1 で揃えるか決める） -->
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<!-- iPad: ホーム画面に追加すると Safari のバーごと消えた「アプリ」として起動する（SPEC_18 P0）
+     2026-09-02 に5本とも black-translucent + viewport-fit=cover へ統一した（正準は oban-builder.html）。
+     本文が画面の最上部(0,0)から描かれるので **safe-area の手当てとセット**。
+     片方だけ入れるとステータスバーがトップバーに重なる → CSS の --safe-t / --safe-b を必ず通すこと。
+     ★ <link rel="manifest"> は張らない。張るとホーム画面追加が start_url をインストールしてしまう（SPEC_18 §2-3） -->
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MANGA">
 <title>MANGA PLATE — page / panel composer</title>
@@ -26,6 +29,15 @@
    オフライン(file://)では読めないので、その場合は Noto Sans JP に落ちる */
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Shippori+Antique&family=Shippori+Antique+B1&display=swap');
 :root{
+  /* SPEC_18 P0 — iPad standalone の安全域。black-translucent + viewport-fit=cover で
+     本文が画面の最上部(0,0)から描かれるので、ステータスバー(時計/バッテリー)と
+     ホームインジケータのぶんだけ中身を押し下げ／持ち上げる。
+     実測 top=32px / bottom=20px（iPadOS 18.7・SPEC_18 §2-3）。
+     ブラウザ表示や PC では 0px になるので**見た目は1pxも変わらない**。
+     ★ 正準は oban-builder.html の #bar。値を使う側は必ずこの2つを通すこと */
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+
   --rouge:#FF4FA8; --ice:#5AE9FF; --gold:#FFD27A; --lavender:#B58EFF; --magenta:#B850FF;
   --bg-0:#07030f; --bg-1:#0c061d; --panel:#150927; --panel-2:#100728; --cell:#0d0620;
   --white:#F8EFFF; --ink:#0a0612;
@@ -33,9 +45,10 @@
   --grad-btn:linear-gradient(135deg,#FF4FA8,#B850FF);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;overflow:hidden;background:var(--bg-1);color:var(--white);font-family:var(--mono)}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg-1);color:var(--white);font-family:var(--mono);
+  touch-action:manipulation;overscroll-behavior:none}  /* SPEC_18 §5-N: Wタップ拡大とゴムバウンドを切る（正準 composer） */
 /* 既定=ツールレール右（キャンバスとサイドパネルの間＝手が届きやすい） / TABで左右入替 */
-#app{display:grid;width:100%;height:100%;grid-template-rows:44px 1fr 40px;grid-template-columns:1fr 54px 318px;
+#app{display:grid;width:100%;height:100%;grid-template-rows:calc(44px + var(--safe-t)) 1fr calc(40px + var(--safe-b));grid-template-columns:1fr 54px 318px;
   grid-template-areas:"top top top" "main rail side" "bottom bottom bottom"}
 body.swap #app{grid-template-columns:318px 54px 1fr;
   grid-template-areas:"top top top" "side rail main" "bottom bottom bottom"}
@@ -45,7 +58,7 @@ body.swap #rail{border-right:1px solid rgba(255,210,122,.18);border-left:0}
 body.swap #side{border-right:1px solid rgba(255,210,122,.18);border-left:0}
 
 /* ---- topbar ---- */
-#topbar{grid-area:top;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--panel-2);
+#topbar{grid-area:top;display:flex;align-items:center;gap:12px;padding:var(--safe-t) 14px 0;background:var(--panel-2);
   border-bottom:1px solid rgba(255,210,122,.18);font-size:10px;letter-spacing:.3em;text-transform:uppercase}
 #topbar .t-title{font-family:var(--disp);font-style:italic;font-weight:900;font-size:19px;letter-spacing:.06em;white-space:nowrap;
   background:linear-gradient(120deg,#FFE9B0,#FFD27A 26%,#FF4FA8 62%,#B58EFF 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -224,7 +237,7 @@ select{width:100%}
 .pal .sw.sel{border:2px solid var(--rouge);box-shadow:0 0 8px rgba(255,79,168,.6)}
 
 /* ---- bottom ---- */
-#bottombar{grid-area:bottom;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel-2);
+#bottombar{grid-area:bottom;display:flex;align-items:center;gap:14px;padding:0 14px var(--safe-b);background:var(--panel-2);
   border-top:1px solid rgba(255,210,122,.18);font-size:9px;letter-spacing:.14em;color:var(--lavender);text-transform:uppercase;overflow:hidden}
 #bb-hint{color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #bb-info{color:var(--ice);white-space:nowrap}

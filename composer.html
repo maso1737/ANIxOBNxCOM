@@ -2,24 +2,37 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<!-- iPad: ホーム画面に追加すると Safari のバーごと消えた「アプリ」として起動する（SPEC_18 P0・正準は animator.html）
-     status-bar-style は指定しない＝既定の不透明バー。時刻・日付・バッテリーだけが上に出て、本文はその下から始まる。
-     black-translucent にすると本文がバーの下へ潜るので safe-area の手当てが要る（OBAN だけそちら。P1 で揃えるか決める） -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- iPad: ホーム画面に追加すると Safari のバーごと消えた「アプリ」として起動する（SPEC_18 P0）
+     2026-09-02 に5本とも black-translucent + viewport-fit=cover へ統一した（正準は oban-builder.html）。
+     本文が画面の最上部(0,0)から描かれるので **safe-area の手当てとセット**。
+     片方だけ入れるとステータスバーがトップバーに重なる → CSS の --safe-t / --safe-b を必ず通すこと。
+     ★ <link rel="manifest"> は張らない。張るとホーム画面追加が start_url をインストールしてしまう（SPEC_18 §2-3） -->
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="COMPOSER">
 <title>COMPOSER v0.5</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
+  /* SPEC_18 P0 — iPad standalone の安全域。black-translucent + viewport-fit=cover で
+     本文が画面の最上部(0,0)から描かれるので、ステータスバー(時計/バッテリー)と
+     ホームインジケータのぶんだけ中身を押し下げ／持ち上げる。
+     実測 top=32px / bottom=20px（iPadOS 18.7・SPEC_18 §2-3）。
+     ブラウザ表示や PC では 0px になるので**見た目は1pxも変わらない**。
+     ★ 正準は oban-builder.html の #bar。値を使う側は必ずこの2つを通すこと */
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+
   --acid:#FF4FA8;--neon:#FFD27A;--dim:#5b4a78;--black:#07030f;--white:#F8EFFF;
   --magenta:#B850FF;--ice:#5AE9FF;--gold:#FFD27A;
   --bank:'Bank Gothic','Barlow Condensed',sans-serif;
   --panel:#100722;--panel2:#150927;
   --border:rgba(255,210,122,0.14);--border-bright:rgba(255,79,168,0.45);
   --mono:'IBM Plex Mono','Menlo','Consolas',monospace;
-  --tp-h:26px; /* #transport の高さ。#tl-resize の bottom 計算がこれに乗るので必ず一致させること */
+  --tp-h:calc(26px + var(--safe-b)); /* #transport の高さ。#tl-resize の bottom 計算がこれに乗るので必ず一致させること。
+                                        SPEC_18 P0: ホームインジケータぶんをここに畳んである＝グリッド行と #tl-resize が自動で揃う */
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 /* SPEC_18 §5-I: `user-scalable=no` は iOS 10 以降**無視される**ので、
@@ -30,10 +43,10 @@
    ピンチ拡大は manipulation でも許可されるので、ビューポートの操作感は変わらない */
 html,body{width:100%;height:100%;background:var(--black);color:var(--white);font-family:var(--mono);font-size:11px;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:manipulation;overscroll-behavior:none;}
 /* インスペクタはフローティング化したので右カラムは廃止。iPad Safariの下端切れ対策に dvh を併用（再生バー対策） */
-#app{position:relative;display:grid;grid-template-columns:1fr;grid-template-rows:32px 1fr var(--tl-h,200px) var(--tp-h);height:100vh;height:100dvh;width:100vw;}
+#app{position:relative;display:grid;grid-template-columns:1fr;grid-template-rows:calc(32px + var(--safe-t)) 1fr var(--tl-h,200px) var(--tp-h);height:100vh;height:100dvh;width:100vw;}
 
 /* TOPBAR */
-#topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--border);background:var(--panel);font-size:9px;letter-spacing:0.25em;}
+#topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:var(--safe-t) 14px 0;border-bottom:1px solid var(--border);background:var(--panel);font-size:9px;letter-spacing:0.25em;}
 #topbar .g{display:flex;gap:10px;align-items:center;}
 .title{color:var(--acid);font-weight:700;letter-spacing:0.3em;}
 .meta{color:rgba(255,255,255,0.35);}
@@ -326,7 +339,7 @@ input[type=number]{-moz-appearance:textfield;}
 #tl-audio-offset{position:absolute;top:2px;right:4px;font-size:7px;letter-spacing:.08em;color:rgba(255,210,122,0.45);pointer-events:none;}
 
 /* TRANSPORT */
-#transport{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:var(--panel);border-top:1px solid var(--border);font-size:9px;letter-spacing:0.2em;}
+#transport{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 14px var(--safe-b);background:var(--panel);border-top:1px solid var(--border);font-size:9px;letter-spacing:0.2em;}
 #transport .g{display:flex;gap:8px;align-items:center;}
 #transport button{background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.7);font-family:var(--mono);font-size:10px;width:26px;height:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.12s;}
 #transport button:hover{border-color:var(--border-bright);color:var(--acid);}
@@ -384,6 +397,26 @@ input[type=number]{-moz-appearance:textfield;}
 #webx-btns button:hover{border-color:var(--acid);color:var(--acid);}
 #webx-go{border-color:rgba(255,79,168,0.5) !important;color:var(--acid) !important;}
 .webx-row.disabled label{color:rgba(255,255,255,0.22);}
+
+/* CONFIRM / ALERT / PROMPT MODAL — native confirm()・alert()・prompt() の代替。
+   iPadのHTMLビューアアプリでは native の3つとも**黙って無視される**（ANIMATOR の showModal と同じ理由）。
+   confirm は false が返るので「押しても何も起きない」、alert はエラーが無言、prompt は null。
+   ANIMATOR の #modal-overlay と同じ役どころ。挙動は OBAN BUILDER の #cf-modal が正準。
+   z-index は #export-overlay(100) / #webx-modal(110) より上の 120 */
+#cfm-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:120;align-items:center;justify-content:center;}
+#cfm-modal.show{display:flex;}
+#cfm-panel{background:#0a0a0c;border:1px solid rgba(255,79,168,0.45);min-width:320px;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,0.7);}
+#cfm-msg{padding:16px 18px;color:rgba(255,255,255,0.82);font-size:10px;letter-spacing:0.08em;line-height:1.85;white-space:pre-wrap;word-break:break-word;}
+#cfm-input{display:none;width:calc(100% - 36px);margin:0 18px 12px;background:#050507;border:1px solid var(--border);color:#fff;font-family:var(--mono);font-size:11px;letter-spacing:0.06em;padding:7px 8px;}
+#cfm-input.show{display:block;}
+#cfm-input:focus{outline:none;border-color:var(--acid);}
+#cfm-btns{display:flex;gap:8px;padding:0 14px 12px;}
+#cfm-btns button{flex:1;background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.6);font-family:var(--mono);font-size:10px;letter-spacing:0.15em;padding:7px 0;cursor:pointer;}
+#cfm-btns button:hover{border-color:var(--acid);color:var(--acid);}
+/* 既定のフォーカスリング（黄）はこの配色から浮くので置き換える。消さずに残すのはキー操作の居場所を見せるため */
+#cfm-btns button:focus-visible{outline:none;border-color:var(--acid);box-shadow:0 0 0 1px rgba(255,79,168,0.5);}
+#cfm-btns button.hidden{display:none;}
+#cfm-ok{border-color:rgba(255,79,168,0.5) !important;color:var(--acid) !important;}
 
 /* SATSUEI FX MODAL (SPEC_06) — 既存 #fx-hud(トランスフォーム)とは別物なので sfx- プレフィックス */
 /* フローティングパネル（INSPECTOR方式・makeFloatDragでヘッダドラッグ）— 画を見ながら調整できるよう非モーダル */
@@ -902,6 +935,17 @@ input[type=number]{-moz-appearance:textfield;}
     <div id="webx-btns">
       <button id="webx-go">EXPORT</button>
       <button id="webx-close">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<div id="cfm-modal">
+  <div id="cfm-panel">
+    <div id="cfm-msg"></div>
+    <input id="cfm-input" type="text" autocomplete="off" spellcheck="false">
+    <div id="cfm-btns">
+      <button id="cfm-cancel">CANCEL</button>
+      <button id="cfm-ok">OK</button>
     </div>
   </div>
 </div>
@@ -1432,6 +1476,53 @@ const guideCtx = guideCanvas.getContext('2d');
 const rulerCanvas = $('#tl-ruler-canvas');
 const rulerCtx = rulerCanvas.getContext('2d');
 
+// ── CONFIRM / ALERT / PROMPT MODAL ──
+// native の confirm() / alert() / prompt() は使わない。
+// **iPadのHTMLビューアアプリでは3つとも黙って無視される**（ANIMATOR の showModal に同じ理由のコメントがある）。
+//   confirm → false が返る＝「押しても何も起きない」／ alert → エラーが無言で消える／ prompt → null
+// 挙動は OBAN BUILDER の #cf-modal が正準: Enter=OK / Esc=CANCEL、開いている間は
+// **document の capture 段でキーを飲む**。飲まないとモーダルの裏で window の keydown に届いて
+// SPACE=再生 / Backspace=KF削除 / Ctrl+Z=undo が走る（Ctrl+Z は INPUT ガードより手前にあるので特に効く）。
+//   ★stopPropagation は既定動作を止めないので、飲んでも prompt の入力欄には文字が入る。
+//   ★テストで window に直接 dispatch すると document の capture を通らず「漏れた」ように見える。
+//     実キーは focus 要素が target なので document.body 等から撃って確かめること。
+// 「Undoで戻せる操作は聞かない」ので、confirm に来るのは戻せない操作か長時間かかる書き出しだけ。
+// 操作の否定（〜できません）は flashLive() へ。ここに出すのは読んでほしいものだけ。
+function cfmOpen(mode, msg, def){
+  return new Promise(res=>{
+    const ov=$('#cfm-modal'), inp=$('#cfm-input'), ok=$('#cfm-ok'), cancel=$('#cfm-cancel');
+    $('#cfm-msg').textContent=msg;
+    inp.classList.toggle('show', mode==='prompt');
+    cancel.classList.toggle('hidden', mode==='alert');
+    if(mode==='prompt') inp.value=def||'';
+    const done=v=>{
+      ov.classList.remove('show');
+      document.removeEventListener('keydown',onKey,true);
+      ok.onclick=cancel.onclick=null;
+      res(v);
+    };
+    const NO = mode==='prompt' ? null : (mode==='alert' ? undefined : false);
+    const YES = mode==='prompt' ? () => inp.value : () => (mode==='alert' ? undefined : true);
+    const onKey=e=>{
+      // IME変換中の Enter は「変換の確定」であって OK ではない（マーカーのメモは日本語を打つ）
+      if(e.isComposing||e.keyCode===229){ e.stopPropagation(); return; }
+      if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); done(NO); return; }
+      if(e.key==='Enter'){ e.preventDefault(); e.stopPropagation(); done(YES()); return; }
+      e.stopPropagation();   // ★裏のショートカットへ漏らさない（既定動作は止めないので入力欄は打てる）
+    };
+    ok.onclick=()=>done(YES());
+    cancel.onclick=()=>done(NO);
+    document.addEventListener('keydown',onKey,true);
+    ov.classList.add('show');
+    (mode==='prompt' ? inp : ok).focus();
+    if(mode==='prompt') inp.select();
+  });
+}
+// 宣言は function（この先頭より前で呼ばれても巻き上げで解決する・window にも載る＝他と同じ作法）
+function modalConfirm(msg){ return cfmOpen('confirm', msg); }
+function modalAlert(msg){ return cfmOpen('alert', msg); }
+function modalPrompt(msg, def){ return cfmOpen('prompt', msg, def); }
+
 // ── TRACK HELPERS ──
 // コンポ尺 = 素材から決まる自然長と、設定パネルで手入力した尺(state.compFrames)の大きい方。
 // compFrames=null なら従来どおり素材まかせ（＝後方互換）
@@ -1801,7 +1892,7 @@ function renderGlobalMarkers(){
       if(!dragActive) return; dragActive=false;
       if(wasDragged){ state.markers.sort((a,b)=>a.frame-b.frame); recordHistory(); renderGlobalMarkers(); }
     });
-    el.addEventListener('dblclick',e=>{ e.stopPropagation(); const v=prompt('マーカーのメモ', m.label||''); if(v!==null){ m.label=v; recordHistory(); renderGlobalMarkers(); } });
+    el.addEventListener('dblclick',async e=>{ e.stopPropagation(); const v=await modalPrompt('マーカーのメモ', m.label||''); if(v!==null){ m.label=v; recordHistory(); renderGlobalMarkers(); } });
     cont.appendChild(el);
   });
 }
@@ -2129,13 +2220,13 @@ function loadJSON(json){
   const fmt = json.format;
   if(fmt==='PROJECT_v2'&&Array.isArray(json.tracks)){
     const parsed=json.tracks.map(t=>parseTrackFromJSON(t)).filter(Boolean);
-    if(!parsed.length){ alert('有効なトラックがありません'); return; }
+    if(!parsed.length){ flashLive('有効なトラックがありません'); return; }
     state.tracks=parsed;
     const sized=json.tracks.find(t=>t.width)||{};
     state.fps=24; state.width=json.width||sized.width||0; state.height=json.height||sized.height||0;
   } else {
     const track=parseTrackFromJSON(json);
-    if(!track){ alert('cells/frames が空です'); return; }
+    if(!track){ flashLive('cells/frames が空です'); return; }
     state.tracks=[track];
     state.fps=24; state.width=json.width; state.height=json.height;
   }
@@ -2203,7 +2294,7 @@ function importJSON(json){
   if(json.format==='PROJECT_v2'&&Array.isArray(json.tracks)){
     if(state.tracks.length===0){ loadJSON(json); return; }
     const parsed=json.tracks.map(t=>parseTrackFromJSON(t)).filter(Boolean);
-    if(!parsed.length){ alert('有効なトラックがありません'); return; }
+    if(!parsed.length){ flashLive('有効なトラックがありません'); return; }
     if(!state.width){ state.fps=24; state.width=json.width||json.tracks[0].width; state.height=json.height||json.tracks[0].height; state.bgBright=json.bgBright??100; }
     if(json.fx) state.fx=normalizeFx(json.fx); // SPEC_06 P3: fx付きJSON（OBAN take.fx等）の追加IMPORTで撮設定を引き継ぐ
     parsed.forEach(t=>state.tracks.push(t));
@@ -2214,7 +2305,7 @@ function importJSON(json){
   }
   // 単一トラック(PROJECT_v1 / ANIMATOR_v1)
   const track=parseTrackFromJSON(json);
-  if(!track){ alert('cells/frames が空です'); return; }
+  if(!track){ flashLive('cells/frames が空です'); return; }
   if(!state.width){ state.fps=24; state.width=json.width; state.height=json.height; state.bgBright=json.bgBright??100; }
   state.tracks.push(track); // append = new front layer
   finishImport();
@@ -2307,7 +2398,7 @@ function importImageFile(file){
         flashLive('🖼 IMAGE TRACK: '+file.name.slice(0,20).toUpperCase());
         resolve();
       };
-      img.onerror=()=>{ alert('画像を読み込めません: '+file.name); resolve(); };
+      img.onerror=()=>{ flashLive('画像を読み込めません: '+file.name); resolve(); };
       img.src=rd.result;
     };
     rd.onerror=()=>resolve();
@@ -2495,7 +2586,7 @@ function removeSelectedTracks(){
 
 function removeTrack(idx){
   if(lockedGuard(state.tracks[idx])) return; // SPEC_11 P4-2
-  if(state.tracks.length<=1){ alert('最後のトラックは削除できません'); return; }
+  if(state.tracks.length<=1){ flashLive('最後のトラックは削除できません'); return; }
   state.tracks.splice(idx,1);
   sanitizeParents(); // 削除トラックを親にしていた子は親なしへ
   recalcTotalFrames();
@@ -4467,7 +4558,7 @@ function buildProjectPayload(){
   };
 }
 function exportProject(){
-  const out=buildProjectPayload(); if(!out){ alert('プロジェクト未読込'); return; }
+  const out=buildProjectPayload(); if(!out){ flashLive('プロジェクト未読込'); return; }
   const blob=new Blob([JSON.stringify(out)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -4715,11 +4806,11 @@ function pickVideoMime(){
 async function exportVideoComposer(){
   if(!state.totalFrames) return;
   const mime=pickVideoMime();
-  if(!mime){ alert('このブラウザは動画書き出し(MediaRecorder)に未対応です'); return; }
+  if(!mime){ modalAlert('このブラウザは動画書き出し(MediaRecorder)に未対応です'); return; }
   const total=state.totalFrames;
   const secs=(total/state.fps).toFixed(1);
   const ext=mime.includes('mp4')?'mp4':'webm';
-  if(!confirm(`全 ${total}コマ（約${secs}秒）を ${ext.toUpperCase()} で書き出します。\n実時間レンダリングのため約${secs}秒かかります。続行しますか？`)) return;
+  if(!await modalConfirm(`全 ${total}コマ（約${secs}秒）を ${ext.toUpperCase()} で書き出します。\n実時間レンダリングのため約${secs}秒かかります。続行しますか？`)) return;
   pause();
   gExportCancel=false;
   $('#export-msg').textContent='EXPORTING VIDEO ('+ext.toUpperCase()+')';
@@ -4731,7 +4822,7 @@ async function exportVideoComposer(){
   const stream=oc.captureStream(state.fps);
   let rec;
   try{ rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:16000000}); }
-  catch(e){ endRender(); ov.classList.remove('show'); alert('MediaRecorderの初期化に失敗: '+e.message); return; }
+  catch(e){ endRender(); ov.classList.remove('show'); modalAlert('MediaRecorderの初期化に失敗: '+e.message); return; }
   const chunks=[];
   rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
   const recStopped=new Promise(res=>{rec.onstop=res;});
@@ -5381,7 +5472,7 @@ async function loadAudioFile(file){
     $('#tl-audio-name').textContent=audio.fileName;
     renderAudioWaveform();
     updateTrackHeights();
-  }catch(e){ alert('音声読み込みエラー: '+e.message); }
+  }catch(e){ modalAlert('音声読み込みエラー: '+e.message); }
 }
 
 function extractAudioPeaks(buffer, numBins){
@@ -5518,10 +5609,10 @@ $('#btn-import').addEventListener('click',()=>{ $('#file-input').click(); });
 $('#btn-paste-json').addEventListener('click',async()=>{
   let j='';
   try{ j=await navigator.clipboard.readText(); }
-  catch(e){ j=prompt('PASTE PROJECT JSON:')||''; } // クリップボード不許可環境のフォールバック
+  catch(e){ j=await modalPrompt('PASTE PROJECT JSON:','')||''; } // クリップボード不許可環境のフォールバック（iPadはここに落ちる）
   if(!j.trim()){ flashLive('クリップボードが空です'); return; }
   try{ importJSON(JSON.parse(j)); flashLive('📋 JSON PASTED'); }
-  catch(err){ alert('JSON error: '+err.message); }
+  catch(err){ modalAlert('JSON error: '+err.message); }
 });
 // 連番画像グループ → 1トラックのシーケンス（1画像=1コマ）。OBANの addFiles と同じ判定。
 function fileToDataURL(f){
@@ -5537,7 +5628,7 @@ async function importImageSeq(items, name){
     }
     cells.push({kind:'draw',duration:1,image:src});
   }
-  if(!w){ alert('画像を読み込めません: '+name); return; }
+  if(!w){ flashLive('画像を読み込めません: '+name); return; }
   importJSON({ format:'IMAGE_v1', type:'image', name:name.toUpperCase(), width:w, height:h, cells });
   flashLive('🎞 SEQ TRACK: '+name.slice(0,18).toUpperCase()+' ('+cells.length+'枚)');
 }
@@ -5552,7 +5643,7 @@ async function importFiles(files){
     if(file.type.startsWith('audio/')){ await loadAudioFile(file); }
     else{
       try{ importJSON(JSON.parse(await file.text())); }
-      catch(err){ alert('JSON error: '+err.message); }
+      catch(err){ modalAlert('JSON error: '+err.message); }
     }
   }
   // 画像を連番グループに仕分け（OBANと同一ルール: 3〜5桁の連番で終わる同名グループ）

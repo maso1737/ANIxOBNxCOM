@@ -1,0 +1,1711 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BRUSH LAB">
+<title>BRUSH LAB — TOOL MECHANICS LAB_05</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Cormorant+Garamond:ital,wght@0,700;1,700&display=swap">
+<style>
+/* ===================== KINETIC STAGE tokens（このシリーズ＝gold） ===================== */
+:root{
+  /* SPEC_18 P0 — iPad standalone の安全域。実測 top=32px / bottom=20px（SPEC_18 §2-3）。
+     ブラウザ表示や PC では 0px になるので見た目は1pxも変わらない。正準は oban-builder.html の #bar */
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+
+  --rouge:#FF4FA8; --ice:#5AE9FF; --gold:#FFD27A; --lavender:#B58EFF; --magenta:#B850FF;
+  --bg-0:#07030f; --bg-1:#0c061d; --panel:#150927; --panel-2:#100728; --cell:#0d0620;
+  --white:#F8EFFF; --ink:#0a0612;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --disp:'Barlow Condensed',sans-serif;
+  --orn:'Cormorant Garamond',serif;
+  --jp:'Noto Sans JP',sans-serif;
+  --grad-btn:linear-gradient(135deg,#FF4FA8,#B850FF);
+  --grad-gold:linear-gradient(120deg,#FFE9B0,#FFD27A 40%,#FF4FA8 100%);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; overflow:hidden; background:var(--bg-1); color:var(--white);
+  font-family:var(--mono); font-size:12px; -webkit-font-smoothing:antialiased;
+  overscroll-behavior:none; touch-action:manipulation;
+}
+#app{
+  /* iPad: ホーム画面から起動（standalone）すると上に不透明バーが出る。SPEC_18 の実測 top 32 / bottom 20 */
+  height:100vh; height:100dvh;
+  padding-top:var(--safe-t); padding-bottom:var(--safe-b);
+  display:grid;
+  grid-template-rows:44px 1fr 44px;
+  grid-template-columns:1fr 300px;
+  grid-template-areas:"top top" "main side" "bot bot";
+}
+/* ===================== topbar / bottombar ===================== */
+#topbar{
+  grid-area:top; display:flex; align-items:center; gap:14px;
+  padding:0 calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
+  border-bottom:1px solid rgba(255,210,122,.18); background:var(--panel-2);
+}
+#topbar .lec{font-size:9px; letter-spacing:.34em; color:var(--gold); opacity:.85}
+#topbar .ttl{
+  font-family:var(--disp); font-style:italic; font-weight:900; font-size:20px;
+  letter-spacing:.04em; text-transform:uppercase;
+  background:var(--grad-gold); -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+#topbar .sub{font-family:var(--jp); font-size:10px; color:#9c8cb8; letter-spacing:.12em}
+#topbar .sp{margin-left:auto; display:flex; gap:10px; align-items:center}
+.tb-btn{
+  font-family:var(--mono); font-size:9px; letter-spacing:.24em; color:var(--gold);
+  border:1px solid rgba(255,210,122,.34); border-radius:3px; padding:5px 9px;
+  background:transparent; cursor:pointer;
+}
+.tb-btn:hover{background:rgba(255,210,122,.1); box-shadow:0 0 8px rgba(255,210,122,.28)}
+.tb-btn.on{background:var(--grad-btn); border-color:transparent; color:#fff}
+#bottombar{
+  grid-area:bot; display:flex; align-items:center; gap:16px; padding:0 16px;
+  border-top:1px solid rgba(255,210,122,.18); background:var(--panel-2);
+  font-size:10px; letter-spacing:.14em; color:#9c8cb8;
+}
+#bottombar b{color:var(--ice); font-weight:500; text-shadow:0 0 8px rgba(90,233,255,.4)}
+#bottombar .warn{color:var(--rouge)}
+/* ===================== main / stage ===================== */
+#main{grid-area:main; position:relative; overflow:hidden; background:var(--bg-0)}
+.stage-grid{
+  position:absolute; inset:0; pointer-events:none; opacity:.05;
+  background-image:linear-gradient(rgba(181,142,255,.6) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(181,142,255,.6) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+.corner{position:absolute; width:16px; height:16px; pointer-events:none; opacity:.5}
+.corner.tl{top:10px;left:10px;border-top:1px solid var(--gold);border-left:1px solid var(--gold)}
+.corner.tr{top:10px;right:10px;border-top:1px solid var(--gold);border-right:1px solid var(--gold)}
+.corner.bl{bottom:10px;left:10px;border-bottom:1px solid var(--gold);border-left:1px solid var(--gold)}
+.corner.br{bottom:10px;right:10px;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold)}
+#canvas-wrap{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  gap:10px; padding:30px 34px 46px;
+}
+.cv-box{position:relative; display:flex; flex-direction:column; gap:5px; min-width:0; min-height:0}
+.cv-lbl{font-size:8.5px; letter-spacing:.3em; color:var(--gold); opacity:.8; height:11px}
+.cv-lbl em{font-style:normal; color:#7d6e99}
+canvas.paint{
+  display:block; border:1px solid rgba(255,210,122,.3); border-radius:2px;
+  touch-action:none; cursor:crosshair; background:#000;
+  image-rendering:auto;
+}
+canvas.paint.dim{opacity:.999}
+/* HUD chips */
+#hud{position:absolute; top:14px; left:16px; display:flex; flex-wrap:wrap; gap:6px; pointer-events:none; max-width:60%}
+.chip{
+  font-size:8.5px; letter-spacing:.2em; padding:3px 7px; border-radius:2px;
+  border:1px solid rgba(255,210,122,.3); background:rgba(12,6,29,.78); color:var(--gold);
+}
+.chip b{color:var(--ice); font-weight:500}
+.chip.hot{border-color:var(--rouge); color:var(--rouge)}
+/* 左下 数値ミニビュー */
+#mini-num{
+  position:absolute; left:16px; bottom:14px; width:328px; padding:9px 11px; pointer-events:none;
+  background:rgba(12,6,29,.86); border:1px solid rgba(255,210,122,.26); border-radius:3px;
+  backdrop-filter:blur(6px);
+}
+/* 右下 構造ミニビュー */
+#mini-sec{
+  position:absolute; right:16px; bottom:14px; width:300px; padding:9px 11px; pointer-events:none;
+  background:rgba(12,6,29,.86); border:1px solid rgba(255,210,122,.26); border-radius:3px;
+  backdrop-filter:blur(6px);
+}
+.mini-t{font-size:8px; letter-spacing:.34em; color:var(--gold); margin-bottom:7px; opacity:.9}
+#sec-cv{display:block; width:100%; height:74px; border-radius:2px; background:rgba(0,0,0,.36)}
+.data-row{display:flex; justify-content:space-between; gap:8px; font-size:9.5px; line-height:1.65}
+.dk{color:#8b7ba8; letter-spacing:.1em}
+.dv{color:var(--gold); font-variant-numeric:tabular-nums}
+.dv.neon{color:var(--ice); text-shadow:0 0 8px rgba(90,233,255,.4)}
+.dv.bad{color:var(--rouge); text-shadow:0 0 8px rgba(255,79,168,.4)}
+/* ===================== side ===================== */
+#side{
+  grid-area:side; overflow-y:auto; overflow-x:hidden; background:var(--panel);
+  border-left:1px solid rgba(255,210,122,.18);
+}
+#side::-webkit-scrollbar{width:2px}
+#side::-webkit-scrollbar-thumb{background:var(--rouge)}
+.sp{padding:11px 13px; border-bottom:1px solid rgba(255,210,122,.12)}
+.spl{font-size:8.5px; letter-spacing:.4em; color:var(--gold); margin-bottom:9px; opacity:.9}
+.spl em{font-style:normal; color:#7d6e99; letter-spacing:.1em; font-size:8px}
+.tr{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:7px 0}
+.tr .lb{font-size:9.5px; letter-spacing:.11em; color:#b3a3cc; flex:1; min-width:0}
+.tr .lb .cond{display:block; font-size:8px; color:#6d5f88; letter-spacing:.05em; margin-top:1px}
+.tr .vl{font-size:9.5px; color:var(--gold); font-variant-numeric:tabular-nums; min-width:38px; text-align:right}
+.tr.off{opacity:.34; pointer-events:none}
+.tr.off .vl{color:#6d5f88}
+input[type=range]{
+  -webkit-appearance:none; appearance:none; width:100%; height:16px; background:transparent; cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track{height:2px; background:rgba(255,210,122,.24); border-radius:2px}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:11px; height:11px; margin-top:-4.5px; border-radius:50%;
+  background:linear-gradient(135deg,var(--gold),var(--rouge)); border:0;
+}
+input[type=range]:disabled::-webkit-slider-thumb{background:#5a4d75}
+.row-sld{margin:2px 0 8px}
+/* chips row */
+.fps{display:flex; flex-wrap:wrap; gap:4px}
+.fp{
+  font-size:8.5px; letter-spacing:.16em; padding:4px 7px; border-radius:2px; cursor:pointer;
+  border:1px solid rgba(255,210,122,.28); color:#b3a3cc; background:transparent; user-select:none;
+}
+.fp:hover{background:rgba(255,210,122,.09)}
+.fp.on{background:var(--grad-btn); border-color:transparent; color:#fff; box-shadow:0 0 12px rgba(255,79,168,.4)}
+/* toggle */
+.tg{width:34px; height:17px; border-radius:9px; border:1px solid rgba(255,210,122,.34); position:relative; cursor:pointer; flex:none}
+.tg::after{content:''; position:absolute; top:2px; left:2px; width:11px; height:11px; border-radius:50%; background:#6d5f88; transition:.15s}
+.tg.on{background:var(--grad-btn); border-color:transparent}
+.tg.on::after{left:19px; background:#fff}
+/* preset list */
+.pre{
+  display:flex; align-items:center; gap:8px; padding:6px 7px; border-radius:3px; cursor:pointer;
+  border:1px solid transparent; margin-bottom:3px;
+}
+.pre:hover{background:rgba(255,210,122,.07)}
+.pre.on{border-color:var(--gold); background:rgba(255,210,122,.11)}
+.pre .no{font-family:var(--orn); font-style:italic; font-size:14px; color:var(--gold); width:16px; text-align:center}
+.pre .nm{font-size:10px; letter-spacing:.18em; color:var(--white)}
+.pre .jp{font-family:var(--jp); font-size:8.5px; color:#8b7ba8; letter-spacing:.06em}
+.pre .md{margin-left:auto; font-size:7.5px; letter-spacing:.16em; padding:2px 5px; border-radius:2px}
+.pre .md.line{color:var(--ice); border:1px solid rgba(90,233,255,.4)}
+.pre .md.stamp{color:var(--rouge); border:1px solid rgba(255,79,168,.4)}
+/* drop */
+.drop{
+  border:1px dashed rgba(255,210,122,.36); border-radius:3px; padding:9px; text-align:center;
+  font-size:8.5px; letter-spacing:.16em; color:#8b7ba8; cursor:pointer; margin:4px 0;
+}
+.drop:hover,.drop.over{border-color:var(--gold); color:var(--gold); background:rgba(255,210,122,.07)}
+.drop .thumb{display:block; width:44px; height:44px; margin:5px auto 3px; border:1px solid rgba(255,210,122,.3); background:#000; object-fit:contain}
+.ed-btn{
+  width:100%; font-family:var(--mono); font-size:9px; letter-spacing:.24em; padding:7px;
+  border:1px solid var(--rouge); color:var(--rouge); background:transparent; border-radius:3px; cursor:pointer;
+}
+.ed-btn:hover{background:rgba(255,79,168,.12); box-shadow:0 0 10px rgba(255,79,168,.3)}
+.ed-btn.gold{border-color:var(--gold); color:var(--gold)}
+.ed-btn.gold:hover{background:rgba(255,210,122,.12); box-shadow:0 0 10px rgba(255,210,122,.3)}
+.ed-btn.ok{background:#2f7d4f; border-color:#2f7d4f; color:#fff}
+.ed-btn.ng{background:#7d2f3f; border-color:#7d2f3f; color:#fff}
+.btn2{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+.hint{font-family:var(--jp); font-size:8.5px; line-height:1.75; color:#7d6e99; letter-spacing:.04em; margin-top:7px}
+.hint b{color:var(--gold); font-weight:500}
+.swatches{display:flex; flex-wrap:wrap; gap:4px}
+.sw{width:20px; height:20px; border-radius:2px; cursor:pointer; border:1px solid rgba(255,255,255,.14)}
+.sw.on{border-color:var(--gold); box-shadow:0 0 8px rgba(255,210,122,.6)}
+/* ===================== modal ===================== */
+#shortcut-modal,#bench-modal{
+  position:fixed; inset:0; background:rgba(7,3,15,.86); display:none; align-items:center; justify-content:center; z-index:50;
+  backdrop-filter:blur(3px);
+}
+#shortcut-modal.on,#bench-modal.on{display:flex}
+.sc-box{
+  width:min(620px,92vw); max-height:82vh; overflow:auto; background:var(--panel);
+  border:1px solid rgba(255,210,122,.3); border-radius:4px; padding:18px 20px;
+}
+.sc-header{
+  display:flex; justify-content:space-between; font-size:10px; letter-spacing:.3em;
+  color:var(--gold); border-bottom:1px solid rgba(255,210,122,.2); padding-bottom:9px; margin-bottom:12px;
+}
+.sc-header span{cursor:pointer}
+.sc-section-lbl{font-size:8.5px; letter-spacing:.34em; color:var(--lavender); margin:13px 0 6px}
+.sc-row{display:flex; gap:10px; align-items:baseline; margin:4px 0; font-size:10px}
+.sc-key{
+  font-size:9px; letter-spacing:.1em; padding:2px 6px; border-radius:2px; color:var(--gold);
+  border:1px solid rgba(255,210,122,.3); min-width:52px; text-align:center; flex:none;
+}
+.sc-desc{color:#b3a3cc; font-family:var(--jp); font-size:9.5px; letter-spacing:.04em}
+table.bench{width:100%; border-collapse:collapse; font-size:10px; margin-top:8px}
+table.bench th,table.bench td{border-bottom:1px solid rgba(255,210,122,.14); padding:5px 7px; text-align:right}
+table.bench th{color:var(--gold); font-size:8.5px; letter-spacing:.2em; text-align:right}
+table.bench td:first-child,table.bench th:first-child{text-align:left; color:#b3a3cc}
+table.bench td b{color:var(--ice)}
+table.bench td .bad{color:var(--rouge)}
+.verdict{margin-top:12px; font-family:var(--jp); font-size:10.5px; line-height:1.8; color:#c9bbdd}
+.verdict b{color:var(--gold)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="lec">TOOL_MECHANICS // LAB_05</span>
+    <span class="ttl">Brush Lab</span>
+    <span class="sub">筆の粒 ─ 1本の線は何枚のハンコでできているか</span>
+    <span class="sp" style="margin-left:auto">
+      <button class="tb-btn" id="b-mode">MODE ▸ PAINT</button>
+      <button class="tb-btn" id="b-bench">⚑ BENCH</button>
+      <button class="tb-btn" id="b-undo" title="1ストローク戻す（Ctrl+Z）">↶ UNDO</button>
+      <button class="tb-btn" id="b-clear">✕ CLEAR</button>
+      <button class="tb-btn" id="sc-open-btn">⌨ SHORTCUTS</button>
+    </span>
+  </div>
+
+  <div id="main">
+    <div class="stage-grid"></div>
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+
+    <div id="canvas-wrap">
+      <div class="cv-box" id="box-a">
+        <div class="cv-lbl" id="lbl-a">BRUSH</div>
+        <canvas id="cv-a" class="paint"></canvas>
+      </div>
+      <div class="cv-box" id="box-b" style="display:none">
+        <div class="cv-lbl" id="lbl-b">ECONTE 現行 <em>（硬い丸ペン）</em></div>
+        <canvas id="cv-b" class="paint"></canvas>
+      </div>
+    </div>
+
+    <div id="hud"></div>
+
+    <div id="mini-num">
+      <div class="mini-t">◈ MEASURE — 直前のストローク</div>
+      <div class="data-row"><span class="dk">スタンプ枚数</span><span class="dv neon" id="m-stamps">—</span></div>
+      <div class="data-row"><span class="dk">区間数 / 1区間あたり</span><span class="dv" id="m-seg">—</span></div>
+      <div class="data-row"><span class="dk">描画にかかった時間</span><span class="dv" id="m-ms">—</span></div>
+      <div class="data-row"><span class="dk">1区間の最悪値（16.7ms=1コマ）</span><span class="dv" id="m-worst">—</span></div>
+      <div class="data-row"><span class="dk">実spacing（px）</span><span class="dv" id="m-sp">—</span></div>
+      <div class="data-row"><span class="dk">tipキャッシュ ヒット率</span><span class="dv" id="m-cache">—</span></div>
+      <div class="data-row"><span class="dk">まとめ合成の追加（離した瞬間）</span><span class="dv" id="m-whole">—</span></div>
+    </div>
+
+    <div id="mini-sec">
+      <div class="mini-t">◈ SECTION — 1区間の中身</div>
+      <canvas id="sec-cv" width="560" height="148"></canvas>
+    </div>
+  </div>
+
+  <div id="side"></div>
+
+  <div id="bottombar">
+    <span>OUT <b id="s-res">1280×720</b></span>
+    <span>MODE <b id="s-mode">PAINT</b></span>
+    <span>BRUSH <b id="s-brush">01 PENCIL</b></span>
+    <span id="s-note"></span>
+    <span style="margin-left:auto" id="s-save">—</span>
+  </div>
+</div>
+
+<div id="shortcut-modal"><div class="sc-box">
+  <div class="sc-header">⌨ KEYBOARD SHORTCUTS <span id="sc-close">✕</span></div>
+  <div class="sc-section-lbl">VIEW</div>
+  <div class="sc-row"><span class="sc-key">M</span><span class="sc-desc">モード循環 PAINT → SPLIT → SHEET</span></div>
+  <div class="sc-row"><span class="sc-key">L</span><span class="sc-desc">出力解像度 LINE 1280 ⇄ COLOR 512（econte の描く先と同じ）</span></div>
+  <div class="sc-row"><span class="sc-key">B</span><span class="sc-desc">背景を循環（黒 / 濃紺 / 中グレー / 白 / 参照画像）</span></div>
+  <div class="sc-row"><span class="sc-key">D</span><span class="sc-desc">スタンプの粒を可視化（ON で1枚ごとに赤い点）</span></div>
+  <div class="sc-section-lbl">BRUSH</div>
+  <div class="sc-row"><span class="sc-key">1 – 6</span><span class="sc-desc">プリセット直接選択</span></div>
+  <div class="sc-row"><span class="sc-key">P</span><span class="sc-desc">プリセット循環</span></div>
+  <div class="sc-row"><span class="sc-key">[ ]</span><span class="sc-desc">太さ ±（右ドラッグでも変えられる＝ANIMATOR と同じ手癖）</span></div>
+  <div class="sc-row"><span class="sc-key">Alt+click</span><span class="sc-desc">スポイト（キャンバスから色を拾う）</span></div>
+  <div class="sc-section-lbl">EDIT</div>
+  <div class="sc-row"><span class="sc-key">Ctrl+Z</span><span class="sc-desc">1ストローク戻す（8手まで）</span></div>
+  <div class="sc-row"><span class="sc-key">X</span><span class="sc-desc">キャンバス消去</span></div>
+  <div class="sc-row"><span class="sc-key">S</span><span class="sc-desc">PNG で書き出す</span></div>
+  <div class="sc-row"><span class="sc-key">V</span><span class="sc-desc">BENCH（重さを実測）</span></div>
+  <div class="sc-row"><span class="sc-key">?</span><span class="sc-desc">この一覧</span></div>
+  <div class="sc-row"><span class="sc-key">Esc</span><span class="sc-desc">モーダルを閉じる → INDEX へ戻る</span></div>
+  <div class="sc-section-lbl">IPAD</div>
+  <div class="sc-row"><span class="sc-key">ペン</span><span class="sc-desc">描く。<b>指では描けません</b>（手のひら対策・SPEC_18 第一原則）</span></div>
+  <div class="sc-row"><span class="sc-key">指</span><span class="sc-desc">パネルのスクロール・つまみ・ボタン</span></div>
+  <div class="sc-row"><span class="sc-key">上のバー</span><span class="sc-desc">キーボードが無いので MODE / UNDO / CLEAR / BENCH はボタンから</span></div>
+  <div class="sc-row"><span class="sc-key">太さ</span><span class="sc-desc">右ドラッグは使えないので SIZE スライダーで</span></div>
+</div></div>
+
+<div id="bench-modal"><div class="sc-box">
+  <div class="sc-header">⚑ BENCH — このブラシは econte に入れて重いか <span id="bench-close">✕</span></div>
+  <div id="bench-body"></div>
+</div></div>
+
+<script>
+'use strict';
+/* ============================================================================
+   BRUSH LAB — TOOL MECHANICS LAB_05
+   目的: econte.html にブラシを増やす前に「絵柄」と「重さ」をここで決める。
+   このラボが本体に渡すのは §ENGINE の関数1本だけ（strokeSegBrush）。
+   枠配り・Undo・消しゴムはラボでは持たない（econte 本体の仕事）。
+   ========================================================================= */
+
+const $ = s => document.querySelector(s);
+const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
+const lerp = (a,b,t) => a + (b-a)*t;
+
+/* [econte 転載] 出力寸法。実機 econte.html の CONTE_W/H と PLATE_K */
+const CONTE_W = 1280, CONTE_H = 720;
+const PLATE_K = 512 / CONTE_W;          // = 0.4（色の解像度）
+
+/* ============================================================================
+   §PRESETS — 「5,6種で足りる」の6種
+   ---------------------------------------------------------------------------
+   mode:'line'  … 今の econte と同じ ctx.stroke() 1回。追加コストほぼゼロ
+   mode:'stamp' … ハンコを撒く。絵柄は出るが枚数ぶん重い
+   ========================================================================= */
+const DEF = {
+  mode:'stamp', shape:'soft', size:24, opacity:1, flow:.5,
+  spacing:.10, jitter:0, sizeJit:0, angJit:0,
+  hardness:.0, grain:0, roundness:1, rotate:false, angle:0,
+  blend:'source-over',
+  pSize:.5, pOpa:.4, spdSize:0, spdOpa:0,
+  smooth:.25, taperIn:0, taperOut:0,
+  img:null, imgInvert:false, imgRev:0
+};
+function mk(o){ return Object.assign({}, DEF, o); }
+
+const PRESETS = [
+  mk({ id:'pencil', name:'PENCIL', jp:'鉛筆・線', mode:'line', shape:'soft',
+       size:5, opacity:.9, flow:1, hardness:1, pSize:.6, pOpa:.5, smooth:.3, taperIn:.10 }),
+  mk({ id:'marker', name:'MARKER', jp:'マーカー・面', mode:'line', shape:'soft',
+       size:34, opacity:.55, flow:1, hardness:1, pSize:.15, pOpa:.2, smooth:.4 }),
+  mk({ id:'flat', name:'FLAT', jp:'平筆・角度で太さが変わる', mode:'stamp', shape:'flat',
+       size:40, opacity:.85, flow:.9, spacing:.06, roundness:.16, rotate:false, angle:38,
+       pSize:.4, pOpa:.3, smooth:.3 }),
+  mk({ id:'air', name:'AIR', jp:'エアブラシ・ボケ足大', mode:'stamp', shape:'soft',
+       size:120, opacity:.7, flow:.06, spacing:.05, hardness:0, pSize:.3, pOpa:.7, smooth:.5 }),
+  mk({ id:'glow', name:'GLOW', jp:'光・1ストロークで光る', mode:'stamp', shape:'glow',
+       size:90, opacity:.9, flow:.10, spacing:.05, blend:'lighter', hardness:0,
+       pSize:.35, pOpa:.6, smooth:.5 }),
+  mk({ id:'grit', name:'GRIT', jp:'ざらつき・汚れ', mode:'stamp', shape:'soft',
+       size:52, opacity:.8, flow:.45, spacing:.16, jitter:.35, sizeJit:.4, angJit:1,
+       hardness:.25, grain:.75, pSize:.5, pOpa:.5, smooth:.2 })
+];
+
+/* ============================================================================
+   §ENGINE — ★ここが econte に移す本体★
+   ---------------------------------------------------------------------------
+   移植の契約:
+     econte.html の strokePatchSeg() の中の
+        ctx.beginPath(); ctx.moveTo/lineTo; ctx.stroke();
+     を strokeSegBrush(ctx, a, b, B, env) 1行に差し替える。
+   注意（移植で必ず要る2点）:
+     1) スタンプは「区間をまたいで間隔を保つ」ので、ストローク状態 BS を
+        paintDown で brushDown() / paintUp で brushUp() する必要がある。
+     2) 太さが変わる（sizeJit / 筆圧 / taper）ので、econte の txTouch に渡す
+        矩形は「その区間で実際に使った最大サイズ」で取る（下の env.usedMax）。
+   ========================================================================= */
+
+let BS = null;                     // ストローク状態（間隔・進行距離の持ち越し）
+let MET = null;                    // 計測
+
+function brushDown(seed){
+  BS = { carry:0, dist:0, n:0, seed:(seed|0) || ((Math.random()*1e9)|0), lastAng:0 };
+  MET = { stamps:0, segs:0, ms:0, worst:0, sp:0, hit:0, miss:0 };
+}
+function brushUp(){ BS = null; }
+
+/* 決定論の乱数（seed から。スタンプ番号で回す＝毎回同じ絵になる＝比較できる） */
+function rnd(i){
+  let x = (BS ? BS.seed : 1) ^ (i * 0x9E3779B1);
+  x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
+  return x / 4294967296;
+}
+
+/* ===========================================================================
+   ★ PLAN と DRAW を分ける（econte の二重描画対策・2026-09-02）★
+   ---------------------------------------------------------------------------
+   econte の strokeSeg() は、区間の両端が別の枠に落ちると
+   **同じ区間を2枚のパッチに引く**（econte.html:5563-5570 で実物を確認済み）。
+   ストロークの進行に依存する値（間隔の持ち越し・進行距離・粒の番号）を
+   描画側で進めると2回ぶん進んでしまい、**枠の境目で継ぎ目が出る**。
+
+     plan … BS を1回だけ進める。何をどこに置くかを決める（1区間につき1回）
+     draw … BS を一切触らない純関数。何回呼んでも同じ絵（パッチの枚数ぶん呼ぶ）
+
+   econte 側はこう書く:
+     const plan = brushPlanSeg(a, b, B, env);          // ← 1回だけ
+     strokePatchSegBake(cut, ka, kind, a, b, plan);
+     if(kb !== ka) strokePatchSegBake(cut, kb, kind, a, b, plan);
+
+   `plan.bbox` は**実際に描かれる範囲**（jitter のはみ出し・回転ぶんを含む）なので、
+   econte の txTouch にはこれをそのまま渡す。`lw/2+1` では足りない。
+   不変条件は __BLAB__.crossCheck() が機械で検証する。
+   ========================================================================= */
+
+/* --- 太さ / 濃さの決まり方（Procreate の dynamics* に対応） --- */
+function dynSize(B, env){
+  let k = 1;
+  k *= lerp(1 - B.pSize, 1, env.press);                    // dynamicsPressureSize
+  k *= lerp(1, clamp(1 - env.speed, .25, 1), B.spdSize);   // dynamicsSpeedSize
+  if(B.taperIn > 0 && BS){                                  // taperStartLength
+    const need = env.size * B.taperIn * 6;
+    if(BS.dist < need) k *= lerp(.12, 1, BS.dist / need);
+  }
+  if(B.taperOut > 0 && env.tailT != null){                  // taperEndLength（全長既知のときだけ）
+    if(env.tailT < B.taperOut) k *= lerp(.12, 1, env.tailT / B.taperOut);
+  }
+  return Math.max(.35, env.size * k);
+}
+function dynAlpha(B, env){
+  let a = B.opacity;
+  a *= lerp(1 - B.pOpa, 1, env.press);                     // dynamicsPressureOpacity
+  a *= lerp(1, clamp(1 - env.speed, .3, 1), B.spdOpa);     // dynamicsSpeedOpacity
+  return clamp(a, 0, 1);
+}
+
+/* --- (1) 計画。BS を進めるのはここだけ ---------------------------------- */
+function brushPlanSeg(a, b, B, env){
+  if(!BS) brushDown();
+  return B.mode === 'line' ? planLine(a, b, B, env) : planStamp(a, b, B, env);
+}
+function planLine(a, b, B, env){
+  const lw = dynSize(B, env);
+  const alpha = dynAlpha(B, env);
+  BS.dist += Math.hypot(b.x - a.x, b.y - a.y);
+  const pad = lw / 2 + 1;
+  return { mode:'line', B:B, color:env.color, erase:!!env.erase, lw:lw, alpha:alpha,
+           a:{ x:a.x, y:a.y }, b:{ x:b.x, y:b.y },
+           bbox:[ Math.min(a.x,b.x)-pad, Math.min(a.y,b.y)-pad,
+                  Math.max(a.x,b.x)+pad, Math.max(a.y,b.y)+pad ] };
+}
+function planStamp(a, b, B, env){
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  const size0 = dynSize(B, env);
+  const sp = Math.max(.6, size0 * B.spacing);      // ★重さを決めるのはここ
+  if(MET) MET.sp = sp;
+  const dirAng = len > .001 ? Math.atan2(dy, dx) : BS.lastAng;
+  BS.lastAng = dirAng;
+  const alpha = dynAlpha(B, env) * B.flow;
+
+  const stamps = [];
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  function put(px, py, sz, an){
+    const tw = tipPx(sz);
+    const rot = B.rotate ? an : (B.angJit > 0 ? an : B.angle * Math.PI / 180);
+    /* 回すと正方形のタイルの角まで届きうるので、そのぶん広く取る。
+       この bbox がそのまま econte の txTouch に渡る＝Undo の取りこぼし対策 */
+    const ext = (Math.abs(rot) > 1e-4 ? tw * 0.7072 : tw / 2);
+    stamps.push({ x:px, y:py, tw:tw, rot:rot, variant:B.grain > 0 ? ((BS.n + stamps.length) & 3) : 0 });
+    if(px - ext < x0) x0 = px - ext;
+    if(py - ext < y0) y0 = py - ext;
+    if(px + ext > x1) x1 = px + ext;
+    if(py + ext > y1) y1 = py + ext;
+  }
+
+  let d = BS.carry;
+  if(len < .001 && BS.n === 0) put(a.x, a.y, size0, dirAng);
+  while(d <= len){
+    const t = len > 0 ? d / len : 0;
+    const i = BS.n + stamps.length;
+    let px = a.x + dx * t, py = a.y + dy * t;
+    let sz = size0, an = dirAng;
+    if(B.jitter > 0){
+      px += (rnd(i * 3 + 1) - .5) * size0 * B.jitter;
+      py += (rnd(i * 3 + 2) - .5) * size0 * B.jitter;
+    }
+    if(B.sizeJit > 0) sz *= lerp(1, .35 + rnd(i * 3 + 3) * .9, B.sizeJit);
+    if(B.angJit > 0)  an += (rnd(i * 5 + 7) - .5) * Math.PI * 2 * B.angJit;
+    put(px, py, sz, an);
+    d += sp;
+  }
+  BS.n += stamps.length;
+  BS.carry = d - len;
+  BS.dist += len;
+  return { mode:'stamp', B:B, color:env.color, erase:!!env.erase, alpha:alpha, stamps:stamps,
+           bbox: stamps.length ? [x0, y0, x1, y1] : [0, 0, -1, -1] };
+}
+
+/* --- (2) 描画。BS を一切触らない純関数。何回呼んでも同じ絵 -------------- */
+function brushDrawSeg(ctx, plan, xf){
+  if(!plan) return;
+  const t0 = performance.now();
+  const ox = xf ? (xf.ox || 0) : 0, oy = xf ? (xf.oy || 0) : 0, sc = xf ? (xf.s || 1) : 1;
+  const B = plan.B;
+  const op = plan.erase ? 'destination-out' : B.blend;
+  ctx.save();
+  ctx.globalCompositeOperation = op;
+  if(plan.mode === 'line'){
+    ctx.globalAlpha = plan.alpha;
+    ctx.strokeStyle = plan.color;
+    ctx.lineWidth = Math.max(.5, plan.lw * sc);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(plan.a.x * sc + ox, plan.a.y * sc + oy);
+    ctx.lineTo(plan.b.x * sc + ox + (plan.a.x === plan.b.x && plan.a.y === plan.b.y ? .01 : 0),
+               plan.b.y * sc + oy);
+    ctx.stroke();
+    if(MET) MET.stamps += 1;
+  }else{
+    ctx.globalAlpha = clamp(plan.alpha, 0, 1);
+    for(let i = 0; i < plan.stamps.length; i++){
+      const st = plan.stamps[i];
+      const tip = getTip(B, st.tw * sc, plan.color, st.variant);
+      if(!tip) continue;
+      const half = tip.width / 2;
+      const px = st.x * sc + ox, py = st.y * sc + oy;
+      if(Math.abs(st.rot) < 1e-4 && B.roundness >= .999){
+        ctx.drawImage(tip, px - half, py - half);
+      }else{
+        ctx.translate(px, py);
+        ctx.rotate(st.rot);
+        ctx.scale(1, B.roundness);
+        ctx.drawImage(tip, -half, -half);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      }
+      if(MET) MET.stamps++;
+      if(SHOW_DOTS) DOTS.push({ x:px, y:py, r:half });
+    }
+  }
+  ctx.restore();
+  const dt = performance.now() - t0;
+  if(MET){ MET.segs++; MET.ms += dt; if(dt > MET.worst) MET.worst = dt; }
+}
+
+/* --- (3) 1枚のキャンバスに引くだけの近道（ラボの PAINT / SHEET 用）------ */
+function strokeSegBrush(ctx, a, b, B, env){
+  brushDrawSeg(ctx, brushPlanSeg(a, b, B, env));
+}
+
+/* --- tip（色つきハンコ）のキャッシュ ---------------------------------------
+   サイズを丸めてキーにする＝毎フレーム作り直さないための定石。
+   ここを外すと同じ設定でも桁で重くなる（BENCH で確かめられる）。 */
+const TIP_CACHE = new Map();
+const TIP_MAX = 160;
+/* サイズを粗く丸める。太いほど刻みも大きくしないと sizeJit でキャッシュが総崩れする
+   （実測: 52px + sizeJit40% で 24バケット → 上限96を4種で割り切れず入れ替わり続けた）。
+   plan 側で bbox を出すのにも同じ値が要るので関数に出してある */
+function tipPx(size){
+  const q = Math.max(2, Math.round(size / 16));
+  return Math.max(2, Math.round(size / q) * q);
+}
+function getTip(B, size, color, variant){
+  const px = tipPx(size);
+  const key = B.id + '|' + px + '|' + color + '|' + B.hardness.toFixed(2) + '|' +
+              B.grain.toFixed(2) + '|' + B.shape + '|' + variant + '|' + B.imgRev;
+  let c = TIP_CACHE.get(key);
+  if(c){ if(MET) MET.hit++; return c; }
+  if(MET) MET.miss++;
+  c = buildTip(B, px, color, variant);
+  if(TIP_CACHE.size > TIP_MAX) TIP_CACHE.delete(TIP_CACHE.keys().next().value);
+  TIP_CACHE.set(key, c);
+  return c;
+}
+
+/* マスク（白＝筆）を作って、色で染める */
+function buildTip(B, px, color, variant){
+  const m = maskFor(B, px, variant);
+  const c = document.createElement('canvas');
+  c.width = c.height = px;
+  const x = c.getContext('2d');
+  x.drawImage(m, 0, 0);
+  x.globalCompositeOperation = 'source-in';
+  x.fillStyle = color;
+  x.fillRect(0, 0, px, px);
+  return c;
+}
+
+function maskFor(B, px, variant){
+  const c = document.createElement('canvas');
+  c.width = c.height = px;
+  const x = c.getContext('2d');
+  const r = px / 2;
+  if(B.shape === 'img' && B.img && B.img.complete && B.img.naturalWidth){
+    x.drawImage(B.img, 0, 0, px, px);
+    lumaToAlpha(x, px, B.imgInvert);
+  }else if(B.shape === 'glow'){
+    const g = x.createRadialGradient(r, r, 0, r, r, r);
+    for(let i = 0; i <= 12; i++){
+      const t = i / 12;
+      const a = clamp(.95 * Math.pow(1 - t, 5) + .30 * Math.pow(1 - t, 1.5), 0, 1);
+      g.addColorStop(t, 'rgba(255,255,255,' + a.toFixed(4) + ')');
+    }
+    x.fillStyle = g; x.fillRect(0, 0, px, px);
+  }else if(B.shape === 'flat'){
+    x.fillStyle = '#fff';
+    x.beginPath(); x.ellipse(r, r, r, r, 0, 0, Math.PI * 2); x.fill();
+    if(B.hardness < .98){
+      const g = x.createRadialGradient(r, r, r * B.hardness, r, r, r);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.globalCompositeOperation = 'destination-in';
+      x.fillStyle = g; x.fillRect(0, 0, px, px);
+      x.globalCompositeOperation = 'source-over';
+    }
+  }else{ // soft
+    const h = clamp(B.hardness, 0, .98);
+    const g = x.createRadialGradient(r, r, 0, r, r, r);
+    for(let i = 0; i <= 12; i++){
+      const t = i / 12;
+      const a = t <= h ? 1 : Math.pow(1 - (t - h) / (1 - h), 1.9);
+      g.addColorStop(t, 'rgba(255,255,255,' + clamp(a,0,1).toFixed(4) + ')');
+    }
+    x.fillStyle = g; x.fillRect(0, 0, px, px);
+  }
+  if(B.grain > 0) applyGrain(x, px, B.grain, variant);
+  return c;
+}
+
+function lumaToAlpha(x, px, invert){
+  const d = x.getImageData(0, 0, px, px), p = d.data;
+  for(let i = 0; i < p.length; i += 4){
+    const l = (p[i] * .299 + p[i+1] * .587 + p[i+2] * .114) / 255;
+    const v = invert ? 1 - l : l;
+    p[i] = p[i+1] = p[i+2] = 255;
+    p[i+3] = Math.round(clamp(v, 0, 1) * (p[i+3] / 255) * 255);
+  }
+  x.putImageData(d, 0, 0);
+}
+
+/* 粒ノイズ。tip ごとに getImageData すると桁で重くなる（実測 136枚で 60.9ms）ので、
+   128×128 のタイルを (量, 種) ごとに1回だけ作って destination-in で抜く。 */
+const NOISE = new Map();
+function noiseTile(amt, variant){
+  const key = amt.toFixed(2) + '|' + variant;
+  let c = NOISE.get(key);
+  if(c) return c;
+  c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  const d = x.createImageData(128, 128), p = d.data;
+  let sd = (0x2545F491 ^ (variant * 0x9E3779B1) ^ ((amt * 1000) | 0)) >>> 0;
+  for(let i = 0; i < p.length; i += 4){
+    sd ^= sd << 13; sd >>>= 0; sd ^= sd >> 17; sd ^= sd << 5; sd >>>= 0;
+    const n = sd / 4294967296;
+    p[i] = p[i+1] = p[i+2] = 255;
+    p[i+3] = Math.round(255 * clamp(1 - amt + amt * n * n * 1.6, 0, 1));
+  }
+  x.putImageData(d, 0, 0);
+  NOISE.set(key, c);
+  return c;
+}
+function applyGrain(x, px, amt, variant){
+  const t = noiseTile(Math.round(amt * 20) / 20, variant);
+  x.globalCompositeOperation = 'destination-in';
+  x.drawImage(t, 0, 0, px, px);
+  x.globalCompositeOperation = 'source-over';
+}
+/* ===================== §ENGINE ここまで ===================================== */
+
+/* ============================================================================
+   §LAB — 以下はラボの都合。econte には持っていかない
+   ========================================================================= */
+const S = {
+  mode:'PAINT', target:'LINE', bg:'NAVY', preset:0,
+  color:'#e8b06a', press:true, showDots:false, bgImg:null,
+  whole:true            // 線モードを「1本まとめて合成」する（区間の重なりムラ対策）
+};
+let SHOW_DOTS = false;
+let DOTS = [];
+const BG = {
+  BLACK:'#000000', NAVY:'#131a2b', GREY:'#6e6e72', WHITE:'#f2efe9', IMAGE:null
+};
+const BG_ORDER = ['BLACK','NAVY','GREY','WHITE','IMAGE'];
+const SWATCH = ['#e8b06a','#f2e3c4','#ff8a4c','#c3453a','#5b7fb5','#2b3b5e','#8fbf7f','#f6f2e8','#1a1420','#b06ad0'];
+
+let cvA = $('#cv-a'), cvB = $('#cv-b'), ctxA = null, ctxB = null;
+let undoStack = [];
+const UNDO_MAX = 8;
+
+function outW(){ return S.target === 'LINE' ? CONTE_W : Math.round(CONTE_W * PLATE_K); }
+function outH(){ return S.target === 'LINE' ? CONTE_H : Math.round(CONTE_H * PLATE_K); }
+function cur(){ return PRESETS[S.preset]; }
+
+function setupCanvas(){
+  const w = outW(), h = outH();
+  [cvA, cvB].forEach(c => {
+    if(c.width !== w || c.height !== h){ c.width = w; c.height = h; }
+  });
+  ctxA = cvA.getContext('2d');
+  ctxB = cvB.getContext('2d');
+  clearCanvas(true);
+}
+function paintBG(ctx){
+  const w = ctx.canvas.width, h = ctx.canvas.height;
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  if(S.bg === 'IMAGE' && S.bgImg && S.bgImg.complete){
+    ctx.fillStyle = '#000'; ctx.fillRect(0,0,w,h);
+    const ir = S.bgImg.naturalWidth / S.bgImg.naturalHeight, cr = w / h;
+    let dw = w, dh = h, dx = 0, dy = 0;
+    if(ir > cr){ dh = h; dw = h * ir; dx = (w - dw)/2; } else { dw = w; dh = w / ir; dy = (h - dh)/2; }
+    ctx.drawImage(S.bgImg, dx, dy, dw, dh);
+  }else{
+    ctx.fillStyle = BG[S.bg] || '#000';
+    ctx.fillRect(0, 0, w, h);
+  }
+  ctx.restore();
+}
+function clearCanvas(silent){
+  paintBG(ctxA); paintBG(ctxB);
+  DOTS = [];
+  if(!silent){ undoStack = []; }
+  drawSection();
+}
+function pushUndo(){
+  try{
+    undoStack.push({ a: ctxA.getImageData(0,0,cvA.width,cvA.height),
+                     b: ctxB.getImageData(0,0,cvB.width,cvB.height) });
+    if(undoStack.length > UNDO_MAX) undoStack.shift();
+  }catch(e){}
+}
+function doUndo(){
+  const s = undoStack.pop(); if(!s) return;
+  ctxA.putImageData(s.a, 0, 0); ctxB.putImageData(s.b, 0, 0);
+  DOTS = [];
+}
+
+/* --- ポインタ → キャンバス座標 --- */
+function toCv(e, c){
+  const r = c.getBoundingClientRect();
+  return { x:(e.clientX - r.left) * (c.width / r.width), y:(e.clientY - r.top) * (c.height / r.height) };
+}
+/* econte 現行の硬い丸ペン（SPLITの左に出す比較用。実機 strokePatchSeg そのまま） */
+function segEconte(ctx, a, b, size, color, press){
+  const lw = Math.max(.5, size * press);
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = lw;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x + (a.x===b.x&&a.y===b.y?.01:0), b.y);
+  ctx.stroke(); ctx.restore();
+}
+
+/* --- 描く（手ブレ補正つき） --- */
+let drawing = null;
+let sawPen = false;                 // ペンを一度でも見たか（iPad の手のひら対策）
+function pDown(e){
+  if(e.button === 2) return;
+  if(e.pointerType === 'pen') sawPen = true;
+  /* SPEC_18 第一原則「指はナビとUI・ペンは描く面だけ」。
+     ペンを使っている端末では指で描かない＝手のひらが乗っても線が出ない。
+     ペンを持たない端末（指だけ / マウス）ではそのまま描ける。 */
+  if(e.pointerType === 'touch' && sawPen){ return; }
+  if(e.altKey){ eyedrop(e); return; }
+  const c = cvA;
+  const p = toCv(e, c);
+  pushUndo();
+  SHOW_DOTS = S.showDots; DOTS = [];
+  brushDown();
+  const B = cur();
+  drawing = { id:e.pointerId, sm:{x:p.x,y:p.y}, last:{x:p.x,y:p.y}, tPrev:performance.now(), speed:0,
+              seed:BS.seed, whole:false, base:null, pts:null };
+  if(S.whole && B.mode === 'line' && B.opacity < 1){
+    /* 区間ごとに globalAlpha を掛けると継ぎ目が二重に乗ってムラになる。
+       点を貯めておいて、離した瞬間に scratch へ 1本ぶん引き直して1回で合成する。
+       econte なら txBegin/txEnd の中に入るので、Undo は1手のまま。 */
+    drawing.whole = true;
+    try{ drawing.base = ctxA.getImageData(0,0,cvA.width,cvA.height); }catch(err){ drawing.whole = false; }
+    drawing.pts = [{x:p.x, y:p.y, press:1}];
+  }
+  try{ c.setPointerCapture(e.pointerId); }catch(err){}
+  const env = mkEnv(e, 0);
+  strokeSegBrush(ctxA, p, p, B, env);
+  if(S.mode === 'SPLIT') segEconte(ctxB, p, p, B.size, S.color, env.press);
+  syncMeasure();
+  e.preventDefault();
+}
+function mkEnv(e, speed){
+  const B = cur();
+  const press = (S.press && e && e.pointerType === 'pen' && e.pressure > 0) ? (0.15 + 0.85*e.pressure)
+              : (S.press && e && e.pointerType === 'pen') ? 0.5 : 1;
+  return { color:S.color, size:B.size * (S.target==='COLOR' ? 1 : 1), press, speed, tailT:null };
+}
+function pMove(e){
+  if(!drawing || e.pointerId !== drawing.id) return;
+  const B = cur();
+  const raw = toCv(e, cvA);
+  // 手ブレ補正（plotSmoothing 相当。1点前へ引き寄せる）
+  const k = 1 - clamp(B.smooth, 0, .92);
+  drawing.sm.x = lerp(drawing.sm.x, raw.x, k);
+  drawing.sm.y = lerp(drawing.sm.y, raw.y, k);
+  const p = { x:drawing.sm.x, y:drawing.sm.y };
+  const now = performance.now();
+  const dt = Math.max(1, now - drawing.tPrev);
+  const d = Math.hypot(p.x - drawing.last.x, p.y - drawing.last.y);
+  drawing.speed = clamp(lerp(drawing.speed, (d / dt) / 3.2, .3), 0, 1);
+  drawing.tPrev = now;
+  const env = mkEnv(e, drawing.speed);
+  if(drawing.pts) drawing.pts.push({x:p.x, y:p.y, press:env.press});
+  strokeSegBrush(ctxA, drawing.last, p, B, env);
+  if(S.mode === 'SPLIT') segEconte(ctxB, drawing.last, p, B.size, S.color, env.press);
+  drawing.last = p;
+  syncMeasure();
+  e.preventDefault();
+}
+function pUp(e){
+  if(!drawing) return;
+  const d = drawing;
+  drawing = null;
+  if(d.whole && d.pts && d.pts.length > 1) wholeFlush(d);
+  brushUp();
+  if(SHOW_DOTS) paintDots();
+  syncMeasure(); drawSection();
+}
+/* 1本ぶんを scratch に alpha=1 で引き直して、1回だけ濃度をかけて乗せる。
+   ★ここが ON のあいだ「筆圧→濃さ」は効かない（太さだけ）＝副作用として明示する */
+let wholeMs = 0;
+function wholeFlush(d){
+  const B = cur();
+  const t0 = performance.now();
+  const sc = document.createElement('canvas');
+  sc.width = cvA.width; sc.height = cvA.height;
+  const sx = sc.getContext('2d');
+  const keepMet = MET;
+  brushDown(d.seed);
+  const B1 = Object.assign({}, B, { opacity:1, blend:'source-over' });
+  for(let i = 1; i < d.pts.length; i++){
+    const a = d.pts[i-1], b = d.pts[i];
+    strokeSegBrush(sx, a, b, B1, { color:S.color, size:B.size, press:b.press, speed:0, tailT:null });
+  }
+  MET = keepMet;
+  ctxA.putImageData(d.base, 0, 0);
+  ctxA.save();
+  ctxA.globalCompositeOperation = B.blend;
+  ctxA.globalAlpha = B.opacity;
+  ctxA.drawImage(sc, 0, 0);
+  ctxA.restore();
+  wholeMs = performance.now() - t0;
+}
+function paintDots(){
+  ctxA.save();
+  ctxA.globalCompositeOperation = 'source-over';
+  ctxA.globalAlpha = 1; ctxA.fillStyle = '#FF4FA8';
+  for(const d of DOTS){ ctxA.beginPath(); ctxA.arc(d.x, d.y, 1.1, 0, 6.284); ctxA.fill(); }
+  ctxA.restore();
+}
+function eyedrop(e){
+  const p = toCv(e, cvA);
+  const d = ctxA.getImageData(Math.round(p.x), Math.round(p.y), 1, 1).data;
+  S.color = '#' + [d[0],d[1],d[2]].map(v => v.toString(16).padStart(2,'0')).join('');
+  buildSide();
+}
+
+/* --- 右ドラッグでサイズ（ANIMATOR の手癖・animator-brush-ops 準拠） --- */
+let sizing = null;
+function sizeDown(e){
+  if(e.button !== 2) return;
+  sizing = { id:e.pointerId, x:e.clientX, start:cur().size };
+  try{ cvA.setPointerCapture(e.pointerId); }catch(err){}
+  e.preventDefault();
+}
+function sizeMove(e){
+  if(!sizing || e.pointerId !== sizing.id) return;
+  const unit = Math.max(1, Math.round(200 / 64));
+  setSize(sizing.start + Math.round((e.clientX - sizing.x) / 10) * unit);
+  e.preventDefault();
+}
+function setSize(v){ cur().size = clamp(Math.round(v), 1, 300); buildSide(); syncBar(); }
+
+/* ============================================================================
+   §MEASURE / §SECTION
+   ========================================================================= */
+function syncMeasure(){
+  if(!MET){ return; }
+  const per = MET.segs ? (MET.stamps / MET.segs) : 0;
+  $('#m-stamps').textContent = MET.stamps.toLocaleString();
+  $('#m-seg').textContent = MET.segs + ' / ' + per.toFixed(1) + '枚';
+  $('#m-ms').textContent = MET.ms.toFixed(2) + ' ms';
+  const w = $('#m-worst');
+  w.textContent = MET.worst.toFixed(2) + ' ms';
+  w.className = 'dv ' + (MET.worst > 8 ? 'bad' : MET.worst > 3 ? '' : 'neon');
+  $('#m-sp').textContent = cur().mode === 'stamp' ? MET.sp.toFixed(1) + ' px' : '—（線モード）';
+  const tot = MET.hit + MET.miss;
+  $('#m-cache').textContent = tot ? Math.round(MET.hit / tot * 100) + '%（' + MET.miss + '回 生成）' : '—';
+  $('#m-whole').textContent = wholeMs ? wholeMs.toFixed(2) + ' ms' : '—（線モード・濃度<1 のときだけ）';
+}
+
+function drawSection(){
+  const c = $('#sec-cv'), x = c.getContext('2d');
+  const W = c.width, H = c.height;
+  x.clearRect(0, 0, W, H);
+  const B = cur();
+  x.strokeStyle = 'rgba(181,142,255,.22)'; x.lineWidth = 1;
+  x.beginPath(); x.moveTo(30, H/2); x.lineTo(W-30, H/2); x.stroke();
+
+  x.fillStyle = 'rgba(255,210,122,.75)'; x.font = '11px "IBM Plex Mono"';
+  if(B.mode === 'line'){
+    x.strokeStyle = 'rgba(90,233,255,.85)'; x.lineWidth = 26; x.lineCap = 'round';
+    x.beginPath(); x.moveTo(60, H/2); x.lineTo(W-60, H/2); x.stroke();
+    x.fillText('ctx.stroke() ×1 ／ 区間あたり 1回', 30, H - 12);
+    return;
+  }
+  const size = 34;
+  const sp = Math.max(3, size * B.spacing);
+  const x0 = 44, x1 = W - 44;
+  let n = 0;
+  for(let px = x0; px <= x1; px += sp){
+    const g = x.createRadialGradient(px, H/2, 0, px, H/2, size/2);
+    const h = clamp(B.hardness, 0, .95);
+    g.addColorStop(0, 'rgba(255,210,122,.55)');
+    g.addColorStop(h, 'rgba(255,210,122,.5)');
+    g.addColorStop(1, 'rgba(255,210,122,0)');
+    x.fillStyle = g;
+    x.beginPath(); x.arc(px, H/2, size/2, 0, 6.284); x.fill();
+    x.fillStyle = '#FF4FA8';
+    x.beginPath(); x.arc(px, H/2, 1.4, 0, 6.284); x.fill();
+    n++;
+    if(n > 400) break;
+  }
+  x.fillStyle = 'rgba(255,210,122,.8)';
+  x.fillText('spacing ' + (B.spacing*100).toFixed(0) + '% → この幅で ' + n + ' 枚', 30, H - 12);
+  x.strokeStyle = 'rgba(90,233,255,.6)'; x.lineWidth = 1;
+  x.beginPath(); x.moveTo(x0, 22); x.lineTo(x0 + sp, 22); x.stroke();
+  x.beginPath(); x.moveTo(x0, 18); x.lineTo(x0, 26); x.moveTo(x0+sp, 18); x.lineTo(x0+sp, 26); x.stroke();
+  x.fillStyle = 'rgba(90,233,255,.85)'; x.fillText(sp.toFixed(1) + 'px', x0 + sp + 6, 26);
+}
+
+/* ============================================================================
+   §SHEET — 6プリセットの見本帳
+   ========================================================================= */
+function drawSheet(){
+  paintBG(ctxA);
+  const W = cvA.width, H = cvA.height;
+  const rows = PRESETS.length;
+  const rh = H / rows;
+  const savedPreset = S.preset;
+  for(let r = 0; r < rows; r++){
+    const B = PRESETS[r];
+    const y = rh * (r + .5);
+    /* 見本帳も実物と同じ経路を通す＝線モードで濃度<1 なら「1本まとめて合成」する。
+       ここを素通しにすると見本だけ継ぎ目のムラが出て、実物と違う絵になる。 */
+    const whole = S.whole && B.mode === 'line' && B.opacity < 1;
+    let tgt = ctxA, sc = null;
+    if(whole){
+      sc = document.createElement('canvas'); sc.width = W; sc.height = H;
+      tgt = sc.getContext('2d');
+    }
+    const Bd = whole ? Object.assign({}, B, { opacity:1, blend:'source-over' }) : B;
+    brushDown(1234 + r);
+    const N = 90;
+    let prev = null;
+    for(let i = 0; i <= N; i++){
+      const t = i / N;
+      const px = lerp(W * .18, W * .95, t);
+      const py = y + Math.sin(t * Math.PI * 1.6) * rh * .22;
+      const p = { x:px, y:py };
+      if(prev){
+        const press = 0.15 + 0.85 * Math.sin(Math.min(1, t * 1.15) * Math.PI);
+        const env = { color:S.color, size:B.size, press, speed:0, tailT: 1 - t };
+        strokeSegBrush(tgt, prev, p, Bd, env);
+      }
+      prev = p;
+    }
+    brushUp();
+    if(whole){
+      ctxA.save();
+      ctxA.globalCompositeOperation = B.blend;
+      ctxA.globalAlpha = B.opacity;
+      ctxA.drawImage(sc, 0, 0);
+      ctxA.restore();
+    }
+    ctxA.save();
+    ctxA.globalCompositeOperation = 'source-over'; ctxA.globalAlpha = 1;
+    ctxA.fillStyle = (S.bg === 'WHITE') ? 'rgba(0,0,0,.62)' : 'rgba(255,210,122,.82)';
+    ctxA.font = Math.round(W/74) + 'px "IBM Plex Mono"';
+    ctxA.fillText(String(r+1).padStart(2,'0') + ' ' + B.name, W * .022, y - rh * .16);
+    ctxA.font = Math.round(W/104) + 'px sans-serif';
+    ctxA.fillStyle = (S.bg === 'WHITE') ? 'rgba(0,0,0,.4)' : 'rgba(181,142,255,.7)';
+    ctxA.fillText(B.jp, W * .022, y + rh * .06);
+    ctxA.fillText(B.mode === 'line' ? '線モード' : 'スタンプ ' + (B.spacing*100).toFixed(0) + '%',
+                  W * .022, y + rh * .24);
+    ctxA.restore();
+  }
+  S.preset = savedPreset;
+}
+
+/* ============================================================================
+   §BENCH — 「econte に入れて重いか」を実測する
+   ========================================================================= */
+function runBench(){
+  const B = cur();
+  const cases = [
+    { lbl:'LINE 1280×720', w:CONTE_W, h:CONTE_H, x2:false },
+    { lbl:'COLOR 512×288', w:Math.round(CONTE_W*PLATE_K), h:Math.round(CONTE_H*PLATE_K), x2:false },
+    { lbl:'LINE ＋枠またぎ（2枚に引く）', w:CONTE_W, h:CONTE_H, x2:true }
+  ];
+  const rows = [];
+  for(const c of cases){
+    const cv = document.createElement('canvas'); cv.width = c.w; cv.height = c.h;
+    const cx = cv.getContext('2d');
+    const cv2 = document.createElement('canvas'); cv2.width = c.w; cv2.height = c.h;
+    const cx2 = cv2.getContext('2d');
+    // ウォームアップ（tipキャッシュを埋める）
+    benchOne(cx, cx2, B, c.w, c.h, c.x2);
+    const t0 = performance.now();
+    const R = 5;
+    let stamps = 0, worst = 0;
+    for(let i = 0; i < R; i++){
+      const r = benchOne(cx, cx2, B, c.w, c.h, c.x2);
+      stamps += r.stamps; worst = Math.max(worst, r.worst);
+    }
+    const ms = (performance.now() - t0) / R;
+    rows.push({ lbl:c.lbl, ms, stamps:Math.round(stamps/R), worst });
+  }
+  showBench(B, rows);
+}
+function benchOne(cx, cx2, B, w, h, x2){
+  brushDown(777);
+  const N = 240;
+  let prev = null;
+  for(let i = 0; i <= N; i++){
+    const t = i / N;
+    const p = { x:lerp(w*.06, w*.94, t), y:h*.5 + Math.sin(t*Math.PI*3)*h*.3 };
+    if(prev){
+      const env = { color:S.color, size:B.size, press:.7, speed:.3, tailT:null };
+      /* 実機と同じ形で測る＝ plan は1回、draw を枚数ぶん */
+      const plan = brushPlanSeg(prev, p, B, env);
+      brushDrawSeg(cx, plan);
+      if(x2) brushDrawSeg(cx2, plan);
+    }
+    prev = p;
+  }
+  const r = { stamps:MET.stamps, worst:MET.worst };
+  brushUp();
+  return r;
+}
+function showBench(B, rows){
+  const budget = 16.7;
+  let html = '<div class="hint" style="margin:0 0 4px">'
+    + '対角に近いS字を1本（240区間）引いたときの実測。<b>1コマ＝16.7ms</b>。'
+    + 'ストローク中は合成（renderPaintViewsSoon）も同時に走るので、'
+    + '<b>描画だけで4ms を超えたら実機では体感に出る</b>と見る。</div>';
+  html += '<table class="bench"><tr><th>条件</th><th>1本の描画</th><th>スタンプ枚数</th><th>1区間の最悪</th><th>判定</th></tr>';
+  for(const r of rows){
+    const bad = r.ms > budget * .55;
+    const mid = r.ms > budget * .24;
+    html += '<tr><td>' + r.lbl + '</td>'
+      + '<td><b>' + r.ms.toFixed(2) + ' ms</b></td>'
+      + '<td>' + r.stamps.toLocaleString() + '</td>'
+      + '<td>' + r.worst.toFixed(2) + ' ms</td>'
+      + '<td>' + (bad ? '<span class="bad">重い</span>' : mid ? '実用' : '軽い') + '</td></tr>';
+  }
+  html += '</table>';
+  const worstRow = rows.reduce((a,b) => a.ms > b.ms ? a : b);
+  html += '<div class="verdict">';
+  if(B.mode === 'line'){
+    html += '<b>' + B.name + ' は線モード</b>。いまの econte と同じ <b>ctx.stroke() 1回</b>で、'
+         + '枚数は区間数と同じ。<b>そのまま入れて問題ありません。</b>';
+  }else if(worstRow.ms > budget * .55){
+    html += '<b>重い側です。</b> spacing を上げる（' + (B.spacing*100).toFixed(0) + '% → '
+         + Math.min(40, Math.round(B.spacing*100*2)) + '% あたり）か、太さを下げると枚数が線形に減ります。'
+         + '<b>spacing を2倍にすれば枚数は半分</b>。';
+  }else if(worstRow.ms > budget * .24){
+    html += '<b>実用範囲です。</b> ただし枠をまたぐカット（3行目）で倍になる場面があるので、'
+         + 'econte に入れるなら spacing はこれ以上下げないこと。';
+  }else{
+    html += '<b>軽いです。</b> この設定なら econte にそのまま入れて体感は変わりません。';
+  }
+  html += '<br>参考: 今回のライトブラシ（Procreate）の <b>plotSpacing 0.72%</b> をそのまま真似すると、'
+       + 'ここの spacing が 0.0072 になり枚数が約 ' + Math.round(B.spacing / .0072) + '倍 になります。'
+       + 'あちらは GPU 前提の値なので持ち込まないこと。</div>';
+  $('#bench-body').innerHTML = html;
+  $('#bench-modal').classList.add('on');
+}
+
+/* ============================================================================
+   §UI
+   ========================================================================= */
+function sld(lbl, cond, key, min, max, step, fmt, enabled){
+  const B = cur();
+  const v = B[key];
+  const off = enabled === false;
+  return '<div class="tr' + (off?' off':'') + '"><span class="lb">' + lbl
+    + (cond ? '<span class="cond">' + cond + '</span>' : '')
+    + '</span><span class="vl">' + fmt(v) + '</span></div>'
+    + '<div class="row-sld"><input type="range" data-k="' + key + '" min="' + min + '" max="' + max
+    + '" step="' + step + '" value="' + v + '"' + (off?' disabled':'') + '></div>';
+}
+function buildSide(){
+  const B = cur();
+  const stamp = B.mode === 'stamp';
+  const hasImg = B.shape === 'img' && B.img;
+  let h = '';
+
+  /* PRESETS */
+  h += '<div class="sp"><div class="spl">BRUSH PRESETS <em>1–6 / P</em></div>';
+  PRESETS.forEach((p, i) => {
+    h += '<div class="pre' + (i===S.preset?' on':'') + '" data-pre="' + i + '">'
+      + '<span class="no">' + (i+1) + '</span>'
+      + '<span><span class="nm">' + p.name + '</span><br><span class="jp">' + p.jp + '</span></span>'
+      + '<span class="md ' + p.mode + '">' + (p.mode==='line'?'LINE':'STAMP') + '</span></div>';
+  });
+  h += '<div class="hint">LINE＝いまの econte と同じ描き方（<b>追加コストゼロ</b>）／'
+     + 'STAMP＝ハンコを撒く（<b>絵柄は出るが枚数ぶん重い</b>）。'
+     + '重さは ⚑ BENCH で数字にできます。</div></div>';
+
+  /* SHAPE */
+  h += '<div class="sp"><div class="spl">SHAPE <em>筆先の絵</em></div>';
+  h += '<div class="fps" style="margin-bottom:7px">'
+    + ['soft','glow','flat','img'].map(s =>
+        '<span class="fp' + (B.shape===s?' on':'') + '" data-shape="' + s + '">'
+        + ({soft:'SOFT 丸',glow:'GLOW 光',flat:'FLAT 平',img:'IMG 画像'})[s] + '</span>').join('')
+    + '</div>';
+  h += '<div class="drop" id="drop-shape">'
+    + (hasImg ? '<img class="thumb" src="' + B.img.src + '">' : '')
+    + (hasImg ? 'SHAPE 差し替え' : 'SHAPE ▸ PNG をドロップ / クリック')
+    + '</div>';
+  h += '<div class="tr' + (hasImg?'':' off') + '"><span class="lb">画像の白黒を反転'
+    + '<span class="cond">白＝筆 が既定（Procreate と同じ）</span></span>'
+    + '<span class="tg' + (B.imgInvert?' on':'') + '" data-tg="imgInvert"></span></div>';
+  h += '<div class="hint">Procreate のカスタムブラシは <b>.brush を ZIP として開くと Shape.png</b> が入っています。'
+     + '内蔵ブラシ由来のものは入っていないので、<b>白地に一発押して PNG 書き出し</b>が確実です。</div>';
+  h += '</div>';
+
+  /* CORE */
+  h += '<div class="sp"><div class="spl">CORE</div>';
+  h += sld('太さ SIZE', '[ ] ／ ステージ右ドラッグ', 'size', 1, 300, 1, v => v + 'px', true);
+  const wholeOn = S.whole && B.mode === 'line' && B.opacity < 1;
+  h += sld('濃度 OPACITY', B.mode === 'line' && B.opacity < 1
+             ? (S.whole ? 'まとめ合成 ON なのでムラは出ません' : '★区間の継ぎ目が濃くなります（下のトグル）')
+             : '', 'opacity', 0, 1, .01, v => (v*100).toFixed(0) + '%', true);
+  h += '<div class="tr' + (B.mode === 'line' ? '' : ' off') + '"><span class="lb">1本まとめて合成 WHOLE'
+    + '<span class="cond">' + (B.mode === 'line'
+        ? '離した瞬間に1本ぶん引き直す。ON のあいだ 筆圧→濃さ は効かない（太さだけ）'
+        : 'スタンプ式では無効（粒の重なりは残したいので）') + '</span></span>'
+    + '<span class="tg' + (S.whole?' on':'') + '" data-tg2="whole"></span></div>';
+  h += sld('1粒の濃さ FLOW', stamp ? '' : 'スタンプ式のみ', 'flow', .01, 1, .01,
+           v => (v*100).toFixed(0) + '%', stamp);
+  h += '<div class="tr"><span class="lb">合成 BLEND</span></div><div class="fps">'
+    + [['source-over','NORMAL'],['multiply','MULTIPLY'],['screen','SCREEN'],['lighter','ADD 光']]
+      .map(([v,n]) => '<span class="fp' + (B.blend===v?' on':'') + '" data-blend="' + v + '">' + n + '</span>').join('')
+    + '</div>';
+  h += '<div class="hint">光を1ストロークで描くなら <b>ADD</b>。重ねるほど明るくなるので、'
+     + 'FLOW を落として何度も通すのがコツ。'
+     + '<b>MULTIPLY は白い紙の上でだけ効きます</b>（暗い背景では沈んで見えなくなります）。</div>';
+  h += '</div>';
+
+  /* STAMP */
+  h += '<div class="sp"><div class="spl">STAMP <em>' + (stamp ? '有効' : '線モードでは無効') + '</em></div>';
+  h += sld('間隔 SPACING', stamp ? '★重さを決めるのはここ。ボケ足が大きいブラシは 5% 以下（実測: 10%で縞8.9% / 25%で35.9%）' : 'スタンプ式のみ', 'spacing', .01, .6, .005,
+           v => (v*100).toFixed(1) + '%', stamp);
+  h += sld('ボケ足 HARDNESS',
+           !stamp ? '線モードでは無効（丸ペンにボケ足は無い）' : hasImg ? '画像SHAPEでは無効（絵柄が画像で決まる）' : '0=ふわふわ / 1=硬い',
+           'hardness', 0, 1, .01, v => (v*100).toFixed(0) + '%', stamp && !hasImg);
+  h += sld('ざらつき GRAIN', stamp ? '4種の粒を回して繰り返しを消す' : 'スタンプ式のみ', 'grain', 0, 1, .01,
+           v => (v*100).toFixed(0) + '%', stamp);
+  h += sld('位置ばらけ JITTER', stamp ? '' : 'スタンプ式のみ', 'jitter', 0, 2, .01,
+           v => (v*100).toFixed(0) + '%', stamp);
+  h += sld('太さばらけ SIZE JIT', stamp ? '' : 'スタンプ式のみ', 'sizeJit', 0, 1, .01,
+           v => (v*100).toFixed(0) + '%', stamp);
+  h += sld('角度ばらけ ANG JIT', stamp ? '' : 'スタンプ式のみ', 'angJit', 0, 1, .01,
+           v => (v*100).toFixed(0) + '%', stamp);
+  h += sld('楕円率 ROUNDNESS', stamp ? '1=真円 / 小さいほど平筆' : 'スタンプ式のみ', 'roundness', .08, 1, .01,
+           v => (v*100).toFixed(0) + '%', stamp);
+  h += sld('筆の角度 ANGLE', stamp && !B.rotate ? '進行方向追従が OFF のときだけ' : (stamp?'追従 ON では無効':'スタンプ式のみ'),
+           'angle', 0, 180, 1, v => v + '°', stamp && !B.rotate);
+  h += '<div class="tr' + (stamp?'':' off') + '"><span class="lb">進行方向に追従 ROTATE'
+    + '<span class="cond">OFF＝カリグラフィ（角度固定で太さが変わる）</span></span>'
+    + '<span class="tg' + (B.rotate?' on':'') + '" data-tg="rotate"></span></div>';
+  h += '</div>';
+
+  /* DYNAMICS */
+  h += '<div class="sp"><div class="spl">DYNAMICS <em>Procreate の dynamics*</em></div>';
+  const penOK = S.press;
+  h += sld('筆圧→太さ', penOK ? 'ペン軸のみ（マウスは常に最大）' : '筆圧 OFF 中', 'pSize', 0, 1, .01,
+           v => (v*100).toFixed(0) + '%', penOK);
+  h += sld('筆圧→濃さ', wholeOn ? 'まとめ合成 ON のあいだは無効' : (penOK ? 'ペン軸のみ' : '筆圧 OFF 中'), 'pOpa', 0, 1, .01,
+           v => (v*100).toFixed(0) + '%', penOK && !wholeOn);
+  h += sld('速さ→太さ', '速く動かすほど細く', 'spdSize', 0, 1, .01, v => (v*100).toFixed(0) + '%', true);
+  h += sld('速さ→濃さ', '速く動かすほど薄く', 'spdOpa', 0, 1, .01, v => (v*100).toFixed(0) + '%', true);
+  h += sld('手ブレ補正 SMOOTH', 'plotSmoothing 相当', 'smooth', 0, .92, .01,
+           v => (v*100).toFixed(0) + '%', true);
+  h += sld('入り TAPER IN', '描き始めから細く立ち上げる', 'taperIn', 0, .5, .01,
+           v => (v*100).toFixed(0) + '%', true);
+  h += sld('抜き TAPER OUT', 'SHEET のサンプル線のみ（フリーハンドは終点が未定）', 'taperOut', 0, .5, .01,
+           v => (v*100).toFixed(0) + '%', false);
+  h += '<div class="tr"><span class="lb">筆圧を使う PRESSURE<span class="cond">ペン(pointerType=pen)のときだけ効く</span></span>'
+    + '<span class="tg' + (S.press?' on':'') + '" data-tg2="press"></span></div>';
+  h += '</div>';
+
+  /* CANVAS */
+  h += '<div class="sp"><div class="spl">CANVAS</div>';
+  h += '<div class="tr"><span class="lb">出力解像度<span class="cond">econte の「描く先」と同じ</span></span></div>'
+    + '<div class="fps" style="margin-bottom:8px">'
+    + [['LINE','LINE 1280'],['COLOR','COLOR 512']].map(([v,n]) =>
+        '<span class="fp' + (S.target===v?' on':'') + '" data-tgt="' + v + '">' + n + '</span>').join('')
+    + '</div>';
+  h += '<div class="tr"><span class="lb">背景 BG <span class="cond">B で循環</span></span></div>'
+    + '<div class="fps" style="margin-bottom:8px">'
+    + BG_ORDER.map(v => '<span class="fp' + (S.bg===v?' on':'') + '" data-bg="' + v + '">'
+        + (v === 'IMAGE' && !S.bgImg ? 'IMAGE ▸選' : v) + '</span>').join('')
+    + '</div>';
+  h += '<div class="drop" id="drop-bg">' + (S.bgImg ? 'BG 差し替え（参照カラスクを敷く）' : 'BG ▸ 画像をドロップ / クリック') + '</div>';
+  h += '<div class="tr"><span class="lb">色 COLOR<span class="cond">Alt+クリックでスポイト</span></span>'
+    + '<input type="color" value="' + S.color + '" id="pick-col" style="width:34px;height:20px;background:none;border:0;padding:0;cursor:pointer"></div>';
+  h += '<div class="swatches">' + SWATCH.map(c =>
+        '<span class="sw' + (S.color.toLowerCase()===c?' on':'') + '" data-sw="' + c + '" style="background:' + c + '"></span>').join('')
+     + '</div>';
+  h += '<div class="tr" style="margin-top:9px"><span class="lb">粒を可視化 <span class="cond">1枚ごとに赤い点（D）</span></span>'
+    + '<span class="tg' + (S.showDots?' on':'') + '" data-tg2="showDots"></span></div>';
+  h += '</div>';
+
+  /* EXPORT */
+  h += '<div class="sp"><div class="spl">EXPORT</div>';
+  h += '<div class="btn2" style="margin-bottom:6px">'
+    + '<button class="ed-btn gold" id="b-copy">COPY PARAMS</button>'
+    + '<button class="ed-btn gold" id="b-paste">PASTE PARAMS</button></div>';
+  h += '<div class="btn2"><button class="ed-btn" id="b-png">SAVE PNG</button>'
+    + '<button class="ed-btn" id="b-reset">RESET ALL</button></div>';
+  h += '<div class="hint">COPY は<b>6種ぜんぶの設定を JSON</b>で出します。'
+     + 'これが econte へ渡す成果物。画像 SHAPE は dataURL 込みなので長くなります。</div>';
+  h += '</div>';
+
+  $('#side').innerHTML = h;
+  wireSide();
+  syncBar();
+  drawSection();
+}
+function wireSide(){
+  const B = cur();
+  document.querySelectorAll('#side input[type=range]').forEach(el => {
+    el.addEventListener('input', e => {
+      cur()[e.target.dataset.k] = +e.target.value;
+      const row = e.target.closest('.row-sld').previousElementSibling;
+      const k = e.target.dataset.k, v = +e.target.value;
+      const vl = row.querySelector('.vl');
+      if(vl){
+        vl.textContent = (k === 'size') ? v + 'px'
+                       : (k === 'angle') ? v + '°'
+                       : (v*100).toFixed(k === 'spacing' ? 1 : 0) + '%';
+      }
+      TIP_CACHE.clear(); drawSection(); syncBar(); save();
+      if(S.mode === 'SHEET') drawSheet();
+    });
+  });
+  document.querySelectorAll('[data-pre]').forEach(el =>
+    el.addEventListener('click', () => { S.preset = +el.dataset.pre; TIP_CACHE.clear(); buildSide(); if(S.mode==='SHEET') drawSheet(); save(); }));
+  document.querySelectorAll('[data-shape]').forEach(el =>
+    el.addEventListener('click', () => {
+      const s = el.dataset.shape;
+      if(s === 'img' && !cur().img){ pickFile(setShapeImg); return; }
+      cur().shape = s;
+      if(s !== 'soft' && cur().mode === 'line') cur().mode = 'stamp';
+      TIP_CACHE.clear(); buildSide(); if(S.mode==='SHEET') drawSheet(); save();
+    }));
+  document.querySelectorAll('[data-blend]').forEach(el =>
+    el.addEventListener('click', () => { cur().blend = el.dataset.blend; buildSide(); if(S.mode==='SHEET') drawSheet(); save(); }));
+  document.querySelectorAll('[data-tg]').forEach(el =>
+    el.addEventListener('click', () => { cur()[el.dataset.tg] = !cur()[el.dataset.tg]; TIP_CACHE.clear(); buildSide(); if(S.mode==='SHEET') drawSheet(); save(); }));
+  document.querySelectorAll('[data-tg2]').forEach(el =>
+    el.addEventListener('click', () => { S[el.dataset.tg2] = !S[el.dataset.tg2]; buildSide(); save(); }));
+  document.querySelectorAll('[data-tgt]').forEach(el =>
+    el.addEventListener('click', () => { S.target = el.dataset.tgt; setupCanvas(); layout(); buildSide(); if(S.mode==='SHEET') drawSheet(); save(); }));
+  document.querySelectorAll('[data-bg]').forEach(el =>
+    el.addEventListener('click', () => { setBG(el.dataset.bg); }));
+  document.querySelectorAll('[data-sw]').forEach(el =>
+    el.addEventListener('click', () => { S.color = el.dataset.sw; TIP_CACHE.clear(); buildSide(); save(); }));
+  const pc = $('#pick-col');
+  if(pc) pc.addEventListener('input', e => { S.color = e.target.value; TIP_CACHE.clear(); buildSide(); save(); });
+
+  wireDrop($('#drop-shape'), setShapeImg);
+  wireDrop($('#drop-bg'), setBgImg);
+
+  $('#b-copy').addEventListener('click', copyParams);
+  $('#b-paste').addEventListener('click', pasteParams);
+  $('#b-png').addEventListener('click', savePNG);
+  $('#b-reset').addEventListener('click', () => {
+    if(!confirm('6種すべてを初期設定に戻します。よろしいですか？')) return;
+    PRESETS.forEach((p, i) => Object.assign(p, JSON.parse(JSON.stringify(DEFAULT_JSON[i]))));
+    PRESETS.forEach(p => { p.img = null; p.shape = p.shape === 'img' ? 'soft' : p.shape; });
+    TIP_CACHE.clear(); buildSide(); clearCanvas(); save();
+  });
+}
+function setBG(v){
+  if(v === 'IMAGE' && !S.bgImg){ pickFile(setBgImg); return; }
+  S.bg = v; clearCanvas(); buildSide(); if(S.mode==='SHEET') drawSheet(); save();
+}
+function wireDrop(el, fn){
+  if(!el) return;
+  el.addEventListener('click', () => pickFile(fn));
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('over'));
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.classList.remove('over');
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f) readImg(f, fn);
+  });
+}
+function pickFile(fn){
+  const i = document.createElement('input');
+  i.type = 'file'; i.accept = 'image/*';
+  i.addEventListener('change', () => { if(i.files[0]) readImg(i.files[0], fn); });
+  i.click();
+}
+function readImg(file, fn){
+  const r = new FileReader();
+  r.onload = () => { const im = new Image(); im.onload = () => fn(im); im.src = r.result; };
+  r.readAsDataURL(file);
+}
+function setShapeImg(im){
+  const B = cur();
+  B.img = im; B.shape = 'img'; B.imgRev++;
+  if(B.mode === 'line') B.mode = 'stamp';
+  TIP_CACHE.clear(); buildSide(); if(S.mode==='SHEET') drawSheet(); save();
+}
+function setBgImg(im){ S.bgImg = im; S.bg = 'IMAGE'; clearCanvas(); buildSide(); save(); }
+
+/* --- COPY / PASTE PARAMS（未知キーは無視） --- */
+function serial(){
+  return {
+    _lab:'BRUSH_LAB', _v:1,
+    presets: PRESETS.map(p => {
+      const o = {}; for(const k in p) if(k !== 'img') o[k] = p[k];
+      o.imgSrc = p.img ? p.img.src : null;
+      return o;
+    }),
+    color:S.color, target:S.target, bg:S.bg, press:S.press
+  };
+}
+function copyParams(){
+  const b = $('#b-copy');
+  const txt = JSON.stringify(serial(), null, 1);
+  const done = ok => { b.textContent = ok ? '✓ COPIED' : '✗ FAILED';
+    b.classList.add(ok?'ok':'ng'); setTimeout(() => { b.textContent='COPY PARAMS'; b.classList.remove('ok','ng'); }, 1200); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(() => done(true), () => done(false));
+  }else{
+    try{ const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t);
+      t.select(); document.execCommand('copy'); t.remove(); done(true); }catch(e){ done(false); }
+  }
+}
+function pasteParams(){
+  const b = $('#b-paste');
+  const done = ok => { b.textContent = ok ? '✓ APPLIED' : '✗ FAILED';
+    b.classList.add(ok?'ok':'ng'); setTimeout(() => { b.textContent='PASTE PARAMS'; b.classList.remove('ok','ng'); }, 1200); };
+  const apply = txt => {
+    try{
+      const o = JSON.parse(txt);
+      if(!o || !Array.isArray(o.presets)) throw 0;
+      o.presets.forEach((p, i) => {
+        if(!PRESETS[i]) return;
+        for(const k in p){ if(k === 'imgSrc' || k === 'img') continue; if(k in DEF || k==='id'||k==='name'||k==='jp') PRESETS[i][k] = p[k]; }
+        if(p.imgSrc){ const im = new Image(); im.onload = () => { PRESETS[i].img = im; PRESETS[i].imgRev++; TIP_CACHE.clear(); buildSide(); }; im.src = p.imgSrc; }
+      });
+      if(o.color) S.color = o.color;
+      if(o.target) S.target = o.target;
+      if(o.bg) S.bg = o.bg;
+      if(typeof o.press === 'boolean') S.press = o.press;
+      TIP_CACHE.clear(); setupCanvas(); layout(); buildSide(); save(); done(true);
+    }catch(e){ done(false); }
+  };
+  if(navigator.clipboard && navigator.clipboard.readText){
+    navigator.clipboard.readText().then(apply, () => { const t = prompt('JSON を貼り付け'); if(t) apply(t); else done(false); });
+  }else{ const t = prompt('JSON を貼り付け'); if(t) apply(t); else done(false); }
+}
+function savePNG(){
+  const a = document.createElement('a');
+  a.download = 'brush-lab_' + cur().id + '_' + Date.now() + '.png';
+  a.href = cvA.toDataURL('image/png'); a.click();
+}
+
+/* --- 保存（localStorage） --- */
+const LS = 'brushlab_v1';
+let saveT = 0;
+function save(){
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    try{ localStorage.setItem(LS, JSON.stringify(serial())); $('#s-save').textContent = '● 保存済'; }
+    catch(e){ $('#s-save').textContent = '○ 保存できず（画像が大きい）'; }
+  }, 400);
+}
+function load(){
+  try{
+    const o = JSON.parse(localStorage.getItem(LS) || 'null');
+    if(!o || !Array.isArray(o.presets)) return;
+    o.presets.forEach((p, i) => {
+      if(!PRESETS[i]) return;
+      for(const k in p){ if(k === 'imgSrc' || k === 'img') continue; if(k in DEF) PRESETS[i][k] = p[k]; }
+      if(p.imgSrc){ const im = new Image(); im.onload = () => { PRESETS[i].img = im; PRESETS[i].imgRev++; TIP_CACHE.clear(); buildSide(); }; im.src = p.imgSrc; }
+    });
+    if(o.color) S.color = o.color;
+    if(o.target) S.target = o.target;
+    if(o.bg && o.bg !== 'IMAGE') S.bg = o.bg;
+    if(typeof o.press === 'boolean') S.press = o.press;
+  }catch(e){}
+}
+const DEFAULT_JSON = JSON.parse(JSON.stringify(PRESETS.map(p => { const o={}; for(const k in p) if(k!=='img') o[k]=p[k]; return o; })));
+
+/* --- HUD / bar --- */
+function syncBar(){
+  const B = cur();
+  $('#s-res').textContent = outW() + '×' + outH();
+  $('#s-mode').textContent = S.mode;
+  $('#s-brush').textContent = String(S.preset+1).padStart(2,'0') + ' ' + B.name;
+  $('#s-note').innerHTML = B.mode === 'line'
+    ? '<b>線モード</b> ─ 追加コストなし'
+    : 'スタンプ <b>' + (B.spacing*100).toFixed(1) + '%</b> ─ 太さ' + B.size + 'px なら ' + Math.max(1,(B.size*B.spacing)).toFixed(1) + 'px 間隔';
+  const hud = $('#hud');
+  hud.innerHTML =
+      '<span class="chip">' + S.mode + '</span>'
+    + '<span class="chip">OUT <b>' + outW() + '×' + outH() + '</b></span>'
+    + '<span class="chip">' + B.name + ' <b>' + (B.mode==='line'?'LINE':'STAMP') + '</b></span>'
+    + '<span class="chip">SIZE <b>' + B.size + '</b></span>'
+    + '<span class="chip">BLEND <b>' + B.blend + '</b></span>'
+    + (B.mode==='stamp' ? '<span class="chip' + (B.spacing < .04 ? ' hot' : '') + '">SPACING <b>' + (B.spacing*100).toFixed(1) + '%</b></span>' : '')
+    + (S.press ? '<span class="chip">PRESSURE <b>ON</b></span>' : '');
+  $('#b-mode').textContent = 'MODE ▸ ' + S.mode;
+  $('#lbl-a').textContent = S.mode === 'SPLIT' ? 'NEW BRUSH ─ ' + B.name : 'BRUSH ─ ' + B.name;
+}
+function layout(){
+  $('#box-b').style.display = (S.mode === 'SPLIT') ? '' : 'none';
+  const sheet = S.mode === 'SHEET';                  // 見本帳のときは計器板が下段に被る
+  $('#mini-num').style.display = sheet ? 'none' : '';
+  $('#mini-sec').style.display = sheet ? 'none' : '';
+  const w = $('#canvas-wrap');
+  const cs = getComputedStyle(w);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const two = S.mode === 'SPLIT';
+  const LBL = 16;                                   // .cv-lbl の高さ＋gap
+  const avW = w.clientWidth - padX - (two ? 10 : 0);
+  const avH = w.clientHeight - padY - LBL;
+  const ar = outW() / outH();
+  let bw = two ? avW/2 : avW, bh = bw / ar;
+  if(bh > avH){ bh = avH; bw = bh * ar; }
+  [cvA, cvB].forEach(c => { c.style.width = Math.max(80,bw) + 'px'; c.style.height = Math.max(45,bh) + 'px'; });
+}
+function setMode(m){
+  S.mode = m;
+  layout(); syncBar(); clearCanvas();
+  if(m === 'SHEET') drawSheet();
+  buildSide();
+  save();
+}
+function cycleMode(){ setMode({PAINT:'SPLIT', SPLIT:'SHEET', SHEET:'PAINT'}[S.mode]); }
+
+/* --- keys --- */
+document.addEventListener('keydown', e => {
+  if(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  const k = e.key;
+  if(k === 'Escape'){
+    if($('#bench-modal').classList.contains('on')){ $('#bench-modal').classList.remove('on'); return; }
+    if($('#shortcut-modal').classList.contains('on')){ $('#shortcut-modal').classList.remove('on'); return; }
+    location.href = 'index.html'; return;   // ANI SUITE のランディングへ戻る
+  }
+  if((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'z'){ e.preventDefault(); doUndo(); return; }
+  if(k >= '1' && k <= '6'){ S.preset = +k - 1; TIP_CACHE.clear(); buildSide(); if(S.mode==='SHEET') drawSheet(); save(); return; }
+  switch(k.toLowerCase()){
+    case 'm': cycleMode(); break;
+    case 'p': S.preset = (S.preset + 1) % PRESETS.length; TIP_CACHE.clear(); buildSide(); if(S.mode==='SHEET') drawSheet(); save(); break;
+    case 'l': S.target = S.target === 'LINE' ? 'COLOR' : 'LINE'; setupCanvas(); layout(); buildSide(); if(S.mode==='SHEET') drawSheet(); save(); break;
+    case 'b': {                                    // 画像が無いときの IMAGE は飛ばす
+      const ord = BG_ORDER.filter(v => v !== 'IMAGE' || S.bgImg);
+      const i = ord.indexOf(S.bg);
+      setBG(ord[(i + 1) % ord.length]);
+      break;
+    }
+    case 'd': S.showDots = !S.showDots; buildSide(); break;
+    case 'x': clearCanvas(); if(S.mode==='SHEET') drawSheet(); break;
+    case 's': savePNG(); break;
+    case 'v': runBench(); break;
+    case '[': setSize(cur().size - Math.max(1, Math.round(cur().size*.2))); break;
+    case ']': setSize(cur().size + Math.max(1, Math.round(cur().size*.2))); break;
+    case '?': case '/': $('#shortcut-modal').classList.toggle('on'); break;
+  }
+});
+
+/* --- wiring --- */
+function boot(){
+  load();
+  setupCanvas();
+  buildSide();
+  layout();
+  syncBar();
+  drawSection();
+
+  cvA.addEventListener('pointerdown', e => { if(e.button === 2){ sizeDown(e); return; } if(S.mode!=='SHEET') pDown(e); });
+  cvA.addEventListener('pointermove', e => { if(sizing){ sizeMove(e); return; } pMove(e); });
+  cvA.addEventListener('pointerup', e => { if(sizing){ sizing = null; return; } pUp(e); });
+  cvA.addEventListener('pointercancel', e => { sizing = null; pUp(e); });
+  cvA.addEventListener('contextmenu', e => e.preventDefault());
+
+  $('#b-mode').addEventListener('click', cycleMode);
+  $('#b-undo').addEventListener('click', () => { doUndo(); });
+  $('#b-clear').addEventListener('click', () => { clearCanvas(); if(S.mode==='SHEET') drawSheet(); });
+  $('#b-bench').addEventListener('click', runBench);
+  $('#sc-open-btn').addEventListener('click', () => $('#shortcut-modal').classList.add('on'));
+  $('#sc-close').addEventListener('click', () => $('#shortcut-modal').classList.remove('on'));
+  $('#bench-close').addEventListener('click', () => $('#bench-modal').classList.remove('on'));
+  window.addEventListener('resize', () => { layout(); });
+
+  // ステージ全体でも画像ドロップを受ける（BG）
+  const main = $('#main');
+  main.addEventListener('dragover', e => e.preventDefault());
+  main.addEventListener('drop', e => {
+    e.preventDefault();
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f) readImg(f, setBgImg);
+  });
+}
+boot();
+
+/* ============================================================================
+   §HOOK — 検証フック（SPEC_SERIES_MAP の型。ヘッドレスでも測れるように）
+   ========================================================================= */
+window.__BLAB__ = {
+  S, PRESETS, cur, setMode,
+  set(k, v){ if(k in S){ S[k] = v; } else { cur()[k] = v; } TIP_CACHE.clear(); setupCanvas(); layout(); buildSide(); },
+  setP(i){ S.preset = i; TIP_CACHE.clear(); buildSide(); },
+  bench(){ const B = cur(); const out = []; const cases = [[CONTE_W,CONTE_H,false],[512,288,false],[CONTE_W,CONTE_H,true]];
+    for(const [w,h,x2] of cases){
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const cx=cv.getContext('2d');
+      const cv2=document.createElement('canvas'); cv2.width=w; cv2.height=h; const cx2=cv2.getContext('2d');
+      benchOne(cx,cx2,B,w,h,x2);
+      const t0=performance.now(); let st=0;
+      for(let i=0;i<5;i++){ st = benchOne(cx,cx2,B,w,h,x2).stamps; }
+      out.push({ w, h, x2, ms:(performance.now()-t0)/5, stamps:st });
+    } return out; },
+  sheet(){ setMode('SHEET'); },
+  render(){ if(S.mode === 'SHEET') drawSheet(); else { paintBG(ctxA); paintBG(ctxB); } drawSection(); syncBar(); },
+  metrics(){ return MET; },
+  /* エンジン本体。移植先（econte）と同じ呼び方で叩けるように出しておく。
+     つまみの「未配線」検出は、これを min/max で回して画が変わるかで判定する。 */
+  engine: { brushPlanSeg, brushDrawSeg, strokeSegBrush, brushDown, brushUp,
+            dynSize, dynAlpha, getTip, tipPx },
+  /* ★不変条件の検証★ econte は枠をまたぐ区間を2枚のパッチに引く（econte.html:5563-5570）。
+     実機と同じ形（枠ごとに別キャンバス・plan は共有）で描いたものが、1枚に普通に引いたものと
+     画素まで一致するかを見る。**配り方の2案を並べて返す**:
+       endpoint … 現行 econte の判定（両端がどちらの枠に落ちるか）
+       bbox     … plan.bbox が枠に掛かるか（＝ブラシの半径ぶんのはみ出しも配る）
+     太いブラシでは endpoint だと**はみ出しが隣の枠に届かず穴があく**。移植では bbox を使う。 */
+  crossCheck(presetIdx){
+    const idx = presetIdx == null ? [0,1,2,3,4,5] : [presetIdx];
+    const W = 480, H = 160, CUT = 240;      // x=CUT で枠が切り替わる想定
+    const path = [];
+    for(let k = 0; k <= 30; k++) path.push({ x:30 + 420*(k/30), y:80 + 40*Math.sin((k/30)*6.283) });
+    const planOf = (pl) => pl.mode === 'line'
+      ? [pl.a.x, pl.a.y, pl.b.x, pl.b.y, +pl.lw.toFixed(4)].join(',')
+      : pl.stamps.map(t => [t.x.toFixed(4), t.y.toFixed(4), t.tw, t.variant].join(',')).join(';');
+    const mk = (w) => { const c = document.createElement('canvas'); c.width = w; c.height = H; return c; };
+    const out = {};
+    for(const i of idx){
+      const B = PRESETS[i];
+      const env = () => ({ color:'#ffffff', size:B.size, press:.6, speed:0, tailT:null });
+      const run = (rule) => {
+        const ref = mk(W), pa = mk(CUT), pb = mk(W - CUT);
+        const rx = ref.getContext('2d'), ax = pa.getContext('2d'), bx = pb.getContext('2d');
+        const sig = [];
+        brushDown(31337);
+        for(let k = 1; k < path.length; k++){
+          const a = path[k-1], b = path[k];
+          const plan = brushPlanSeg(a, b, B, env());
+          sig.push(planOf(plan));
+          brushDrawSeg(rx, plan);
+          if(rule === 'endpoint'){
+            const ka = a.x < CUT ? 0 : 1, kb = b.x < CUT ? 0 : 1;   // econte の frameAtBake 相当
+            brushDrawSeg(ka === 0 ? ax : bx, plan, ka === 0 ? null : { ox:-CUT });
+            if(kb !== ka) brushDrawSeg(kb === 0 ? ax : bx, plan, kb === 0 ? null : { ox:-CUT });
+          }else{
+            if(plan.bbox[0] <  CUT) brushDrawSeg(ax, plan);
+            if(plan.bbox[2] >= CUT) brushDrawSeg(bx, plan, { ox:-CUT });
+          }
+        }
+        brushUp();
+        const cmp = mk(W), cc = cmp.getContext('2d');
+        cc.drawImage(pa, 0, 0); cc.drawImage(pb, CUT, 0);
+        const d1 = rx.getImageData(0, 0, W, H).data, d2 = cc.getImageData(0, 0, W, H).data;
+        let diff = 0, worst = 0;
+        for(let j = 3; j < d1.length; j += 4){
+          const e = Math.abs(d1[j] - d2[j]);
+          if(e > 2){ diff++; if(e > worst) worst = e; }
+        }
+        return { diff, worst, sig:sig.join('|') };
+      };
+      /* plan が draw の回数に影響されないこと（BS を draw 側で進めていたら崩れる） */
+      brushDown(31337);
+      const solo = [];
+      for(let k = 1; k < path.length; k++) solo.push(planOf(brushPlanSeg(path[k-1], path[k], B, env())));
+      brushUp();
+      const ep = run('endpoint'), bb = run('bbox');
+      out[(i+1) + ' ' + B.name] = {
+        planStable: bb.sig === solo.join('|'),
+        endpointRule: ep.diff + 'px / 最大' + ep.worst,
+        bboxRule:     bb.diff + 'px / 最大' + bb.worst,
+        verdict: (bb.sig === solo.join('|') && bb.diff <= ep.diff) ? 'OK' : 'NG'
+      };
+    }
+    /* 残差の注: 太い線（lw が整数でない）を別々のバッファに描くと、Chrome の
+       アンチエイリアスが**バッファ内の絶対座標に依存して**数階調ずれることがある。
+       素の canvas に lw=31.96 を渡すと同じ 132px/21 が出る＝エンジン由来ではない。
+       econte の現行の丸ペンでも同じことが起きている（気づかれていないだけ）。 */
+    return out;
+  },
+  /* つまみの全数チェック。min と max で描画が変わらないものを未配線として返す */
+  wiring(presetIdx, list){
+    const keep = S.preset;
+    S.preset = presetIdx == null ? S.preset : presetIdx;
+    const base = cur();
+    const hash = (over, press, speed) => {
+      const B = Object.assign({}, base, over || {});
+      const cv = document.createElement('canvas'); cv.width = 640; cv.height = 200;
+      const cx = cv.getContext('2d');
+      brushDown(999);
+      let prev = null;
+      for(let i = 0; i <= 40; i++){
+        const p = { x:40 + 560*(i/40), y:100 + 30*Math.sin((i/40)*6.283) };
+        if(prev) strokeSegBrush(cx, prev, p, B, { color:'#ffffff', size:B.size, press:press == null ? .6 : press, speed:speed || 0, tailT:1 - i/40 });
+        prev = p;
+      }
+      brushUp();
+      const d = cx.getImageData(0, 0, 640, 200).data;
+      let h = 0, ink = 0;
+      for(let i = 3; i < d.length; i += 4){ h = (h*31 + d[i])|0; ink += d[i]; }
+      return h + ':' + ink;
+    };
+    const tests = list || [
+      ['size',{size:6},{size:80}], ['opacity',{opacity:.1},{opacity:1}],
+      ['flow',{flow:.05},{flow:1}], ['spacing',{spacing:.03},{spacing:.5}],
+      ['hardness',{hardness:0},{hardness:1}], ['grain',{grain:0},{grain:1}],
+      ['jitter',{jitter:0},{jitter:2}], ['sizeJit',{sizeJit:0},{sizeJit:1}],
+      ['angJit',{angJit:0},{angJit:1}], ['roundness',{roundness:.1},{roundness:1}],
+      ['angle',{angle:0,rotate:false,roundness:.2},{angle:90,rotate:false,roundness:.2}],
+      ['rotate',{rotate:false,roundness:.2},{rotate:true,roundness:.2}],
+      ['blend',{blend:'source-over'},{blend:'lighter'}],
+      ['taperIn',{taperIn:0},{taperIn:.5}], ['taperOut',{taperOut:0},{taperOut:.5}],
+      ['pSize',{pSize:0},{pSize:1}], ['pOpa',{pOpa:0},{pOpa:1}],
+      ['spdSize',{spdSize:0},{spdSize:1}], ['spdOpa',{spdOpa:0},{spdOpa:1}]
+    ];
+    const out = {};
+    for(const [k, a, b] of tests){
+      const sp = (k === 'spdSize' || k === 'spdOpa') ? .8 : 0;
+      const pr = (k === 'pSize' || k === 'pOpa') ? .25 : .6;
+      out[k] = hash(a, pr, sp) !== hash(b, pr, sp) ? 'wired' : 'NOT WIRED';
+    }
+    S.preset = keep;
+    return out;
+  },
+  /* 縞（stamp ripple）の実測。ボケ足の大きいブラシで spacing を決めるための計測器。
+     真横に1本引いて中央500pxの明度の最大-最小を、背景を引いた信号量で割る。 */
+  ripple(spacings){
+    const list = spacings || [.03,.05,.08,.10,.15,.25];
+    const keepSp = cur().spacing, keepCol = S.color, keepBg = S.bg;
+    const out = {};
+    S.bg = 'BLACK';
+    for(const sp of list){
+      cur().spacing = sp;
+      paintBG(ctxA);
+      const w = cvA.width, h = cvA.height;
+      brushDown(4242);
+      let prev = null;
+      for(let k = 0; k <= 30; k++){
+        const p = { x:w*(.02 + .96*k/30), y:h*.5 };
+        if(prev) strokeSegBrush(ctxA, prev, p, cur(), { color:'#ffffff', size:cur().size, press:1, speed:0, tailT:null });
+        prev = p;
+      }
+      const st = MET.stamps;
+      brushUp();
+      const d = ctxA.getImageData(0, Math.round(h*.5), w, 1).data;
+      const v = []; for(let x = Math.round(w*.31); x < Math.round(w*.70); x++) v.push(d[x*4]);
+      const mn = Math.min.apply(null, v), mx = Math.max.apply(null, v);
+      const av = v.reduce((a,b) => a+b, 0) / v.length;
+      out[(sp*100).toFixed(0)+'%'] = { stamps:st, signal:+av.toFixed(0), ripplePct: av > 1 ? +(((mx-mn)/av)*100).toFixed(1) : null };
+    }
+    cur().spacing = keepSp; S.color = keepCol; S.bg = keepBg;
+    paintBG(ctxA); buildSide();
+    return out;
+  },
+  tipCacheSize(){ return TIP_CACHE.size; },
+  /* econte へ渡す形。これをそのまま SPEC に貼る */
+  exportForEconte(){ return JSON.stringify(serial(), null, 1); }
+};
+</script>
+</body>
+</html>

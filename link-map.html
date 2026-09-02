@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LINK MAP">
+<title>LINK MAP — ANI × OBN × COM の連携マップ</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+/* ============================================================
+   LINK MAP — OBAN BUILDER の GLOSS テーマに合わせた連携マップ
+   ・ノード＝アプリ／矢印＝データの行き来（1本＝1ルート）
+   ・ルートを「やってみた」でチェック → 全部で CLEAR
+   ・進捗は localStorage['linkmap_done_v1']
+   トークンは oban-builder.html の GLOSS からそのまま持ってきている。
+   **本文は 13px 基準**（アプリ本体は 11px。ここは読み物なので大きくしてある）
+   ============================================================ */
+:root{
+  /* SPEC_18 P0 — iPad standalone の安全域。実測 top=32px / bottom=20px（SPEC_18 §2-3）。
+     ブラウザ表示や PC では 0px になるので見た目は1pxも変わらない。正準は oban-builder.html の #bar */
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+
+  --bg:#08090C;--ink:#E8ECF2;
+  --panel:rgba(10,12,16,.95);--cell:rgba(232,236,242,.03);
+  --grey:rgba(232,236,242,.55);--dim:rgba(232,236,242,.3);
+  --line:rgba(232,236,242,.14);--line-2:rgba(232,236,242,.08);
+  --acc:#E9F1FA;--accRGB:233,241,250;--acc2:#BFEFFF;
+  --acc-fill:linear-gradient(180deg,#FFFFFF,#DCE6F0 46%,#F4F9FF);--acc-ink:#05070B;
+  --acc-pt:#5AE9FF;--acc-ptRGB:90,233,255;
+  --acc-inset:inset 0 1px 0 rgba(255,255,255,.9);
+  --acc-glow:0 0 18px rgba(90,233,255,.5);
+  --acc-hover-fill:linear-gradient(180deg,rgba(90,233,255,.24),rgba(255,255,255,.08));
+  --acc-hover-line:#5AE9FF;
+  --mark:#FFC94F;
+  --saira:'Saira Condensed','Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
+  --mono:'JetBrains Mono','Menlo','Consolas',monospace;
+  --jp:'Noto Sans JP',-apple-system,'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:rgba(232,236,242,.04)}
+*::-webkit-scrollbar-thumb{background:rgba(var(--accRGB),.45);border:3px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:rgba(var(--accRGB),.85);border:3px solid transparent;background-clip:padding-box}
+html,body{min-height:100%;touch-action:manipulation;overscroll-behavior:none}  /* SPEC_18 §5-N（正準 composer） */
+body{
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%,transparent 40%,rgba(4,5,7,.72) 100%),
+    linear-gradient(rgba(232,236,242,.028) 1px,transparent 1px) center/80px 80px,
+    linear-gradient(90deg,rgba(232,236,242,.028) 1px,transparent 1px) center/80px 80px,
+    linear-gradient(180deg,#0A0C11,#07080B 62%,#0A0B0F);
+  background-attachment:fixed;
+  color:var(--ink);font-family:var(--mono);font-size:13px;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:calc(60px + var(--safe-b));  /* SPEC_18 P0 */
+}
+
+/* ---------- トップバー ---------- */
+#bar{
+  position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  min-height:calc(64px + var(--safe-t));padding:calc(10px + var(--safe-t)) 18px 10px;  /* SPEC_18 P0: sticky なので中身だけ押し下げる */
+  background:linear-gradient(to bottom,rgba(6,7,10,.96),rgba(6,7,10,.74) 70%,rgba(6,7,10,.3));
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--line);
+}
+#bar::after{
+  content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(var(--accRGB),.5) 16%,rgba(var(--accRGB),.07) 62%,transparent);
+}
+.brand{display:flex;align-items:center;gap:12px;flex:none}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--acc2);
+  box-shadow:0 0 12px rgba(var(--acc-ptRGB),.9);flex:none}
+.brand .bwrap{display:flex;flex-direction:column;gap:3px}
+.brand .bname{font-family:var(--saira);font-weight:700;font-size:21px;letter-spacing:.14em;line-height:.9;color:var(--ink)}
+.brand .bsub{font-family:var(--jp);font-size:10px;letter-spacing:.16em;color:rgba(232,236,242,.45);line-height:1}
+#bar .flex{flex:1;min-width:8px}
+
+/* 進捗（ゲームっぽい部分） */
+#score{display:flex;align-items:center;gap:12px;flex:none}
+#score .lab{font-family:var(--saira);font-weight:600;font-size:12px;letter-spacing:.26em;color:rgba(232,236,242,.5)}
+#score .num{font-family:var(--saira);font-weight:700;font-size:24px;letter-spacing:.06em;color:var(--acc2);line-height:1}
+#score .num b{color:var(--ink)}
+#bararea{width:190px;height:8px;border:1px solid var(--line);background:rgba(232,236,242,.04);position:relative;overflow:hidden}
+#barfill{position:absolute;left:0;top:0;bottom:0;width:0%;background:var(--acc-fill);
+  box-shadow:var(--acc-glow);transition:width .4s cubic-bezier(.2,.9,.25,1)}
+.btn{
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;flex:none;
+  border:1px solid var(--line);background:var(--cell);color:rgba(232,236,242,.75);
+  font-family:var(--saira);font-weight:600;font-size:12px;letter-spacing:.16em;transition:all .12s;
+  text-decoration:none;
+}
+.btn:hover{background:var(--acc-hover-fill);border-color:var(--acc-hover-line);color:var(--ink);box-shadow:var(--acc-glow)}
+.btn:active{filter:brightness(1.18);box-shadow:var(--acc-glow),var(--acc-inset)}
+
+/* ---------- レイアウト ---------- */
+#wrap{max-width:1500px;margin:0 auto;padding:22px 18px 0;
+  display:grid;grid-template-columns:minmax(0,1.35fr) minmax(340px,.9fr);gap:22px;align-items:start}
+@media (max-width:1080px){#wrap{grid-template-columns:1fr}}
+
+.card{border:1px solid var(--line);background:var(--panel);position:relative}
+.card::before{content:'';position:absolute;left:0;right:0;top:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(var(--accRGB),.45) 20%,rgba(var(--accRGB),.06) 70%,transparent)}
+.sect{display:flex;align-items:baseline;gap:10px;padding:14px 16px 8px;border-bottom:1px solid var(--line-2)}
+.sect .en{font-family:var(--saira);font-weight:600;font-size:14px;letter-spacing:.26em;color:var(--acc)}
+.sect .jp{font-family:var(--jp);font-size:11px;letter-spacing:.1em;color:rgba(232,236,242,.42)}
+
+/* ---------- マップ ---------- */
+#mapbox{padding:10px 12px 14px;overflow-x:auto}
+#map{width:100%;min-width:660px;height:auto;display:block;overflow:visible}
+.edge{fill:none;stroke:rgba(232,236,242,.20);stroke-width:2;transition:stroke .16s,stroke-width .16s,opacity .16s;
+  marker-end:url(#ar);cursor:pointer}
+.edge.dash{stroke-dasharray:7 6}
+.edge.done{stroke:rgba(var(--acc-ptRGB),.5);marker-end:url(#arDone)}
+.edge.on{stroke:#FFFFFF;stroke-width:3.4;marker-end:url(#arOn);filter:url(#eglow)}
+.edge.mute{opacity:.14}
+.ehit{fill:none;stroke:transparent;stroke-width:22;cursor:pointer}
+
+.node rect{fill:rgba(232,236,242,.035);stroke:var(--line);stroke-width:1;transition:all .16s}
+.node .nm{font-family:var(--saira);font-weight:700;font-size:23px;letter-spacing:.16em;fill:rgba(232,236,242,.86);
+  text-anchor:middle;dominant-baseline:middle}
+.node .jp{font-family:var(--jp);font-size:12.5px;letter-spacing:.08em;fill:rgba(232,236,242,.46);
+  text-anchor:middle;dominant-baseline:middle}
+.node{cursor:pointer}
+.node:hover rect{stroke:var(--acc-hover-line);fill:rgba(var(--acc-ptRGB),.10)}
+.node:hover .nm{fill:var(--ink)}
+.node.lit rect{stroke:rgba(var(--accRGB),.9);fill:rgba(var(--accRGB),.14);
+  filter:url(#eglow)}
+.node.lit .nm{fill:var(--acc2)}
+.node.mute{opacity:.2}
+.elabel{font-family:var(--jp);font-size:14px;letter-spacing:.04em;fill:rgba(232,236,242,.5);
+  text-anchor:middle;dominant-baseline:middle;pointer-events:none;transition:fill .16s;
+  /* 線の上を通っても読めるように、地の色で縁取ってから塗る */
+  paint-order:stroke fill;stroke:#0A0C11;stroke-width:3.5px;stroke-linejoin:round}
+.elabel.done{fill:rgba(var(--acc-ptRGB),.8)}
+.elabel.on{fill:var(--acc2);font-weight:500}
+.elabel.mute{opacity:.12}
+
+#legend{display:flex;flex-wrap:wrap;gap:8px 18px;padding:10px 16px 14px;border-top:1px solid var(--line-2);
+  font-family:var(--jp);font-size:11px;color:rgba(232,236,242,.45)}
+#legend span{display:inline-flex;align-items:center;gap:7px}
+#legend i{display:inline-block;width:22px;height:0;border-top:2px solid rgba(232,236,242,.25)}
+#legend i.done{border-color:rgba(var(--acc-ptRGB),.6)}
+#legend i.dash{border-top-style:dashed;border-color:rgba(232,236,242,.25)}
+
+/* ---------- ミッション一覧 ---------- */
+#list{padding:6px 0 8px;max-height:none}
+.mi{border-top:1px solid var(--line-2);padding:11px 16px;cursor:pointer;transition:background .12s}
+.mi:first-child{border-top:0}
+.mi:hover{background:rgba(var(--acc-ptRGB),.06)}
+.mi.on{background:rgba(var(--accRGB),.09);box-shadow:inset 3px 0 0 var(--acc-pt)}
+.mi .hd{display:flex;align-items:center;gap:10px}
+.mi .ck{width:22px;height:22px;flex:none;border:1px solid var(--line);background:rgba(232,236,242,.03);
+  display:flex;align-items:center;justify-content:center;font-size:13px;color:transparent;transition:all .14s}
+.mi .ck:hover{border-color:var(--acc-hover-line);box-shadow:var(--acc-glow)}
+.mi.done .ck{background:var(--acc-fill);border-color:transparent;color:var(--acc-ink);
+  box-shadow:var(--acc-inset),var(--acc-glow)}
+.mi .rt{flex:1;min-width:0;font-family:var(--saira);font-weight:600;font-size:13px;letter-spacing:.14em;
+  color:rgba(232,236,242,.62);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mi.done .rt{color:var(--acc2)}
+.mi .rt em{font-style:normal;color:rgba(232,236,242,.3);padding:0 5px}
+.mi .ti{margin:7px 0 0 32px;font-family:var(--jp);font-size:13px;line-height:1.55;color:rgba(232,236,242,.82)}
+.mi .dt{margin:6px 0 0 32px;font-family:var(--jp);font-size:11.5px;line-height:1.7;color:rgba(232,236,242,.5);
+  display:none}
+.mi.on .dt{display:block}
+.mi .dt b{color:var(--acc2);font-weight:500}
+.mi .dt .k{display:inline-block;border:1px solid rgba(var(--acc-ptRGB),.35);background:rgba(var(--acc-ptRGB),.07);
+  padding:1px 6px;margin:0 2px;font-family:var(--mono);font-size:11px;color:var(--acc2);white-space:nowrap}
+.mi .go{margin:9px 0 0 32px;display:none;gap:7px;flex-wrap:wrap}
+.mi.on .go{display:flex}
+.mi .go a{height:26px;padding:0 10px;font-size:11px;letter-spacing:.12em}
+.mi .warn{color:var(--mark)}
+
+/* ---------- CLEAR 演出 ---------- */
+#clear{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;
+  background:rgba(4,5,8,.82);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);padding:24px}
+#clear.show{display:flex}
+#clearbox{border:1px solid rgba(var(--accRGB),.7);background:var(--panel);padding:38px 46px;text-align:center;
+  box-shadow:0 0 60px rgba(var(--acc-ptRGB),.32);animation:pop .5s cubic-bezier(.2,1.3,.3,1)}
+@keyframes pop{0%{transform:scale(.86);opacity:0}100%{transform:scale(1);opacity:1}}
+#clearbox .big{font-family:var(--saira);font-weight:700;font-size:64px;letter-spacing:.22em;line-height:1;
+  background:var(--acc-fill);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 22px rgba(var(--acc-ptRGB),.55))}
+#clearbox .sub{margin-top:14px;font-family:var(--jp);font-size:13px;letter-spacing:.1em;color:rgba(232,236,242,.7)}
+#clearbox .row{margin-top:22px;display:flex;gap:10px;justify-content:center}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <div class="brand">
+    <span class="dot"></span>
+    <span class="bwrap">
+      <span class="bname">LINK MAP</span>
+      <span class="bsub">アプリ間の行き来 ぜんぶ</span>
+    </span>
+  </div>
+  <span class="flex"></span>
+  <div id="score">
+    <span class="lab">CLEARED</span>
+    <span class="num"><b id="sc-n">0</b> / <span id="sc-t">10</span></span>
+    <span id="bararea"><span id="barfill"></span></span>
+  </div>
+  <button class="btn" id="b-reset" title="チェックを全部外す">RESET</button>
+  <a class="btn" id="b-home" href="index.html" title="ランディングページへ">HOME</a>
+</div>
+
+<div id="wrap">
+
+  <!-- ============ 左: マップ ============ -->
+  <div class="card">
+    <div class="sect"><span class="en">MAP</span><span class="jp">矢印をクリックすると、そのルートの手順が右に出ます</span></div>
+    <div id="mapbox">
+      <svg id="map" viewBox="0 0 960 560" role="img" aria-label="アプリ間の連携マップ">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="rgba(232,236,242,.28)"/>
+          </marker>
+          <marker id="arDone" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="rgba(90,233,255,.75)"/>
+          </marker>
+          <marker id="arOn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#FFFFFF"/>
+          </marker>
+          <filter id="eglow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="4" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <g id="edges"></g>
+        <g id="nodes"></g>
+        <g id="elabels"></g>
+      </svg>
+    </div>
+    <div id="legend">
+      <span><i></i>まだ試していないルート</span>
+      <span><i class="done"></i>クリア済み</span>
+      <span><i class="dash"></i>まだ直結していない（ファイル手渡し）</span>
+      <span>※ 連携はすべて<b style="color:rgba(232,236,242,.7);font-weight:400">同じブラウザの中</b>だけで繋がります</span>
+    </div>
+  </div>
+
+  <!-- ============ 右: ミッション ============ -->
+  <div class="card">
+    <div class="sect"><span class="en">ROUTES</span><span class="jp">やってみたら □ を押してチェック</span></div>
+    <div id="list"></div>
+  </div>
+
+</div>
+
+<div id="clear">
+  <div id="clearbox">
+    <div class="big">CLEAR!</div>
+    <div class="sub">連携ルート 10本、ぜんぶ通りました。</div>
+    <div class="row">
+      <button class="btn" id="b-close">閉じる</button>
+      <button class="btn" id="b-again">もう一周</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   データ — ノードとルート
+   座標は viewBox 0 0 960 620。カードは 200×82（中心指定）。
+   ANIMATOR がハブ（4本と繋がる）なので上段中央に置き、
+   長い斜め2本（an→co / mp→ob）だけが中央で交差する形にしている。
+   ============================================================ */
+const NODES={
+  ec:{x:120,y:120,nm:'ECONTE',   jp:'絵コンテ・プリプロ',   file:'econte.html'},
+  an:{x:450,y:120,nm:'ANIMATOR', jp:'作画',                file:'animator.html'},
+  ob:{x:830,y:120,nm:'OBAN',     jp:'モーションコミック',   file:'oban-builder.html'},
+  mp:{x:450,y:450,nm:'MANGA PLATE',jp:'漫画ページ・コマ割り',file:'manga-plate.html'},
+  co:{x:830,y:450,nm:'COMPOSER', jp:'合成・書き出し',      file:'composer.html'},
+};
+const NW=200,NH=82;   // カードの幅・高さ
+
+/* ルート。d=SVGパス（矢印の向き＝データが流れる向き）
+   lx/ly=ラベル位置。dash=まだ直結していないルート */
+const ROUTES=[
+ {id:'ec-an',a:'ec',b:'an',dash:1,
+  d:'M 220,120 L 342,120', lx:281,ly:102,
+  lab:'手渡し',
+  ti:'ECONTE の絵コンテを ANIMATOR へ持っていく',
+  dt:'この1本だけ<b>まだ直結していません</b>。ECONTE から <span class="k">⇩ PROJ</span>（ZIP）や '
+    +'カラースクリプトPNG・コンテ動画を書き出して、ANIMATOR には <span class="k">REF ▸ + JSON / SEQ</span> '
+    +'から<b>ファイルで渡します</b>。<br>'
+    +'<span class="warn">※ 共有倉庫（tdr_live）で直結する案は SPEC_10 P2 として残っているが未着手。'
+    +'ここが繋がると絵コンテ→作画がボタン1つになる。</span>'},
+
+ {id:'an-ob',a:'an',b:'ob',
+  d:'M 550,106 L 722,106', lx:636,ly:88,
+  lab:'連番を取り込む',
+  ti:'ANIMATOR で描いた連番を OBAN のコマにする',
+  dt:'ANIMATOR で <span class="k">LIVE ○</span> を1回押す → OBAN の '
+    +'<span class="k">⚙ SETTINGS ▸ FILE／連携 ▸ ▶ANIMATOR</span> で選ぶ。<br>'
+    +'<b>PNG の書き出しは要りません。</b>以後 ANIMATOR で保存するたびに OBAN の絵が自動で入れ替わります'
+    +'（届かないときはコマの <span class="k">RELOAD</span>）。'},
+
+ {id:'ob-an',a:'ob',b:'an',
+  d:'M 722,134 L 550,134', lx:636,ly:152,
+  lab:'ANIMATORで開く',
+  ti:'OBAN で選んだコマを ANIMATOR で描き直す',
+  dt:'OBAN でコマを選び、インスペクタの <span class="k">編集 ▸ ANIMATORで開く</span>。<br>'
+    +'そのコマの ANIMATOR プロジェクトが<b>新しいタブで開いて LIVE が自動で入ります</b>。'
+    +'直したら OBAN 側は勝手に追従します。'},
+
+ {id:'an-mp',a:'an',b:'mp',
+  d:'M 436,161 L 436,401', lx:386,ly:266,
+  lab:'絵をコマへ',
+  ti:'ANIMATOR で描いた絵を MANGA PLATE のコマに入れる',
+  dt:'ANIMATOR で <span class="k">LIVE ○</span> を1回押す → MANGA PLATE でコマを選んで '
+    +'<span class="k">◀ ANIMATOR 取込</span>。<br>'
+    +'選んだコマにピタリ収まり、以後は<b>保存のたび自動更新</b>。'
+    +'複数コマを描いていれば ◆Items に<b>コマ送り</b>が出ます。'},
+
+ {id:'mp-an',a:'mp',b:'an',
+  d:'M 464,401 L 464,161', lx:518,ly:380,
+  lab:'下敷き／描き足し',
+  ti:'MANGA PLATE のコマを ANIMATOR で描く・描き足す',
+  dt:'<b>①中身を描く</b>: コマを選んで <span class="k">▶ ANIMATOR REF</span> → ANIMATOR の '
+    +'<span class="k">REF（R）▸ + FROM SAVED</span> で下敷きにして描く。<br>'
+    +'<b>②はみ出しを描き足す</b>: <span class="k">▶ 描き足し（のりしろ付き）</span> → 戻す層（奥/中間/手前）を選ぶ。'
+    +'<b>桃の実線＝コマ枠／水色の破線＝のりしろの端</b>、その間を描く。<br>'
+    +'どちらも戻りは <span class="k">◀ ANIMATOR 取込</span>で、送った位置にピタリ入ります。'},
+
+ {id:'mp-ob',a:'mp',b:'ob',
+  d:'M 550,428 Q 700,394 758,161', lx:694,ly:200,
+  lab:'ページ／層',
+  ti:'MANGA PLATE のページやコマを OBAN でモーションコミックにする',
+  dt:'<b>①かんたん</b>: <span class="k">▶ OBAN</span> でページを1枚絵として送る'
+    +'（読み文字は<b>焼かずに文字のまま</b>渡るので OBAN 側で直せます）。<br>'
+    +'<b>②コマ内パララックス</b>: ◆Items で素材に <b>奥／中間／手前</b> を付けてから '
+    +'<span class="k">▶▶ OBAN レイヤー</span>。1コマが<b>フレーム＋子パネル</b>で入り、'
+    +'カメラを振ると層ごとに違う速さで動きます。<br>'
+    +'寄り（T.U.）でも分けたいときはフレームの <span class="k">Z</span> を上げる'
+    +'（レイヤー送りなら 1.00 で届く）。'},
+
+ {id:'ob-mp',a:'ob',b:'mp',
+  d:'M 792,161 Q 742,430 552,458', lx:648,ly:452,
+  lab:'文字が戻る',
+  ti:'OBAN で直した読み文字を MANGA PLATE の原稿に戻す',
+  dt:'OBAN 側でセリフを打ち直すと、<b>文字列だけ</b>が原稿へ戻ります'
+    +'（<span class="k">Ctrl+Z</span> で取り消せます）。<br>'
+    +'<b>位置・サイズ・色・行間は MANGA PLATE が正</b>。往復するほど版面がにじむのを防ぐため、'
+    +'レイアウトはあえて戻していません。'},
+
+ {id:'an-co',a:'an',b:'co',
+  d:'M 528,161 Q 566,400 722,436', lx:624,ly:318,
+  lab:'トラックへ',
+  ti:'ANIMATOR で描いた絵を COMPOSER のトラックにする',
+  dt:'ANIMATOR の <span class="k">→ COMPOSER</span> を押すと、COMPOSER が別ウィンドウで開いて'
+    +'そのままトラックになります。<br>'
+    +'以後 ANIMATOR で保存するたび、<b>同じ projectId のトラックの絵だけ</b>が差し替わります'
+    +'（キーフレームや変形は保たれる）。'},
+
+ {id:'mp-co',a:'mp',b:'co',
+  d:'M 550,478 L 722,478', lx:636,ly:498,
+  lab:'ページ／層',
+  ti:'MANGA PLATE のページやコマを COMPOSER で詰める',
+  dt:'<b>①かんたん</b>: <span class="k">▶ COMPOSER</span> でページが1トラックとして入ります。<br>'
+    +'<b>②レイヤー</b>: <span class="k">▶▶ COMPOSER レイヤー</span> で '
+    +'<b>地 → 奥 → 中間 → 手前 → 枠の上</b> が奥から手前の順に別トラックで並びます。'
+    +'カメラを動かすとトラックごとに違う速さで動く＝奥行きが出ます。<br>'
+    +'<span class="warn">※ COMPOSER は拡大がニアレストなので、'
+    +'ぱかぱか層の解像度を下げていると線がジャギります。詰めに使うなら 100% に。</span>'},
+
+ {id:'ob-co',a:'ob',b:'co',
+  d:'M 843,161 L 843,401', lx:888,ly:280,
+  lab:'カメラを渡す',
+  ti:'OBAN で作ったカメラワークを COMPOSER へ持っていく',
+  dt:'OBAN の <span class="k">COMPOSER ▶</span> で TAKE を CAMERA トラックの JSON に変換してコピー → '
+    +'COMPOSER の <span class="k">▶ OBAN</span> で貼り付け。<br>'
+    +'撮影処理（FX）と<b>ルートパネルの配置</b>も一緒に付いてくるので、'
+    +'COMPOSER 側に同じ名前の画像を先に入れておくと<b>位置・サイズ・重ね順が自動で乗ります</b>。'},
+];
+
+/* ============================================================
+   描画
+   ============================================================ */
+const $=s=>document.querySelector(s);
+const SVGNS='http://www.w3.org/2000/svg';
+function el(n,at){const e=document.createElementNS(SVGNS,n);for(const k in at)e.setAttribute(k,at[k]);return e;}
+
+const DONE_KEY='linkmap_done_v1';
+let done={};
+try{done=JSON.parse(localStorage.getItem(DONE_KEY)||'{}')||{};}catch(e){done={};}
+let sel=null;          // 選択中のルートid（nullなら全部ふつう表示）
+let selNode=null;      // 選択中のノードid（そのアプリに繋がるルートだけ光らせる）
+
+/* ---- ノード ---- */
+function drawNodes(){
+  const g=$('#nodes');g.innerHTML='';
+  for(const id in NODES){
+    const n=NODES[id];
+    const grp=el('g',{class:'node','data-node':id});
+    grp.appendChild(el('rect',{x:n.x-NW/2,y:n.y-NH/2,width:NW,height:NH}));
+    const t1=el('text',{class:'nm',x:n.x,y:n.y-9});t1.textContent=n.nm;
+    const t2=el('text',{class:'jp',x:n.x,y:n.y+16});t2.textContent=n.jp;
+    grp.appendChild(t1);grp.appendChild(t2);
+    grp.addEventListener('click',()=>{selNode=(selNode===id)?null:id;sel=null;render();});
+    g.appendChild(grp);
+  }
+}
+/* ---- 矢印とラベル ---- */
+function drawEdges(){
+  const g=$('#edges'),lg=$('#elabels');g.innerHTML='';lg.innerHTML='';
+  ROUTES.forEach(r=>{
+    // 当たり判定用の太い透明線を先に置く（細い線でも掴める）
+    const hit=el('path',{class:'ehit',d:r.d,'data-rt':r.id});
+    const p=el('path',{class:'edge'+(r.dash?' dash':''),d:r.d,'data-rt':r.id});
+    hit.addEventListener('click',()=>pick(r.id));
+    p.addEventListener('click',()=>pick(r.id));
+    g.appendChild(hit);g.appendChild(p);
+    const t=el('text',{class:'elabel',x:r.lx,y:r.ly,'data-rt':r.id});
+    lg.appendChild(t);
+  });
+}
+/* ---- ミッション一覧 ---- */
+function drawList(){
+  const box=$('#list');box.innerHTML='';
+  ROUTES.forEach(r=>{
+    const d=document.createElement('div');
+    d.className='mi'+(done[r.id]?' done':'')+(sel===r.id?' on':'');
+    d.dataset.rt=r.id;
+    d.innerHTML=
+      '<div class="hd">'
+      +'<span class="ck" data-a="ck" title="やってみたらチェック">✓</span>'
+      +'<span class="rt">'+NODES[r.a].nm+' <em>▶</em> '+NODES[r.b].nm+'</span>'
+      +'</div>'
+      +'<div class="ti">'+r.ti+'</div>'
+      +'<div class="dt">'+r.dt+'</div>'
+      +'<div class="go">'
+      +'<a class="btn" href="'+NODES[r.a].file+'" target="_blank" rel="noopener">'+NODES[r.a].nm+' を開く</a>'
+      +'<a class="btn" href="'+NODES[r.b].file+'" target="_blank" rel="noopener">'+NODES[r.b].nm+' を開く</a>'
+      +'</div>';
+    d.addEventListener('click',ev=>{
+      if(ev.target.dataset&&ev.target.dataset.a==='ck'){toggle(r.id);return;}
+      if(ev.target.tagName==='A')return;               // 「開く」は素通し
+      pick(r.id);
+    });
+    box.appendChild(d);
+  });
+}
+/* ---- 状態を画面に反映 ---- */
+function render(){
+  // ハイライトの対象を決める（ルート選択 > ノード選択 > なし）
+  let lit=null;
+  if(sel)lit=[sel];
+  else if(selNode)lit=ROUTES.filter(r=>r.a===selNode||r.b===selNode).map(r=>r.id);
+
+  document.querySelectorAll('.edge').forEach(p=>{
+    const id=p.dataset.rt;
+    p.classList.toggle('done',!!done[id]);
+    p.classList.toggle('on',!!lit&&lit.indexOf(id)>=0);
+    p.classList.toggle('mute',!!lit&&lit.indexOf(id)<0);
+  });
+  document.querySelectorAll('.elabel').forEach(t=>{
+    const id=t.dataset.rt, r=ROUTES.find(x=>x.id===id);
+    t.textContent=(done[id]?'✓ ':'')+r.lab;      // クリア済みは頭に ✓
+    t.classList.toggle('done',!!done[id]);
+    t.classList.toggle('on',!!lit&&lit.indexOf(id)>=0);
+    t.classList.toggle('mute',!!lit&&lit.indexOf(id)<0);
+  });
+  // ノードは「選択中のルートの両端」か「選んだノード」を光らせる
+  const hot=sel?[ROUTES.find(r=>r.id===sel).a,ROUTES.find(r=>r.id===sel).b]
+              :(selNode?[selNode]:null);
+  document.querySelectorAll('.node').forEach(g=>{
+    const id=g.dataset.node;
+    g.classList.toggle('lit',!!hot&&hot.indexOf(id)>=0);
+    g.classList.toggle('mute',!!hot&&hot.indexOf(id)<0);
+  });
+  document.querySelectorAll('.mi').forEach(d=>{
+    d.classList.toggle('done',!!done[d.dataset.rt]);
+    d.classList.toggle('on',sel===d.dataset.rt);
+  });
+  // スコア
+  const n=ROUTES.filter(r=>done[r.id]).length, t=ROUTES.length;
+  $('#sc-n').textContent=n;$('#sc-t').textContent=t;
+  $('#barfill').style.width=(n/t*100).toFixed(1)+'%';
+}
+function pick(id){
+  sel=(sel===id)?null:id;
+  if(sel)selNode=null;
+  render();
+  const row=document.querySelector('.mi[data-rt="'+id+'"]');
+  if(sel&&row)row.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function toggle(id){
+  const was=ROUTES.every(r=>done[r.id]);
+  done[id]=!done[id];
+  if(!done[id])delete done[id];
+  try{localStorage.setItem(DONE_KEY,JSON.stringify(done));}catch(e){}
+  render();
+  if(!was&&ROUTES.every(r=>done[r.id]))showClear();
+}
+function showClear(){$('#clear').classList.add('show');}
+
+$('#b-reset').addEventListener('click',()=>{
+  done={};try{localStorage.removeItem(DONE_KEY);}catch(e){}
+  sel=null;selNode=null;render();
+});
+$('#b-close').addEventListener('click',()=>$('#clear').classList.remove('show'));
+$('#b-again').addEventListener('click',()=>{
+  $('#clear').classList.remove('show');
+  done={};try{localStorage.removeItem(DONE_KEY);}catch(e){}
+  sel=null;selNode=null;render();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if($('#clear').classList.contains('show')){$('#clear').classList.remove('show');return;}
+    sel=null;selNode=null;render();
+  }
+});
+
+drawNodes();drawEdges();drawList();render();
+</script>
+</body>
+</html>

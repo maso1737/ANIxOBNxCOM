@@ -2,11 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<!-- iPad: ホーム画面に追加すると Safari のバーごと消えた「アプリ」として起動する（SPEC_18 P0・正準は animator.html）
-     status-bar-style は指定しない＝既定の不透明バー。時刻・日付・バッテリーだけが上に出て、本文はその下から始まる。
-     black-translucent にすると本文がバーの下へ潜るので safe-area の手当てが要る（OBAN だけそちら。P1 で揃えるか決める） -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- iPad: ホーム画面に追加すると Safari のバーごと消えた「アプリ」として起動する（SPEC_18 P0）
+     2026-09-02 に5本とも black-translucent + viewport-fit=cover へ統一した（正準は oban-builder.html）。
+     本文が画面の最上部(0,0)から描かれるので **safe-area の手当てとセット**。
+     片方だけ入れるとステータスバーがトップバーに重なる → CSS の --safe-t / --safe-b を必ず通すこと。
+     ★ <link rel="manifest"> は張らない。張るとホーム画面追加が start_url をインストールしてしまう（SPEC_18 §2-3） -->
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ECONTE">
 <title>ECONTE — pre-production board</title>
@@ -16,6 +19,15 @@
    SPEC_10 P0: BOARD(考える場) / SHEET(絵コンテ表) / EDIT(加筆)
    ============================================================ */
 :root{
+  /* SPEC_18 P0 — iPad standalone の安全域。black-translucent + viewport-fit=cover で
+     本文が画面の最上部(0,0)から描かれるので、ステータスバー(時計/バッテリー)と
+     ホームインジケータのぶんだけ中身を押し下げ／持ち上げる。
+     実測 top=32px / bottom=20px（iPadOS 18.7・SPEC_18 §2-3）。
+     ブラウザ表示や PC では 0px になるので**見た目は1pxも変わらない**。
+     ★ 正準は oban-builder.html の #bar。値を使う側は必ずこの2つを通すこと */
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+
   --acid:#FF4FA8;--rouge:#FF4FA8;--magenta:#B850FF;--ice:#5AE9FF;
   --gold:#FFD27A;--amber:#FFC94F;
   --dim:#5b4a78;--grey:#9d8db3;--black:#07030f;--bg:#0c061d;
@@ -24,10 +36,11 @@
   --bank:'Bank Gothic','Barlow Condensed','Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
   --mono:'IBM Plex Mono','Menlo','Consolas',monospace;
   --jp:-apple-system,'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
-  --bartop:42px;   /* トップバーの高さ。ビューの top と1か所で揃える（大きいUIで伸びる） */
+  --bartop:calc(42px + var(--safe-t));   /* トップバーの高さ。ビューの top と1か所で揃える（大きいUIで伸びる）。
+                       SPEC_18 P0: ステータスバーぶんをここに畳んである＝#bar の高さと .view の top が自動で揃う */
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden}
+html,body{height:100%;overflow:hidden;touch-action:manipulation;overscroll-behavior:none}  /* SPEC_18 §5-N（正準 composer） */
 body{
   background:
     radial-gradient(ellipse 68% 48% at 84% -4%,rgba(184,80,255,0.11),transparent 56%),
@@ -40,7 +53,7 @@ body{
 /* ---------- top bar ---------- */
 #bar{
   position:fixed;left:0;right:0;top:0;height:var(--bartop);z-index:50;display:flex;align-items:center;gap:7px;
-  padding:0 14px;background:var(--panel);border-bottom:1px solid var(--border);
+  padding:var(--safe-t) 14px 0;background:var(--panel);border-bottom:1px solid var(--border);
   font-size:9px;letter-spacing:.14em;
   overflow-x:auto;overflow-y:hidden;scrollbar-width:none;   /* 狭い画面ではバーごと横に流せる */
 }
@@ -62,7 +75,7 @@ body{
 #bar-total{margin-left:auto;color:var(--gold);letter-spacing:.12em}
 #save-dot{color:var(--grey);min-width:52px;text-align:right}
 /* ---------- views（V2-A: STUDIO / EDIT の2つ） ---------- */
-.view{position:fixed;left:0;right:0;top:var(--bartop);bottom:0;display:none}
+.view{position:fixed;left:0;right:0;top:var(--bartop);bottom:var(--safe-b);display:none}
 .view.on{display:block}
 #view-studio{display:none;flex-direction:column}
 #view-studio.on{display:flex}
@@ -722,7 +735,7 @@ body.ui-big #cam-expand-label input[type=range]{width:78px}
 #tl-bottom.pane-max #tl-strip{flex:1;height:auto !important}
 #tl-bottom.pane-max{min-height:0}
 /* ---------- 大きいUI（iPadで指が当たりやすいサイズ・SETTINGSで切替） ---------- */
-body.ui-big{--bartop:52px}
+body.ui-big{--bartop:calc(52px + var(--safe-t))}
 body.ui-big .btn{padding:9px 15px;font-size:10.5px}
 body.ui-big .etool{padding:10px 14px;font-size:10.5px}
 body.ui-big .sld-val{font-size:11px;min-width:34px}

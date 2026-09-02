@@ -522,3 +522,88 @@ pointerup を取り逃がして残ると、以後ペンのタップが全部「�
 - `_Research/NotebookLM_iPadOS 26におけるPWA型プロ向け制作ツールのタッチ.md` … 研究稿B
   （**AとBは3本指の可否で対立している。実機はAを支持した**）
 - `SPEC_16_ECONTE_V4.md` §5-D … econte 側の iPad タスク（本 SPEC に吸収する）
+
+---
+
+## 4-4b. safe-area の横展開（P3 の第一段・2026-09-02）
+
+§4-4 が「他4本は default（不透明バー）のまま。**急がない**。揃えるときは OBAN の `#bar` を写す」と
+保留にしていた分を、**8本すべてに入れた**（`index.html` と、あとから増えた `link-map.html` /
+`brush-lab.html` を含む）。
+
+### 決めたこと — 変数を1組だけ通す
+
+各ファイルの `:root` に**この2つだけ**を置き、値を使う側は必ずここを通す。
+
+```css
+--safe-t:env(safe-area-inset-top,0px);
+--safe-b:env(safe-area-inset-bottom,0px);
+```
+
+**`env()` を式の中に直接書かない。** OBAN は元々直書きだったので、この機会に変数へ寄せた。
+理由は「どこに安全域が効いているか」を grep 一発（`var(--safe-t)`）で数えられるようにするため。
+
+### 骨格ごとの当て方（3通り）
+
+**どれも「帯の背景は画面の端まで届いたまま、中身だけ内側へ寄る」が目標。**
+OBAN の見た目（全画面のまま、ロゴだけが時計と重ならない）が正準。
+
+| 骨格 | やり方 | 適用先 |
+|---|---|---|
+| **グリッド**（`#app` の行で帯の高さが決まる） | 行を `calc(36px + var(--safe-t))` に伸ばし、帯には `padding-top:var(--safe-t)` | animator / composer / manga-plate |
+| **fixed 帯 + 変数**（帯の高さと本文の top が1変数で繋がっている） | **その変数に畳む**（`--bartop:calc(42px + var(--safe-t))`）→ 帯も本文も自動で揃う | econte / oban |
+| **sticky / 流し込み** | 帯は `padding-top` を増やすだけ、下は `body` の `padding-bottom` へ | link-map / index |
+
+★ **composer の `--tp-h` と econte の `--bartop` は「畳む」が正解。**
+どちらも**別の計算がその変数に乗っている**（`#tl-resize{bottom:calc(--tl-h + --tp-h - 3px)}` /
+`.view{top:var(--bartop)}`）ので、行だけ伸ばすと**掴み代やビューの上端がズレる**。
+変数に畳めば全部が一度に揃う。実測: `--tp-h` を `calc(26px + var(--safe-b))` にしたら
+`#tl-resize` の bottom が 223px → **243px** に自動追従した。
+
+### ★ animator の縦持ちだけ `--safe-b` を足さない
+
+`@media (max-width:900px) and (orientation:portrait)` は `grid-template-rows` を**5行**に増やしているが、
+`grid-template-areas` は**4行のまま**（`top / tool-stage-side / strip / bot`）。
+その結果 **`bot` は4行目に載り、5行目の 32px は誰も居ない空行**になる（実測 2026-09-02・
+`elementsFromPoint` で `#app` しか返らないことを確認）。
+ホームインジケータはその空行に収まるので、**5行目に `--safe-b` を足すと空白が20px増えるだけ**。
+横持ち（基本レイアウト）は `bot` が最終行なので必要。
+
+> ⚠ **付随して見つかった既存の崩れ（今回は直していない）**: 同じ縦持ちMQは
+> `#side` を下段へ移すつもりで `grid-template-columns` と行数だけ変えているが、
+> `grid-template-areas` を更新していないため **`#side` は2行目に残ったまま**（tool/stage と重なる）。
+> areas を5行で書き直せば直るが、縦持ちの見え方が変わるので**実機で見ながら別途**。
+
+### touch-action は格下げしない
+
+`html,body` へ `touch-action:manipulation` + `overscroll-behavior:none` を入れたのは
+**econte / manga-plate / oban / index / link-map**（composer は P1d で導入済み）。
+
+★ **`animator` は `touch-action:none` のまま。`manipulation` に置き換えないこと。**
+`none` は `manipulation` より**強い**（ブラウザのパン・ピンチも通さない）＝描く面として正しい。
+Wタップ拡大も `none` で止まるので、置き換えると**緩くなるだけ**。
+
+### 検証（2026-09-02）
+
+デスクトップでは `env()` が 0px なので、**`--safe-t:32px` / `--safe-b:20px` を実行時に流し込んで**
+レイアウト計算そのものを測った（実測値は §2-3）。
+
+| ツール | 上の帯 | 下の帯 | 判定 |
+|---|---|---|---|
+| animator（横 1024×768） | 36 → 68px・padT 32 | 32 → 52px・padB 20・bottom=768 のまま | ✅ |
+| composer（768×1024） | 32 → 64px・padT 32 | transport 26 → 46px・padB 20 ／ `#tl-resize` 223 → **243px** | ✅ |
+| econte（1024×768） | `--bartop` 42 → 74px・`.view` top も 74 へ自動追従 | `.view` bottom 768 → 748 | ✅ |
+| manga-plate（1024×768） | 44 → 76px・padT 32 | 40 → 60px・padB 20 | ✅ |
+| oban（1024×768） | 64 → 96px（従来どおり） | `#dock` padB 14 → 34px | ✅ |
+| index / link-map / brush-lab | body padT / bar padT / `#app` padT | body・`#app` の padB | ✅ |
+
+**`env()`=0 のとき見た目が1pxも変わらないこと**は VRT で担保した:
+`verify:animator` / `verify:composer` / `verify:oban` 各6点すべて **0.000%**。
+
+### ★ brush-lab は safe-area があるのに一度も発火していなかった
+
+`brush-lab.html` は `#app` に `env(safe-area-inset-*)` を持っていたが、
+**`apple-mobile-web-app-capable` が無いので standalone にならず、安全域が常に 0px** だった。
+メタを足して初めて効くようになった。**安全域の CSS を書いたら、メタが揃っているか必ず確かめること。**
+
+- [x] **P3 の第一段**: safe-area / メタ / touch-action の横展開（2026-09-02・8本）

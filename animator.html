@@ -2,14 +2,24 @@
 <!-- saved from url=(0075)file:///C:/Users/so173/Documents/Claude/Projects/Animation_Paint/index.html -->
 <html lang="ja"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ANIMATOR">
 <title>ANIMATOR — EDIT</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
+  /* SPEC_18 P0 — iPad standalone の安全域。black-translucent + viewport-fit=cover で
+     本文が画面の最上部(0,0)から描かれるので、ステータスバー(時計/バッテリー)と
+     ホームインジケータのぶんだけ中身を押し下げ／持ち上げる。
+     実測 top=32px / bottom=20px（iPadOS 18.7・SPEC_18 §2-3）。
+     ブラウザ表示や PC では 0px になるので**見た目は1pxも変わらない**。
+     ★ 正準は oban-builder.html の #bar。値を使う側は必ずこの2つを通すこと */
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+
   --acid:#FF4FA8;
   --magenta:#B850FF;
   --ice:#5AE9FF;
@@ -42,7 +52,7 @@ html,body{
 #app{
   display:grid;
   grid-template-columns:72px 1fr 96px;
-  grid-template-rows:36px 1fr 138px 32px;
+  grid-template-rows:calc(36px + var(--safe-t)) 1fr 138px calc(32px + var(--safe-b));
   grid-template-areas:
     "top  top   top"
     "tool stage side"
@@ -1367,7 +1377,11 @@ input[type=range]::-moz-range-thumb{
 @media (max-width:900px) and (orientation:portrait){
   #app{
     grid-template-columns:78px 1fr;
-    grid-template-rows:36px 1fr 180px 130px 32px;
+    /* ★5行目には --safe-b を足さない。**この行は空**だから（実測 2026-09-02）。
+       grid-template-areas が4行のまま（top/tool-stage-side/strip/bot）なので `bot` は4行目に載り、
+       5行目の 32px は誰も居ない余白＝ホームインジケータはそこに収まる。
+       足すと「空白がもう20px増えるだけ」になる。横持ち（基本レイアウト）の方は bot が最終行なので必要。 */
+    grid-template-rows:calc(36px + var(--safe-t)) 1fr 180px 130px 32px;
   }
   #side{
     grid-column:1/-1;
@@ -1445,6 +1459,19 @@ input[type=range]::-moz-range-thumb{
 #mirror-guide.axis-v::before{left:50%;top:0;bottom:0;width:1px;transform:translateX(-50%);}
 #mirror-guide.axis-h{cursor:ns-resize;}
 #mirror-guide.axis-h::before{top:50%;left:0;right:0;height:1px;transform:translateY(-50%);}
+/* ============================================================
+   SPEC_18 P0 — iPad standalone の安全域（2026-09-02）
+   #app の grid-template-rows で上下の帯を安全域ぶん伸ばしてあるので、
+   ここでは帯の**中身**を同じだけ内側へ寄せる。
+   ★このファイルには #topbar / #bottombar の定義が2組ずつある（古い重複）ので、
+     どちらが勝っても効くように**スタイルの最後**で当てている。触るときはここを見ること。
+   ★ touch-action は html,body の `none` のまま。`manipulation` に**格下げしない**
+     （描く面なのでブラウザのパン/ズームを一切通さないのが正しい。Wタップ拡大も none で止まる）。
+   ブラウザ表示や PC では env() が 0px ＝ 見た目は1pxも変わらない。
+   ============================================================ */
+#topbar{padding-top:var(--safe-t);}
+#bottombar{padding-bottom:var(--safe-b);}
+
 </style>
 </head>
 <body>

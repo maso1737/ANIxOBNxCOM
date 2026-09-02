@@ -367,3 +367,76 @@ cd verify && npm run verify:composer
 - `closeSfxModal()` / `toggleSfxModal()` は **`.primary` に触らない**（開閉と点灯を切り離した）
 - CSS は `#topbar button.primary.final` を追加。OBAN の `.btn.fx.on` と同じ考え方
 - 検証: `npm run verify:composer` 6/6 = 0.000%（見た目の回帰なし）＋実クリックで4状態を確認
+
+---
+
+## native ダイアログの追放（2026-09-02・SPEC_18 の前提整備）
+
+**方針は econte V2-G3 と同じ: Undoで戻せる操作は聞かない。戻せない操作だけ聞く。**
+COMPOSER は削除系（`removeTrack` など）がもともと確認なし＋`recordHistory()` 済みで、
+**この方針にはすでに合っていた**。直したのは**出し方**のほう。
+
+### なぜ直したか
+
+**iPadのHTMLビューアアプリでは native の `confirm()` / `alert()` / `prompt()` が3つとも黙って無視される**
+（ANIMATOR の `showModal` 実装コメントに同じ理由が書いてある）。エラーも出ない。
+
+| | iPadでの挙動 | 見え方 |
+|---|---|---|
+| `confirm()` | **`false` が返る** | 「押しても何も起きない」＝機能が死ぬ |
+| `alert()` | 何も出ない | エラーが無言で消える |
+| `prompt()` | **`null` が返る** | 入力機能が死ぬ |
+
+COMPOSER は SPEC_18 の iPad パイロット機なのに、**動画書き出しの続行確認が native `confirm()` のまま**で、
+iPad では書き出しボタンが完全に死んでいた。EXPORT WEB 側は `webConfirmLarge()` で回避済みだったので、
+**動画とマーカーのメモだけが取り残されていた**形。
+
+### `#cfm-modal`（1つの箱を3モードで使う）
+
+`cfmOpen(mode,msg,def)` が本体。`modalConfirm` / `modalAlert` / `modalPrompt` はその薄い包み。
+
+| mode | 見た目 | 戻り値 |
+|---|---|---|
+| `confirm` | CANCEL + OK | `true` / `false` |
+| `alert` | **CANCEL を隠して OK だけ** | `undefined`（await しなくてよい） |
+| `prompt` | 入力欄 + CANCEL + OK | 入力文字列 / `null` |
+
+- 挙動は **OBAN BUILDER の `#cf-modal` に合わせた**（この系統の正準）:
+  **Enter=OK / Esc=CANCEL**、開いている間は `document` の **capture段でキーを飲む**、開いたら OK（promptは入力欄）にフォーカス
+- **キーを飲むのが要点。** 飲まないとモーダルの裏で `window` の keydown（ショートカット本体）に届いて
+  **SPACE=再生 / Backspace=KF削除 / Ctrl+Z=undo** が走る。
+  ★**`Ctrl+Z` は `if(e.target.tagName==='INPUT') return;` より手前にある**ので、入力欄に居ても効いてしまう＝飲むしかない
+- ★**`stopPropagation()` は既定動作を止めない**ので、飲んでも prompt の入力欄には文字が入る。
+  実測: 入力欄で `CUT 12 timing check` と打鍵 → 全文入る／同時に `isPlaying` は `false` のまま（SPACE が再生に化けない）
+- ★**IME変換中の Enter は「変換の確定」であって OK ではない。** `e.isComposing || e.keyCode===229` で先に抜ける。
+  マーカーのメモは日本語を打つのでここを外すと1文字目の変換確定で閉じる
+- `z-index` は **120**（`#webx-modal`=110 / `#export-overlay`=100 より上）
+- フォーカスリングは既定の黄色がこの配色から浮くので `:focus-visible` を上書き。**消さずに残す**（キー操作の居場所）
+
+> ⚠ **テストで `window` に直接 dispatch すると `document` の capture を通らず「漏れた」ように見える。**
+> 実キーは focus 要素が target なので `document.body` 等から撃つこと。
+> ブラウザ自動化の `key: "Return"` は `key:''` の空イベントを投げる実装があるので **`"Enter"` で撃つ**（ここで一度引っかかった）。
+
+### `alert()` 13件の寄せ先
+
+**操作の否定は `flashLive()`（既存トースト・1.6秒）／読んでほしいものは `modalAlert()`。**
+判定は「`e.message` のような**読んで意味がある文字列**を含むか」。
+
+| → `flashLive()`（8件） | → `modalAlert()`（5件） |
+|---|---|
+| 有効なトラックがありません ×2 / cells/frames が空です ×2 / 画像を読み込めません ×2 / 最後のトラックは削除できません / プロジェクト未読込 | このブラウザは動画書き出しに未対応です / MediaRecorderの初期化に失敗 / 音声読み込みエラー / JSON error ×2 |
+
+`modalAlert()` は **await しない**（`modalAlert(...); return;`）ので、呼び出し側を `async` にする必要がない。
+
+### ⚠ 触ってはいけない `alert()`
+
+`composer.html` の AE JSX テンプレ文字列の中に `alert(` が2つある（`'  if(!comp...alert("コンポを…")…'` と
+`'  alert("COMPOSER IMPORTED…")'`）。あれは **After Effects の ExtendScript** で、ブラウザでは動かない。
+grep で拾っても**置き換えないこと**。
+
+### 残り
+
+`prompt()` のもう1件（`#btn-paste-json` のクリップボード不許可フォールバック）も `modalPrompt` にした。
+**iPad は `navigator.clipboard.readText()` が失敗してここに落ちるので、これで初めて iPad でも貼り付けできる。**
+
+検証: `node tools/check.js` ALL PASS ／ `npm run verify:composer` 6/6 = 0.000%（見た目の回帰なし）
