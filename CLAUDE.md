@@ -42,6 +42,10 @@
 `ANIMATOR_HANDOVER.md` / `COMPOSER_HANDOVER.md` / `OBAN_BUILDER_HANDOVER.md` /
 `OBAN_BUILDER_UI_HANDOVER.md`（新UIの規約） / `ECONTE_HANDOVER.md`
 
+**`DEPTH_PLATE_HANDOVER.md` — 4本目の道具「見えがかり特化2.5D」の構想（2026-09-04・実装前）。**
+モーションコミックの「一瞬3D化」を作る。概念設計は固まり、**次は試作ラボ5本のうち LAB A か LAB D から**。
+調査9本（`_Research/DEPTH_PLATE/`）の要点はこの1枚に写してあるので、**原文は開かなくてよい**。
+
 手順書（人間向け・ボタン名で追える）:
 `GUIDE_MANGA_LINKS.md` … ANIMATOR⇄MANGA PLATE⇄OBAN/COMPOSER。**連携ボタンの表記を変えたら更新**
 `link-map.html` … 上の内容を絵にしたもの（5アプリ・10ルート。ECONTE だけ未接続＝破線）。**同じく表記変更で更新**
