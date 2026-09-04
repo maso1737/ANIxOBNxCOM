@@ -29,7 +29,8 @@
 - `inbetween_lab.html` / `inbetween_warp_lab.html` — 中割り実験ラボ
 - `tools/check.js` — 依存ゼロのスモークチェック（構文/配線/ID重複/デッドコード）。**対象は `FILES` 配列。HTMLを足したらここにも足す**（brush-lab.html 追加済み）
 - `verify/` — VERIFY HARNESS（決定論VRT＋パフォーマンス予算。SPEC_08）。
-  **ANIMATOR / COMPOSER / OBAN BUILDER 実装済み**。詳細は [verify/CLAUDE.md](verify/CLAUDE.md)
+  **ANIMATOR / COMPOSER / OBAN BUILDER / ECONTE 実装済み**（manga-plate は未＝SPEC_09 v2 が出力を変えている最中なので保留）。
+  詳細は [verify/CLAUDE.md](verify/CLAUDE.md)
 
 ドキュメント（ハンドオーバー／仕様）:
 **まず読む3枚:**
@@ -58,7 +59,7 @@
 | `SPEC_05_OBAN_BUILDER_V2` | OBAN BUILDER V2 拡張 | 実装済 |
 | `SPEC_06_SATSUEI_KIT` | 撮影処理キット（fx共通スキーマ） | 実装済。正準はスキル `satsuei-fx-kit` |
 | `SPEC_07_ANIMATOR_OBAN_BRIDGE` | animator⇄OBAN 連番往復 | 実装済（animator は改修ゼロが大原則） |
-| `SPEC_08_VERIFY_HARNESS` | 決定論VRT＋perf予算 | animator / composer / oban 実装済。**econte・manga-plate は未** |
+| `SPEC_08_VERIFY_HARNESS` | 決定論VRT＋perf予算 | animator / composer / oban / **econte 実装済**（2026-09-03）。manga-plate は**保留**（SPEC_09 v2 進行中のため） |
 | `SPEC_09_MANGA_PLATE` | 漫画ページ＆コマ割り（v1=素材／v2=ページ） | **進行中**（最新 §v2-15・2026-09-02） |
 | `SPEC_10_ECONTE` | econte 原設計（`cuts[]` 単一データ） | P0+P1 実装済／**P2 は要判定**（後発が引き取った可能性） |
 | `SPEC_11_COMPOSER_POLISH` | COMPOSER 磨き込み | **P0〜P7 完了・残なし**。イーズは他ツールの正準 |
@@ -123,8 +124,9 @@ node tools/check.js
 cd verify && npm run verify:animator
 cd verify && npm run verify:composer
 cd verify && npm run verify:oban
+cd verify && npm run verify:econte
 ```
-コマ送り6点を作業解像度そのままで撮って前回の承認済み画像と比較する（PASS=0%）。
+コマ送り6〜9点を作業解像度そのままで撮って前回の承認済み画像と比較する（PASS=0%）。
 意図した変更で差分が出たら `UPDATE_BASELINE=1 node harness/runner.mjs verify.<tool>.config.json` で承認。
 `artifacts/summary.json` だけ読めば合否と崩れた位置が分かる。詳細は [verify/CLAUDE.md](verify/CLAUDE.md)。
 

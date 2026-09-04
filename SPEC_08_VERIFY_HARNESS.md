@@ -119,15 +119,23 @@ Playwright e2e が実機で通っている（3本とも Pass1 6コマすべて 0
 - OBAN BUILDER: ステージ＝ウィンドウなので `VW/VH/DPR` と `cv` サイズをフィクスチャで固定してから撮る。
   TAKE走行の6点で 台形quadマスク・内部パララックス・IN演出・drift・連番送り・whiteoutワイプ・
   KF窓テキストを踏む。**PLACE編集ビューではなく `mode='take'`＋`PV.on` の出力側**を撮ること。
-- econte も同じ runner で回せる（HTMLに契約を足して config を1本増やすだけ）。
+- ECONTE（2026-09-03 実装）: **撮る面が2つある**（TIMELINE出力＝`drawCamFrame` ／ GRIDセル＝`drawCellFrame`）。
+  契約に面を選ぶ引数は無いので、**`seek(t)` の t で撮り分ける**（`t>=10000` でセル側）。t→状態の写像は
+  こちらの自由なので契約違反ではない。フィクスチャは FIX / **T.U** / **PAN** / 投げ縄 / 空 の5カット。
+  ★ **フィクスチャを「アプリの関数で組み立てて同じ関数で描く」と対称性で穴が空く。**
+  econte は塗りも描画も `camBakeRect` を通るため、それをずらす負のコントロールが**自己相殺して素通り**した。
+  座標マッピングを通らない絵（`ehPatchMarks`）を混ぜて初めて 8/9 が落ちるようになった。
+  **他ツールへ広げるときも、必ず片側だけを通る素材を混ぜること。**
+- 撮影キャンバスは **1280×720 を超えない**こと（runner はビューポート既定のまま `locator.screenshot()`
+  するので、`position:fixed` の要素は下が切れる）。
 
 ## ロードマップ
 
 - **v1（実装済）**: 契約API・決定論・統合runner・VRT・予算・スキーマ・APIモック・動くサンプル。
 - **v2（実装済 2026-07）**: 上記§v2 一式。純JS（決定論/pixelmatch/bbox/スキーマ/framemd5解析/逆乗算）は
   自己テスト通過。ブラウザ無し環境では @napi-rs/canvas で2パス合否フローを再現確認済み。
-- **Playwright e2e実走（実機確認済 2026-08-05）**: ANIMATOR / COMPOSER / OBAN BUILDER で2パス通し。
+- **Playwright e2e実走（実機確認済 2026-08-05 / econte 2026-09-03）**: ANIMATOR / COMPOSER / OBAN BUILDER / ECONTE で2パス通し。
   chromium は `chromium_headless_shell-1228`（playwright 1.61.1 固定）。
-- **未**: econte への契約埋め込み、COMPOSER の FXチェーン（SATSUEI）検証、
+- **未**: manga-plate（**保留で確定**＝SPEC_09 v2 が出力を変えている最中）、COMPOSER の FXチェーン（SATSUEI）検証、
   OBAN 書き出しビューア（`viewerHTML`）の検証。LP側の既存ツール（SCROLL_*_LP / Camera Map Fx 等）も同様。
 - **将来**: ④実API面が決まれば極小プロキシ＋実ストリーミング検証を具体化。

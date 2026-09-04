@@ -570,6 +570,8 @@ html,body{
 }
 .sg-num:focus{outline:none;border-color:var(--acid);color:var(--acid);}
 .sg-x{font-size:9px;color:rgba(255,255,255,0.45);}
+/* SCREEN TONE の実寸プレビュー（タイルを repeat で貼るだけ＝キャンバス100%と同じ見え方） */
+.tone-prev{flex:1;min-width:40px;height:22px;border:1px solid var(--border);background:#fff;}
 .sg-preset{min-width:0;font-size:8px;letter-spacing:0.02em;padding:3px 6px;}
 
 .layer{
@@ -1625,9 +1627,9 @@ input[type=range]::-moz-range-thumb{
     </div>
     <div id="stage-toast"></div>
     <div id="zoom-ctl">
-      <button id="zoom-out">−</button>
+      <button id="zoom-out" title="1段 縮小（100% と FIT には必ず立ち寄ります）">−</button>
       <span class="zval" id="zoom-val">41%</span>
-      <button id="zoom-in">+</button>
+      <button id="zoom-in" title="1段 拡大（100% と FIT には必ず立ち寄ります）">+</button>
       <button id="zoom-fit" title="画面に合わせる（F）／Wクリックで100%表示">FIT</button>
     </div>
   </div>
@@ -1823,6 +1825,28 @@ input[type=range]::-moz-range-thumb{
         <input type="number" id="guide-safe-b" class="sg-num" min="1" max="100" step="1" title="タイトルセーフ(%)">
         <span class="sg-x">%</span>
       </div>
+    </div>
+    <div class="ref-sect">
+      <div class="ref-sect-h">SCREEN TONE（網点の粗さ・濃さ）</div>
+      <div class="sc-hint">下書／指示ボタンの Wクリックで出るトーンインクの網点。ピッチ＝タイル1辺px（小さいほど細かい）／濃度＝ドットの覆う面積%。<b>もう描いてある絵は変わりません</b>（これから塗るぶんだけ）</div>
+      <div class="sg-row">
+        <span class="sc-label" style="min-width:56px;">T1 下書</span>
+        <input type="number" id="tone1-pitch" class="sg-num" min="4" max="48" step="1" title="ピッチ（タイル1辺px。小さいほど細かい）">
+        <span class="sg-x">px</span>
+        <input type="number" id="tone1-cov" class="sg-num" min="1" max="95" step="1" title="濃度（%）">
+        <span class="sg-x">%</span>
+        <span class="tone-prev" id="tone1-prev" title="実寸プレビュー"></span>
+      </div>
+      <div class="sg-row">
+        <span class="sc-label" style="min-width:56px;">T2 指示</span>
+        <input type="number" id="tone2-pitch" class="sg-num" min="4" max="48" step="1" title="ピッチ（タイル1辺px。小さいほど細かい）">
+        <span class="sg-x">px</span>
+        <input type="number" id="tone2-cov" class="sg-num" min="1" max="95" step="1" title="濃度（%）">
+        <span class="sg-x">%</span>
+        <span class="tone-prev" id="tone2-prev" title="実寸プレビュー"></span>
+      </div>
+      <div class="sc-hint" style="margin-top:4px;margin-bottom:0;">プレビューは画面の実寸なので、ズーム 100%（＋ボタンで立ち寄れます）のキャンバスと同じ大きさに見えます</div>
+      <button id="tone-reset" class="ref-btn" style="width:100%;margin-top:6px;padding:5px 0;">RESET（14px / 10%・40%）</button>
     </div>
     <div class="ref-sect">
       <div class="ref-sect-h">TIMELAPSE（作画タイムラプス）</div>
@@ -2052,6 +2076,11 @@ function saveInk(){
   try{ localStorage.setItem(INK_LS, JSON.stringify({
     blue: INK.blue, orange: INK.orange,
     tone1: TONE.tone1.color, tone2: TONE.tone2.color,
+    // 網点の粗さ／濃さも持ち越す（色だけ保存していたので、開き直すと既定に戻っていた）
+    toneShape: {
+      tone1: { pitch: TONE.tone1.pitch, cov: TONE.tone1.cov },
+      tone2: { pitch: TONE.tone2.pitch, cov: TONE.tone2.cov },
+    },
     toneMode: { blue: toneMode.blue, orange: toneMode.orange },
   })); }catch(e){}
 }
@@ -2085,11 +2114,17 @@ let gOniSlot = null;
 // ── SCREEN TONE（下書/指示ボタンのWクリックで dot10%/dot40% トーンインクに切替）──
 // パターンはキャンバス原点固定＝塗り足しても網点がズレず繋がる（現実の貼りトーンと同じ）。
 // 描画結果は drawData に実ピクセルとして焼き込まれるため書き出し/連携は変更不要。
-const TONE_PITCH = 26;  // 網点タイル1辺px の既定（45°配置・タイルあたりドット2個相当）
-// pitch はスロットごとに持たせる（CLIP STUDIO のトーン見本に寄せた粗さ）
+const TONE_PITCH = 14;  // 網点タイル1辺px の既定（45°配置・タイルあたりドット2個相当）
+// pitch はスロットごとに持たせる。
+// 2026-09-03: 既定を 26 → 14 に細かくした。26px は作業解像度 2048px 幅に対して約73タイル＝
+// B4/600dpi に置き換えると 10線ちょっとで、貼りトーンというより「大きい水玉」に見えていた
+// （発注者報告「ドット2種がかなり大きい比率に見える」）。
+// 粗さの好みは絵によるので **SETTINGS ▸ SCREEN TONE で変えられる**（TONE_LIMIT の範囲）。
+const TONE_LIMIT = { pitch: [4, 48], cov: [0.01, 0.95] };
+const TONE_DEFAULT = { tone1: { cov: 0.10, pitch: 14 }, tone2: { cov: 0.40, pitch: 14 } };
 const TONE = {
-  tone1: { cov: 0.10, pitch: 26, color: '#000000' },  // 下書スロット: 細かめの疎ドット
-  tone2: { cov: 0.40, pitch: 26, color: '#000000' },  // 指示スロット: 同ピッチで大きいドット
+  tone1: { cov: 0.10, pitch: 14, color: '#000000' },  // 下書スロット: 細かめの疎ドット
+  tone2: { cov: 0.40, pitch: 14, color: '#000000' },  // 指示スロット: 同ピッチで大きいドット
 };
 const toneMode = { blue: false, orange: false };
 function isToneInk(c){ return c === 'tone1' || c === 'tone2'; }
@@ -2098,6 +2133,16 @@ function slotInk(c){
   if(c === 'blue'   && toneMode.blue)   return 'tone1';
   if(c === 'orange' && toneMode.orange) return 'tone2';
   return c;
+}
+function clampTonePitch(v){
+  v = Math.round(Number(v));
+  if(!isFinite(v)) return TONE_PITCH;
+  return Math.max(TONE_LIMIT.pitch[0], Math.min(TONE_LIMIT.pitch[1], v));
+}
+function clampToneCov(v){
+  v = Number(v);
+  if(!isFinite(v)) return 0.1;
+  return Math.max(TONE_LIMIT.cov[0], Math.min(TONE_LIMIT.cov[1], v));
 }
 // 網点タイル生成: 被覆率から半径を決め1pxずつ判定（ペン用pattern と FILL用mask を同時に作る）
 function buildTone(key){
@@ -2134,6 +2179,13 @@ function buildTone(key){
     if(o && typeof o === 'object'){
       if(o.tone1) TONE.tone1.color = o.tone1;
       if(o.tone2) TONE.tone2.color = o.tone2;
+      if(o.toneShape){
+        ['tone1','tone2'].forEach(k => {
+          const s = o.toneShape[k]; if(!s) return;
+          if(typeof s.pitch === 'number') TONE[k].pitch = clampTonePitch(s.pitch);
+          if(typeof s.cov   === 'number') TONE[k].cov   = clampToneCov(s.cov);
+        });
+      }
       if(o.toneMode){ toneMode.blue = !!o.toneMode.blue; toneMode.orange = !!o.toneMode.orange; }
     }
   }catch(e){}
@@ -3100,14 +3152,18 @@ setupCanvas();
 // ============================================================
 // FIT / ZOOM
 // ============================================================
-function fitToStage(){
+// 画面に収まる倍率（FIT の倍率）。＋/− の立ち寄り先としても使うので関数に出した
+function stageFitScale(){
   const sw = stage.clientWidth;
   const sh = stage.clientHeight;
   const margin = 24;
-  const scale = Math.min(
+  return Math.min(
     (sw - margin * 2) / CFG.WORK_W,
     (sh - margin * 2) / CFG.WORK_H
   );
+}
+function fitToStage(){
+  const scale = stageFitScale();
   state.zoom = scale;
   state.fitMode = true;
   state.panX = 0;
@@ -3122,6 +3178,29 @@ function zoomActual(){
   state.panY = 0;
   applyZoom();
 }
+// ＋/− の1段（×1.25）。**100% と FIT の倍率には必ず立ち寄る**（2026-09-03）。
+// 網点トーンやペンの粒の「実際の大きさ」は等倍でしか判断できないのに、×1.25 を掛けるだけだと
+// 41%→51%→64%→80%→100.1%… と 100% を素通りしていた。FIT も同じ理由で止まり木にする。
+// FIT に着地したときだけは中央へ戻す（パンが残っていると「画面に収まっている」ことを確認できない）
+function zoomStep(dir){
+  const cur = state.zoom;
+  const raw = dir > 0 ? cur * 1.25 : cur / 1.25;
+  const fit = stageFitScale();
+  const eps = 1e-4;
+  // いまの倍率と raw の間に挟まっている止まり木のうち、cur にいちばん近いものへ着地する
+  let stop = null;
+  for(const s of [1, fit]){
+    if(!isFinite(s) || s <= 0) continue;
+    if(Math.abs(s - cur) < eps) continue;                       // もう乗っている止まり木は飛ばす
+    const between = dir > 0 ? (s > cur && s <= raw + eps) : (s < cur && s >= raw - eps);
+    if(!between) continue;
+    if(stop == null || Math.abs(s - cur) < Math.abs(stop - cur)) stop = s;
+  }
+  if(stop != null && Math.abs(stop - fit) < eps){ fitToStage(); return; }   // FIT は中央に戻して収める
+  const { x, y } = getZoomFocal();
+  zoomAt(x, y, stop != null ? stop : raw);
+}
+
 // FITを続けて2回（FITボタンWクリック / Fキー2回）で 100% 表示へ
 let _lastFitAt = -1e9;
 function fitAction(){
@@ -3176,7 +3255,12 @@ function newRefImgId(){ return 'ri_' + (++_refId) + '_' + Date.now().toString(36
 // あるアニメ参照の現在ティック画像
 function animTickImg(r){
   const t = currentSyncTick();
-  if(!r.ticks || t < 0 || t >= r.ticks.length) return null;
+  if(!r.ticks || !r.ticks.length || t < 0) return null;
+  // renderRefLayer と**同じ規則**にする。1コマだけの参照（MANGA PLATE のコマ枠など）は
+  // 全ティックで出しっぱなしなのに、ここだけ t>=1 で null を返していた
+  // ＝「画は見えているのに 中央 が効かない」の真因（2026-09-03）
+  if(r.ticks.length === 1) return r.ticks[0] || null;
+  if(t >= r.ticks.length) return null;
   return r.ticks[t] || null;
 }
 function firstTickImg(r){ if(!r.ticks) return null; for(const im of r.ticks){ if(im) return im; } return null; }
@@ -3188,8 +3272,10 @@ function centerRefAnimator(r){
   r.y = Math.round((CFG.WORK_H - im.naturalHeight) / 2);
 }
 // 可動参照の表示サイズ（natural*scale）。画像が無ければnull
+// ※「中央」戻しでも使うので、コマ同期参照の**尺が尽きていて今は表示が無い**ときは
+//   先頭の絵で代用する（そうしないと、参照が消えているコマでだけ 中央 が黙って効かない）
 function refObjSize(type, obj){
-  const img = (type === 'img') ? obj.img : animTickImg(obj);
+  const img = (type === 'img') ? obj.img : (animTickImg(obj) || firstTickImg(obj));
   if(!img) return null;
   return { img, w: img.naturalWidth * obj.scale, h: img.naturalHeight * obj.scale };
 }
@@ -3273,13 +3359,16 @@ function loadRefImageFromSrc(src, opts){
 // 選択中の可動参照を 原寸(1:1)＆中央 に戻す（画像/アニメ/フレーム共通）
 function refCenterSel(){
   const e = refFindSel(); if(!e) return;
-  e.obj.scale = 1;
   if(e.type === 'frame'){
+    e.obj.scale = 1;
     e.obj.x = 0; e.obj.y = 0; // フレームは等倍0,0が原寸中央
   } else {
+    // scale は**戻す先が決まってから**触る。先に 1 にしていたので、絵が引けなかったとき
+    // 「拡縮だけ戻って位置は動かない」＝効いていないように見えていた
     const s = refObjSize(e.type, e.obj); if(!s) return;
-    e.obj.x = Math.round((CFG.WORK_W - s.w) / 2);
-    e.obj.y = Math.round((CFG.WORK_H - s.h) / 2);
+    e.obj.scale = 1;
+    e.obj.x = Math.round((CFG.WORK_W - s.img.naturalWidth) / 2);
+    e.obj.y = Math.round((CFG.WORK_H - s.img.naturalHeight) / 2);
   }
   renderSelObj(e.type); markMetaDirty(); scheduleSave();
 }
@@ -6239,14 +6328,8 @@ function getZoomFocal(){
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 }
 
-document.getElementById('zoom-in').addEventListener('click', () => {
-  const { x, y } = getZoomFocal();
-  zoomAt(x, y, state.zoom * 1.25);
-});
-document.getElementById('zoom-out').addEventListener('click', () => {
-  const { x, y } = getZoomFocal();
-  zoomAt(x, y, state.zoom / 1.25);
-});
+document.getElementById('zoom-in').addEventListener('click', () => zoomStep(+1));
+document.getElementById('zoom-out').addEventListener('click', () => zoomStep(-1));
 document.getElementById('zoom-fit').addEventListener('click', fitAction);
 
 // ホイールズーム（Ctrl不要、Altは予約）
@@ -9243,6 +9326,43 @@ bindGuideNum('guide-res-w','resW',16,()=>CFG.WORK_W);
 bindGuideNum('guide-res-h','resH',16,()=>CFG.WORK_H);
 bindGuideNum('guide-safe-a','safeA',1,100);
 bindGuideNum('guide-safe-b','safeB',1,100);
+
+// ── SCREEN TONE（網点の粗さ・濃さ）配線 ──
+// TONE[k].pitch / cov を変えて buildTone() でタイルを作り直すだけ。
+// **すでに drawData に焼けている画は変わらない**（トーンは描いた時点でピクセルになる）。
+function applyToneShapeUI(){
+  ['tone1','tone2'].forEach(k => {
+    const t = TONE[k];
+    const p = document.getElementById(k+'-pitch');
+    const c = document.getElementById(k+'-cov');
+    const v = document.getElementById(k+'-prev');
+    if(p && document.activeElement!==p) p.value = t.pitch;
+    if(c && document.activeElement!==c) c.value = Math.round(t.cov*100);
+    if(v) v.style.background = '#FFF url(' + t.tileURL + ') repeat';
+  });
+}
+function commitToneShape(k){
+  buildTone(k); saveInk();
+  applyToneShapeUI(); updateInkSwatches();
+}
+['tone1','tone2'].forEach(k => {
+  const p = document.getElementById(k+'-pitch');
+  const c = document.getElementById(k+'-cov');
+  if(p) p.addEventListener('change', ()=>{ TONE[k].pitch = clampTonePitch(p.value); commitToneShape(k); });
+  if(c) c.addEventListener('change', ()=>{ TONE[k].cov   = clampToneCov(parseFloat(c.value)/100); commitToneShape(k); });
+});
+(function(){
+  const b = document.getElementById('tone-reset'); if(!b) return;
+  b.addEventListener('click', ()=>{
+    ['tone1','tone2'].forEach(k => {
+      TONE[k].pitch = TONE_DEFAULT[k].pitch;
+      TONE[k].cov   = TONE_DEFAULT[k].cov;
+      buildTone(k);
+    });
+    saveInk(); applyToneShapeUI(); updateInkSwatches();
+  });
+})();
+applyToneShapeUI();
 
 // ── CANVAS SIZE（作業領域）配線 ──
 function applyCanvasSizeUI(){

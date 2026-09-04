@@ -1,0 +1,29 @@
+{
+  "tool": "econte",
+  "root": "..",
+  "html": "econte.html?harness=1",
+
+  "seeks": [
+    { "label": "e01_c1_fix",       "timeMs": 170 },
+    { "label": "e02_c2_tu_lead",   "timeMs": 587 },
+    { "label": "e03_c2_tu_mid",    "timeMs": 920 },
+    { "label": "e04_c2_tu_end",    "timeMs": 1254 },
+    { "label": "e05_c3_pan",       "timeMs": 1545 },
+    { "label": "e06_c4_lasso",     "timeMs": 1879 },
+    { "label": "e07_c5_empty",     "timeMs": 2170 },
+    { "label": "e08_grid_c2_tu",   "timeMs": 10587 },
+    { "label": "e09_grid_c3_pan",  "timeMs": 11545 }
+  ],
+
+  "vrt": { "colorThreshold": 0.1, "allowedPixelRatio": 0.0002 },
+
+  "perfPass": { "enabled": true, "sampleMs": 2000, "samples": 8 },
+
+  "budget": {
+    "maxTTFFms": 800,
+    "maxLongestFrameMs": 300,
+    "maxVramBytes": 67108864
+  },
+
+  "timeoutMs": 30000
+}

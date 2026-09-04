@@ -10,7 +10,9 @@
     "verify:composer": "node harness/runner.mjs verify.composer.config.json",
     "approve:composer": "UPDATE_BASELINE=1 node harness/runner.mjs verify.composer.config.json",
     "verify:oban": "node harness/runner.mjs verify.oban.config.json",
-    "approve:oban": "UPDATE_BASELINE=1 node harness/runner.mjs verify.oban.config.json"
+    "approve:oban": "UPDATE_BASELINE=1 node harness/runner.mjs verify.oban.config.json",
+    "verify:econte": "node harness/runner.mjs verify.econte.config.json",
+    "approve:econte": "UPDATE_BASELINE=1 node harness/runner.mjs verify.econte.config.json"
   },
   "devDependencies": {
     "pixelmatch": "^6.0.0",

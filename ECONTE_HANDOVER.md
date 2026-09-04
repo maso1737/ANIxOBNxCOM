@@ -367,6 +367,14 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   指で描ける場所は無い（`paintDown` の touch return に加え、**`gridPaintDown` も touch を
   選択だけで返す**）。GRIDで「セルを選ぼうとしただけで色が乗る」のは
   `gridStrokeStart` が pointerType を見ていなかったため
+- ★ **逆向きも要る（2026-09-03）: GRID のペンは描くだけで、選択には一切触らない。**
+  「指＝選択／ペン＝描く」は片側しか実装されていなかった。`gridPaintDown` の
+  `if(gSelCells.indexOf(key) < 0) setSelCells([key])` がペンにも効いていたので、
+  **指で数枚まとめて選んだあとペンで1枚描き足すと、その瞬間に選択が1枚へ畳まれていた**
+  （発注者報告「GRIDでペン描画では同時に選択にならないように。選択は指のみ」）。
+  → 条件を `e.pointerType !== 'pen'` で括った。**マウス（デスクトップ）は指が無いので従来どおり
+  押した場所を選択も兼ねる**。`state.curCut` / `state.curFrame` は「どこに描くか」なので
+  ペンでも必ず更新する（ここを一緒に止めると別のカットに描いてしまう）
 - **指の長押し＝スポイト**（`bindTouchEyedrop` 500ms/12px）。拾い元は
   **`eyedropView()`＝表示されているキャンバスの画素**なので、非常駐カットでも効く。
   `eyedropAt()` もレイヤーから拾えないときはここへ落ちる（Altクリックが空振りしない）

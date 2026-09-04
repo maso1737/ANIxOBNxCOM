@@ -16,8 +16,12 @@
    **他の4本には1行も入っていない**（`navigator.standalone` を見ているのは probe だけ・safe-area は OBAN の top のみ）。
 2. ~~**COMPOSER に native ダイアログが残っている**~~ → **2026-09-02 完了**（`alert` 13 / `confirm` 1 / `prompt` 2 = 16件を `#cfm-modal` と `flashLive()` へ）。
    実装メモは `COMPOSER_HANDOVER.md` の「native ダイアログの追放」。
-3. **econte / manga-plate には VRT（`verify:*`）が無い。** econte のペイントは V2→V3→V4 で3回作り直しているのに
-   回帰の網が無い。ブラシを足す前にここを張るかどうかを決める。
+3. ~~**econte / manga-plate には VRT が無い**~~ → **econte は 2026-09-03 完了**（`npm run verify:econte`・9コマ）。
+   **manga-plate は「まだ張らない」で確定**——SPEC_09 v2 が出力そのものを変えている最中なので、
+   いま張ると承認しなおしが常態化して**差分を見なくなる**（ゴールデンテストの本当の死に方）。§v2 が一段落してから。
+   ★ econte のフィクスチャは **T.U / PAN を「TIMELINE出力」と「GRIDセル」の両方で撮ってある**。
+   発注者報告の「大きくなっている方の画にペイントがのらない/ずれる・継ぎ目が出る」を直すときの
+   before/after がここで取れる（詳細と負のコントロールは [verify/CLAUDE.md](verify/CLAUDE.md)）。
 4. **新しく `link-map.html` / `brush-lab.html` が増えている**（別セッション作・index のカード07/08）。
    `tools/check.js` の対象にも追加済みで、SPEC_18 P0 も 2026-09-02 に当てた。
    **BRUSH LAB は §3（econte のブラシ）の設計レビュー用ラボ**なので、ブラシに着手するときはまずそこを見る。
@@ -86,6 +90,22 @@
 ### 残り（この順で）
 
 - [ ] **P2 スキル化**（SPEC_18 の決着を `.claude/skills/ipad-grammar/` に落とす）。COMPOSER が正準
+
+#### §4-1〜§4-3 の残り（2026-09-03 実コードで確認）
+
+**COMPOSER は3つとも完了**（`makeNumField` 18欄 / `.tl-drag-handle{touch-action:none}`＋`dhPid` / `gTap` 2・3・4本指）。
+他ツールに同じものが無いだけ。
+
+| | §4-1 数値欄の div 化 | §4-2 ⠿ ハンドル | §4-3 多指タップ |
+|---|---|---|---|
+| composer | ✅ 18欄（kf 8 / fx 8 / ease 2）。**設定・書き出しの10欄は素の input のまま** | ✅ | ✅ 2/3/4本 |
+| animator | ❌ 7欄（`#fps-input` 含む＝SPEC 名指し） | — | ❌ **4本指が無い** |
+| econte | ✅ 素の `input[type=number]` は0 | ❌ 長押し350ms のまま → ハンドルへ | ❌ **4本指が無い**（`n>3` で捨てている） |
+| manga-plate | ❌ 2欄（`#lk-w` / `#lk-h`） | ❌ ▲▼ボタンのみ | ✅ 2/3本（プレビュー無し＝4本は不要） |
+| oban | ❌ 5欄（書き出し・コンバータ） | — | ⚠ **3本指が `n===3` の早期 return で塞がったまま**（コメントも古い）。5本指 CAPTURE は**維持で確定** |
+
+★ **5本指は OBAN の CAPTURE だけ。** 実機で使えているので残す（2026-09-03 発注者判断・SPEC_18 §4-3）。
+他ツールへ新規に割り当てるのは引き続き禁止。
 - [x] ~~**P0 の横展開**~~ **完了（2026-09-02・8本）**。black-translucent + viewport-fit=cover + `--safe-t`/`--safe-b` の押し下げ＋
       `touch-action` / `overscroll-behavior`。詳細は SPEC_18 **§4-4b**。⛶ の `canFS` は元から5本に入っていた
 - [x] ~~**COMPOSER の native ダイアログを潰す**~~ **完了（2026-09-02）**。16件 → 0件
@@ -156,8 +176,9 @@
    `(typeof e.pressure === 'number' && e.pressure > 0) ? e.pressure : 0.5` で**同じ形**になっている——
    ペン以外では 1 を返すので実害は出にくいが、**筆圧の扱いを触るときは animator の `raw`/`ema` 分岐に揃える**
 
-8. **回帰の網が無い**（下の §4）。ブラシは「前と同じ線が引けるか」が全てなので、
-   **触る前に `verify:econte` を張るか、張らないなら手で確認する範囲を決めてから始める**
+8. ~~回帰の網が無い~~ **2026-09-03 に `verify:econte` を張った**（C1 FIX / C2 T.U / C3 PAN / C4 投げ縄 / C5 空 の5カット・9コマ）。
+   ★ 上の 1〜3・6・7 は**すべてこの網に掛かる**（枠をまたぐ二重描画・Undo矩形・投げ縄との食い違い・筆圧0）。
+   **ブラシを触る前に1回 `npm run verify:econte` を回してから始める**（差分の起点を作る）
 
 ---
 
@@ -165,7 +186,7 @@
 
 | # | 抜け | 実測 | 効く場面 |
 |---|---|---|---|
-| 1 | **econte / manga-plate に VRT が無い** | `verify.*.config.json` は animator / composer / oban の3本のみ。`window.__HARNESS__` も econte=0 / manga-plate=0 | ペイント作り直し（V2→V3→V4）・ブラシ追加・コマ割り |
+| 1 | ~~econte に VRT が無い~~ **2026-09-03 解消**／manga-plate は**保留で確定** | econte: `verify.econte.config.json`＋`window.__HARNESS__`（9コマ・負のコントロール2種で確認済み）。manga-plate は SPEC_09 v2 が出力そのものを変えている最中＝承認しなおしが常態化するので**§v2 が一段落してから** | ブラシ追加（§3）の安全網が張れた |
 | 2 | ~~COMPOSER の native ダイアログ~~ | **2026-09-02 解消**（16件 → 0件） | — |
 | 3 | ~~`navigator.standalone` が0本~~ | **抜けではなかった**。⛶ の出し分けは `canFS` で5本とも実装済み | — |
 | 4 | ~~safe-area が oban の top だけ~~ | **2026-09-02 に8本へ横展開**（SPEC_18 §4-4b） | — |
@@ -238,7 +259,8 @@
 3. ~~SPEC_18 P0 の横展開~~ **完了（2026-09-02・8本）**
 4. **P2 スキル化**（3 が終わってから。動くものを見てから型にする）
 5. **econte §5-D（iPad）** — SPEC_16 の最後の1つが片付く
-6. **econte ブラシ** — 先に `verify:econte` を張るか決める。①入り抜き → ②手ブレ補正 の順
+6. **econte ブラシ** — ~~先に `verify:econte` を張るか決める~~ **張った（2026-09-03）**。①入り抜き → ②手ブレ補正 の順。
+   **触る前後で `cd verify && npm run verify:econte` を回す**（意図した変更なら `approve:econte` で承認）
 7. **SPEC_17 の OBAN / SPEC_12 / MOTION_COMIC Phase4-5 / SPEC_10 P2 を「やる or 閉じる」で判定**（未着手の宙吊りを減らす）
 
 ---
@@ -255,6 +277,7 @@ node tools/check.js
 cd verify && npm run verify:animator
 cd verify && npm run verify:composer
 cd verify && npm run verify:oban
+cd verify && npm run verify:econte
 ```
 
 > ⚠ `verify/node_modules` は `Documents` 配下なので `npm ci` は Claude が実行してよい。

@@ -2,7 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- maximum-scale=1.0 は必須。iPadOS Safari は user-scalable=no を無視するので、これが無いと
+     細かいキーをWタップしたとき **スマートズーム**が起きて「キーボードが出たみたいにUIが上へずれ、
+     もう一度Wタップで戻る」になる（発注者報告・2026-09-03）。econte / manga-plate は元から入っていた -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <!-- iPad: ホーム画面に追加すると Safari のバーごと消えた「アプリ」として起動する（SPEC_18 P0）
      2026-09-02 に5本とも black-translucent + viewport-fit=cover へ統一した（正準は oban-builder.html）。
      本文が画面の最上部(0,0)から描かれるので **safe-area の手当てとセット**。
@@ -489,6 +492,13 @@ input[type=number]{-moz-appearance:textfield;}
   .tl-track-btns .tl-tbtn.del{display:none;}
   /* 横は自前のスワイプ、縦はリストのスクロールに渡す。none にすると指で上下送りができなくなる */
   .tl-track-label{touch-action:pan-y;}
+  /* イーズのバー：見た目の3px線はそのままに、掴める帯だけ26pxへ（発注者報告「動かしづらい」）。
+     ペン専任のつもりでも、細い range は狙いが1〜2pxずれただけで track を素通りする */
+  .ease-range{width:80px;height:26px;background:transparent;touch-action:none;}
+  .ease-range::-webkit-slider-runnable-track{height:3px;background:rgba(255,255,255,0.18);border-radius:2px;}
+  .ease-range::-webkit-slider-thumb{width:14px;height:22px;margin-top:-9.5px;}
+  .ease-range::-moz-range-track{height:3px;background:rgba(255,255,255,0.18);border-radius:2px;}
+  .ease-range::-moz-range-thumb{width:14px;height:22px;}
   .ease-num{width:44px;height:26px;line-height:22px;font-size:11px;}
   .kf-val{height:28px;line-height:22px;font-size:11px;}
   .fx-row .fx-val{height:26px;line-height:22px;}
@@ -1740,20 +1750,32 @@ function applyInfluence(field,val,live){
     tracksInv.add(s.t);
   });
   if(!n){ if(!live) flashLive('対象キーがありません'); return; }
-  recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses();
+  // live=true（スライダー/スクラブを動かしている最中）は**履歴を積まない**。
+  // 配線側のコメントは元から「input 中は履歴を積まず」だったのに、ここが live を見ておらず
+  // 1ドラッグで数十手ぶんの recordHistory() が走っていた ＝ Undo が埋まるうえに重く、
+  // 「バーが動かしづらい」の主因（2026-09-03）
+  // ダイヤの作り直しも離してから（形が変わるのは 0⇔非0 の境目だけなので、これで困らない）
+  if(!live){ recordHistory(); tracksInv.forEach(ti=>renderKfDiamonds(ti)); refreshKfSelClasses(); }
   drawCurrentFrame(); renderGraph();
-  flashLive('∿ INF '+(field==='ei'?'IN':'OUT')+(val==null?' CLEAR':'='+Math.round(val)+'%'));
+  flashLive('∿ INF '+(field==='ei'?'IN':'OUT')+(val==null?' CLEAR':'='+Math.round(val)+'%')
+            +(targets.length>1?(' × '+targets.length+' キー'):''));
 }
 // HOLD は キーのWクリック/Ctrl+クリック送り（cycleEase → applyKeyModeToFrame）に統合したので
 // 専用のトグル関数は廃止（旧 applyHold）
-// イーズ量スライダーの現在値表示（単一選択KF or 現フレームのキー）
+// いま指/ペン/マウスで掴んでいるイーズバー（'ei' | 'eo' | null）
+let gEaseDrag=null;
+// イーズ量スライダーの現在値表示（選択KFの先頭 or 現フレームのキー）
 function updateInfluenceUI(){
   const inEl=$('#ease-in-num'), outEl=$('#ease-out-num');
   const inR=$('#ease-in-range'), outR=$('#ease-out-range');
   if(!inEl||!outEl||!inR||!outR) return;
+  // 2026-09-03: **複数選択のときも先頭のキーを見せる。**
+  // 以前は kfSel.length===1 のときしか src を立てず、複数選択だと found=false → 下で
+  // range に 0 が書き戻されていた。スライダーを動かすたび applyInfluence → drawCurrentFrame →
+  // updateKfUI → ここ、と回るので **バーが毎回0へ戻る＝完全に無反応**に見えていた（発注者報告）。
   let src=null;
-  if(kfSel.length===1) src=kfSel[0];
-  else if(!kfSel.length && selTrack()) src={t:state.selectedTrack,f:curLocalFrame()};
+  if(kfSel.length) src=kfSel[0];
+  else if(selTrack()) src={t:state.selectedTrack,f:curLocalFrame()};
   let ei=null,eo=null,ez=0,hold=false,found=false;
   if(src){
     const t=state.tracks[src.t];
@@ -1769,8 +1791,10 @@ function updateInfluenceUI(){
   outEl.value = ov==null?'—':String(ov);
   inEl.classList.toggle('inherit', ei==null&&iv!=null);
   outEl.classList.toggle('inherit', eo==null&&ov!=null);
-  if(document.activeElement!==inR)   inR.value  = iv==null?0:iv;
-  if(document.activeElement!==outR)  outR.value = ov==null?0:ov;
+  // 掴んでいるバーには書き戻さない。**activeElement では判定できない**（iPadOS は
+  // range を指/ペンで触ってもフォーカスが移らないことがある）ので、自前の掴み中フラグで見る
+  if(gEaseDrag!=='ei'  && document.activeElement!==inR)   inR.value  = iv==null?0:iv;
+  if(gEaseDrag!=='eo'  && document.activeElement!==outR)  outR.value = ov==null?0:ov;
 }
 
 // ── KFナビゲーション（J/K） ──
@@ -2755,6 +2779,10 @@ window.addEventListener('pointerup',e=>{ if(gHeldTrack&&gHeldTrack.pid===e.point
 window.addEventListener('pointercancel',e=>{ if(gHeldTrack&&gHeldTrack.pid===e.pointerId){ gHeldTrack=null; gTrackMultiSel=false; gKfMultiSel=false; } });
 // SPEC_18 §5-G: キーの複数選択も同じ型（1本を置いたまま別のキーをタップ）。矩形はマウス専用にした
 let gHeldKf=null, gKfMultiSel=false;
+// §6-15: キーのWタップ判定は**ダイヤの要素ごとのクロージャに置かない**。
+// renderKfDiamonds() がダイヤを作り直すたびに数え直しになって、1回目と2回目で別の要素に
+// なっていると永久に成立しない。トラック+コマで覚えて要素の生死から切り離す。
+let gKfTap={t:-1,f:-1,at:-1e9};
 window.addEventListener('pointerup',e=>{ if(gHeldKf&&gHeldKf.pid===e.pointerId){ gHeldKf=null; setTimeout(()=>{gKfMultiSel=false;},0); } });
 window.addEventListener('pointercancel',e=>{ if(gHeldKf&&gHeldKf.pid===e.pointerId){ gHeldKf=null; gKfMultiSel=false; } });
 window.addEventListener('pointerdown',()=>{ gStripArmed=false; },true); // capture＝どのハンドラより先にリセット
@@ -3454,8 +3482,8 @@ function renderKfDiamonds(trackIdx){
     let dragActive=false, wasDragged=false, origF=f, shiftStart=false, ctrlStart=false, altStart=false, copyF=f;
     let groupMode=false, groupSnap=null, lastDelta=0, gMin=0, gMax=total-1, gEdges=null, snapCands=null;
     let groupEls=null;        // グループ移動中に一緒に動かすダイヤのDOM（掴んだ瞬間に控える）
-    let lastKfTap=-1e9;       // Wタップ判定。§6-4: 起動直後の誤判定を避けて十分過去から
     let kfPid=null;           // §6-14: 追いかけるポインタを1本に固定（ペンのホバーmoveで抜けない）
+    let downX=0;              // §6-15: ドラッグ判定の起点＝**押した場所**（キーの中心ではない）
     function putKeys(targetF,removeF){
       ALL_PROPS.forEach(p=>{
         if(!(p in kfVals)) return;
@@ -3495,6 +3523,9 @@ function renderKfDiamonds(trackIdx){
       // SPEC_18 §5-G: 指／ペンは「1つ押さえたまま別のキーをタップ」でも複数選択できる（矩形はマウス専用）。
       // 押さえる側と足す側でポインタ種別が違ってよい（指で押さえてペンでタップ、が実用上いちばん通る）
       if(e.pointerType!=='mouse'){
+        // gHeldTrack と同じ型の保険。pointerup を取り逃がして gHeldKf が残ると、以後の
+        // タップが全部「追加選択」に化けて**Wタップも移動もできなくなる**（§6-9）
+        if(gHeldKf&&performance.now()-(gHeldKf.at||0)>15000){ gHeldKf=null; gKfMultiSel=false; }
         if(gHeldKf&&!(gHeldKf.t===trackIdx&&gHeldKf.f===f)){
           gKfMultiSel=true; killTapGesture();
           if(!kfSelHas(gHeldKf.t,gHeldKf.f)) kfSelSet(gHeldKf.t,gHeldKf.f); // 押さえているキーを基点に
@@ -3503,11 +3534,11 @@ function renderKfDiamonds(trackIdx){
           e.stopPropagation(); e.preventDefault();
           return;
         }
-        gHeldKf={pid:e.pointerId,t:trackIdx,f};
+        gHeldKf={pid:e.pointerId,t:trackIdx,f,at:performance.now()};
       }
       selectTrack(trackIdx); // 2026-07-26: 別トラックのキーを触ったらそのトラックが選択状態になる
       if(lockedGuard(track)) return; // SPEC_11 P4-2
-      dragActive=true; wasDragged=false; origF=f; copyF=f; lastDelta=0;
+      dragActive=true; wasDragged=false; origF=f; copyF=f; lastDelta=0; downX=e.clientX;
       shiftStart=e.shiftKey; ctrlStart=e.ctrlKey||e.metaKey; altStart=e.altKey;
       // 複数選択中のキーを掴んだ場合はグループ移動（Alt=複製のときは単体扱い）
       groupMode = !altStart && kfSel.length>1 && kfSelHas(trackIdx,f);
@@ -3545,7 +3576,11 @@ function renderKfDiamonds(trackIdx){
       // SPEC_18 §5-G: ドラッグ判定のしきい値はマウス3px / 指・ペン10px。
       // 3px のままだとペンの手ブレで「動かした」ことになり、**Wクリック（イーズ送り）が一度も
       // 成立しなかった**（発注者報告「キーは細かいのでペンでもWクリックしたい」の真因）
-      if(!wasDragged){ const th=(e.pointerType==='mouse')?3:NUMSCRUB_TAP_PX; if(Math.abs(e.clientX-(rect.left+frameFrac(origF+off)*rect.width))<th) return; wasDragged=true; }
+      // §6-15（2026-09-03）: しきい値を測る**起点がキーの中心だった**のが残りの真因。
+      // ダイヤの当たりは中心から10px前後あるので、少し外して押しただけで最初の move が
+      // いきなり「ドラッグ」になり、Wタップが一度も成立しなかった（指もペンも無反応）。
+      // 起点は必ず押した場所（downX）にする。
+      if(!wasDragged){ const th=(e.pointerType==='mouse')?3:NUMSCRUB_TAP_PX; if(Math.abs(e.clientX-downX)<th) return; wasDragged=true; }
       if(groupMode){
         let gd=newF-f;
         if(shiftStart&&gEdges) gd=snapDelta(gd,gEdges,ppf,null,snapCands); // グループは「どれか1つの端」が吸い付く
@@ -3582,8 +3617,10 @@ function renderKfDiamonds(trackIdx){
       // Wタップ / Wクリック = イーズ送り。pointerdown で preventDefault しているので
       // ブラウザの dblclick は飛んでこない（＝指でもペンでも効かなかった）。自前で数える
       const now=performance.now();
-      if(now-lastKfTap<320){ lastKfTap=-1e9; cycleEase(trackIdx,origF); return; }
-      lastKfTap=now;
+      if(gKfTap.t===trackIdx&&gKfTap.f===origF&&now-gKfTap.at<NUMSCRUB_DTAP_MS){
+        gKfTap={t:-1,f:-1,at:-1e9}; cycleEase(trackIdx,origF); return;
+      }
+      gKfTap={t:trackIdx,f:origF,at:now};
       // 複数選択に入っているキーを1回触っただけでは選択を畳まない
       // ＝直後のWタップが「選択ぶん全部のイーズ変更」になる（applyKeyModeToFrame が選択を見る）
       if(!(kfSel.length>1&&kfSelHas(trackIdx,origF))) kfSelSet(trackIdx,origF);
@@ -5676,10 +5713,17 @@ function applyEaseInput(field,raw,live){
 }
 (function(){
   // range は input 中は履歴を積まず（live=true）、離した時に確定
-  $('#ease-in-range').addEventListener('input',e=>applyEaseInput('ei',e.target.value,true));
-  $('#ease-out-range').addEventListener('input',e=>applyEaseInput('eo',e.target.value,true));
-  $('#ease-in-range').addEventListener('change',e=>{applyEaseInput('ei',e.target.value,false);updateInfluenceUI();});
-  $('#ease-out-range').addEventListener('change',e=>{applyEaseInput('eo',e.target.value,false);updateInfluenceUI();});
+  [['ei','#ease-in-range'],['eo','#ease-out-range']].forEach(([field,sel])=>{
+    const el=$(sel); if(!el) return;
+    el.addEventListener('input',e=>applyEaseInput(field,e.target.value,true));
+    el.addEventListener('change',e=>{applyEaseInput(field,e.target.value,false);updateInfluenceUI();});
+    // 掴んでいる間は updateInfluenceUI に書き戻させない（§6-16）。
+    // pointerup は掴んだまま欄の外で離すことがあるので window で受ける
+    el.addEventListener('pointerdown',()=>{ gEaseDrag=field; });
+    const release=()=>{ if(gEaseDrag===field){ gEaseDrag=null; updateInfluenceUI(); } };
+    window.addEventListener('pointerup',release);
+    window.addEventListener('pointercancel',release);
+  });
 })();
 $('#btn-graph').addEventListener('click',toggleGraph);
 $('#btn-export-jsx').addEventListener('click',exportAeJsx);

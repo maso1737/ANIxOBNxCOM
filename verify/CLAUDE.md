@@ -8,14 +8,19 @@ Animation Paint の単一HTMLツールを**決定論的に**検証するハー�
 （スキル `single-html-verify` の配布物と同一）。**ここでは改造しない。**
 挙動を変えたくなったら、まず正準側を直して SPEC_08 の version を上げ、その後コピーし直す。
 
-現在の対象は **ANIMATOR / COMPOSER / OBAN BUILDER**。econte も同じ要領で足せる
-（HTMLに `window.__HARNESS__` を実装して config を1本追加するだけ）。
+現在の対象は **ANIMATOR / COMPOSER / OBAN BUILDER / ECONTE**（manga-plate は未。SPEC_09 v2 が
+まだ出力そのものを変えている最中なので、承認しなおしが常態化する＝いま張っても得にならない）。
 
 | ツール | config | 起動URL（鍵） | 撮るもの |
 |---|---|---|---|
 | ANIMATOR | `verify.animator.config.json` | `animator.html?ro=1` | 作画レイヤー合成（1024×576） |
 | COMPOSER | `verify.composer.config.json` | `composer.html?harness=1` | コンポ合成（960×540） |
 | OBAN BUILDER | `verify.oban.config.json` | `oban-builder.html?harness=1` | TAKE走行中のステージ（960×540） |
+| ECONTE | `verify.econte.config.json` | `econte.html?harness=1` | TIMELINE出力 と GRIDセル（**1280×720**） |
+
+> ⚠ **撮影キャンバスは 1280×720 を超えないこと。** runner はビューポート既定（1280×720）のまま
+> `locator.screenshot()` する。`position:fixed` の要素はスクロールできないので、**大きくすると下が切れる**。
+> econte で「出力の下にGRIDセル帯」を付けようとして踏んだ。**2つ撮りたいなら seek の t で撮り分ける**。
 
 **animator だけ鍵が違うのは歴史的理由**。animator には元から別窓用の `?ro=1`（＝autosaveしない窓）が
 あったのでそれを流用した。3つとも意味は同じ「**その窓は保存しない**」で、フィクスチャが現在の作業を
@@ -29,6 +34,7 @@ npm install
 npm run verify:animator
 npm run verify:composer
 npm run verify:oban
+npm run verify:econte
 ```
 
 - 初回は `baselines/` に正解画像を作るだけで必ず通る。**2回目以降が本番**（比較してPASS/FAIL）。
@@ -230,6 +236,92 @@ dwell2 〜0.6522 / travel 〜0.8921 / dwell3 〜1.0        wipeP = 0.4425
 6コマ中4コマが 0.875〜7.4% で FAIL する。**残り2コマが0%なのは正常**:
 `o01_p000` はカメラが原点（`cam.x*pf=0` で係数が効かない）、`o03_p045_wipe` は画面の約87%が
 白に飛んでいて幾何の差が出ない。**この2枚はワイプと初期状態の番人**であって、レイアウトの番人ではない。
+
+## ECONTE 側の契約（econte.html 末尾）
+
+```js
+window.__HARNESS__ = { version:1, kind:'canvas2d', canvas:'#harness-shot', ready, seek, render, info }
+```
+
+econte 固有の事情が4つある。
+
+1. **`?harness=1`（`HARNESS_ON`）の窓でしか動かない。** 同じ鍵で `scheduleSave()` と `saveAll()` を
+   封鎖しているので、検証窓は `econte_db_v1` を**読みはしても一切書かない**。
+   （実測確認済み: 本物のDBに目印を置いてから harness窓でフィクスチャを組み `saveAll()` を直接叩いても、
+   `cuts` は空のまま・目印も無傷・`eh*` の id は1つも入らない）
+
+2. **素材に写真を使わない。** 紙（ベイク空間 1280×720）に決定論の絵を `ehMakePaper()` で描いて
+   `baseC` に直接持たせ、`res:true` で常駐扱いにする（`getBase`/`needLine` が
+   `requestResident` の非同期へ落ちない）。＝ここで見るのは**枠・パッチ・合成**の回帰だけ。
+   写真の読み込み経路は対象外。
+
+3. **撮る面が2つある。`seek(t)` の t で撮り分ける**（契約は「t→状態」なので合法）。
+
+   | t | ehMode | 何を撮るか |
+   |---|---|---|
+   | `< 10000` | `out` | `renderOutputFrame` → `drawCamFrame`。**プレビュー・録画・書き出しと同じ関数** |
+   | `>= 10000` | `cells` | `drawCellFrame` を 640×360 で 2×2。**GRID セル＝自分の枠のパッチだけ** |
+
+   ★ **この2つを両方撮るのが econte 版の肝。** SPEC_16 §3-3 で
+   「GRIDセルは自分の枠しか描かない／合成した本当の画は TIMELINE に出る」と**意図的に分けてある**ので、
+   片方だけ見ていても T.U./PAN の食い違いに気づけない。
+
+4. **フィクスチャ（`ehBuildFixture`）はカット5本 / 全56コマ / 24fps。**
+
+   | | 構成 | 何を踏むか |
+   |---|---|---|
+   | C1 | FIX（枠1つ・12コマ） | いちばん素直な経路。line と plate（0.4倍解像度）の両方 |
+   | C2 | **T.U**（A=全景 → B=寄り・lead4/move12/tail4） | **入れ子＝`patchHides` が効く。A にも B にも塗ってある**（発注者報告の本体） |
+   | C3 | **PAN**（A→B が並ぶ・10コマ） | 入れ子でない＝隠さず重なる。枠の境目で線が切れないこと |
+   | C4 | 投げ縄（8コマ） | `lassoFillPolygon`＝`strokeSeg` とは別経路（スキャンライン）＋消し（`destination-out`） |
+   | C5 | 空カット（6コマ） | 紙も加筆も無い＝bg だけ出る経路 |
+
+   絵は **`ehStroke()` が econte 自身の `strokeSeg()` を呼んで**引く（ブラシ幅・色・ツール・
+   塗り先・**枠をまたぐ区間の二重描画**がそのまま回帰対象になる）。
+
+### ★ `ehPatchMarks()` が要る理由 —— 負のコントロールが自己相殺した話（2026-09-03）
+
+最初、パッチの中身を `ehStroke()` だけで作っていた。この状態で
+**`camBakeRect` の x を +2px ずらす負のコントロールを当てても、9コマ中8コマが 0.000% のまま通ってしまった。**
+
+原因は対称性だった。`strokeSeg` → `strokePatchSegBake` → **`bakeToPatch()` も `camBakeRect` を使う**。
+フィクスチャは毎回その場で塗り直すので、
+
+> 2px ずれた所に塗って、2px ずれた所に出す ＝ **打ち消し合って差分が出ない**
+
+実運用では絵は先にパッチへ焼けていて**出す側だけ**が変わるので、これは
+**ハーネスだけが嘘をつく**状態（＝置き場所の回帰を丸ごと見逃す）。
+
+そこで `ehPatchMarks()` で、**座標マッピングを一切通さない絵**（枠の縁・四隅の目印・逆対角線を
+パッチのピクセル空間へ直接）を全カットの全枠に入れてある。**この関数を消すと検証の芯が抜ける。**
+
+> 一般化: **フィクスチャを「アプリの関数で組み立てて、同じ関数で描く」と対称性で穴が空く。**
+> 他ツールへ広げるときも、必ず片側だけを通る素材を混ぜること。
+
+### 予算（ECONTE・2026-09-03 実測）
+
+| 項目 | 実測 | 上限 | 何を捕まえるか |
+|---|---|---|---|
+| `maxTTFFms` | 199〜207ms | 800 | 起動＋紙4枚の生成＋フィクスチャのペイント |
+| `maxLongestFrameMs` | 177〜184ms | 300 | 最長フレーム（起動時のスクリプト評価が主） |
+| `maxVramBytes` | 39.2MB | 64MB | 紙4枚（各3.7MB）＋パッチ10枚（line 3.7MB / plate 0.59MB） |
+| `allowedPixelRatio` | 0.000% | 0.02% | 他3ツールと同じ |
+
+### 負のコントロール（2種・実測）
+
+| 壊し方 | 結果 | 通ったコマの説明 |
+|---|---|---|
+| `camBakeRect` の x を **+2px** | **8/9 FAIL**（0.549〜1.518%） | `e07_c5_empty` だけ 0%。**パッチが1枚も無いカット**なので正しい |
+| ブラシ幅を **5% 細く** | **7/9 FAIL**（0.139〜1.330%） | `e06_c4_lasso` 0.006%（中身は投げ縄＝筆を通らない）／`e07` 0%。**どちらも正しい** |
+
+＝ 置き場所（合成側）と 筆（ペイント側）が**別々に**見張られていることの確認。
+
+### 新しいコマ位置（seek）を足すとき（ECONTE）
+
+`timeMs → frame` は `floor(t/(1000/24))`。**ちょうど境界に乗せない**（`frame*41.667` より
+2〜4ms 大きい値を選ぶ）。カットの割り当ては通しフレームで
+`C1=0〜11 / C2=12〜31 / C3=32〜41 / C4=42〜49 / C5=50〜55`。
+GRIDセルを撮りたいときは **その値に 10000 を足す**。
 
 ## 他のツールへ広げるとき
 

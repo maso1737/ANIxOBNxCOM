@@ -1389,14 +1389,20 @@ function idbGetAll(store){
   });
 }
 
+/* VERIFY HARNESS モード（?harness=1）。検証用フィクスチャは現在の作業を捨てて組み直すので、
+   この鍵が無い窓では harness を起動させない＆自動保存も一切書かない（本窓の作業を守る）。
+   animator の `?ro=1` / composer・oban の `?harness=1` と意味は同じ（SPEC_08）。 */
+const HARNESS_ON = (()=>{ try{ return new URLSearchParams(location.search).get('harness') === '1'; }catch(e){ return false; } })();
+
 let saveTimer = 0;
 function scheduleSave(){
+  if(HARNESS_ON) return;
   $('#save-dot').textContent = '…';
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => { saveAll(); }, 700);
 }
 async function saveAll(){
-  if(!db) return;
+  if(HARNESS_ON || !db) return;
   try{
     const phItems = photos.map(p => ({ id: p.id, name: p.name, x: p.x, y: p.y, w: p.w, h: p.h, blob: p.blob,
                                        rot: p.rot || 0, filter: p.filter || null, ref: p.ref || null }));
@@ -5035,7 +5041,11 @@ function gridPaintDown(e, cv){
   // 選択は**押すたびに合わせ直す**。以前は「別のセルに移ったとき」しか触っていなかったので、
   // いま居るセルをもう一度押しても選択が入らなかった（選択を外した直後に効いてくる）。
   // すでに複数選んでいてその中を押したときは**選択を保つ**（一括操作の途中で消えると使えない）
-  if(gSelCells.indexOf(key) < 0) setSelCells([key]);
+  // ★ ペンだけは例外＝**描くだけで選択は動かさない**（2026-09-03・発注者要望「選択は指のみ」）。
+  //   指でまとめて選んだ数枚に対して、ペンで1枚描き足した瞬間に選択が1枚へ畳まれていた。
+  //   マウス（デスクトップ）は指が無いので従来どおり選択も兼ねる。
+  //   ※ state.curCut / curFrame は「どこに描くか」なので、ペンでも必ず更新する（上の2行）
+  if(e.pointerType !== 'pen' && gSelCells.indexOf(key) < 0) setSelCells([key]);
   syncEditPanels();
   const cut = cuts[i];
   if(paintKind() === 'line' && !isResident(cut)){
@@ -9776,7 +9786,332 @@ async function init(){
   }
   $('#save-dot').textContent = 'SAVED';
 }
-init();
+/* 起動の完了を待てるようにしておく（VERIFY HARNESS の ready() が await する） */
+const gBootPromise = init();
+
+// ============================================================
+// VERIFY HARNESS（SPEC_08 / single-html-verify）
+//   window.__HARNESS__ = {version,kind,canvas,ready,seek,render,info}
+//   verify/harness/runner.mjs が「中身を知らずに」検証するための共通面。
+//
+//   ・通常操作では一切走らない。ready() を呼ぶのは runner だけ。
+//   ・**?harness=1 の窓でしか動かない**（HARNESS_ON）。フィクスチャは現在の作業を
+//     捨てて組み直すので、本窓で誤って呼ばれても壊れないようにするための鍵。
+//     同じ鍵で IndexedDB への書き込みも止めている。
+//   ・素材は**写真を使わない**。紙（ベイク空間）に決定論の絵を1枚描いて baseC にする。
+//     写真の読み込み経路を通さないぶん、ここで見るのは純粋に「枠・パッチ・合成」の回帰。
+//   ・撮るのは画面ではなく専用キャンバス #harness-shot（**1280×720 固定**）。
+//     ★ runner はビューポート既定 1280×720 のまま `locator.screenshot()` する。
+//       position:fixed の要素はスクロールできないので、**これより大きくすると下が切れる**。
+//       animator(1024×576) / composer(960×540) が小さいのも同じ事情。
+//   ・econte は撮る面が**2つ**ある。`seek(t)` の t で撮り分ける（契約は「t→状態」だけなので合法）:
+//       t <  EH_FIX.GRID_T0 … TIMELINE 出力（renderOutputFrame → drawCamFrame ＝ 書き出しと同じ関数）
+//       t >= EH_FIX.GRID_T0 … その位置のカットの GRID セル（drawCellFrame）を 640×360 で 2×2
+//     ★ **これが econte 版の肝。** T.U./PAN で「GRIDで塗った絵」と「タイムラインに出る絵」が
+//       食い違う件（SPEC_16 §3-3 の意図的な分岐）は、片方だけ見ていても気づけない。
+//       両方を別カットとして撮っておけば、どちらを直したのかが差分で分かる。
+// ============================================================
+const EH_FIX = {
+  BW: 1280, BH: 720,        // ベイク空間＝出力と等倍。撮影キャンバスもこの寸法
+  CELL_W: 640, CELL_H: 360, // GRIDセル（2×2 でちょうど 1280×720）
+  MAXCELL: 4,
+  GRID_T0: 10000,           // これ以上の t は「GRIDセルを撮る」の意味
+};
+let ehShotCv = null, ehShotCtx = null, ehCellCv = null, ehCellCtx = null;
+let ehMode = 'out';         // 'out' = TIMELINE出力 / 'cells' = GRIDセル
+let ehReadyPromise = null;
+
+// 決定論PRNG（Math.random に依存しない＝injectの無いPass2でも同じ絵になる）
+function ehRng(seed){
+  let s = seed >>> 0;
+  return function(){ s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+// 紙（ベイク空間）の絵。**文字は使わない**（フォント差で揺れるため）。
+// 細かい格子を入れてあるので、T.U./PAN の切り出しがズレると必ず目に見える。
+function ehMakePaper(seed){
+  const c = blankCanvas(EH_FIX.BW, EH_FIX.BH);
+  const x = ctx2d(c);
+  const rnd = ehRng(seed);
+  x.fillStyle = '#efeae2'; x.fillRect(0, 0, EH_FIX.BW, EH_FIX.BH);
+  // 40px 格子（細）＋ 160px 格子（太）＝ 拡大率のズレが読める物差し
+  for(let gx = 0; gx <= EH_FIX.BW; gx += 40){
+    x.strokeStyle = (gx % 160 === 0) ? 'rgba(60,60,80,0.55)' : 'rgba(60,60,80,0.18)';
+    x.lineWidth = (gx % 160 === 0) ? 2 : 1;
+    x.beginPath(); x.moveTo(gx + 0.5, 0); x.lineTo(gx + 0.5, EH_FIX.BH); x.stroke();
+  }
+  for(let gy = 0; gy <= EH_FIX.BH; gy += 40){
+    x.strokeStyle = (gy % 160 === 0) ? 'rgba(60,60,80,0.55)' : 'rgba(60,60,80,0.18)';
+    x.lineWidth = (gy % 160 === 0) ? 2 : 1;
+    x.beginPath(); x.moveTo(0, gy + 0.5); x.lineTo(EH_FIX.BW, gy + 0.5); x.stroke();
+  }
+  // 色ブロック（切り出し位置の手がかり）
+  const cols = ['#c94f4f', '#4f7cc9', '#4fa06a', '#c9a24f', '#8a4fc9'];
+  for(let i = 0; i < 5; i++){
+    x.fillStyle = cols[i];
+    x.fillRect(60 + i * 240, 60 + (i % 2) * 480, 120, 120);
+  }
+  // 対角線と円（リサンプルの質が変わると出る）
+  x.strokeStyle = '#333'; x.lineWidth = 3;
+  x.beginPath(); x.moveTo(0, 0); x.lineTo(EH_FIX.BW, EH_FIX.BH); x.stroke();
+  x.beginPath(); x.arc(EH_FIX.BW / 2, EH_FIX.BH / 2, 150, 0, Math.PI * 2); x.stroke();
+  // ばら撒き点（PRNG が固定されていることの確認も兼ねる）
+  x.fillStyle = 'rgba(20,20,30,0.7)';
+  for(let i = 0; i < 40; i++) x.fillRect(Math.round(rnd() * EH_FIX.BW), Math.round(rnd() * EH_FIX.BH), 4, 4);
+  return c;
+}
+
+// カット1つ分の器。写真を使わないので baseC を直接持たせ、res=true で常駐扱いにする
+// （getBase / needLine が requestResident へ落ちない＝非同期を挟まない）。seed<0 で紙なし
+function ehMakeCut(cam, lead, tail, seed){
+  const cut = {
+    id: 'eh' + (seed < 0 ? 'x' : seed), cam, camLead: lead, camTail: tail,
+    bakeRect: { x: 0, y: 0, w: EH_FIX.BW, h: EH_FIX.BH },
+    bakeW: EH_FIX.BW, bakeH: EH_FIX.BH, bakeExpand: 1,
+    baseC: seed >= 0 ? ehMakePaper(seed) : null,
+    fr: [], res: true, bg: 232, baseAlpha: DEFAULT_BASE_ALPHA,
+    durF: 12, note: '', baseBlob: null, dirtyBase: false, thumb: null,
+  };
+  relabelCam(cut);
+  ensureFr(cut);
+  recalcDur(cut);
+  return cut;
+}
+
+/* ★ 置き場所の見張り（**パッチのピクセル空間に直接描く**）。
+   ── なぜ要るか（2026-09-03・負のコントロールで発覚）────────────────────────
+   ehStroke は `strokeSeg` → `bakeToPatch()` を通る＝**塗る位置も camBakeRect で決まる**。
+   フィクスチャは毎回塗り直すので、`camBakeRect` を +2px ずらすと
+   「2px ずれた所に塗って、2px ずれた所に出す」で**打ち消し合って差分が出ない**。
+   実運用では絵は先にパッチへ焼けていて出す側だけが変わるので、これは
+   **ハーネスだけが嘘をつく**状態になる（＝置き場所の回帰を丸ごと見逃す）。
+   そこで、座標マッピングを一切通さない絵をパッチに直接入れておく。
+   枠の縁とコーナーの目印なので、置き場所・切り出し・重ね順が1pxでも変われば必ず出る。 */
+function ehPatchMarks(cut, hue){
+  const n = frCount(cut);
+  for(let k = 0; k < n; k++){
+    const c = frLayer(cut, k, 'line', true);
+    if(!c) continue;
+    const x = ctx2d(c), W = c.width, H = c.height;
+    x.save();
+    x.strokeStyle = hue; x.lineWidth = 4;
+    x.strokeRect(10, 10, W - 20, H - 20);              // 枠の縁（切り出しのズレが出る）
+    x.lineWidth = 8;
+    const L = 60;
+    [[0,0,1,1],[W,0,-1,1],[0,H,1,-1],[W,H,-1,-1]].forEach(([cx,cy,sx,sy]) => {
+      x.beginPath();
+      x.moveTo(cx + sx*10, cy + sy*10); x.lineTo(cx + sx*(10+L), cy + sy*10);
+      x.moveTo(cx + sx*10, cy + sy*10); x.lineTo(cx + sx*10, cy + sy*(10+L));
+      x.stroke();                                      // コーナーの目印（k ごとに位置が違う）
+    });
+    x.lineWidth = 2;
+    x.beginPath(); x.moveTo(10, H - 10); x.lineTo(W - 10, 10); x.stroke();  // 逆対角
+    x.restore();
+    markPatch(cut, k, 'line');
+  }
+}
+
+// econte 自身の筆で1本引く（**ベイク空間の座標**）。
+// state を通すので、ブラシ幅・色・ツール・塗り先の扱いがそのまま回帰対象になる。
+function ehStroke(pts, opt){
+  opt = opt || {};
+  state.etool = opt.erase ? 'eraser' : 'pen';
+  state.paintTarget = opt.plate ? 'color' : 'draw';
+  state.brush = opt.brush || 6;
+  state.fillColor = opt.color || '#101018';
+  for(let i = 1; i < pts.length; i++) strokeSeg(pts[i - 1], pts[i]);
+  state.etool = 'pen'; state.paintTarget = 'draw';
+}
+
+// 決定論フィクスチャを組む（毎回まったく同じドキュメントを作る）
+async function ehBuildFixture(){
+  if(!HARNESS_ON){
+    throw new Error('VERIFY HARNESS: ?harness=1 の窓でのみ実行できます（本窓の作業を壊さないため）');
+  }
+  await gBootPromise;
+  if(window.__DET__) await window.__DET__.ensureRenderReady();  // フォント/画像
+  pause();
+  clearTimeout(saveTimer);
+
+  // 描画状態を既定に固定（localStorage 復元値の影響を消す）
+  state.etool = 'pen'; state.paintTarget = 'draw'; state.brush = 6;
+  state.pressurePen = false; state.fillColor = '#101018';
+  state.curFrame = 0;
+  gPaint.colorAlpha = 1; gPaint.colorBlend = 'multiply';
+  const bm = $('#burnin-mode'); if(bm) bm.value = 'off';   // 焼き込みは絵に文字を出すので必ず off
+  photos.length = 0;
+  cuts.length = 0;
+  setSelCells([]);
+
+  const FULL = { x: 0, y: 0, w: EH_FIX.BW, h: EH_FIX.BH };
+
+  // ── C1 FIX（枠1つ＝カメラ無し）。いちばん素直な経路 ──
+  const c1 = ehMakeCut([mkCam(FULL, 0)], 0, 0, 11);
+  c1.durF = 12;
+  cuts.push(c1);
+
+  // ── C2 T.U（A=全景 → B=寄り。入れ子なので patchHides が効く） ──
+  //    ★ 発注者報告の本体: **A にも B にも塗ってある**状態を作る。
+  //      GRIDセル（下段）は自分の枠のパッチだけ／TIMELINE（上段）は両方を合成する。
+  const c2 = ehMakeCut([mkCam(FULL, 12), mkCam({ x: 320, y: 180, w: 640, h: 360 }, 0)], 4, 4, 22);
+  cuts.push(c2);
+
+  // ── C3 PAN（A→B が並ぶ＝入れ子でない。枠の境目で線が切れないこと） ──
+  const c3 = ehMakeCut([mkCam({ x: 0, y: 0, w: 640, h: 360 }, 10),
+                        mkCam({ x: 640, y: 360, w: 640, h: 360 }, 0)], 0, 0, 33);
+  cuts.push(c3);
+
+  // ── C4 投げ縄塗り（strokeSeg とは別経路＝スキャンライン。ROADMAP §3-6） ──
+  const c4 = ehMakeCut([mkCam(FULL, 0)], 0, 0, 44);
+  c4.durF = 8;
+  cuts.push(c4);
+
+  // ── C5 空カット（紙も加筆も無い＝bg だけ出る経路） ──
+  const c5 = ehMakeCut([mkCam(FULL, 0)], 0, 0, -1);
+  c5.durF = 6;
+  cuts.push(c5);
+
+  // ── ペイント（econte 自身の筆で引く） ──
+  // C1: 線＋色。色は plate（0.4倍解像度）なので、線と色でパッチ解像度が違う経路を両方踏む
+  state.curCut = 0;
+  ehStroke([{x:120,y:120},{x:1160,y:200},{x:600,y:640},{x:120,y:120}], { brush: 8 });
+  ehStroke([{x:200,y:520},{x:1080,y:520}], { brush: 2 });
+  ehStroke([{x:300,y:300},{x:980,y:300},{x:980,y:430},{x:300,y:430},{x:300,y:300}],
+           { plate: true, brush: 40, color: '#e06a3c' });
+
+  // C2 T.U: **A の外側**と**B の内側**の両方に引く。
+  //   ・A だけに乗る線 = 寄ったとき枠外へ出ていく
+  //   ・B の中の線 = 寄りでだけ効く（GRIDのBセルにはこれだけが出る）
+  //   ・A と B をまたぐ線 = strokeSeg が両方のパッチに引く（ROADMAP §3-1 の二重描画）
+  state.curCut = 1;
+  ehStroke([{x:80,y:80},{x:300,y:140},{x:80,y:640}], { brush: 10 });                  // A のみ
+  ehStroke([{x:420,y:260},{x:860,y:300},{x:640,y:480},{x:420,y:260}], { brush: 5 });  // B の中
+  ehStroke([{x:180,y:400},{x:760,y:380}], { brush: 7, color: '#2a5fb0' });            // A→B をまたぐ
+  ehStroke([{x:480,y:220},{x:900,y:520}], { plate: true, brush: 60, color: '#7ec6a0' }); // B に色
+
+  // C3 PAN: 枠の境目をまたぐ線（並ぶ配置なので隠さず重なる）
+  state.curCut = 2;
+  ehStroke([{x:120,y:120},{x:1140,y:660}], { brush: 9 });
+  ehStroke([{x:560,y:60},{x:700,y:700}], { brush: 4, color: '#b03a5f' });
+  ehStroke([{x:700,y:420},{x:1180,y:420}], { plate: true, brush: 50, color: '#c9c04f' });
+
+  // C4: 投げ縄（多角形の一括塗り）を line と plate で1回ずつ。座標はパッチ内ピクセル
+  state.curCut = 3;
+  const l1 = frLayer(c4, 0, 'line', true);
+  lassoFillPolygon(ctx2d(l1), l1.width, l1.height,
+    [{x:200,y:150},{x:900,y:120},{x:1050,y:520},{x:520,y:620},{x:180,y:430}], '#303040', false);
+  markPatch(c4, 0, 'line');
+  const p1 = frLayer(c4, 0, 'plate', true);
+  lassoFillPolygon(ctx2d(p1), p1.width, p1.height,
+    [{x:60,y:40},{x:200,y:30},{x:220,y:150},{x:80,y:170}], '#5a8ad0', false);
+  markPatch(c4, 0, 'plate');
+  // 消しの経路も1回踏む（destination-out）
+  ehStroke([{x:400,y:300},{x:800,y:340}], { erase: true, brush: 24 });
+
+  // 置き場所の見張り（座標マッピングを通さない絵）。**塗りのあとに入れる**＝上に乗る
+  ehPatchMarks(c1, '#1f6f4a');
+  ehPatchMarks(c2, '#b03030');
+  ehPatchMarks(c3, '#2c3fa0');
+  ehPatchMarks(c4, '#7a4fb0');
+
+  state.curCut = 0; state.curFrame = 0;
+  state.tl.frame = 0; state.tl.loop = true; state.tl.playing = false;
+  invalidateCoverage();
+  updateTotals();
+
+  // 撮影用キャンバス（出力そのまま＝1:1。CSS寸法もピクセル寸法と同じにする＝縮小リサンプル無し）
+  if(!ehShotCv){
+    ehShotCv = document.createElement('canvas');
+    ehShotCv.id = 'harness-shot';
+    ehShotCv.style.cssText = 'position:fixed;left:0;top:0;z-index:99999;pointer-events:none;background:#fff;';
+    document.body.appendChild(ehShotCv);
+    ehShotCtx = ctx2d(ehShotCv);
+    ehCellCv = blankCanvas(EH_FIX.CELL_W, EH_FIX.CELL_H);
+    ehCellCtx = ctx2d(ehCellCv);
+  }
+  ehShotCv.width = EH_FIX.BW; ehShotCv.height = EH_FIX.BH;
+  ehShotCv.style.width = EH_FIX.BW + 'px';
+  ehShotCv.style.height = EH_FIX.BH + 'px';
+
+  window.__HARNESS__.seek(0);
+  window.__HARNESS__.render();
+
+  // Pass2（実クロックperf）: injectが無い＝__TEST_MODE__ が立たない側でだけ自走させる。
+  // 合成を回して LoAF を実測する。Pass1では絶対に回さない（seek/renderと競合する）。
+  if(!window.__TEST_MODE__){
+    let f = 0;
+    const spin = () => {
+      f = (f + 1) % Math.max(1, totalFrames());
+      state.tl.frame = f;
+      ehMode = 'out';                          // 実再生に相当するのは出力側だけ
+      ehComposite();
+      requestAnimationFrame(spin);
+    };
+    requestAnimationFrame(spin);
+  }
+}
+
+// ehMode に応じて TIMELINE 出力 or GRIDセル を1枚に描く
+function ehComposite(){
+  if(!ehShotCtx) return;
+  const ca = cutIndexAt(state.tl.frame);
+  ehShotCtx.clearRect(0, 0, EH_FIX.BW, EH_FIX.BH);
+  if(!ca){
+    ehShotCtx.fillStyle = '#1a1a22';
+    ehShotCtx.fillRect(0, 0, EH_FIX.BW, EH_FIX.BH);
+    return;
+  }
+  if(ehMode !== 'cells'){
+    renderOutputFrame(ehShotCtx, ca);   // ★ プレビュー・録画・書き出しと同じ経路
+    return;
+  }
+  // GRID セル: 自分の枠のパッチしか描かない（drawCellFrame）。2×2 に最大4枚
+  const cut = cuts[ca.i];
+  const n = Math.min(EH_FIX.MAXCELL, frCount(cut));
+  ehShotCtx.fillStyle = '#0e0e14';
+  ehShotCtx.fillRect(0, 0, EH_FIX.BW, EH_FIX.BH);
+  for(let k = 0; k < n; k++){
+    ehCellCtx.clearRect(0, 0, EH_FIX.CELL_W, EH_FIX.CELL_H);
+    drawCellFrame(ehCellCtx, cut, k, EH_FIX.CELL_W, EH_FIX.CELL_H);
+    ehShotCtx.drawImage(ehCellCv, (k % 2) * EH_FIX.CELL_W, Math.floor(k / 2) * EH_FIX.CELL_H);
+  }
+}
+
+window.__HARNESS__ = {
+  version: 1,
+  kind: 'canvas2d',
+  canvas: '#harness-shot',
+  ready(){ return ehReadyPromise || (ehReadyPromise = ehBuildFixture()); },
+  // t(ms) → 通しフレーム。状態を決めるだけで描かない（契約どおり純関数）。
+  // t が GRID_T0 以上なら「そのフレームのカットの GRID セルを撮る」の意味（上のコメント参照）
+  seek(t){
+    const T = Math.max(1, totalFrames());
+    ehMode = (t >= EH_FIX.GRID_T0) ? 'cells' : 'out';
+    const tt = (t >= EH_FIX.GRID_T0) ? (t - EH_FIX.GRID_T0) : t;
+    state.tl.frame = Math.floor(tt / (1000 / FPS)) % T;
+  },
+  // 現在状態を1回だけ同期描画
+  render(){ ehComposite(); },
+  // Canvas2Dなので GPU VRAM ではなく パッチ実RAM量。
+  // 予算キー互換のため vramBytesEstimate の名前で返す（budget.maxVramBytes が効く）。
+  info(){
+    let px = 0, patches = 0;
+    for(const c of cuts){
+      if(c.baseC) px += c.baseC.width * c.baseC.height * 4;
+      for(const f of (c.fr || [])){
+        if(f && f.line){ px += f.line.width * f.line.height * 4; patches++; }
+        if(f && f.plate){ px += f.plate.width * f.plate.height * 4; patches++; }
+      }
+    }
+    return {
+      cuts: cuts.length,
+      frames: totalFrames(),
+      patches,
+      pixelBytes: px,
+      vramBytesEstimate: px,
+    };
+  },
+};
 
 // デバッグ/検証用フック（single-html-verify系。UIには出ない）
 window.__ECONTE__ = {
