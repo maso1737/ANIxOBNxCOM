@@ -11,6 +11,11 @@
   body{margin:0;background:var(--bg);color:var(--ink);
     font:13px/1.5 -apple-system,"Segoe UI",sans-serif;-webkit-user-select:none;user-select:none}
   header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:12px}
+  /* HOME は他ツールと同じく「バーの右端の最後」に置く（iPad standalone には戻るボタンが無い） */
+  header .home{margin-left:auto;align-self:center;background:#262b34;color:var(--ink);
+    border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:11px;
+    letter-spacing:.12em;text-decoration:none;min-height:34px;display:inline-flex;align-items:center}
+  header .home:hover{border-color:var(--accent);color:var(--accent)}
   header h1{font-size:14px;letter-spacing:.08em;margin:0;font-weight:700}
   header .sub{color:var(--muted);font-size:11px}
   .wrap{display:flex;gap:16px;padding:16px;flex-wrap:wrap}
@@ -45,6 +50,7 @@
 <header>
   <h1>WARP LAB</h1>
   <span class="sub">複数原画（〜15枚）ラスター・フロー中割 — 連続再生 / フェード比較 / イーズ検証</span>
+  <a class="home" href="index.html" title="ランディングページに戻る">HOME</a>
 </header>
 
 <div class="wrap">

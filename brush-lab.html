@@ -246,6 +246,7 @@ table.bench td .bad{color:var(--rouge)}
       <button class="tb-btn" id="b-undo" title="1ストローク戻す（Ctrl+Z）">↶ UNDO</button>
       <button class="tb-btn" id="b-clear">✕ CLEAR</button>
       <button class="tb-btn" id="sc-open-btn">⌨ SHORTCUTS</button>
+      <button class="tb-btn" id="b-home" title="ランディングページに戻る">HOME</button>
     </span>
   </div>
 
@@ -1472,13 +1473,15 @@ function setMode(m){
 function cycleMode(){ setMode({PAINT:'SPLIT', SPLIT:'SHEET', SHEET:'PAINT'}[S.mode]); }
 
 /* --- keys --- */
+$('#b-home').addEventListener('click', () => { location.href = 'index.html'; });
+
 document.addEventListener('keydown', e => {
   if(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   const k = e.key;
   if(k === 'Escape'){
     if($('#bench-modal').classList.contains('on')){ $('#bench-modal').classList.remove('on'); return; }
     if($('#shortcut-modal').classList.contains('on')){ $('#shortcut-modal').classList.remove('on'); return; }
-    location.href = 'index.html'; return;   // ANI SUITE のランディングへ戻る
+    location.href = 'index.html'; return;   // ANI SUITE のランディングへ戻る（キー版。iPad用は topbar の HOME）
   }
   if((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'z'){ e.preventDefault(); doUndo(); return; }
   if(k >= '1' && k <= '6'){ S.preset = +k - 1; TIP_CACHE.clear(); buildSide(); if(S.mode==='SHEET') drawSheet(); save(); return; }

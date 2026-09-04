@@ -12,3 +12,15 @@ Design_*/
 
 # 確認用テストデータ（Gitでは管理しない）
 OP_pose_book1/
+
+# ★ 個人データの流出防止（このリポジトリは公開・GitHub Pages）
+# ツール本体は localStorage にしか保存しないので、HTMLを公開しても中身は出ない。
+# 出るとしたら「書き出したファイルをうっかりコミットする」経路だけなので、ここで止める。
+ref-board-*.json
+refboard-*.json
+econte-*.json
+econte-*.zip
+composer-*.json
+manga-plate-*.json
+*_export.json
+*.refclip.json

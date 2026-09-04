@@ -37,7 +37,17 @@ header{
   border-bottom:1px solid var(--border);
   backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
 }
-h1{margin:0;font-size:13px;letter-spacing:.18em;color:var(--acid);font-weight:600}
+h1{margin:0;font-size:13px;letter-spacing:.18em;color:var(--acid);font-weight:600;
+  display:flex;align-items:center;gap:8px}
+/* HOME は他ツールと同じく「バーの右端の最後」。iPad standalone だと Safari の戻るが無いので必須 */
+.homebtn{
+  margin-left:auto; flex:0 0 auto;
+  background:var(--panel); border:1px solid var(--border); color:var(--gold);
+  font-family:var(--mono); font-size:10px; letter-spacing:.14em;
+  padding:7px 11px; border-radius:2px; cursor:pointer; min-height:34px;
+  text-decoration:none; display:inline-flex; align-items:center;
+}
+.homebtn:hover{border-color:var(--gold)}
 h1 small{color:var(--dim);letter-spacing:.08em;font-weight:400;margin-left:8px}
 nav{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
 nav button{
@@ -109,7 +119,8 @@ a.navlink b{color:var(--gold);display:block;font-size:10px;letter-spacing:.1em;m
 <body>
 
 <header>
-  <h1>iPad PROBE <small>SPEC_18 実機測定</small></h1>
+  <h1>iPad PROBE <small>SPEC_18 実機測定</small>
+    <a class="homebtn" href="index.html" title="ランディングページに戻る">HOME</a></h1>
   <nav>
     <button data-tab="env" class="on">① 環境</button>
     <button data-tab="gest">② 多指</button>

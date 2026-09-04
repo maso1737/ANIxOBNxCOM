@@ -25,6 +25,10 @@
 4. **新しく `link-map.html` / `brush-lab.html` が増えている**（別セッション作・index のカード07/08）。
    `tools/check.js` の対象にも追加済みで、SPEC_18 P0 も 2026-09-02 に当てた。
    **BRUSH LAB は §3（econte のブラシ）の設計レビュー用ラボ**なので、ブラシに着手するときはまずそこを見る。
+5. **4本目の道具 DEPTH PLATE が試作に入った**（2026-09-04）。LAB A ＝ `depth-brush-lab.html`（DEPTH BRUSH）。
+   **このリポジトリで唯一の `type="module"`**（three.js r170 / importmap）＝ローカルサーバで開く（port 8146）。
+   次は LAB B（トーンが何度で崩れるか）/ C（生成線）/ D（部屋の中）/ E（嘘パース）のどれか。
+   設計と実測は `DEPTH_PLATE_HANDOVER.md`。**SPEC_19 は「これだ」が出るまで書かない。**
 
 ---
 
@@ -270,7 +274,8 @@
 ```
 node tools/check.js
 ```
-6ファイル（animator / oban-builder / composer / index / manga-plate / econte）の 構文 / id配線 / id重複 / 未参照関数。
+9ファイル（animator / oban-builder / composer / index / manga-plate / econte / link-map / brush-lab / depth-brush-lab）の 構文 / id配線 / id重複 / 未参照関数。
+**`type="module"` も JS として検査する**（2026-09-04 修正。それまで module のラボは全項目を素通りして「構文 OK」だけ出していた）。
 
 描画・合成を触ったら:
 ```

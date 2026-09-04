@@ -8,12 +8,25 @@
 const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
-const FILES = ['animator.html', 'oban-builder.html', 'composer.html', 'index.html', 'manga-plate.html', 'econte.html', 'link-map.html', 'brush-lab.html'];
+const FILES = ['animator.html', 'oban-builder.html', 'composer.html', 'index.html', 'manga-plate.html', 'econte.html', 'link-map.html', 'brush-lab.html', 'depth-brush-lab.html', 'ref-board.html', 'inbetween_warp_lab.html', 'ipad-probe.html'];
 
-// type属性を持たない <script> だけを対象にする（id付きJSは拾い、
-// type="application/json" 等のデータブロック＝EXPORT WEBのビューアテンプレ等は除外）。
+// JSとして扱う <script>: type無し / type="module" / text|application/javascript。
+// type="application/json" 等のデータブロック＝EXPORT WEBのビューアテンプレ等は除外する。
+// ※ module を JS 扱いしないと、ラボ群（depth-brush-lab.html 等）が
+//    「構文 OK」だけ出して配線・id重複・未参照関数を1つも見ないまま通ってしまう。
 // matchAll と replace で別インスタンスが要るため都度生成する。
-const scriptRe = () => /<script(?![^>]*\btype\s*=)[^>]*>([\s\S]*?)<\/script>/g;
+const scriptRe = () => /<script([^>]*)>([\s\S]*?)<\/script>/g;
+const isJsTag = attrs => {
+  const m = attrs.match(/\btype\s*=\s*["']([^"']*)["']/);
+  if(!m) return true;                       // type無し＝JS
+  const t = m[1].trim().toLowerCase();
+  return t === 'module' || t === 'text/javascript' || t === 'application/javascript';
+};
+// new Function は import/export を解釈できない。構文チェックの前だけ落とす
+//（実行はせず parse するだけなので、参照が消えても検査結果は変わらない）
+const stripModuleSyntax = js => js
+  .replace(/^[ \t]*import\s[^\n;]*;[ \t]*$/gm, '')
+  .replace(/^[ \t]*export\s+(?=default|function|class|const|let|var|\{)/gm, '');
 
 // JS内で動的に生成される等、実在チェックから除外するidプレフィックス
 const ID_IGNORE = [
@@ -28,17 +41,18 @@ const ok = msg => console.log('  ✓ ' + msg);
 for(const file of FILES){
   console.log('== ' + file + ' ==');
   const html = fs.readFileSync(path.join(root, file), 'utf8');
-  const jsBlocks = [...html.matchAll(scriptRe())].map(m => m[1]).filter(s => s.length > 200);
+  const jsBlocks = [...html.matchAll(scriptRe())]
+    .filter(m => isJsTag(m[1])).map(m => m[2]).filter(s => s.length > 200);
   const js = jsBlocks.join('\n;\n');
 
   // 1) 構文
-  try{ new Function(js); ok('構文 OK'); }
+  try{ new Function(stripModuleSyntax(js)); ok('構文 OK'); }
   catch(e){ fail('構文エラー: ' + e.message); continue; }
 
   if(!js) { console.log(); continue; }
 
   // HTML部（scriptの中身を除いたもの）から id を収集
-  const htmlOnly = html.replace(scriptRe(), '');
+  const htmlOnly = html.replace(scriptRe(), (all, attrs) => isJsTag(attrs) ? '' : all);
   const htmlIds = new Set([...htmlOnly.matchAll(/\bid\s*=\s*"([^"]+)"/g)].map(m => m[1]));
   // <script> タグ自身のid（例: id="satsuei-core"）も実在idとして登録
   //（JS本文除去でタグごと消えるが、自分自身をidで参照するのは正当なため）
@@ -75,7 +89,10 @@ for(const file of FILES){
   });
   const dead = [];
   for(const d of defs){
-    const re = new RegExp('\\b' + d.name.replace(/\$/g, '\\$') + '\\b', 'g');
+    // `$` は \w に含まれず \b で境界が作れないため、`$('#x')` 形式のヘルパが
+    // 常に「未参照関数」と誤検出されていた（ref-board.html を追加して発覚）。
+    // 前後の識別子文字を否定先読み/後読みで自前に見る（$ を含む名前も正しく数える）
+    const re = new RegExp('(?<![\w$])' + d.name.replace(/\$/g, '\\$') + '(?![\w$])', 'g');
     if((html.match(re) || []).length <= 1) dead.push(d.name);
   }
   if(dead.length) dead.forEach(n => fail(`未参照関数（デッドコード候補）: ${n}`));

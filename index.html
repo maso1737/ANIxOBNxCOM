@@ -42,7 +42,11 @@
   --jp:-apple-system,'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;touch-action:manipulation;overscroll-behavior:none;}  /* SPEC_18 §5-N（正準 composer） */
+html,body{touch-action:manipulation;overscroll-behavior:none;}  /* SPEC_18 §5-N（正準 composer） */
+html{height:100%;}
+/* body を height:100% にすると、カードが2段になって背が伸びたときに背景（グラデ）が
+   ビューポート1枚ぶんしか塗られず、スクロールした先が白く抜ける。min-height で本文と一緒に伸ばす */
+body{min-height:100%;}
 body{
   background:
     radial-gradient(ellipse 85% 60% at 88% -12%, rgba(184,80,255,0.22), transparent 60%),
@@ -52,9 +56,11 @@ body{
   color:var(--fg);
   font-family:var(--mono);
   -webkit-user-select:none;user-select:none;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
   gap:44px;padding:calc(24px + var(--safe-t)) 24px calc(24px + var(--safe-b));  /* SPEC_18 P0 */
-  overflow:hidden;position:relative;
+  /* justify-content:center + overflow:hidden だと、収まらない時に上端が切れて触れなくなる。
+     auto マージンで「入るときは中央・入らないときは上から普通にスクロール」に倒す */
+  overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;
 }
 /* corner ticks */
 .corner{position:fixed;width:16px;height:16px;pointer-events:none;z-index:5;}
@@ -75,7 +81,7 @@ body{
   -webkit-text-stroke:1.5px rgba(255,210,122,0.13);
   pointer-events:none;white-space:nowrap;
 }
-.lockup{text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center;}
+.lockup{text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center;margin-top:auto;}
 .eyebrow{font-size:11px;letter-spacing:0.5em;text-indent:0.5em;color:var(--gold);}
 h1{
   font-family:var(--bank);font-weight:400;
@@ -118,7 +124,21 @@ a.card:hover{
   padding:2px 8px;border:1px solid var(--border);border-radius:2px;
   color:var(--ice);
 }
-footer{font-size:10px;color:var(--dim);letter-spacing:0.3em;display:flex;gap:18px;}
+footer{font-size:10px;color:var(--dim);letter-spacing:0.3em;display:flex;gap:18px;margin-bottom:auto;}
+/* ── サブカテゴリ: 実験ラボ・脇の道具（01〜05 の本編と混ぜない） ── */
+.subhead{display:flex;align-items:center;gap:14px;width:100%;max-width:860px;margin:-16px 0 -18px;}
+.subhead .rule{flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--border) 30%,var(--border) 70%,transparent);}
+.subhead .lb{font-size:9px;letter-spacing:0.42em;color:var(--dim);white-space:nowrap;}
+.grid.sub{grid-template-columns:repeat(5,1fr);gap:12px;}
+@media (max-width:820px){ .grid.sub{grid-template-columns:1fr 1fr 1fr;} }
+@media (max-width:560px){ .grid.sub{grid-template-columns:1fr 1fr;} }
+a.card.mini{padding:16px 13px 14px;background:linear-gradient(180deg,rgba(90,233,255,0.04),rgba(184,80,255,0.02)),var(--panel);}
+a.card.mini:hover{border-color:rgba(90,233,255,0.45);box-shadow:0 0 14px rgba(90,233,255,0.28);}
+.card.mini .ord{top:8px;right:10px;font-size:9px;letter-spacing:0.2em;}
+.card.mini .name{font-size:13px;letter-spacing:0.14em;margin-bottom:6px;color:var(--ice);text-shadow:0 0 9px rgba(90,233,255,0.35);}
+.card.mini .desc{font-size:10px;line-height:1.75;letter-spacing:0.06em;}
+.card.mini .tags{margin-top:9px;gap:4px;}
+.card.mini .tag{font-size:8px;padding:1px 6px;letter-spacing:0.14em;}
 @media (prefers-reduced-motion:reduce){ a.card{transition:none;} }
 </style>
 </head>
@@ -183,43 +203,44 @@ footer{font-size:10px;color:var(--dim);letter-spacing:0.3em;display:flex;gap:18p
         <span class="tag">PNG</span>
       </div>
     </a>
-    <a class="card" href="inbetween_warp_lab.html">
+  </div>
+
+  <div class="subhead">
+    <span class="rule"></span>
+    <span class="lb">LAB &amp; UTILITIES</span>
+    <span class="rule"></span>
+  </div>
+
+  <div class="grid sub">
+    <a class="card mini" href="inbetween_warp_lab.html">
       <span class="ord">06</span>
-      <div class="name">INBETWEEN WARP LAB</div>
-      <div class="desc">中割り実験ラボ<br>ワープ補間の検証</div>
-      <div class="tags">
-        <span class="tag">LAB</span>
-        <span class="tag">WARP</span>
-      </div>
+      <div class="name">WARP LAB</div>
+      <div class="desc">中割り実験<br>ワープ補間の検証</div>
+      <div class="tags"><span class="tag">LAB</span></div>
     </a>
-    <a class="card" href="link-map.html">
+    <a class="card mini" href="link-map.html">
       <span class="ord">07</span>
       <div class="name">LINK MAP</div>
-      <div class="desc">アプリ間の行き来 ぜんぶ<br>どのボタンで何が届くか</div>
-      <div class="tags">
-        <span class="tag">GUIDE</span>
-        <span class="tag">ROUTES</span>
-      </div>
+      <div class="desc">アプリ間の行き来<br>どのボタンで何が届くか</div>
+      <div class="tags"><span class="tag">GUIDE</span></div>
     </a>
-    <a class="card" href="brush-lab.html">
+    <a class="card mini" href="brush-lab.html">
       <span class="ord">08</span>
       <div class="name">BRUSH LAB</div>
-      <div class="desc">筆先と重さの実験室<br>ECONTE に入れる前に決める</div>
-      <div class="tags">
-        <span class="tag">LAB</span>
-        <span class="tag">BRUSH</span>
-        <span class="tag">BENCH</span>
-      </div>
+      <div class="desc">筆先と重さの実験室<br>ECONTE に入れる前に</div>
+      <div class="tags"><span class="tag">LAB</span></div>
     </a>
-    <a class="card" href="ipad-probe.html">
+    <a class="card mini" href="ipad-probe.html">
       <span class="ord">09</span>
       <div class="name">iPad PROBE</div>
-      <div class="desc">iPad操作の実機測定<br>多指 / 筆圧 / Scribble / 遷移</div>
-      <div class="tags">
-        <span class="tag">LAB</span>
-        <span class="tag">TOUCH</span>
-        <span class="tag">SPEC_18</span>
-      </div>
+      <div class="desc">iPad操作の実機測定<br>多指 / 筆圧 / Scribble</div>
+      <div class="tags"><span class="tag">SPEC_18</span></div>
+    </a>
+    <a class="card mini" href="ref-board.html">
+      <span class="ord">10</span>
+      <div class="name">REF BOARD</div>
+      <div class="desc">参考リンクの受け皿<br>X / IG / YouTube・棚</div>
+      <div class="tags"><span class="tag">REF</span></div>
     </a>
   </div>
 

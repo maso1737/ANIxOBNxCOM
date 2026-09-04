@@ -22,12 +22,30 @@
   **econte へ焼き込む前に必ず読む4点**（① plan は1区間1回・draw は枚数ぶん ② 配る枠は `plan.bbox` で決める
   ③ `txTouch` にも `plan.bbox` を渡す ④ 線モードの濃度<1 は1本まとめて合成）。
   検証フック `window.__BLAB__`（`crossCheck()` / `bench()` / `ripple()` / `wiring()`）
-- `index.html` — ランディングページ。**カード8枚**（01 ANIMATOR / 02 OBAN / 03 COMPOSER / 04 ECONTE / 05 MANGA PLATE / 06 INBETWEEN WARP LAB / 07 LINK MAP / 08 BRUSH LAB）
+- `depth-brush-lab.html` — **DEPTH BRUSH（DEPTH PLATE LAB_A）。「深度を描くのは気持ちいいか」を判断するためのラボ**。
+  絵をD&D → 前面投影の格子メッシュに貼る → 深度マップをブラシで描く（盛る/彫る/ならす/平ら）→
+  寄り＋振りで見る → 連番PNG＋`*.depth.png`。**視差px（フルHD換算）を実測して Z幅 を逆算する**のが本体。
+  **このリポジトリで唯一の `type="module"`（three.js r170 / importmap）。** 既存の非module群とはスコープが混ざらない。
+  設計の根拠と決定事項は `DEPTH_PLATE_HANDOVER.md`。検証フック `window.__LAB__`（`api.step()` で1フレーム進める）
+- `index.html` — ランディングページ。**2段構成**（2026-09-04）。
+  上＝**本編アプリ5枚**（01 ANIMATOR / 02 OBAN / 03 COMPOSER / 04 ECONTE / 05 MANGA PLATE。rouge系・大）／
+  下＝`LAB & UTILITIES` の**サブ5枚**（06 WARP LAB / 07 LINK MAP / 08 BRUSH LAB / 09 iPad PROBE / 10 REF BOARD。ice系・小 `.card.mini`）。
+  **道具が増えたら基本はサブ側に足す**（本編＝パイプラインの本線だけ）。
+  `body` は `overflow:hidden` をやめ、`justify-content:flex-start` ＋ `.lockup{margin-top:auto}` / `footer{margin-bottom:auto}` の
+  auto マージンで「入るときは中央・入らないときは上から普通にスクロール」にしてある。
+  **`justify-content:center` に戻すと、収まらない画面で上端が切れて触れなくなる**（iPad縦で踏む）
+- `ref-board.html` — **REF BOARD。参考リンクの受け皿**（X / Instagram / Threads / YouTube / Vimeo / TikTok を年月別に貯める。埋め込みプレビュー・語彙タグ・メモカード・**プレイリスト棚**）。
+  **econte へ `→ECONTE` でリファレンスを送る送り手**（受け側の契約は SPEC_13 §2-1a / §2-1a-2）。
+  データは `localStorage['refboard.v1']` にしか無く、**HTMLファイル自体に個人データは1件も含まれない**（下の「公開リポジトリ」参照）。
+  設計メモは [Tools/ref-board/CLAUDE.md](../Tools/ref-board/CLAUDE.md)（本体はこちら、資料はあちら）
 - `link-map.html` — **LINK MAP。アプリ間の連携マップ**（GLOSSテーマ・ノード5つと10ルート。
   矢印/ノードをクリックで手順が出て、やってみたらチェック→全部で CLEAR。進捗は `localStorage['linkmap_done_v1']`）。
   **中身は `GUIDE_MANGA_LINKS.md` と同じ情報＝連携を変えたら両方直す**
 - `inbetween_lab.html` / `inbetween_warp_lab.html` — 中割り実験ラボ
-- `tools/check.js` — 依存ゼロのスモークチェック（構文/配線/ID重複/デッドコード）。**対象は `FILES` 配列。HTMLを足したらここにも足す**（brush-lab.html 追加済み）
+- `tools/check.js` — 依存ゼロのスモークチェック（構文/配線/ID重複/デッドコード）。**対象は `FILES` 配列。HTMLを足したらここにも足す**（brush-lab.html / depth-brush-lab.html 追加済み）。
+  **`type="module"` も JS として検査する**（2026-09-04）。以前は type属性のある `<script>` を全部データブロック扱いで飛ばしていたため、
+  module のラボは「構文 OK」だけ出して配線・id重複・未参照関数を1つも見ないまま通っていた（偽のグリーン）。
+  構文チェックの直前だけ `import`/`export` を落として `new Function` に渡している
 - `verify/` — VERIFY HARNESS（決定論VRT＋パフォーマンス予算。SPEC_08）。
   **ANIMATOR / COMPOSER / OBAN BUILDER / ECONTE 実装済み**（manga-plate は未＝SPEC_09 v2 が出力を変えている最中なので保留）。
   詳細は [verify/CLAUDE.md](verify/CLAUDE.md)
@@ -113,11 +131,36 @@ https://claude.ai/code/artifact/a57e3c0b-064f-4e1b-97d2-a158602ab07b
 
 `animator` / `composer` は入出力の性格が違う（ANIMATOR_v1・PROJECT_v2・連番・動画）ので**この並びには揃えない**。
 
+**HOME は例外なくバーの右端の最後**（2026-09-04 に未装備だった4本へ追加）。
+iPad の standalone 起動には Safari の「戻る」が無いので、**HOME が無い＝そのツールから出られない**。
+
+| ツール | HOME |
+|---|---|
+| `animator` / `composer` / `econte` / `manga-plate` | トップバー右端（従来どおり） |
+| `brush-lab` | トップバー右端に追加。**従来は Esc キーだけ**でキーの無い iPad から戻れなかった（キー版も残置） |
+| `inbetween_warp_lab` | `header` 右端に追加（`margin-left:auto`） |
+| `ipad-probe` | `h1` 行の右端に追加（`.homebtn`） |
+| `ref-board` | ブランド行の右端に追加（`#btnHome`） |
+| `oban-builder` | **例外。⚙ SETTINGS ▸ FILE／連携 の中のまま**（バーが埋まっているので出さない） |
+
+## 公開リポジトリであること（個人データを置かない）
+
+このリポジトリは public ＋ GitHub Pages。**中身は誰でも読める**ので、
+`?readonly` のような JS 側のフラグは鍵にならない（URLを書き換えれば外れるし、ソースも読める）。
+
+守り方は1つだけ：**データをファイルに入れない**。各ツールは `localStorage` / IndexedDB にしか保存しないので、
+HTML を公開しても他人の画面には空のアプリが出るだけ（REF BOARD のリンクもメモも端末の中にしかない）。
+漏れる経路は「**書き出した JSON / ZIP をうっかりコミットする**」だけなので、`.gitignore` で止めてある
+（`ref-board-*.json` / `econte-*.zip` / `*_export.json` ほか）。**書き出しファイルをリポジトリ直下に置かない**。
+REF BOARD には `<meta name="robots" content="noindex,nofollow">` も入れてある（検索結果に載せる必要が無いため）。
+
 ## 変更後に必ず行うチェック
 ```
 node tools/check.js
 ```
-6ファイル（animator / oban-builder / composer / index / manga-plate / econte）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※type属性の無い `<script>` のみJS扱い（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。
+12ファイル（animator / oban-builder / composer / index / manga-plate / econte / link-map / brush-lab / depth-brush-lab / ref-board / inbetween_warp_lab / ipad-probe）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※JS扱いは type無し・`type="module"`・`text|application/javascript` のみ（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。**depth-brush-lab だけはローカルサーバで開く**
+（`Projects/.claude/launch.json` の `depth-brush-lab` / port 8146 → `http://localhost:8146/depth-brush-lab.html`。
+module ＋ CDN import なので `file://` での可否は未確認。書き出しの `showDirectoryPicker` も http:// のほうが確実）。
 
 **描画・合成まわりを触ったら、続けて見た目の回帰検査も走らせる**（SPEC_08）:
 ```

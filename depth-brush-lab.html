@@ -1,0 +1,1685 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>DEPTH BRUSH — DEPTH PLATE LAB_A</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,900;1,900&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Cormorant+Garamond:ital,wght@0,700;1,700&display=swap">
+<style>
+/* ===================== KINETIC STAGE tokens（DEPTH PLATE 系＝ice） ===================== */
+:root{
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --rouge:#FF4FA8; --ice:#5AE9FF; --gold:#FFD27A; --lavender:#B58EFF; --magenta:#B850FF;
+  --bg-0:#03080f; --bg-1:#06101d; --panel:#08182a; --panel-2:#061424; --cell:#05121f;
+  --white:#EAF7FF; --ink:#03080f;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --disp:'Barlow Condensed',sans-serif;
+  --orn:'Cormorant Garamond',serif;
+  --jp:'Noto Sans JP',sans-serif;
+  --grad-btn:linear-gradient(135deg,#5AE9FF,#B850FF);
+  --grad-ice:linear-gradient(120deg,#C9F6FF,#5AE9FF 42%,#B850FF 100%);
+  --line:rgba(90,233,255,.18);
+  --line-2:rgba(90,233,255,.30);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; overflow:hidden; background:var(--bg-1); color:var(--white);
+  font-family:var(--mono); font-size:12px; -webkit-font-smoothing:antialiased;
+  overscroll-behavior:none; touch-action:manipulation;
+}
+#app{
+  height:100vh; height:100dvh;
+  padding-top:var(--safe-t); padding-bottom:var(--safe-b);
+  display:grid;
+  grid-template-rows:44px 1fr 44px;
+  grid-template-columns:1fr 322px;
+  grid-template-areas:"top top" "main side" "bot bot";
+}
+/* ===================== topbar / bottombar ===================== */
+#topbar{
+  grid-area:top; display:flex; align-items:center; gap:12px;
+  padding:0 16px; border-bottom:1px solid var(--line); background:var(--panel-2);
+}
+#topbar .lec{font-size:9px; letter-spacing:.34em; color:var(--ice); opacity:.85; flex:none}
+#topbar .ttl{
+  font-family:var(--disp); font-style:italic; font-weight:900; font-size:20px;
+  letter-spacing:.04em; text-transform:uppercase; flex:none;
+  background:var(--grad-ice); -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+#topbar .sub{font-family:var(--jp); font-size:10px; color:#7f93a8; letter-spacing:.1em; flex:none}
+.tb-btn{
+  font-family:var(--mono); font-size:9px; letter-spacing:.2em; color:var(--ice);
+  border:1px solid var(--line-2); border-radius:3px; padding:5px 9px;
+  background:transparent; cursor:pointer; white-space:nowrap;
+}
+.tb-btn:hover{background:rgba(90,233,255,.1); box-shadow:0 0 8px rgba(90,233,255,.28)}
+.tb-btn.on{background:var(--grad-btn); border-color:transparent; color:#02121c}
+.tb-btn:disabled{opacity:.3; cursor:default; box-shadow:none; background:transparent}
+#bottombar{
+  grid-area:bot; display:flex; align-items:center; gap:16px; padding:0 16px;
+  border-top:1px solid var(--line); background:var(--panel-2);
+  font-size:10px; letter-spacing:.14em; color:#7f93a8; overflow:hidden; white-space:nowrap;
+}
+#bottombar b{color:var(--ice); font-weight:500; text-shadow:0 0 8px rgba(90,233,255,.4)}
+/* ===================== main / stage ===================== */
+#main{grid-area:main; position:relative; overflow:hidden; background:var(--bg-0)}
+#gl{position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; cursor:crosshair}
+#main.cam #gl{cursor:grab}
+#main.cam.drag #gl{cursor:grabbing}
+.corner{position:absolute; width:16px; height:16px; pointer-events:none; opacity:.5; z-index:3}
+.corner.tl{top:10px;left:10px;border-top:1px solid var(--ice);border-left:1px solid var(--ice)}
+.corner.tr{top:10px;right:10px;border-top:1px solid var(--ice);border-right:1px solid var(--ice)}
+.corner.bl{bottom:10px;left:10px;border-bottom:1px solid var(--ice);border-left:1px solid var(--ice)}
+.corner.br{bottom:10px;right:10px;border-bottom:1px solid var(--ice);border-right:1px solid var(--ice)}
+/* カットのフレーム。ここに写るものがそのまま連番PNGになる */
+#frame-guide{
+  position:absolute; pointer-events:none; z-index:2;
+  border:1px solid rgba(90,233,255,.34);
+  box-shadow:0 0 0 9999px rgba(3,8,15,.55);
+}
+#ring{
+  position:absolute; left:0; top:0; border-radius:50%; pointer-events:none; z-index:4;
+  border:1px solid rgba(90,233,255,.85); box-shadow:0 0 0 1px rgba(0,0,0,.55) inset, 0 0 8px rgba(90,233,255,.35);
+  transform:translate(-50%,-50%); display:none;
+}
+#ring.carve{border-color:rgba(255,79,168,.9); box-shadow:0 0 0 1px rgba(0,0,0,.55) inset, 0 0 8px rgba(255,79,168,.35)}
+#ring.smooth{border-style:dashed; border-color:rgba(255,210,122,.9)}
+#ring.flat{border-style:dotted; border-color:rgba(181,142,255,.95)}
+#hud{position:absolute; top:14px; left:16px; display:flex; flex-wrap:wrap; gap:6px; pointer-events:none; max-width:56%; z-index:3}
+.chip{
+  font-size:8.5px; letter-spacing:.2em; padding:3px 7px; border-radius:2px;
+  border:1px solid var(--line-2); background:rgba(6,16,29,.8); color:var(--ice);
+}
+.chip b{color:var(--gold); font-weight:500}
+.chip.hot{border-color:var(--rouge); color:var(--rouge)}
+.chip.warn{border-color:var(--gold); color:var(--gold)}
+#drop-hint{
+  position:absolute; inset:0; z-index:6; display:none; align-items:center; justify-content:center;
+  background:rgba(3,8,15,.72); backdrop-filter:blur(2px); pointer-events:none;
+}
+#drop-hint.on{display:flex}
+#drop-hint span{
+  font-family:var(--jp); font-size:13px; letter-spacing:.18em; color:var(--ice);
+  border:1px dashed var(--ice); padding:22px 34px; border-radius:4px; text-align:center; line-height:2;
+}
+#mini-num{
+  position:absolute; left:16px; bottom:14px; width:340px; padding:9px 11px; pointer-events:none; z-index:3;
+  background:rgba(6,16,29,.88); border:1px solid var(--line-2); border-radius:3px; backdrop-filter:blur(6px);
+}
+#mini-dep{
+  position:absolute; right:16px; bottom:14px; width:272px; padding:9px 11px; pointer-events:none; z-index:3;
+  background:rgba(6,16,29,.88); border:1px solid var(--line-2); border-radius:3px; backdrop-filter:blur(6px);
+}
+.mini-t{font-size:8px; letter-spacing:.34em; color:var(--ice); margin-bottom:7px; opacity:.9}
+.mini-t em{font-style:normal; color:#6b7d92; letter-spacing:.08em}
+#dep-cv{display:block; width:100%; height:150px; border-radius:2px; background:#000}
+.data-row{display:flex; justify-content:space-between; gap:8px; font-size:9.5px; line-height:1.68}
+.dk{color:#6f8298; letter-spacing:.06em}
+.dv{color:var(--ice); font-variant-numeric:tabular-nums}
+.dv.big{font-size:12.5px; font-weight:600}
+.dv.ok{color:#5CE6A4; text-shadow:0 0 8px rgba(92,230,164,.35)}
+.dv.warn{color:var(--gold); text-shadow:0 0 8px rgba(255,210,122,.35)}
+.dv.bad{color:var(--rouge); text-shadow:0 0 8px rgba(255,79,168,.4)}
+.dv.dead{color:#ff2d2d; text-shadow:0 0 10px rgba(255,45,45,.5)}
+/* ===================== side ===================== */
+#side{
+  grid-area:side; overflow-y:auto; overflow-x:hidden; background:var(--panel);
+  border-left:1px solid var(--line);
+}
+#side::-webkit-scrollbar{width:2px}
+#side::-webkit-scrollbar-thumb{background:var(--ice)}
+.sp{padding:11px 13px; border-bottom:1px solid rgba(90,233,255,.12)}
+.spl{font-size:8.5px; letter-spacing:.4em; color:var(--ice); margin-bottom:9px; opacity:.9}
+.spl em{font-style:normal; color:#6b7d92; letter-spacing:.08em; font-size:8px}
+.tr{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:7px 0}
+.tr .lb{font-size:9.5px; letter-spacing:.1em; color:#9db2c6; flex:1; min-width:0}
+.tr .lb .cond{display:block; font-size:8px; color:#5b6d80; letter-spacing:.02em; margin-top:1px; font-family:var(--jp)}
+.tr .vl{font-size:9.5px; color:var(--ice); font-variant-numeric:tabular-nums; min-width:58px; text-align:right}
+.tr.off{opacity:.34; pointer-events:none}
+.tr.off .vl{color:#5b6d80}
+.row-sld{margin:2px 0 8px}
+.row-sld.off{opacity:.34; pointer-events:none}
+input[type=range]{-webkit-appearance:none; appearance:none; width:100%; height:16px; background:transparent; cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:2px; background:rgba(90,233,255,.24); border-radius:2px}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:11px; height:11px; margin-top:-4.5px; border-radius:50%;
+  background:linear-gradient(135deg,var(--ice),var(--magenta)); border:0;
+}
+input[type=range]:disabled::-webkit-slider-thumb{background:#3d5266}
+select{
+  width:100%; font-family:var(--mono); font-size:9.5px; letter-spacing:.12em; padding:5px 6px;
+  background:var(--cell); color:var(--ice); border:1px solid var(--line-2); border-radius:3px; cursor:pointer;
+}
+.fps{display:flex; flex-wrap:wrap; gap:4px}
+.fp{
+  font-size:8.5px; letter-spacing:.14em; padding:4px 7px; border-radius:2px; cursor:pointer;
+  border:1px solid var(--line-2); color:#9db2c6; background:transparent; user-select:none;
+}
+.fp:hover{background:rgba(90,233,255,.09)}
+.fp.on{background:var(--grad-btn); border-color:transparent; color:#02121c; box-shadow:0 0 12px rgba(90,233,255,.35)}
+.fp .kk{opacity:.55; font-size:7.5px; margin-left:4px}
+.tg{width:34px; height:17px; border-radius:9px; border:1px solid var(--line-2); position:relative; cursor:pointer; flex:none}
+.tg::after{content:''; position:absolute; top:2px; left:2px; width:11px; height:11px; border-radius:50%; background:#3d5266; transition:.15s}
+.tg.on{background:var(--grad-btn); border-color:transparent}
+.tg.on::after{left:19px; background:#02121c}
+.pre{display:flex; align-items:center; gap:8px; padding:6px 7px; border-radius:3px; cursor:pointer; border:1px solid transparent; margin-bottom:3px}
+.pre:hover{background:rgba(90,233,255,.07)}
+.pre.on{border-color:var(--ice); background:rgba(90,233,255,.11)}
+.pre .no{font-family:var(--orn); font-style:italic; font-size:14px; color:var(--ice); width:16px; text-align:center}
+.pre .nm{font-size:10px; letter-spacing:.14em; color:var(--white)}
+.pre .jp{font-family:var(--jp); font-size:8.5px; color:#6f8298; letter-spacing:.02em}
+.pre .md{margin-left:auto; font-size:7.5px; letter-spacing:.12em; padding:2px 5px; border-radius:2px; color:var(--gold); border:1px solid rgba(255,210,122,.4)}
+.drop{
+  border:1px dashed var(--line-2); border-radius:3px; padding:9px; text-align:center;
+  font-size:8.5px; letter-spacing:.12em; color:#6f8298; cursor:pointer; margin:4px 0;
+}
+.drop:hover,.drop.over{border-color:var(--ice); color:var(--ice); background:rgba(90,233,255,.07)}
+.drop img{display:block; width:52px; height:52px; margin:5px auto 3px; border:1px solid var(--line-2); background:#000; object-fit:contain}
+.drop .nm{display:block; margin-top:3px; color:#9db2c6; font-size:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.ed-btn{
+  width:100%; font-family:var(--mono); font-size:9px; letter-spacing:.2em; padding:7px;
+  border:1px solid var(--ice); color:var(--ice); background:transparent; border-radius:3px; cursor:pointer;
+}
+.ed-btn:hover{background:rgba(90,233,255,.12); box-shadow:0 0 10px rgba(90,233,255,.3)}
+.ed-btn.rouge{border-color:var(--rouge); color:var(--rouge)}
+.ed-btn.rouge:hover{background:rgba(255,79,168,.12); box-shadow:0 0 10px rgba(255,79,168,.3)}
+.ed-btn.gold{border-color:var(--gold); color:var(--gold)}
+.ed-btn.gold:hover{background:rgba(255,210,122,.12); box-shadow:0 0 10px rgba(255,210,122,.3)}
+.ed-btn:disabled{opacity:.34; cursor:default; box-shadow:none; background:transparent}
+.btn2{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:5px}
+.hint{font-family:var(--jp); font-size:8.5px; line-height:1.75; color:#5f7286; letter-spacing:.01em; margin-top:7px}
+.hint b{color:var(--ice); font-weight:500}
+.hint u{color:var(--gold); text-decoration:none}
+.bar{height:3px; border-radius:2px; background:rgba(90,233,255,.16); overflow:hidden; margin-top:6px}
+.bar i{display:block; height:100%; width:0%; background:var(--grad-btn); transition:width .1s}
+/* ===================== modal ===================== */
+#shortcut-modal{
+  position:fixed; inset:0; background:rgba(3,8,15,.88); display:none; align-items:center; justify-content:center;
+  z-index:50; backdrop-filter:blur(3px);
+}
+#shortcut-modal.on{display:flex}
+.sc-box{
+  width:min(680px,92vw); max-height:84vh; overflow:auto; background:var(--panel);
+  border:1px solid var(--line-2); border-radius:4px; padding:18px 20px;
+}
+.sc-header{
+  display:flex; justify-content:space-between; font-size:10px; letter-spacing:.3em;
+  color:var(--ice); border-bottom:1px solid var(--line); padding-bottom:9px; margin-bottom:12px;
+}
+.sc-header span{cursor:pointer}
+.sc-section-lbl{font-size:8.5px; letter-spacing:.34em; color:var(--lavender); margin:14px 0 6px}
+.sc-row{display:flex; gap:10px; align-items:baseline; margin:4px 0; font-size:10px}
+.sc-key{
+  font-size:9px; letter-spacing:.04em; padding:2px 6px; border-radius:2px; color:var(--ice);
+  border:1px solid var(--line-2); min-width:112px; text-align:center; flex:none;
+}
+.sc-desc{color:#9db2c6; font-family:var(--jp); font-size:9.5px; letter-spacing:.01em}
+table.band{width:100%; border-collapse:collapse; font-size:9.5px; margin-top:8px}
+table.band th,table.band td{border-bottom:1px solid rgba(90,233,255,.14); padding:4px 7px; text-align:right}
+table.band th{color:var(--ice); font-size:8.5px; letter-spacing:.18em}
+table.band td:first-child,table.band th:first-child{text-align:left}
+table.band td:last-child,table.band th:last-child{text-align:left; font-family:var(--jp); color:#9db2c6}
+table.band tr.b0 td:first-child{color:#5CE6A4}
+table.band tr.b1 td:first-child{color:var(--gold)}
+table.band tr.b2 td:first-child{color:var(--rouge)}
+table.band tr.b3 td:first-child{color:#ff2d2d}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="lec">DEPTH_PLATE // LAB_A</span>
+    <span class="ttl">Depth Brush</span>
+    <span class="sub">板に厚みを描く ─ 深度は塗るものか</span>
+    <span style="margin-left:auto; display:flex; gap:8px; align-items:center">
+      <button class="tb-btn on" id="b-mode" title="PAINT ⇄ CAM（Space長押しでも一時的にCAM）">MODE ▸ PAINT</button>
+      <button class="tb-btn" id="b-home" title="正面へ戻す（H）">⌂ HOME</button>
+      <button class="tb-btn" id="b-play" title="ショットを再生（Enter）">▶ SHOT</button>
+      <button class="tb-btn" id="b-undo" title="1ストローク戻す（Ctrl+Z）">↶</button>
+      <button class="tb-btn" id="b-redo" title="やり直す（Ctrl+Shift+Z）">↷</button>
+      <button class="tb-btn" id="sc-open-btn">⌨ KEYS</button>
+    </span>
+  </div>
+
+  <div id="main">
+    <canvas id="gl"></canvas>
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div id="frame-guide"></div>
+    <div id="ring"></div>
+    <div id="hud"></div>
+
+    <div id="mini-num">
+      <div class="mini-t">◈ PARALLAX — 振れ幅の実測 <em>（フルHD幅=1920px 換算）</em></div>
+      <div class="data-row"><span class="dk">最大差分視差 @±<span id="m-deg">3.0</span>°</span><span class="dv big" id="m-par">—</span></div>
+      <div class="data-row"><span class="dk">判定（調査 §3-①）</span><span class="dv" id="m-band">—</span></div>
+      <div class="data-row"><span class="dk">Zbg / Zfg（&gt;5 で大パース）</span><span class="dv" id="m-ratio">—</span></div>
+      <div class="data-row"><span class="dk">深度レンジ / Z幅（world）</span><span class="dv" id="m-range">—</span></div>
+      <div class="data-row"><span class="dk">格子1マス（絵のpx）</span><span class="dv" id="m-cell">—</span></div>
+      <div class="data-row"><span class="dk">頂点数 / FPS</span><span class="dv" id="m-fps">—</span></div>
+    </div>
+
+    <div id="mini-dep">
+      <div class="mini-t">◈ DEPTH MAP <em>（白=手前）</em></div>
+      <canvas id="dep-cv" width="272" height="150"></canvas>
+    </div>
+
+    <div id="drop-hint"><span>絵の PNG / JPG をドロップ<br>（ファイル名に <b>depth</b> を含むと深度マップとして読む）</span></div>
+  </div>
+
+  <div id="side">
+
+    <div class="sp">
+      <div class="spl">◈ SOURCE <em>／ 絵と深度の入口</em></div>
+      <div class="drop" id="drop-art">
+        <img id="art-thumb" alt="">
+        絵を D&amp;D / クリックで選択
+        <b class="nm" id="art-name">（内蔵テストプレート）</b>
+      </div>
+      <input type="file" id="file-art" accept="image/*" style="display:none">
+      <div class="tr" style="margin-top:10px"><span class="lb">深度の下地をつくる</span></div>
+      <div class="fps">
+        <span class="fp" id="g-flat">FLAT</span>
+        <span class="fp" id="g-luma">輝度から</span>
+        <span class="fp" id="g-sphere">中央球</span>
+        <span class="fp" id="g-vgrad">垂直グラデ</span>
+      </div>
+      <div class="tr" style="margin-top:9px"><span class="lb">下地の強さ<span class="cond">FLAT 以外で有効</span></span><span class="vl" id="vl-gen">0.60</span></div>
+      <div class="row-sld"><input type="range" id="sl-gen" min="0" max="1" step="0.01" value="0.6"></div>
+      <div class="tr"><span class="lb">輝度を反転<span class="cond">「輝度から」でのみ有効（黒＝手前にする）</span></span><div class="tg" id="tg-inv"></div></div>
+      <div class="btn2">
+        <button class="ed-btn" id="b-load-dep">深度PNGを読む</button>
+        <button class="ed-btn gold" id="b-save-dep">深度PNGを書く</button>
+      </div>
+      <input type="file" id="file-dep" accept="image/png" style="display:none">
+      <div class="hint">深度PNGは <b>RGB 3ch パッキング（実効24bit）</b>。<u>可逆PNGのみ</u>。8bitグレースケールを読ませても自動判定して受け取る。</div>
+    </div>
+
+    <div class="sp">
+      <div class="spl">◈ BRUSH <em>／ 深度を描く</em></div>
+      <div class="fps">
+        <span class="fp on" id="t-raise">盛る<span class="kk">1</span></span>
+        <span class="fp" id="t-carve">彫る<span class="kk">2</span></span>
+        <span class="fp" id="t-smooth">ならす<span class="kk">3</span></span>
+        <span class="fp" id="t-flat">平ら<span class="kk">4</span></span>
+      </div>
+      <div class="tr" style="margin-top:9px"><span class="lb">サイズ<span class="cond">ステージ上を右ドラッグでも変えられる</span></span><span class="vl" id="vl-size">120 px</span></div>
+      <div class="row-sld"><input type="range" id="sl-size" min="4" max="600" step="1" value="120"></div>
+      <div class="tr"><span class="lb">強さ</span><span class="vl" id="vl-str">0.50</span></div>
+      <div class="row-sld"><input type="range" id="sl-str" min="0.01" max="1" step="0.01" value="0.5"></div>
+      <div class="tr"><span class="lb">硬さ（縁の立ち方）</span><span class="vl" id="vl-hard">0.50</span></div>
+      <div class="row-sld"><input type="range" id="sl-hard" min="0" max="1" step="0.01" value="0.5"></div>
+      <div class="tr"><span class="lb">筆圧<span class="cond">ペン軸のみ。指・マウスでは効かない</span></span><div class="tg on" id="tg-press"></div></div>
+      <div class="tr"><span class="lb">「平ら」の目標深度<span class="cond">Alt+クリックのスポイトで拾える</span></span><span class="vl" id="vl-pick">0.500</span></div>
+      <div class="btn2">
+        <button class="ed-btn rouge" id="b-clear">深度をリセット</button>
+        <button class="ed-btn" id="b-invert">深度を反転</button>
+      </div>
+    </div>
+
+    <div class="sp">
+      <div class="spl">◈ RELIEF <em>／ 板の厚み</em></div>
+      <div class="tr"><span class="lb">Z幅（world）<span class="cond">視差クランプONのとき自動で決まる</span></span><span class="vl" id="vl-zs">0.300</span></div>
+      <div class="row-sld"><input type="range" id="sl-zs" min="0" max="1.2" step="0.005" value="0.3"></div>
+      <div class="tr"><span class="lb">深度レンジの圧縮</span></div>
+      <select id="sel-comp">
+        <option value="linear">linear ─ そのまま</option>
+        <option value="log" selected>log ─ 手前を保ち奥を潰す</option>
+        <option value="sigmoid">sigmoid ─ 中間を伸ばし両端を潰す</option>
+      </select>
+      <div class="tr" style="margin-top:8px"><span class="lb">圧縮の強さ<span class="cond">linear では無効</span></span><span class="vl" id="vl-comp">0.55</span></div>
+      <div class="row-sld"><input type="range" id="sl-comp" min="0" max="1" step="0.01" value="0.55"></div>
+      <div class="tr"><span class="lb">格子の細かさ<span class="cond">長辺の分割数。スカルプトの解像度そのもの</span></span><span class="vl" id="vl-seg">256</span></div>
+      <div class="row-sld"><input type="range" id="sl-seg" min="32" max="512" step="16" value="256"></div>
+      <div class="tr"><span class="lb">のりしろ<span class="cond">端の未描画を隠す。メッシュを外へ伸ばす</span></span><span class="vl" id="vl-bleed">4.0 %</span></div>
+      <div class="row-sld"><input type="range" id="sl-bleed" min="0" max="0.15" step="0.005" value="0.04"></div>
+    </div>
+
+    <div class="sp">
+      <div class="spl">◈ PARALLAX CLAMP <em>／ 視差の上限</em></div>
+      <div class="tr"><span class="lb">視差クランプ<span class="cond">ONにするとZ幅を自動で下げて上限を守る</span></span><div class="tg on" id="tg-clamp"></div></div>
+      <div class="tr"><span class="lb">上限（視差px @FullHD）<span class="cond">クランプONのときのみ有効</span></span><span class="vl" id="vl-lim">20 px</span></div>
+      <div class="row-sld"><input type="range" id="sl-lim" min="2" max="60" step="1" value="20"></div>
+      <div class="tr"><span class="lb">判定に使う振れ幅<span class="cond">±この角度で視差を測る</span></span><span class="vl" id="vl-swing">3.0 °</span></div>
+      <div class="row-sld"><input type="range" id="sl-swing" min="0.5" max="12" step="0.1" value="3"></div>
+      <div class="hint">0〜10px＝<u>破綻ゼロ</u>／10〜25px＝<u>単層の限界</u>（0.5〜0.8秒で抜ければ通る）／25〜50px＝<b>層分割が必須</b>／50px〜＝破綻域。<br>寄り（ドリーイン）はこの制限を受けない。</div>
+    </div>
+
+    <div class="sp">
+      <div class="spl">◈ VIEW <em>／ 見え方</em></div>
+      <div class="fps">
+        <span class="fp on" id="v-art">絵<span class="kk">A</span></span>
+        <span class="fp" id="v-relief">レリーフ<span class="kk">S</span></span>
+        <span class="fp" id="v-mix">絵＋陰影<span class="kk">D</span></span>
+        <span class="fp" id="v-depth">深度<span class="kk">F</span></span>
+      </div>
+      <div class="tr" style="margin-top:9px"><span class="lb">陰影の強さ<span class="cond">「レリーフ」「絵＋陰影」でのみ有効</span></span><span class="vl" id="vl-relief">0.45</span></div>
+      <div class="row-sld"><input type="range" id="sl-relief" min="0" max="1" step="0.01" value="0.45"></div>
+      <div class="tr"><span class="lb">格子を出す（ワイヤー）<span class="cond">格子がスカルプトに足りているかを見る</span></span><div class="tg" id="tg-wire"></div></div>
+    </div>
+
+    <div class="sp">
+      <div class="spl">◈ CAMERA <em>／ 見えがかり</em></div>
+      <div class="tr"><span class="lb">画角（FOV）</span><span class="vl" id="vl-fov">35 °</span></div>
+      <div class="row-sld"><input type="range" id="sl-fov" min="12" max="70" step="1" value="35"></div>
+      <div class="tr"><span class="lb">寄り（ドリーイン）<span class="cond">1.00＝板が画面いっぱい</span></span><span class="vl" id="vl-dolly">1.00 ×</span></div>
+      <div class="row-sld"><input type="range" id="sl-dolly" min="0.5" max="3" step="0.01" value="1"></div>
+      <div class="tr"><span class="lb">振り 横（Y）</span><span class="vl" id="vl-ry">0.0 °</span></div>
+      <div class="row-sld"><input type="range" id="sl-ry" min="-12" max="12" step="0.1" value="0"></div>
+      <div class="tr"><span class="lb">振り 縦（X）</span><span class="vl" id="vl-rx">0.0 °</span></div>
+      <div class="row-sld"><input type="range" id="sl-rx" min="-12" max="12" step="0.1" value="0"></div>
+    </div>
+
+    <div class="sp">
+      <div class="spl">◈ SHOT <em>／ 一瞬だけ立体化して迫る</em></div>
+      <div class="pre on" id="p-oshi"><span class="no">I</span><span><span class="nm">OSHI</span><br><span class="jp">迫る（寄り主体・振りは味付け）</span></span><span class="md">0.6s</span></div>
+      <div class="pre" id="p-furi"><span class="no">II</span><span><span class="nm">FURI</span><br><span class="jp">振る（層の限界を見る）</span></span><span class="md">0.8s</span></div>
+      <div class="pre" id="p-issyun"><span class="no">III</span><span><span class="nm">ISSYUN</span><br><span class="jp">一瞬（0.4秒で抜ける）</span></span><span class="md">0.4s</span></div>
+      <div class="pre" id="p-yure"><span class="no">IV</span><span><span class="nm">YURE</span><br><span class="jp">揺らす（手持ち風・往復）</span></span><span class="md">1.2s</span></div>
+      <div class="tr" style="margin-top:9px"><span class="lb">尺（フレーム数）</span><span class="vl" id="vl-frames">36 f</span></div>
+      <div class="row-sld"><input type="range" id="sl-frames" min="6" max="120" step="1" value="36"></div>
+      <div class="tr"><span class="lb">fps</span><span class="vl" id="vl-fps">24</span></div>
+      <div class="row-sld"><input type="range" id="sl-fps" min="8" max="60" step="1" value="24"></div>
+      <div class="tr"><span class="lb">寄り 始 → 終</span><span class="vl" id="vl-z0">1.00 ×</span></div>
+      <div class="row-sld"><input type="range" id="sl-z0" min="0.5" max="3" step="0.01" value="1"></div>
+      <div class="tr"><span class="lb">　</span><span class="vl" id="vl-z1">1.55 ×</span></div>
+      <div class="row-sld"><input type="range" id="sl-z1" min="0.5" max="3" step="0.01" value="1.55"></div>
+      <div class="tr"><span class="lb">振りの振幅</span><span class="vl" id="vl-amp">2.5 °</span></div>
+      <div class="row-sld"><input type="range" id="sl-amp" min="0" max="12" step="0.1" value="2.5"></div>
+    </div>
+
+    <div class="sp">
+      <div class="spl">◈ EXPORT <em>／ 連番PNG</em></div>
+      <div class="tr"><span class="lb">深度も連番で吐く<span class="cond">*_0001.depth.png（RGBパッキング）</span></span><div class="tg on" id="tg-depseq"></div></div>
+      <div class="tr"><span class="lb">出力の横幅</span><span class="vl" id="vl-outw">1920 px</span></div>
+      <div class="row-sld"><input type="range" id="sl-outw" min="640" max="2560" step="16" value="1920"></div>
+      <button class="ed-btn" id="b-exp-seq">連番PNGを書き出す</button>
+      <div class="btn2">
+        <button class="ed-btn gold" id="b-exp-still">いまの1枚</button>
+        <button class="ed-btn gold" id="b-exp-plate">板の深度PNG</button>
+      </div>
+      <div class="bar"><i id="exp-bar"></i></div>
+      <div class="hint" id="exp-msg">Chrome のフォルダ選択に対応。file:// で開くと個別ダウンロードになる。</div>
+    </div>
+
+    <div class="sp">
+      <div class="spl">◈ 問い <em>／ このラボが答えるもの</em></div>
+      <div class="hint" style="margin-top:0">
+        <b>深度を「描く」のは気持ちいいか？</b>（DEPTH PLATE 決定2）<br>
+        判断材料は3つ ─ ①ブラシの手応え（盛る/彫る/ならす/平ら・右ドラッグ・筆圧・Undo）
+        ②<u>格子の細かさ</u>が描いた形に追いつくか ③振ったときに <u>視差px</u> がどこで破綻するか。<br>
+        答えが出たら SPEC_19 へ。
+      </div>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <span>PLATE <b id="s-res">—</b></span>
+    <span>DEPTH <b id="s-dres">—</b></span>
+    <span>MODE <b id="s-mode">PAINT</b></span>
+    <span>TOOL <b id="s-tool">盛る</b></span>
+    <span id="s-note"></span>
+    <span style="margin-left:auto" id="s-save">—</span>
+  </div>
+</div>
+
+<div id="shortcut-modal"><div class="sc-box">
+  <div class="sc-header">⌨ DEPTH BRUSH — KEYS &amp; MOUSE <span id="sc-close">✕</span></div>
+
+  <div class="sc-section-lbl">描く</div>
+  <div class="sc-row"><span class="sc-key">左ドラッグ</span><span class="sc-desc">深度を描く（PAINTモード）</span></div>
+  <div class="sc-row"><span class="sc-key">右ドラッグ</span><span class="sc-desc">ブラシサイズ（右=太く / 左=細く）</span></div>
+  <div class="sc-row"><span class="sc-key">Alt + クリック</span><span class="sc-desc">深度スポイト → 「平ら」の目標深度に入る</span></div>
+  <div class="sc-row"><span class="sc-key">1 / 2 / 3 / 4</span><span class="sc-desc">盛る / 彫る / ならす / 平ら</span></div>
+  <div class="sc-row"><span class="sc-key">X</span><span class="sc-desc">盛る ⇄ 彫る を入れ替え</span></div>
+  <div class="sc-row"><span class="sc-key">[ / ]</span><span class="sc-desc">ブラシサイズを 1 段ずつ</span></div>
+  <div class="sc-row"><span class="sc-key">Ctrl+Z / Ctrl+Shift+Z</span><span class="sc-desc">Undo / Redo（矩形タイル単位）</span></div>
+
+  <div class="sc-section-lbl">見る</div>
+  <div class="sc-row"><span class="sc-key">Space（長押し）</span><span class="sc-desc">押している間だけ CAM モード（バネ式）</span></div>
+  <div class="sc-row"><span class="sc-key">Space（短押し）</span><span class="sc-desc">PAINT ⇄ CAM を切り替え</span></div>
+  <div class="sc-row"><span class="sc-key">中ドラッグ</span><span class="sc-desc">モードを問わず振る</span></div>
+  <div class="sc-row"><span class="sc-key">ホイール</span><span class="sc-desc">寄り（ドリーイン / アウト）</span></div>
+  <div class="sc-row"><span class="sc-key">H</span><span class="sc-desc">正面へ戻す（振り 0°・寄り 1.00×）</span></div>
+  <div class="sc-row"><span class="sc-key">A / S / D / F</span><span class="sc-desc">絵 / レリーフ / 絵＋陰影 / 深度</span></div>
+  <div class="sc-row"><span class="sc-key">W</span><span class="sc-desc">格子（ワイヤー）の表示切替</span></div>
+  <div class="sc-row"><span class="sc-key">Enter</span><span class="sc-desc">ショット再生 / 停止</span></div>
+  <div class="sc-row"><span class="sc-key">Esc</span><span class="sc-desc">再生中なら停止 → そうでなければこのモーダルを閉じる</span></div>
+
+  <div class="sc-section-lbl">視差の目安（調査 §3-① フルHD基準）</div>
+  <table class="band">
+    <tr><th>視差px</th><th>度（換算）</th><th>成立する構造</th></tr>
+    <tr class="b0"><td>0 〜 10</td><td>±0.5〜1.5°</td><td>単層＋のりしろで破綻ゼロ</td></tr>
+    <tr class="b1"><td>10 〜 25</td><td>±2〜3.5°</td><td>単層の限界。0.5〜0.8秒で抜ければ通る</td></tr>
+    <tr class="b2"><td>25 〜 50</td><td>±4〜8°</td><td>層分割が必須（→ LAB B）</td></tr>
+    <tr class="b3"><td>50 〜</td><td>±10°〜</td><td>破綻域。対象外</td></tr>
+  </table>
+  <div class="hint">寄り（ドリーイン）は前進運動なので視差が放射状の拡大になり、この制限を受けない。<b>「迫ってくる」の主成分はこちら。</b></div>
+</div></div>
+<script type="importmap">
+{"imports":{
+  "three":"https://unpkg.com/three@0.170.0/build/three.module.js"
+}}
+</script>
+<script type="module">
+/* =====================================================================================
+   DEPTH BRUSH — DEPTH PLATE LAB_A
+   問い: 深度を「描く」のは気持ちいいか？（DEPTH_PLATE_HANDOVER.md 決定2）
+
+   構造上の要（動かすと全部変わる）
+   - 前面投影UV ＝ 画面そのもの。UV展開はしない → world.xy から uv が一次式で出る（xyToUv）
+   - 深度は「メッシュを彫る」のではなく Float32 の深度マップにブラシで描く
+   - 深度テクスチャは編集中 float / NEAREST 固定 / 保存は RGB 3ch パッキング（可逆PNGのみ）
+   - のりしろ＝メッシュを外へ伸ばして端の未描画を隠す（uv は ClampToEdge で縁を引き伸ばす）
+   - 視差クランプは後付けではなく最初から。フルHD幅換算の視差px を実測して Z幅 を逆算する
+   ===================================================================================== */
+import * as THREE from 'three';
+THREE.ColorManagement.enabled = false;   /* 絵のバイトをそのまま出す（色管理で化けさせない） */
+
+const $  = s => document.querySelector(s);
+const clamp = (v,a,b) => v<a?a:(v>b?b:v);
+const lerp  = (a,b,t) => a+(b-a)*t;
+const D2R   = Math.PI/180;
+const fmt   = (v,n)=>v.toFixed(n);
+
+/* ===================== 1. 状態 ===================== */
+const S = {
+  art:null, artName:'（内蔵テストプレート）', iw:0, ih:0,
+  dw:0, dh:0, depth:null, dmin:0.5, dmax:0.5, base:0.5,
+  tool:'raise', brush:{size:120,str:0.5,hard:0.5,press:true}, pick:0.5,
+  gen:0.6, inv:false, genKind:'',
+  zs:0.30, zsEff:0.30, comp:'log', compAmt:0.55, seg:256, bleed:0.04,
+  clampOn:true, lim:20, swing:3,
+  view:'art', relief:0.45, wire:false,
+  fov:35, dolly:1, rx:0, ry:0,
+  shot:{sec:0.6, frames:36, fps:24, z0:1, z1:1.55, amp:2.5, kind:'oshi'},
+  outw:1920, depSeq:true,
+  mode:'paint', exporting:false,
+  par:0, band:0, ratio:1
+};
+const VIEW_ID = {art:0, relief:1, mix:2, depth:3};
+const TOOL_JP = {raise:'盛る', carve:'彫る', smooth:'ならす', flat:'平ら'};
+const BANDS = [
+  {max:10, cls:'ok',   t:'破綻ゼロ（単層＋のりしろ）'},
+  {max:25, cls:'warn', t:'単層の限界（0.5〜0.8秒で抜ければ通る）'},
+  {max:50, cls:'bad',  t:'層分割が必須 → LAB B'},
+  {max:1e9,cls:'dead', t:'破綻域。対象外'}
+];
+
+/* ===================== 2. 内蔵テストプレート =====================
+   §3-① が名指しした最悪の構図＝「くっきりした線画＋後ろのスクリーントーン」を
+   最初から画面に出しておく。読み込む絵が無くても問いに答えられる状態にするため。 */
+function makeTestPlate(){
+  const w=1280, h=720;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const g=c.getContext('2d');
+  g.fillStyle='#fff'; g.fillRect(0,0,w,h);
+
+  /* 背景 ─ スクリーントーン（規則的な網目。引き伸ばしが一発で見える） */
+  g.fillStyle='#141414';
+  const pitch=8, rr=2.35;
+  for(let y=0;y<h+pitch;y+=pitch){
+    const off = ((y/pitch)|0)%2 ? pitch/2 : 0;
+    for(let x=off;x<w+pitch;x+=pitch){ g.beginPath(); g.arc(x,y,rr,0,6.2832); g.fill(); }
+  }
+  const gr=g.createLinearGradient(0,0,0,h);
+  gr.addColorStop(0,'rgba(255,255,255,0)'); gr.addColorStop(0.62,'rgba(255,255,255,.55)'); gr.addColorStop(1,'rgba(255,255,255,.95)');
+  g.fillStyle=gr; g.fillRect(0,0,w,h);
+
+  /* 集中線 */
+  g.save(); g.strokeStyle='#141414'; g.lineCap='round';
+  const cx=w*0.53, cy=h*0.40;
+  for(let i=0;i<96;i++){
+    const a=(i/96)*Math.PI*2+0.11;
+    const r0=210+((i*53)%90), r1=1120;
+    g.lineWidth = 0.8 + ((i*7)%5)*0.55;
+    g.beginPath();
+    g.moveTo(cx+Math.cos(a)*r0, cy+Math.sin(a)*r0);
+    g.lineTo(cx+Math.cos(a)*r1, cy+Math.sin(a)*r1);
+    g.stroke();
+  }
+  g.restore();
+
+  /* 中景 ─ 人物の上半身シルエット */
+  g.save();
+  g.fillStyle='#141414';
+  g.beginPath();
+  g.moveTo(150,720); g.lineTo(176,516); g.quadraticCurveTo(210,452,286,436);
+  g.quadraticCurveTo(300,372,344,352); g.quadraticCurveTo(392,332,424,372);
+  g.quadraticCurveTo(452,412,432,452); g.quadraticCurveTo(496,470,520,540);
+  g.lineTo(544,720); g.closePath(); g.fill();
+  g.fillStyle='#fff';
+  g.beginPath(); g.ellipse(352,404,22,7,-0.24,0,6.2832); g.fill();
+  g.beginPath(); g.ellipse(404,398,17,6,-0.24,0,6.2832); g.fill();
+  g.restore();
+
+  /* 手前 ─ 迫ってくる拳（この一点のためのツール） */
+  g.save();
+  g.lineJoin='round'; g.lineCap='round'; g.strokeStyle='#141414';
+  const fx=880, fy=470;
+  g.fillStyle='#fff'; g.lineWidth=9;
+  g.beginPath();                                  /* 前腕 */
+  g.moveTo(1075,720); g.lineTo(1245,720); g.lineTo(1042,536);
+  g.quadraticCurveTo(980,500,952,540); g.closePath(); g.fill(); g.stroke();
+  g.beginPath();                                  /* 拳 */
+  g.ellipse(fx,fy,168,146,-0.13,0,6.2832); g.fill(); g.stroke();
+  g.lineWidth=6.5;
+  for(let i=0;i<4;i++){                           /* 指の割り */
+    const y=fy-96+i*62;
+    g.beginPath(); g.moveTo(fx-150, y+10); g.quadraticCurveTo(fx-20, y-6, fx+126, y+16); g.stroke();
+  }
+  g.lineWidth=5;
+  g.beginPath(); g.moveTo(fx-118,fy+96); g.quadraticCurveTo(fx-40,fy+128,fx+72,fy+96); g.stroke();
+  g.beginPath(); g.ellipse(fx+96,fy-118,44,30,0.5,0,6.2832); g.stroke();   /* 親指 */
+  g.restore();
+
+  /* 吹き出し ─ 単層深度に混ぜてはいけないもの（§3-①） */
+  g.save();
+  g.fillStyle='#fff'; g.strokeStyle='#141414'; g.lineWidth=6;
+  g.beginPath(); g.ellipse(268,168,182,96,0,0,6.2832); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(300,244); g.lineTo(268,334); g.lineTo(360,254); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(302,246); g.lineTo(268,334); g.lineTo(358,256); g.stroke();
+  g.fillStyle='#141414';
+  [[-96,-34,190],[-104,4,206],[-72,42,140]].forEach(([dx,dy,ww])=>{
+    g.fillRect(268+dx,168+dy,ww,9);
+  });
+  g.restore();
+
+  return c;
+}
+
+/* ===================== 3. 深度マップ ===================== */
+function allocDepth(iw,ih){
+  const LONG = 1024;
+  const k = Math.min(1, LONG/Math.max(iw,ih));
+  S.dw = Math.max(16, Math.round(iw*k));
+  S.dh = Math.max(16, Math.round(ih*k));
+  S.depth = new Float32Array(S.dw*S.dh).fill(S.base);
+  S.dmin = S.dmax = S.base;
+  undoStack.length=0; redoStack.length=0; undoBytes=0;
+}
+function refreshDepthStats(){
+  let mn=1, mx=0; const d=S.depth;
+  for(let i=0;i<d.length;i++){ const v=d[i]; if(v<mn)mn=v; if(v>mx)mx=v; }
+  S.dmin=mn; S.dmax=mx;
+}
+function sampleDepth(u,v){
+  const x = clamp(Math.round(u*S.dw-0.5),0,S.dw-1);
+  const y = clamp(Math.round((1-v)*S.dh-0.5),0,S.dh-1);
+  return S.depth[y*S.dw+x];
+}
+/* 深度→Z の圧縮カーブ。GLSL 側 curve() と必ず同じ式にすること */
+function curveJS(t){
+  t = clamp(t,0,1);
+  if(S.comp==='log'){
+    /* 手前(t=1)側の傾きを立て、奥(t=0)側を潰す。向きを逆にすると拳の厚みが先に消える */
+    const k=S.compAmt*15; if(k<0.001) return t;
+    return 1-Math.log(1+k*(1-t))/Math.log(1+k);
+  }
+  if(S.comp==='sigmoid'){
+    const k=S.compAmt*11; if(k<0.001) return t;
+    const s=1/(1+Math.exp(-k*(t-0.5))), s0=1/(1+Math.exp(k*0.5)), s1=1/(1+Math.exp(-k*0.5));
+    return (s-s0)/(s1-s0);
+  }
+  return t;
+}
+
+/* ===================== 4. 矩形タイル Undo =====================
+   既存のブラシ資産がそのまま効くか＝決定2の検証項目そのもの。
+   触ったタイルだけを最初の1回コピーする（copy-on-first-write）。 */
+const TILE=128;
+const undoStack=[], redoStack=[];
+let undoBytes=0, stroke=null;
+const UNDO_BUDGET = 1.6e8;   /* 160MB 相当で古いものから捨てる */
+
+function tileKey(tx,ty){ return ty*8192+tx; }
+function readTile(tx,ty){
+  const out=new Float32Array(TILE*TILE);
+  const w=Math.min(TILE,S.dw-tx*TILE), h=Math.min(TILE,S.dh-ty*TILE);
+  for(let y=0;y<h;y++){
+    const o=(ty*TILE+y)*S.dw+tx*TILE;
+    out.set(S.depth.subarray(o,o+w), y*TILE);
+  }
+  return out;
+}
+function writeTile(tx,ty,buf){
+  const w=Math.min(TILE,S.dw-tx*TILE), h=Math.min(TILE,S.dh-ty*TILE);
+  for(let y=0;y<h;y++){
+    const o=(ty*TILE+y)*S.dw+tx*TILE;
+    S.depth.set(buf.subarray(y*TILE,y*TILE+w), o);
+  }
+}
+function beginStroke(){ stroke={tiles:new Map()}; }
+function markTiles(x0,y0,x1,y1){
+  if(!stroke) return;
+  const tx0=Math.floor(x0/TILE), tx1=Math.floor(x1/TILE);
+  const ty0=Math.floor(y0/TILE), ty1=Math.floor(y1/TILE);
+  for(let ty=ty0;ty<=ty1;ty++) for(let tx=tx0;tx<=tx1;tx++){
+    const k=tileKey(tx,ty);
+    if(!stroke.tiles.has(k)) stroke.tiles.set(k, readTile(tx,ty));
+  }
+}
+function endStroke(){
+  if(!stroke || !stroke.tiles.size){ stroke=null; return; }
+  undoStack.push(stroke);
+  undoBytes += stroke.tiles.size*TILE*TILE*4;
+  redoStack.length=0;
+  while(undoBytes>UNDO_BUDGET && undoStack.length>1){
+    const old=undoStack.shift(); undoBytes -= old.tiles.size*TILE*TILE*4;
+  }
+  stroke=null; refreshDepthStats(); markDepthDirty(); syncUndoBtns();
+}
+function swapTiles(rec){
+  const inv={tiles:new Map()};
+  for(const [k,buf] of rec.tiles){
+    const tx=k%8192, ty=(k-tx)/8192;
+    inv.tiles.set(k, readTile(tx,ty));
+    writeTile(tx,ty,buf);
+  }
+  return inv;
+}
+function doUndo(){
+  const rec=undoStack.pop(); if(!rec){ toast('これ以上戻せない'); return; }
+  undoBytes -= rec.tiles.size*TILE*TILE*4;
+  redoStack.push(swapTiles(rec));
+  refreshDepthStats(); markDepthDirty(); syncUndoBtns(); toast('UNDO');
+}
+function doRedo(){
+  const rec=redoStack.pop(); if(!rec){ toast('やり直すものが無い'); return; }
+  undoStack.push(swapTiles(rec));
+  undoBytes += rec.tiles.size*TILE*TILE*4;
+  refreshDepthStats(); markDepthDirty(); syncUndoBtns(); toast('REDO');
+}
+function syncUndoBtns(){
+  $('#b-undo').disabled = !undoStack.length;
+  $('#b-redo').disabled = !redoStack.length;
+}
+/* 全面を書き換える操作（生成・反転・リセット）も同じ Undo に載せる */
+function wholeEdit(fn){
+  beginStroke(); markTiles(0,0,S.dw-1,S.dh-1); fn(); endStroke();
+}
+
+/* ===================== 5. three.js ===================== */
+const glc = $('#gl');
+const renderer = new THREE.WebGLRenderer({canvas:glc, antialias:true, alpha:true, preserveDrawingBuffer:true});
+renderer.setClearColor(0x000000, 0);
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 200);
+const probeCam = new THREE.PerspectiveCamera(35, 1, 0.01, 200);
+
+const VS = `
+uniform sampler2D uDepth;
+uniform float uZ, uBase, uComp, uBleed;
+uniform int uCompMode;
+varying vec2 vUv;
+varying float vD;
+varying vec3 vWorld;
+varying float vViewZ;
+float curve(float t){
+  t = clamp(t,0.0,1.0);
+  if(uCompMode==1){
+    float k = uComp*15.0;
+    if(k<0.001) return t;
+    return 1.0 - log(1.0+k*(1.0-t))/log(1.0+k);
+  } else if(uCompMode==2){
+    float k = uComp*11.0;
+    if(k<0.001) return t;
+    float s  = 1.0/(1.0+exp(-k*(t-0.5)));
+    float s0 = 1.0/(1.0+exp(k*0.5));
+    float s1 = 1.0/(1.0+exp(-k*0.5));
+    return (s-s0)/(s1-s0);
+  }
+  return t;
+}
+void main(){
+  vec2 uvB = (uv-0.5)*(1.0+uBleed)+0.5;      /* のりしろ: 縁の画素を外へ引き伸ばす */
+  vUv = uvB;
+  float d = texture2D(uDepth, vec2(uvB.x, 1.0-uvB.y)).r;
+  vD = d;
+  vec3 p = position;
+  p.xy *= (1.0+uBleed);
+  p.z = (curve(d)-curve(uBase))*uZ;
+  vec4 wp = modelMatrix*vec4(p,1.0);
+  vWorld = wp.xyz;
+  vec4 mv = viewMatrix*wp;
+  vViewZ = -mv.z;
+  gl_Position = projectionMatrix*mv;
+}`;
+
+const FS = `
+uniform sampler2D uArt;
+uniform int uView;
+uniform float uRelief, uDNear, uDFar;
+varying vec2 vUv;
+varying float vD;
+varying vec3 vWorld;
+varying float vViewZ;
+vec3 pack24(float v){
+  v = clamp(v,0.0,1.0);
+  float x = floor(v*16777215.0+0.5);
+  float r = floor(x/65536.0);
+  float g = floor((x-r*65536.0)/256.0);
+  float b = x-r*65536.0-g*256.0;
+  return vec3(r,g,b)/255.0;
+}
+void main(){
+  if(uView==4){ gl_FragColor = vec4(pack24(vD),1.0); return; }
+  if(uView==5){
+    float t = clamp((uDFar-vViewZ)/max(uDFar-uDNear,1e-5),0.0,1.0);
+    gl_FragColor = vec4(pack24(t),1.0); return;
+  }
+  vec4 art = texture2D(uArt, vUv);
+  vec3 n = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+  if(dot(n, cameraPosition-vWorld) < 0.0) n = -n;
+  vec3 L = normalize(vec3(-0.42,0.58,0.70));
+  float sh = 0.30 + 0.70*clamp(dot(n,L),0.0,1.0);
+  vec3 col; float a = 1.0;
+  if(uView==0){ col = art.rgb; a = art.a; }
+  else if(uView==1){ col = vec3(0.80,0.87,0.95)*mix(1.0,sh,uRelief); }
+  else if(uView==2){ col = art.rgb*mix(1.0,sh,uRelief); a = art.a; }
+  else { col = vec3(vD); }
+  gl_FragColor = vec4(col,a);
+}`;
+
+const uni = {
+  uDepth:{value:null}, uArt:{value:null},
+  uZ:{value:S.zs}, uBase:{value:S.base}, uComp:{value:S.compAmt}, uCompMode:{value:1},
+  uBleed:{value:S.bleed}, uView:{value:0}, uRelief:{value:S.relief},
+  uDNear:{value:1}, uDFar:{value:2}
+};
+const mat = new THREE.ShaderMaterial({
+  uniforms:uni, vertexShader:VS, fragmentShader:FS,
+  transparent:true, side:THREE.DoubleSide, extensions:{derivatives:true}
+});
+const wireMat = new THREE.ShaderMaterial({
+  uniforms:uni, vertexShader:VS,
+  fragmentShader:'void main(){ gl_FragColor = vec4(0.35,0.91,1.0,0.34); }',
+  wireframe:true, transparent:true, depthTest:false, extensions:{derivatives:true}
+});
+let geo=null, mesh=null, wire=null;
+
+function buildGeo(){
+  const aspect = S.iw/S.ih;
+  let sx,sy;
+  if(aspect>=1){ sx=S.seg; sy=Math.max(8,Math.round(S.seg/aspect)); }
+  else         { sy=S.seg; sx=Math.max(8,Math.round(S.seg*aspect)); }
+  if(geo) geo.dispose();
+  geo = new THREE.PlaneGeometry(aspect, 1, sx, sy);
+  if(mesh){ mesh.geometry = geo; wire.geometry = geo; }
+  else{
+    mesh = new THREE.Mesh(geo, mat);          scene.add(mesh);
+    wire = new THREE.Mesh(geo, wireMat);      wire.visible=false; wire.renderOrder=2; scene.add(wire);
+  }
+}
+function rebuildTextures(){
+  if(uni.uDepth.value) uni.uDepth.value.dispose();
+  const dt = new THREE.DataTexture(S.depth, S.dw, S.dh, THREE.RedFormat, THREE.FloatType);
+  /* NEAREST 固定。パッキング深度に LINEAR を掛けると桁が混ざって深度が飛ぶ（既定は LINEAR） */
+  dt.minFilter = dt.magFilter = THREE.NearestFilter;
+  dt.wrapS = dt.wrapT = THREE.ClampToEdgeWrapping;
+  dt.needsUpdate = true;
+  uni.uDepth.value = dt;
+
+  if(uni.uArt.value) uni.uArt.value.dispose();
+  const at = new THREE.CanvasTexture(S.art);
+  at.colorSpace = THREE.NoColorSpace;
+  at.wrapS = at.wrapT = THREE.ClampToEdgeWrapping;
+  at.minFilter = THREE.LinearMipmapLinearFilter;
+  at.magFilter = THREE.LinearFilter;
+  at.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  at.needsUpdate = true;
+  uni.uArt.value = at;
+}
+let depthDirty=false;
+function markDepthDirty(){ depthDirty=true; miniDirty=true; }
+
+/* ===================== 6. カメラと視差 ===================== */
+let VW=1, VH=1;
+/* フレーム＝カットの画面。窓の形ではなく板のアスペクトで決める。
+   窓に合わせると「視差px」も出力サイズも窓の形で変わってしまい、測定の意味が消える。
+   ステージ側はレターボックスして、見えているものと書き出すものを一致させる。 */
+function frameAspect(){ return S.iw/S.ih; }
+function frameRect(){
+  const A=frameAspect();
+  let w=VW, h=VW/A;
+  if(h>VH){ h=VH; w=VH*A; }
+  return {x:(VW-w)/2, y:(VH-h)/2, w, h};
+}
+function fitDist(){
+  const t = Math.tan(S.fov*D2R/2);
+  const pw = S.iw/S.ih;
+  return Math.max(0.5/t, (pw/2)/(t*frameAspect()));
+}
+function placeCam(cam, rxDeg, ryDeg, dist){
+  const rx=rxDeg*D2R, ry=ryDeg*D2R;
+  cam.position.set(dist*Math.cos(rx)*Math.sin(ry), dist*Math.sin(rx), dist*Math.cos(rx)*Math.cos(ry));
+  cam.lookAt(0,0,0);
+  cam.updateMatrixWorld(true);
+}
+function ndcX(p, rxDeg, ryDeg, dist){
+  probeCam.fov=S.fov; probeCam.aspect=frameAspect(); probeCam.updateProjectionMatrix();
+  placeCam(probeCam, rxDeg, ryDeg, dist);
+  return p.clone().project(probeCam).x;
+}
+/* 最大差分視差（手前の点と奥の点が ±deg で画面上どれだけズレるか）をフルHD幅換算の px で返す */
+const _pn=new THREE.Vector3(), _pf=new THREE.Vector3();
+function measureParallax(zs, deg){
+  const dist = fitDist()/S.dolly;
+  const cb = curveJS(S.base);
+  _pn.set(0,0,(curveJS(S.dmax)-cb)*zs);
+  _pf.set(0,0,(curveJS(S.dmin)-cb)*zs);
+  const dn = ndcX(_pn,0,deg,dist) - ndcX(_pn,0,-deg,dist);
+  const df = ndcX(_pf,0,deg,dist) - ndcX(_pf,0,-deg,dist);
+  return Math.abs(dn-df)*0.5*1920;
+}
+function solveZ(){
+  if(S.dmax-S.dmin < 1e-4) return Math.min(S.zs,1.2);
+  let z = S.zs>0.001 ? S.zs : 0.3;
+  for(let i=0;i<7;i++){
+    const p = measureParallax(z, S.swing);
+    if(p<1e-6){ z=1.2; break; }
+    z = clamp(z*(S.lim/p), 0, 1.2);
+  }
+  return z;
+}
+function bandOf(px){ for(let i=0;i<BANDS.length;i++) if(px<BANDS[i].max) return i; return 3; }
+function depthRatio(){
+  /* Zbg/Zfg ─ カメラから見た奥/手前の距離比。5 超で「1°振るだけで巨大な視差」域 */
+  const dist=fitDist()/S.dolly, cb=curveJS(S.base);
+  const zn=(curveJS(S.dmax)-cb)*S.zsEff, zf=(curveJS(S.dmin)-cb)*S.zsEff;
+  return (dist-zf)/Math.max(dist-zn, 1e-4);
+}
+
+/* ===================== 7. 画面 ⇄ 板の対応（前面投影UV の唯一の利点） ===================== */
+const ray = new THREE.Raycaster();
+const _o=new THREE.Vector3(), _d=new THREE.Vector3(), _p=new THREE.Vector3();
+function xyToUv(p){ return {u: p.x/(S.iw/S.ih)+0.5, v: p.y+0.5}; }
+function pickUV(clientX, clientY){
+  const r = glc.getBoundingClientRect(), f = frameRect();
+  /* NDC はキャンバス全体ではなくフレーム矩形で取る（レターボックスの帯を数えない） */
+  ray.setFromCamera(new THREE.Vector2(((clientX-r.left-f.x)/f.w)*2-1, -((clientY-r.top-f.y)/f.h)*2+1), camera);
+  _o.copy(ray.ray.origin); _d.copy(ray.ray.direction);
+  if(Math.abs(_d.z)<1e-6) return null;
+  let t=(0-_o.z)/_d.z; if(t<=0) return null;
+  _p.copy(_d).multiplyScalar(t).add(_o);
+  let uv = xyToUv(_p);
+  const cb=curveJS(S.base);
+  for(let i=0;i<6;i++){                       /* 変位した面へ寄せる（振った状態でも狙った所に乗る） */
+    const z=(curveJS(sampleDepth(clamp(uv.u,0,1),clamp(uv.v,0,1)))-cb)*S.zsEff;
+    t=(z-_o.z)/_d.z; if(t<=0) break;
+    _p.copy(_d).multiplyScalar(t).add(_o);
+    uv = xyToUv(_p);
+  }
+  return uv;
+}
+function worldAtUV(u,v){
+  const cb=curveJS(S.base);
+  return new THREE.Vector3((u-0.5)*(S.iw/S.ih), v-0.5, (curveJS(sampleDepth(u,v))-cb)*S.zsEff);
+}
+
+/* ===================== 8. ブラシ ===================== */
+function falloff(t, hard){
+  const e = 1e-4 + (1-hard);
+  const x = clamp((1-t)/e, 0, 1);
+  return x*x*(3-2*x);
+}
+function stamp(px, py, pressure){
+  const rd = Math.max(0.75, S.brush.size*0.5*(S.dw/S.iw));
+  const x0=Math.max(0,Math.floor(px-rd)), x1=Math.min(S.dw-1,Math.ceil(px+rd));
+  const y0=Math.max(0,Math.floor(py-rd)), y1=Math.min(S.dh-1,Math.ceil(py+rd));
+  if(x1<x0||y1<y0) return;
+  markTiles(x0,y0,x1,y1);
+  const d=S.depth, hard=S.brush.hard, str=S.brush.str*pressure, tool=S.tool, tgt=S.pick;
+  /* ならす の近傍はブラシ半径に比例させる。1px 固定だと滑らかな山では差が出ず「効かない」 */
+  const so=Math.max(1, Math.round(rd*0.15));
+  for(let y=y0;y<=y1;y++){
+    const row=y*S.dw;
+    for(let x=x0;x<=x1;x++){
+      const t=Math.hypot(x-px,y-py)/rd; if(t>1) continue;
+      const f=falloff(t,hard); if(f<=0) continue;
+      const i=row+x; let v=d[i];
+      if(tool==='raise')       v = v + f*str*0.035;
+      else if(tool==='carve')  v = v - f*str*0.035;
+      else if(tool==='smooth'){
+        const l=d[row+(x-so>=0?x-so:x)], r=d[row+(x+so<S.dw?x+so:x)];
+        const u=d[(y-so>=0?y-so:y)*S.dw+x], w=d[(y+so<S.dh?y+so:y)*S.dw+x];
+        v = lerp(v, (l+r+u+w+v)/5, f*str*0.9);
+      }
+      else                     v = lerp(v, tgt, f*str*0.30);
+      v = v<0?0:(v>1?1:v);
+      d[i]=v;
+      if(v<S.dmin) S.dmin=v; if(v>S.dmax) S.dmax=v;
+    }
+  }
+  markDepthDirty();
+}
+let lastPaint=null;
+function paintAt(clientX, clientY, pressure){
+  const uv = pickUV(clientX, clientY);
+  if(!uv) return;
+  const px = uv.u*S.dw, py = (1-uv.v)*S.dh;
+  const rd = Math.max(0.75, S.brush.size*0.5*(S.dw/S.iw));
+  const sp = Math.max(0.8, rd*0.16);
+  if(lastPaint){
+    const dx=px-lastPaint.x, dy=py-lastPaint.y, L=Math.hypot(dx,dy);
+    const n=Math.min(220, Math.floor(L/sp));
+    for(let i=1;i<=n;i++) stamp(lastPaint.x+dx*i/n, lastPaint.y+dy*i/n, pressure);
+    if(n>0) lastPaint={x:px,y:py};
+  }else{
+    stamp(px,py,pressure);
+    lastPaint={x:px,y:py};
+  }
+}
+function pressFactor(e){
+  if(!S.brush.press) return 1;
+  if(!e || e.pointerType!=='pen') return 1;
+  const p = (typeof e.pressure==='number' && e.pressure>0) ? e.pressure : 0.5;
+  return 0.2 + 0.8*p;
+}
+function eyedrop(clientX, clientY){
+  const uv=pickUV(clientX,clientY); if(!uv) return;
+  S.pick = sampleDepth(clamp(uv.u,0,1), clamp(uv.v,0,1));
+  $('#vl-pick').textContent = fmt(S.pick,3);
+  toast('深度スポイト '+fmt(S.pick,3)+' → 「平ら」の目標');
+}
+
+/* ===================== 9. 深度の下地生成 ===================== */
+let lumaCache=null;
+function lumaOf(){
+  if(lumaCache && lumaCache.w===S.dw && lumaCache.h===S.dh) return lumaCache.a;
+  const c=document.createElement('canvas'); c.width=S.dw; c.height=S.dh;
+  const g=c.getContext('2d',{willReadFrequently:true});
+  g.drawImage(S.art,0,0,S.dw,S.dh);
+  const im=g.getImageData(0,0,S.dw,S.dh).data;
+  const a=new Float32Array(S.dw*S.dh);
+  for(let i=0;i<a.length;i++) a[i]=(im[i*4]*0.299+im[i*4+1]*0.587+im[i*4+2]*0.114)/255;
+  lumaCache={w:S.dw,h:S.dh,a};
+  return a;
+}
+function generate(kind){
+  S.genKind = kind;
+  wholeEdit(()=>{
+    const d=S.depth, amt=S.gen;
+    if(kind==='flat'){ d.fill(S.base); }
+    else if(kind==='luma'){
+      const a=lumaOf();
+      for(let i=0;i<d.length;i++){
+        const l = S.inv ? 1-a[i] : a[i];
+        d[i] = clamp(S.base + (l-0.5)*amt*2, 0, 1);
+      }
+    }
+    else if(kind==='sphere'){
+      const cx=S.dw/2, cy=S.dh/2, R=Math.min(S.dw,S.dh)*0.46;
+      for(let y=0;y<S.dh;y++) for(let x=0;x<S.dw;x++){
+        const t=Math.hypot(x-cx,y-cy)/R;
+        const h = t<1 ? Math.sqrt(1-t*t) : 0;
+        d[y*S.dw+x] = clamp(S.base + h*amt*0.5, 0, 1);
+      }
+    }
+    else if(kind==='vgrad'){
+      for(let y=0;y<S.dh;y++){
+        const v = S.base + (0.5-(y/(S.dh-1)))*amt;
+        for(let x=0;x<S.dw;x++) d[y*S.dw+x]=clamp(v,0,1);
+      }
+    }
+  });
+  ['g-flat','g-luma','g-sphere','g-vgrad'].forEach(id=>{
+    $('#'+id).classList.toggle('on', id==='g-'+kind);
+  });
+  syncGenRows();
+  toast('下地: '+kind);
+}
+
+/* ===================== 10. 深度PNG（RGB 3ch パッキング・可逆のみ） ===================== */
+function depthToCanvas(){
+  const c=document.createElement('canvas'); c.width=S.dw; c.height=S.dh;
+  const id=new ImageData(S.dw,S.dh), o=id.data;
+  for(let i=0;i<S.depth.length;i++){
+    const x=Math.round(clamp(S.depth[i],0,1)*16777215);
+    o[i*4]=(x>>>16)&255; o[i*4+1]=(x>>>8)&255; o[i*4+2]=x&255; o[i*4+3]=255;
+  }
+  c.getContext('2d').putImageData(id,0,0);
+  return c;
+}
+function loadDepthImage(img){
+  const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
+  const g=c.getContext('2d',{willReadFrequently:true});
+  g.drawImage(img,0,0);
+  const im=g.getImageData(0,0,img.width,img.height).data;
+  /* グレースケール8bit か RGBパッキングかを自動判定 */
+  let gray=true;
+  for(let i=0;i<im.length && gray;i+=4*97){ if(im[i]!==im[i+1]||im[i+1]!==im[i+2]) gray=false; }
+  wholeEdit(()=>{
+    for(let y=0;y<S.dh;y++){
+      const sy=Math.min(img.height-1, Math.round(y*img.height/S.dh));
+      for(let x=0;x<S.dw;x++){
+        const sx=Math.min(img.width-1, Math.round(x*img.width/S.dw));
+        const o=(sy*img.width+sx)*4;
+        S.depth[y*S.dw+x] = gray ? im[o]/255
+                                 : (im[o]*65536+im[o+1]*256+im[o+2])/16777215;
+      }
+    }
+  });
+  toast('深度PNGを読み込み（'+(gray?'8bitグレー':'RGBパッキング')+' '+img.width+'×'+img.height+'）');
+}
+
+/* ===================== 11. 書き出し ===================== */
+async function pickDir(){
+  if(!window.showDirectoryPicker) return null;
+  try{ return await window.showDirectoryPicker({id:'depth-brush', mode:'readwrite', startIn:'downloads'}); }
+  catch(e){ return e && e.name==='AbortError' ? 'abort' : null; }
+}
+async function putFile(dir, name, blob){
+  if(dir){
+    const fh=await dir.getFileHandle(name,{create:true});
+    const w=await fh.createWritable(); await w.write(blob); await w.close();
+  }else{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  }
+}
+const toBlob = c => new Promise(r=>c.toBlob(r,'image/png'));
+
+function renderBeauty(w,h){
+  const pr=renderer.getPixelRatio();
+  renderer.setPixelRatio(1);
+  renderer.setSize(w,h,false);
+  renderer.setScissorTest(false);
+  renderer.setViewport(0,0,w,h);
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+  uni.uView.value = VIEW_ID[S.view];
+  renderer.render(scene,camera);
+  const out=document.createElement('canvas'); out.width=w; out.height=h;
+  out.getContext('2d').drawImage(glc,0,0,w,h);
+  renderer.setPixelRatio(pr);
+  renderer.setSize(VW,VH,false);
+  updateCamera();
+  return out;
+}
+function renderPacked(w,h,mode){
+  const rt=new THREE.WebGLRenderTarget(w,h,{
+    minFilter:THREE.NearestFilter, magFilter:THREE.NearestFilter,
+    type:THREE.UnsignedByteType, colorSpace:THREE.NoColorSpace, depthBuffer:true, samples:0
+  });
+  const pa=camera.aspect;
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+  const dist=camera.position.length(), cb=curveJS(S.base);
+  uni.uDNear.value = dist-(curveJS(S.dmax)-cb)*S.zsEff;
+  uni.uDFar.value  = dist-(curveJS(S.dmin)-cb)*S.zsEff;
+  uni.uView.value = mode;
+  const wv=wire.visible; wire.visible=false;
+  renderer.setScissorTest(false);
+  renderer.setRenderTarget(rt);   /* three が RT の全面をビューポートにする。ここで setViewport すると pixelRatio 倍されて壊れる */
+  renderer.setClearColor(0x000000,1); renderer.clear();
+  renderer.render(scene,camera);
+  renderer.setRenderTarget(null);
+  renderer.setClearColor(0x000000,0);
+  renderer.setViewport(0,0,VW,VH);
+  wire.visible=wv;
+  const buf=new Uint8Array(w*h*4);
+  renderer.readRenderTargetPixels(rt,0,0,w,h,buf);
+  rt.dispose();
+  camera.aspect=pa; camera.updateProjectionMatrix();
+  const out=document.createElement('canvas'); out.width=w; out.height=h;
+  const id=new ImageData(w,h);
+  for(let y=0;y<h;y++) id.data.set(buf.subarray((h-1-y)*w*4,(h-1-y)*w*4+w*4), y*w*4);
+  out.getContext('2d').putImageData(id,0,0);
+  return out;
+}
+function outSize(){
+  const w=Math.round(S.outw/2)*2;
+  return {w, h:Math.max(2, Math.round(w/frameAspect()/2)*2)};
+}
+async function exportStill(){
+  const {w,h}=outSize();
+  await putFile(null,'depth_brush_still.png', await toBlob(renderBeauty(w,h)));
+  toast('1枚書き出し '+w+'×'+h);
+}
+async function exportPlate(){
+  await putFile(null,'plate.depth.png', await toBlob(depthToCanvas()));
+  toast('板の深度PNG '+S.dw+'×'+S.dh+'（RGBパッキング）');
+}
+async function exportSeq(){
+  if(S.exporting) return;
+  const dir = await pickDir();
+  if(dir==='abort') return;
+  S.exporting=true; stopShot();
+  const {w,h}=outSize();
+  const N=S.shot.frames, keep={dolly:S.dolly, rx:S.rx, ry:S.ry};
+  const bar=$('#exp-bar'), msg=$('#exp-msg');
+  msg.textContent = dir ? 'FOLDER へ書き出し中…' : '個別ダウンロードで書き出し中…';
+  try{
+    for(let i=0;i<N;i++){
+      applyShot(N===1?0:i/(N-1));
+      updateCamera();
+      const n=String(i+1).padStart(4,'0');
+      await putFile(dir, `depth_brush_${n}.png`, await toBlob(renderBeauty(w,h)));
+      if(S.depSeq) await putFile(dir, `depth_brush_${n}.depth.png`, await toBlob(renderPacked(w,h,5)));
+      bar.style.width = ((i+1)/N*100).toFixed(1)+'%';
+      msg.textContent = `${i+1} / ${N} フレーム`;
+      if(i%3===2) await new Promise(r=>setTimeout(r,0));
+    }
+    await putFile(dir, 'plate.depth.png', await toBlob(depthToCanvas()));
+    msg.textContent = `完了 ─ ${N}枚${S.depSeq?'（＋深度連番）':''}＋ plate.depth.png`;
+  }catch(e){
+    msg.textContent = 'ERROR: '+(e&&e.message||e);
+  }
+  S.dolly=keep.dolly; S.rx=keep.rx; S.ry=keep.ry;
+  syncCamUI(); updateCamera();
+  bar.style.width='0%'; S.exporting=false;
+}
+
+/* ===================== 12. ショット ===================== */
+const SHOTS = {
+  oshi  :{sec:0.6, z0:1.00, z1:1.55, amp:1.2},
+  furi  :{sec:0.8, z0:1.15, z1:1.15, amp:4.0},
+  issyun:{sec:0.4, z0:1.00, z1:1.90, amp:2.0},
+  yure  :{sec:1.2, z0:1.20, z1:1.26, amp:1.5}
+};
+const easeOutCubic = u => 1-Math.pow(1-u,3);
+const easeOutQuint = u => 1-Math.pow(1-u,5);
+function applyShot(u){
+  const k=S.shot.kind, a=S.shot.amp;
+  let e = k==='issyun' ? easeOutQuint(u) : easeOutCubic(u);
+  S.dolly = lerp(S.shot.z0, S.shot.z1, e);
+  if(k==='furi'){ S.ry = a*Math.sin(u*Math.PI*2); S.rx = a*0.18*Math.sin(u*Math.PI*4); }
+  else if(k==='yure'){
+    S.ry = a*(Math.sin(u*Math.PI*6.1)*0.6 + Math.sin(u*Math.PI*2.3+1.1)*0.4);
+    S.rx = a*(Math.sin(u*Math.PI*4.7+2.0)*0.5 + Math.sin(u*Math.PI*9.3)*0.22);
+  }
+  else{ S.ry = a*Math.sin(u*Math.PI); S.rx = a*0.34*Math.sin(u*Math.PI*0.8); }
+  S.dolly=clamp(S.dolly,0.5,3); S.ry=clamp(S.ry,-12,12); S.rx=clamp(S.rx,-12,12);
+}
+let playT0=null;
+function startShot(){ playT0=performance.now(); $('#b-play').classList.add('on'); $('#b-play').textContent='■ STOP'; }
+function stopShot(){ playT0=null; $('#b-play').classList.remove('on'); $('#b-play').textContent='▶ SHOT'; }
+function toggleShot(){ playT0===null ? startShot() : stopShot(); }
+function setShotPreset(kind){
+  const p=SHOTS[kind]; if(!p) return;
+  S.shot.kind=kind; S.shot.sec=p.sec;
+  S.shot.frames=Math.max(6,Math.round(p.sec*S.shot.fps));
+  S.shot.z0=p.z0; S.shot.z1=p.z1; S.shot.amp=p.amp;
+  ['oshi','furi','issyun','yure'].forEach(k=>$('#p-'+k).classList.toggle('on', k===kind));
+  setVal('sl-frames',S.shot.frames); setVal('sl-z0',S.shot.z0); setVal('sl-z1',S.shot.z1); setVal('sl-amp',S.shot.amp);
+  syncShotUI();
+  startShot();
+}
+
+/* ===================== 13. UI 配線 ===================== */
+let toastT=0;
+function toast(msg){
+  $('#s-note').textContent = msg;
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>{ $('#s-note').textContent=''; }, 2200);
+}
+function setVal(id,v){ const e=$('#'+id); if(e) e.value=v; }
+function setRow(id,on){
+  const e=$('#'+id); if(!e) return;
+  const box=e.closest('.row-sld')||e.closest('.tr');
+  if(box) box.classList.toggle('off',!on);
+  const tr = box && box.classList.contains('row-sld') ? box.previousElementSibling : null;
+  if(tr && tr.classList.contains('tr')) tr.classList.toggle('off',!on);
+  if(e.tagName==='INPUT') e.disabled=!on;
+}
+function bindSlider(id, fn){
+  const e=$('#'+id);
+  const run=()=>{ fn(parseFloat(e.value)); };
+  e.addEventListener('input', run);
+  return run;
+}
+function bindToggle(id, get, set){
+  const e=$('#'+id);
+  e.classList.toggle('on', !!get());
+  e.addEventListener('click', ()=>{ set(!get()); e.classList.toggle('on', !!get()); });
+}
+function syncGenRows(){
+  setRow('sl-gen', S.genKind!=='flat' && S.genKind!=='');
+  const tr=$('#tg-inv').closest('.tr');
+  tr.classList.toggle('off', S.genKind!=='luma');
+}
+function syncCamUI(){
+  setVal('sl-dolly',S.dolly); setVal('sl-rx',S.rx); setVal('sl-ry',S.ry);
+  $('#vl-dolly').textContent=fmt(S.dolly,2)+' ×';
+  $('#vl-rx').textContent=fmt(S.rx,1)+' °';
+  $('#vl-ry').textContent=fmt(S.ry,1)+' °';
+}
+function syncShotUI(){
+  $('#vl-frames').textContent=S.shot.frames+' f';
+  $('#vl-fps').textContent=S.shot.fps;
+  $('#vl-z0').textContent=fmt(S.shot.z0,2)+' ×';
+  $('#vl-z1').textContent=fmt(S.shot.z1,2)+' ×';
+  $('#vl-amp').textContent=fmt(S.shot.amp,1)+' °';
+}
+function setTool(t){
+  S.tool=t;
+  ['raise','carve','smooth','flat'].forEach(k=>$('#t-'+k).classList.toggle('on',k===t));
+  $('#s-tool').textContent=TOOL_JP[t];
+  $('#ring').className = t==='carve'?'carve':(t==='smooth'?'smooth':(t==='flat'?'flat':''));
+  setRow('sl-str', true);
+}
+function setView(v){
+  S.view=v; uni.uView.value=VIEW_ID[v];
+  ['art','relief','mix','depth'].forEach(k=>$('#v-'+k).classList.toggle('on',k===v));
+  setRow('sl-relief', v==='relief'||v==='mix');
+}
+function setMode(m){
+  S.mode=m;
+  $('#b-mode').textContent='MODE ▸ '+(m==='paint'?'PAINT':'CAM');
+  $('#b-mode').classList.toggle('on', m==='paint');
+  $('#s-mode').textContent = m==='paint'?'PAINT':'CAM';
+  $('#main').classList.toggle('cam', m==='cam');
+  $('#ring').style.display = m==='paint' ? 'block' : 'none';
+}
+function updateCamera(){
+  camera.fov=S.fov; camera.aspect=frameAspect(); camera.updateProjectionMatrix();
+  placeCam(camera, S.rx, S.ry, fitDist()/S.dolly);
+}
+/* ステージにフレームを出す。ここに写るものが、そのまま書き出される */
+function layoutFrame(){
+  const f=frameRect(), g=$('#frame-guide');
+  g.style.left=f.x+'px'; g.style.top=f.y+'px';
+  g.style.width=f.w+'px'; g.style.height=f.h+'px';
+}
+function renderStage(){
+  const f=frameRect();
+  renderer.setScissorTest(false);
+  renderer.setViewport(0,0,VW,VH);
+  renderer.clear();
+  renderer.setViewport(f.x,f.y,f.w,f.h);
+  renderer.setScissor(f.x,f.y,f.w,f.h);
+  renderer.setScissorTest(true);
+  renderer.render(scene,camera);
+  renderer.setScissorTest(false);
+}
+
+/* ---- 絵の読み込み ---- */
+function adoptArt(canvasOrImg, name){
+  const c = canvasOrImg.tagName==='CANVAS' ? canvasOrImg : (()=>{
+    const t=document.createElement('canvas'); t.width=canvasOrImg.naturalWidth||canvasOrImg.width;
+    t.height=canvasOrImg.naturalHeight||canvasOrImg.height;
+    t.getContext('2d').drawImage(canvasOrImg,0,0); return t;
+  })();
+  S.art=c; S.iw=c.width; S.ih=c.height; S.artName=name;
+  lumaCache=null;
+  allocDepth(S.iw,S.ih);
+  buildGeo(); rebuildTextures();
+  $('#art-name').textContent=name;
+  $('#art-thumb').src=c.toDataURL('image/png');
+  $('#s-res').textContent=S.iw+'×'+S.ih;
+  $('#s-dres').textContent=S.dw+'×'+S.dh;
+  S.genKind=''; ['g-flat','g-luma','g-sphere','g-vgrad'].forEach(id=>$('#'+id).classList.remove('on'));
+  syncGenRows(); syncUndoBtns(); markDepthDirty();
+}
+function readImageFile(file, cb){
+  const url=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{ cb(img); URL.revokeObjectURL(url); };
+  img.onerror=()=>{ toast('画像を読めなかった'); URL.revokeObjectURL(url); };
+  img.src=url;   /* file:// でも通るよう Blob URL のみ。fetch は使わない */
+}
+function handleFile(file){
+  if(!file) return;
+  if(/depth/i.test(file.name)) readImageFile(file, img=>loadDepthImage(img));
+  else                         readImageFile(file, img=>adoptArt(img, file.name));
+}
+
+/* ===================== 14. 入力（ブラシの手癖は animator-brush-ops 準拠） ===================== */
+const SIZE_STEP_PX=10;
+let gPaint=null, gCam=null, gSize=null, spaceHeld=false, spaceDown=0, modeBefore='paint';
+
+glc.addEventListener('contextmenu', e=>e.preventDefault());
+glc.addEventListener('pointerdown', e=>{
+  if(S.exporting) return;
+  glc.focus?.();
+  if(e.button===2){
+    e.preventDefault();
+    gSize={id:e.pointerId, x:e.clientX, start:S.brush.size};
+    return;
+  }
+  if(e.button===1){ e.preventDefault(); gCam={id:e.pointerId,x:e.clientX,y:e.clientY,rx:S.rx,ry:S.ry}; $('#main').classList.add('drag'); return; }
+  if(e.button!==0) return;
+  if(e.altKey){ eyedrop(e.clientX,e.clientY); return; }
+  if(S.mode==='cam' || spaceHeld){
+    gCam={id:e.pointerId,x:e.clientX,y:e.clientY,rx:S.rx,ry:S.ry};
+    $('#main').classList.add('drag');
+    return;
+  }
+  stopShot();
+  beginStroke(); lastPaint=null;
+  gPaint={id:e.pointerId};
+  paintAt(e.clientX,e.clientY,pressFactor(e));
+});
+window.addEventListener('pointermove', e=>{
+  updateRing(e.clientX,e.clientY);
+  if(gSize && e.pointerId===gSize.id){
+    e.preventDefault();
+    const n=clamp(Math.round(gSize.start + (e.clientX-gSize.x)/SIZE_STEP_PX*4), 4, 600);
+    S.brush.size=n; setVal('sl-size',n); $('#vl-size').textContent=n+' px';
+    return;
+  }
+  if(gCam && e.pointerId===gCam.id){
+    S.ry = clamp(gCam.ry + (e.clientX-gCam.x)*0.10, -12, 12);
+    S.rx = clamp(gCam.rx - (e.clientY-gCam.y)*0.10, -12, 12);
+    syncCamUI();
+    return;
+  }
+  if(gPaint && e.pointerId===gPaint.id){
+    /* 合成イベントや古い環境では空配列が返るので、そのときは本体の1点で描く */
+    const co = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+    if(co && co.length){ for(const ce of co) paintAt(ce.clientX,ce.clientY,pressFactor(ce)); }
+    else paintAt(e.clientX,e.clientY,pressFactor(e));
+  }
+});
+window.addEventListener('pointerup', e=>{
+  if(gSize && e.pointerId===gSize.id) gSize=null;
+  if(gCam && e.pointerId===gCam.id){ gCam=null; $('#main').classList.remove('drag'); }
+  if(gPaint && e.pointerId===gPaint.id){ gPaint=null; lastPaint=null; endStroke(); }
+});
+window.addEventListener('pointercancel', ()=>{ if(gPaint){gPaint=null;lastPaint=null;endStroke();} gCam=null; gSize=null; $('#main').classList.remove('drag'); });
+glc.addEventListener('wheel', e=>{
+  e.preventDefault();
+  S.dolly = clamp(S.dolly*Math.exp(-e.deltaY*0.0012), 0.5, 3);
+  syncCamUI();
+}, {passive:false});
+
+function updateRing(cx,cy){
+  const ring=$('#ring');
+  if(S.mode!=='paint'||S.exporting){ ring.style.display='none'; return; }
+  const r=glc.getBoundingClientRect();
+  if(cx<r.left||cx>r.right||cy<r.top||cy>r.bottom){ ring.style.display='none'; return; }
+  const uv=pickUV(cx,cy);
+  let px=S.brush.size*0.5;
+  if(uv){
+    const w=worldAtUV(clamp(uv.u,0,1),clamp(uv.v,0,1));
+    const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0);
+    const a=w.clone().project(camera);
+    const b=w.clone().addScaledVector(right, (S.brush.size*0.5)/S.ih).project(camera);
+    px=Math.abs(b.x-a.x)*0.5*frameRect().w;
+  }
+  ring.style.display='block';
+  ring.style.left=(cx-r.left)+'px'; ring.style.top=(cy-r.top)+'px';
+  ring.style.width=(px*2)+'px'; ring.style.height=(px*2)+'px';
+}
+
+/* ---- キー ---- */
+function typing(t){ return t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName); }
+window.addEventListener('keydown', e=>{
+  if(typing(e.target)) return;
+  const k=e.key.toLowerCase();
+  if((e.ctrlKey||e.metaKey) && k==='z'){ e.preventDefault(); e.shiftKey?doRedo():doUndo(); return; }
+  if(e.code==='Space'){
+    e.preventDefault();
+    if(!e.repeat){ spaceDown=performance.now(); spaceHeld=true; modeBefore=S.mode; setMode('cam'); }
+    return;
+  }
+  if(k==='escape'){ if(playT0!==null) stopShot(); else $('#shortcut-modal').classList.remove('on'); return; }
+  if(k==='enter'){ toggleShot(); return; }
+  if(k==='h'){ S.rx=0; S.ry=0; S.dolly=1; syncCamUI(); toast('HOME'); return; }
+  if(k==='w'){ S.wire=!S.wire; wire.visible=S.wire; $('#tg-wire').classList.toggle('on',S.wire); return; }
+  if(k==='x'){ setTool(S.tool==='raise'?'carve':'raise'); toast(TOOL_JP[S.tool]); return; }
+  if(k==='['||k===']'){
+    const n=clamp(S.brush.size + (k===']'?4:-4), 4, 600);
+    S.brush.size=n; setVal('sl-size',n); $('#vl-size').textContent=n+' px'; return;
+  }
+  const T={'1':'raise','2':'carve','3':'smooth','4':'flat'};
+  if(T[k]){ setTool(T[k]); toast(TOOL_JP[T[k]]); return; }
+  const V={a:'art',s:'relief',d:'mix',f:'depth'};
+  if(V[k]){ setView(V[k]); return; }
+});
+window.addEventListener('keyup', e=>{
+  if(e.code==='Space'){
+    spaceHeld=false;
+    /* バネ式: 250ms 以上押していたら元へ戻す。短押しは普通の切替 */
+    if(performance.now()-spaceDown>=250) setMode(modeBefore);
+    else setMode(modeBefore==='paint'?'cam':'paint');
+  }
+});
+window.addEventListener('blur', ()=>{ spaceHeld=false; });
+
+/* ---- D&D ---- */
+const hint=$('#drop-hint');
+let dragN=0;
+['dragenter','dragover'].forEach(ev=>window.addEventListener(ev, e=>{
+  e.preventDefault(); if(ev==='dragenter') dragN++; hint.classList.add('on');
+}));
+['dragleave','drop'].forEach(ev=>window.addEventListener(ev, e=>{
+  e.preventDefault();
+  if(ev==='dragleave'){ dragN--; if(dragN>0) return; }
+  dragN=0; hint.classList.remove('on');
+  if(ev==='drop' && e.dataTransfer && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+}));
+
+/* ===================== 15. パネル配線 ===================== */
+$('#drop-art').addEventListener('click', ()=>$('#file-art').click());
+/* ★ File を先にローカルへ取る。e.target.value='' は同期で走るので、
+   onload の中で e.target.files[0] を見ると必ず undefined になる（D&D では起きないので気づけない） */
+$('#file-art').addEventListener('change', e=>{
+  const f=e.target.files[0]; e.target.value='';
+  if(f) readImageFile(f, img=>adoptArt(img, f.name));
+});
+$('#b-load-dep').addEventListener('click', ()=>$('#file-dep').click());
+$('#file-dep').addEventListener('change', e=>{
+  const f=e.target.files[0]; e.target.value='';
+  if(f) readImageFile(f, img=>loadDepthImage(img));
+});
+$('#b-save-dep').addEventListener('click', exportPlate);
+
+['flat','luma','sphere','vgrad'].forEach(k=>$('#g-'+k).addEventListener('click', ()=>generate(k)));
+bindSlider('sl-gen', v=>{ S.gen=v; $('#vl-gen').textContent=fmt(v,2); if(S.genKind && S.genKind!=='flat') generate(S.genKind); });
+bindToggle('tg-inv', ()=>S.inv, v=>{ S.inv=v; if(S.genKind==='luma') generate('luma'); });
+
+['raise','carve','smooth','flat'].forEach(k=>$('#t-'+k).addEventListener('click', ()=>setTool(k)));
+bindSlider('sl-size', v=>{ S.brush.size=v; $('#vl-size').textContent=v+' px'; });
+bindSlider('sl-str',  v=>{ S.brush.str=v;  $('#vl-str').textContent=fmt(v,2); });
+bindSlider('sl-hard', v=>{ S.brush.hard=v; $('#vl-hard').textContent=fmt(v,2); });
+bindToggle('tg-press', ()=>S.brush.press, v=>{ S.brush.press=v; });
+$('#b-clear').addEventListener('click', ()=>{ wholeEdit(()=>S.depth.fill(S.base)); S.genKind='flat'; ['g-flat','g-luma','g-sphere','g-vgrad'].forEach(id=>$('#'+id).classList.toggle('on',id==='g-flat')); syncGenRows(); toast('深度をリセット'); });
+$('#b-invert').addEventListener('click', ()=>{ wholeEdit(()=>{ for(let i=0;i<S.depth.length;i++) S.depth[i]=1-S.depth[i]; }); toast('深度を反転'); });
+
+bindSlider('sl-zs', v=>{ S.zs=v; });
+$('#sel-comp').addEventListener('change', e=>{
+  S.comp=e.target.value;
+  uni.uCompMode.value = S.comp==='log'?1:(S.comp==='sigmoid'?2:0);
+  setRow('sl-comp', S.comp!=='linear');
+});
+bindSlider('sl-comp', v=>{ S.compAmt=v; uni.uComp.value=v; $('#vl-comp').textContent=fmt(v,2); });
+bindSlider('sl-seg',  v=>{ S.seg=v; $('#vl-seg').textContent=v; buildGeo(); });
+bindSlider('sl-bleed',v=>{ S.bleed=v; uni.uBleed.value=v; $('#vl-bleed').textContent=fmt(v*100,1)+' %'; });
+
+bindToggle('tg-clamp', ()=>S.clampOn, v=>{ S.clampOn=v; setRow('sl-lim',v); setRow('sl-zs',!v); });
+bindSlider('sl-lim',   v=>{ S.lim=v; $('#vl-lim').textContent=v+' px'; });
+bindSlider('sl-swing', v=>{ S.swing=v; $('#vl-swing').textContent=fmt(v,1)+' °'; $('#m-deg').textContent=fmt(v,1); });
+
+['art','relief','mix','depth'].forEach(k=>$('#v-'+k).addEventListener('click', ()=>setView(k)));
+bindSlider('sl-relief', v=>{ S.relief=v; uni.uRelief.value=v; $('#vl-relief').textContent=fmt(v,2); });
+bindToggle('tg-wire', ()=>S.wire, v=>{ S.wire=v; wire.visible=v; });
+
+bindSlider('sl-fov',   v=>{ S.fov=v; $('#vl-fov').textContent=v+' °'; });
+bindSlider('sl-dolly', v=>{ S.dolly=v; $('#vl-dolly').textContent=fmt(v,2)+' ×'; });
+bindSlider('sl-rx',    v=>{ S.rx=v; $('#vl-rx').textContent=fmt(v,1)+' °'; });
+bindSlider('sl-ry',    v=>{ S.ry=v; $('#vl-ry').textContent=fmt(v,1)+' °'; });
+
+['oshi','furi','issyun','yure'].forEach(k=>$('#p-'+k).addEventListener('click', ()=>setShotPreset(k)));
+bindSlider('sl-frames', v=>{ S.shot.frames=v; syncShotUI(); });
+bindSlider('sl-fps',    v=>{ S.shot.fps=v;    syncShotUI(); });
+bindSlider('sl-z0',     v=>{ S.shot.z0=v;     syncShotUI(); });
+bindSlider('sl-z1',     v=>{ S.shot.z1=v;     syncShotUI(); });
+bindSlider('sl-amp',    v=>{ S.shot.amp=v;    syncShotUI(); });
+
+bindToggle('tg-depseq', ()=>S.depSeq, v=>{ S.depSeq=v; });
+bindSlider('sl-outw', v=>{ S.outw=v; $('#vl-outw').textContent=v+' px'; });
+$('#b-exp-seq').addEventListener('click', exportSeq);
+$('#b-exp-still').addEventListener('click', exportStill);
+$('#b-exp-plate').addEventListener('click', exportPlate);
+
+$('#b-mode').addEventListener('click', ()=>setMode(S.mode==='paint'?'cam':'paint'));
+$('#b-home').addEventListener('click', ()=>{ S.rx=0; S.ry=0; S.dolly=1; syncCamUI(); });
+$('#b-play').addEventListener('click', toggleShot);
+$('#b-undo').addEventListener('click', doUndo);
+$('#b-redo').addEventListener('click', doRedo);
+$('#sc-open-btn').addEventListener('click', ()=>$('#shortcut-modal').classList.add('on'));
+$('#sc-close').addEventListener('click', ()=>$('#shortcut-modal').classList.remove('on'));
+$('#shortcut-modal').addEventListener('click', e=>{ if(e.target.id==='shortcut-modal') e.target.classList.remove('on'); });
+
+/* ===================== 16. 深度ミニビュー ===================== */
+let miniDirty=true, miniT=0;
+const depCv=$('#dep-cv'), depCtx=depCv.getContext('2d');
+let miniOff=null;
+let hoverUV=null;
+function drawMini(){
+  if(!S.depth) return;
+  if(!miniOff || miniOff.width!==S.dw || miniOff.height!==S.dh){
+    miniOff=document.createElement('canvas'); miniOff.width=S.dw; miniOff.height=S.dh;
+  }
+  const g=miniOff.getContext('2d');
+  const id=new ImageData(S.dw,S.dh), o=id.data;
+  for(let i=0;i<S.depth.length;i++){
+    const v=Math.round(clamp(S.depth[i],0,1)*255);
+    o[i*4]=v; o[i*4+1]=v; o[i*4+2]=v; o[i*4+3]=255;
+  }
+  g.putImageData(id,0,0);
+  const W=depCv.width, H=depCv.height;
+  depCtx.clearRect(0,0,W,H);
+  depCtx.fillStyle='#000'; depCtx.fillRect(0,0,W,H);
+  const s=Math.min(W/S.dw, H/S.dh), dw=S.dw*s, dh=S.dh*s, ox=(W-dw)/2, oy=(H-dh)/2;
+  depCtx.imageSmoothingEnabled=false;
+  depCtx.drawImage(miniOff, ox,oy,dw,dh);
+  if(hoverUV){                       /* カーソル行の断面プロファイル */
+    const y=clamp(Math.round((1-hoverUV.v)*S.dh),0,S.dh-1);
+    depCtx.strokeStyle='rgba(255,79,168,.55)'; depCtx.lineWidth=1;
+    depCtx.beginPath(); depCtx.moveTo(ox, oy+y*s+0.5); depCtx.lineTo(ox+dw, oy+y*s+0.5); depCtx.stroke();
+    depCtx.strokeStyle='rgba(90,233,255,.95)'; depCtx.lineWidth=1.4;
+    depCtx.beginPath();
+    for(let x=0;x<S.dw;x++){
+      const v=S.depth[y*S.dw+x];
+      const px=ox+x*s, py=oy+dh-v*dh;
+      x===0?depCtx.moveTo(px,py):depCtx.lineTo(px,py);
+    }
+    depCtx.stroke();
+  }
+}
+
+/* ===================== 17. ループ ===================== */
+let frames=0, fpsT=performance.now(), fpsVal=0;
+function syncViewport(){
+  const r=glc.getBoundingClientRect();
+  const w=Math.max(2,Math.round(r.width)), h=Math.max(2,Math.round(r.height));
+  if(w!==VW||h!==VH){
+    VW=w; VH=h;
+    renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+    renderer.setSize(w,h,false);
+    layoutFrame();
+  }
+}
+function tick(now){
+  requestAnimationFrame(tick);
+  syncViewport();
+  if(S.exporting) return;
+
+  if(playT0!==null){
+    const dur=Math.max(0.05, S.shot.frames/S.shot.fps)*1000;
+    const u=(now-playT0)/dur;
+    if(u>=1){ applyShot(1); stopShot(); } else applyShot(u);
+    syncCamUI();
+  }
+
+  /* 視差クランプ ─ Z幅を毎フレーム解き直す（後付けではなく常時効く装置） */
+  S.zsEff = S.clampOn ? solveZ() : S.zs;
+  uni.uZ.value = S.zsEff;
+  if(S.clampOn) $('#vl-zs').textContent=fmt(S.zsEff,3);
+  else          $('#vl-zs').textContent=fmt(S.zs,3);
+
+  if(depthDirty){ uni.uDepth.value.needsUpdate=true; depthDirty=false; }
+  updateCamera();
+  uni.uView.value = VIEW_ID[S.view];
+  renderStage();
+
+  frames++;
+  if(now-fpsT>500){ fpsVal=frames*1000/(now-fpsT); frames=0; fpsT=now; updateReadout(); }
+  if(miniDirty && now-miniT>110){ drawMini(); miniDirty=false; miniT=now; }
+}
+function updateReadout(){
+  S.par = measureParallax(S.zsEff, S.swing);
+  S.band = bandOf(S.par);
+  S.ratio = depthRatio();
+  const B=BANDS[S.band];
+  const pe=$('#m-par'); pe.textContent=fmt(S.par,1)+' px'; pe.className='dv big '+B.cls;
+  const be=$('#m-band'); be.textContent=B.t; be.className='dv '+B.cls;
+  const re=$('#m-ratio'); re.textContent=fmt(S.ratio,2);
+  re.className='dv '+(S.ratio>5?'bad':(S.ratio>3?'warn':'ok'));
+  $('#m-range').textContent=fmt(S.dmin,2)+'–'+fmt(S.dmax,2)+' / '+fmt(S.zsEff,3);
+  const segLong = S.iw>=S.ih ? S.seg : Math.max(8,Math.round(S.seg*(S.iw/S.ih)));
+  $('#m-cell').textContent = fmt(S.iw/segLong,1)+' px';
+  const verts = geo ? geo.attributes.position.count : 0;
+  $('#m-fps').textContent = (verts/1000).toFixed(1)+'k / '+fpsVal.toFixed(0);
+  $('#s-save').textContent = 'UNDO '+undoStack.length+' ／ '+(undoBytes/1048576).toFixed(1)+' MB';
+
+  const hud=$('#hud');
+  const chips=[
+    `<span class="chip">MODE <b>${S.mode==='paint'?'PAINT':'CAM'}</b></span>`,
+    `<span class="chip">${TOOL_JP[S.tool]} <b>${S.brush.size}px</b></span>`,
+    `<span class="chip ${S.band>=2?'hot':(S.band===1?'warn':'')}">視差 <b>${fmt(S.par,1)}px</b> ${B.t}</span>`
+  ];
+  if(S.ratio>5) chips.push('<span class="chip hot">大パース Zbg/Zfg '+fmt(S.ratio,1)+' ▸ 圧縮を効かせる</span>');
+  if(S.clampOn) chips.push('<span class="chip">クランプ <b>'+S.lim+'px</b> ▸ Z幅 '+fmt(S.zsEff,3)+'</span>');
+  hud.innerHTML=chips.join('');
+}
+glc.addEventListener('pointermove', e=>{
+  const uv=pickUV(e.clientX,e.clientY);
+  if(uv){ hoverUV=uv; miniDirty=true; }
+});
+
+/* ===================== 18. 起動 ===================== */
+function boot(){
+  adoptArt(makeTestPlate(), '（内蔵テストプレート）');
+  setTool('raise'); setView('art'); setMode('paint');
+  uni.uCompMode.value=1;
+  setRow('sl-comp', true); setRow('sl-lim', true); setRow('sl-zs', false); setRow('sl-relief', false);
+  syncGenRows(); syncCamUI(); syncShotUI(); syncUndoBtns();
+  $('#vl-size').textContent=S.brush.size+' px';
+  $('#vl-str').textContent=fmt(S.brush.str,2);
+  $('#vl-hard').textContent=fmt(S.brush.hard,2);
+  $('#vl-gen').textContent=fmt(S.gen,2);
+  $('#vl-pick').textContent=fmt(S.pick,3);
+  $('#vl-comp').textContent=fmt(S.compAmt,2);
+  $('#vl-seg').textContent=S.seg;
+  $('#vl-bleed').textContent=fmt(S.bleed*100,1)+' %';
+  $('#vl-lim').textContent=S.lim+' px';
+  $('#vl-swing').textContent=fmt(S.swing,1)+' °';
+  $('#m-deg').textContent=fmt(S.swing,1);
+  $('#vl-relief').textContent=fmt(S.relief,2);
+  $('#vl-fov').textContent=S.fov+' °';
+  $('#vl-outw').textContent=S.outw+' px';
+  if(!window.showDirectoryPicker) $('#exp-msg').textContent='フォルダ選択が使えないので個別ダウンロードになる（http:// で開くと使える）。';
+  generate('luma');            /* 触ってすぐ立体が出ている状態から始める */
+  requestAnimationFrame(tick);
+}
+/* 検証用の窓口（VRT ハーネスに昇格するときは window.__HARNESS__ に置き換える） */
+window.__LAB__ = {
+  S, uni, camera, renderer,
+  get mesh(){ return mesh; }, get geo(){ return geo; },
+  api:{ setTool, setView, setMode, generate, applyShot, measureParallax, solveZ,
+        doUndo, doRedo, stamp, paintAt, pickUV, sampleDepth, curveJS, fitDist,
+        depthToCanvas, loadDepthImage, renderPacked, outSize,
+        updateCamera, updateReadout, refreshDepthStats, drawMini, toast,
+        frameRect, layoutFrame,
+        step(){ syncViewport(); layoutFrame(); updateCamera();
+                S.zsEff = S.clampOn ? solveZ() : S.zs; uni.uZ.value = S.zsEff;
+                if(uni.uDepth.value) uni.uDepth.value.needsUpdate=true;
+                uni.uView.value = VIEW_ID[S.view];
+                renderStage(); updateReadout(); drawMini(); },
+        undoDepth(){ return {n:undoStack.length, mb:+(undoBytes/1048576).toFixed(2)}; } }
+};
+boot();
+</script>
+</body>
+</html>
