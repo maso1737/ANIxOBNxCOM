@@ -318,7 +318,12 @@ html,body{
 #canvas-wrap{
   position:relative;
   background:transparent;
-  /* 描画領域は中央に */
+  /* 描画領域は中央に。
+     ★flex:0 0 auto が要る。#stage は display:flex なので、既定の flex-shrink:1 だと
+     ズーム100%などで幅がステージより大きくなった途端に **wrap だけが縮められ**、
+     中の canvas がはみ出して「左上起点」になっていた（実測: style 2048px → rect 856px）。
+     ズーム/パンの計算はすべて「wrap はステージ中心にある」前提なので、縮むと焦点がズレる。 */
+  flex:0 0 auto;
 }
 /* FRAMEレイヤー編集モード時のステージ枠（ピンク色のヒント） */
 #stage.frame-edit{
@@ -1518,14 +1523,14 @@ input[type=range]::-moz-range-thumb{
       </svg>
       <span class="lbl">PEN</span>
     </button>
-    <button class="tool" data-tool="erase" title="消しゴム (E)">
+    <button class="tool" data-tool="erase" title="消しゴム (E)（Wクリックで筆圧 ON/OFF・長押しでこのコマを全消去）">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M16 4l4 4-9 9H7l-3-3 9-9z"></path>
         <path d="M9 17h11"></path>
       </svg>
       <span class="lbl">ERASE</span>
     </button>
-    <button class="tool" data-tool="fill" title="塗りつぶし (G)（Wクリックで投げ縄塗り・長押しで投げ縄透明消し）">
+    <button class="tool" data-tool="fill" title="塗りつぶし (G)（Wクリックで投げ縄⇔バケツ・長押しで透明消し⇔投げ縄塗り）">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M5 11l7-7 7 7-7 7-7-7z"></path>
         <path d="M5 11h14"></path>
@@ -1556,7 +1561,7 @@ input[type=range]::-moz-range-thumb{
 
     <!-- INK COLOR 縦 -->
     <div class="tb-ink-stack" id="tb-ink-stack">
-      <button class="tb-ink on" data-c="black">主線</button>
+      <button class="tb-ink on" data-c="black" title="主線（黒）（1）&#10;長押し: 元の黒に戻す（パレット/スポイトで下書に移ったときの戻り道）">主線</button>
       <button class="tb-ink" data-c="blue">下書</button>
       <button class="tb-ink" data-c="orange">指示</button>
     </div>
@@ -1846,7 +1851,12 @@ input[type=range]::-moz-range-thumb{
         <span class="tone-prev" id="tone2-prev" title="実寸プレビュー"></span>
       </div>
       <div class="sc-hint" style="margin-top:4px;margin-bottom:0;">プレビューは画面の実寸なので、ズーム 100%（＋ボタンで立ち寄れます）のキャンバスと同じ大きさに見えます</div>
-      <button id="tone-reset" class="ref-btn" style="width:100%;margin-top:6px;padding:5px 0;">RESET（14px / 10%・40%）</button>
+      <div class="sg-row" style="margin-top:8px;">
+        <span class="sc-label" style="flex:1;min-width:0;">トーンにスポイトの色を入れる</span>
+        <button id="tone-pick-toggle" class="ref-btn" style="min-width:54px;text-align:center;">OFF</button>
+      </div>
+      <div class="sc-hint" style="margin-top:4px;margin-bottom:0;"><b>OFF（既定）</b>＝トーン選択中にスポイトすると、網点はそのままで<b>下書／指示の通常インクに切り替わって</b>そこへ色が入ります。<b>ON</b>＝従来どおり網点そのものの色を塗り替えます</div>
+      <button id="tone-reset" class="ref-btn" style="width:100%;margin-top:6px;padding:5px 0;">RESET（T1 8px/6%・T2 4px/40%）</button>
     </div>
     <div class="ref-sect">
       <div class="ref-sect-h">TIMELAPSE（作画タイムラプス）</div>
@@ -2077,11 +2087,13 @@ function saveInk(){
     blue: INK.blue, orange: INK.orange,
     tone1: TONE.tone1.color, tone2: TONE.tone2.color,
     // 網点の粗さ／濃さも持ち越す（色だけ保存していたので、開き直すと既定に戻っていた）
+    __tv: TONE_SHAPE_V,
     toneShape: {
       tone1: { pitch: TONE.tone1.pitch, cov: TONE.tone1.cov },
       tone2: { pitch: TONE.tone2.pitch, cov: TONE.tone2.cov },
     },
     toneMode: { blue: toneMode.blue, orange: toneMode.orange },
+    tonePick: gTonePick,
   })); }catch(e){}
 }
 
@@ -2111,7 +2123,8 @@ function saveOnionCfg(){ try{ localStorage.setItem(ONION_LS, JSON.stringify(ONIO
 // 選択中のONIONカラーチップ（null | 'prev' | 'next'）。選択中はAltスポイト/パレットの行き先になる。
 let gOniSlot = null;
 
-// ── SCREEN TONE（下書/指示ボタンのWクリックで dot10%/dot40% トーンインクに切替）──
+// ── SCREEN TONE（下書/指示ボタンのWクリックで T1/T2 トーンインクに切替）──
+// 既定は T1=8px/6%（薄いアタリ）・T2=4px/40%（濃い網）。SETTINGS ▸ SCREEN TONE で変更可。
 // パターンはキャンバス原点固定＝塗り足しても網点がズレず繋がる（現実の貼りトーンと同じ）。
 // 描画結果は drawData に実ピクセルとして焼き込まれるため書き出し/連携は変更不要。
 const TONE_PITCH = 14;  // 網点タイル1辺px の既定（45°配置・タイルあたりドット2個相当）
@@ -2121,12 +2134,18 @@ const TONE_PITCH = 14;  // 網点タイル1辺px の既定（45°配置・タイ
 // （発注者報告「ドット2種がかなり大きい比率に見える」）。
 // 粗さの好みは絵によるので **SETTINGS ▸ SCREEN TONE で変えられる**（TONE_LIMIT の範囲）。
 const TONE_LIMIT = { pitch: [4, 48], cov: [0.01, 0.95] };
-const TONE_DEFAULT = { tone1: { cov: 0.10, pitch: 14 }, tone2: { cov: 0.40, pitch: 14 } };
+// 既定は 2026-09-12 に実機の見えがかりで決め直した（T1=薄いアタリ／T2=濃いベタ寄り）
+const TONE_DEFAULT = { tone1: { cov: 0.06, pitch: 8 }, tone2: { cov: 0.40, pitch: 4 } };
+const TONE_SHAPE_V = 2;   // toneShape 保存の世代。上げると古い保存の粗さ/濃さを読み捨てて既定へ
 const TONE = {
-  tone1: { cov: 0.10, pitch: 14, color: '#000000' },  // 下書スロット: 細かめの疎ドット
-  tone2: { cov: 0.40, pitch: 14, color: '#000000' },  // 指示スロット: 同ピッチで大きいドット
+  tone1: { cov: 0.06, pitch: 8, color: '#000000' },  // 下書スロット: 8px・6%＝細かく薄いアタリ
+  tone2: { cov: 0.40, pitch: 4, color: '#000000' },  // 指示スロット: 4px・40%＝細かく濃い網
 };
 const toneMode = { blue: false, orange: false };
+// トーン選択中にスポイトした色を「網点そのものの色」に入れるか。
+//   既定 OFF＝網点は黒のまま。拾った色は下書／指示の通常インクへ回す（そちらに切り替わる）。
+//   SETTINGS ▸ SCREEN TONE で ON にすると従来どおり網点の色を塗り替える。
+let gTonePick = false;
 function isToneInk(c){ return c === 'tone1' || c === 'tone2'; }
 // 下書/指示スロット名 → 現在有効なインク名（トーンモード中は tone1/tone2）
 function slotInk(c){
@@ -2179,7 +2198,9 @@ function buildTone(key){
     if(o && typeof o === 'object'){
       if(o.tone1) TONE.tone1.color = o.tone1;
       if(o.tone2) TONE.tone2.color = o.tone2;
-      if(o.toneShape){
+      // 世代印が無い（＝旧既定 14px/10%・40% の頃の保存）ときは粗さ/濃さを読み捨てて新既定を使う。
+      // 自分で触った値は保存時に __tv が付くので、以後はちゃんと持ち越される。
+      if(o.toneShape && o.__tv === TONE_SHAPE_V){
         ['tone1','tone2'].forEach(k => {
           const s = o.toneShape[k]; if(!s) return;
           if(typeof s.pitch === 'number') TONE[k].pitch = clampTonePitch(s.pitch);
@@ -2187,6 +2208,7 @@ function buildTone(key){
         });
       }
       if(o.toneMode){ toneMode.blue = !!o.toneMode.blue; toneMode.orange = !!o.toneMode.orange; }
+      if(typeof o.tonePick === 'boolean') gTonePick = o.tonePick;
     }
   }catch(e){}
 })();
@@ -2216,6 +2238,16 @@ function setActiveInkColor(hex){
   saveInk();
   updateInkSwatches();
   return true;
+}
+
+// 主線を出荷時の黒に戻し、主線を選択状態にする（主線ボタンの長押し）。
+//   パレット選択やスポイトで「下書へフォーカスが移って別の色で描ける」状態になったとき、
+//   一手で黒へ帰れる道を用意する（主線の色そのものは元から固定＝黒）。
+function resetBlackInk(){
+  INK.black = '#000000';
+  state.inkColor = 'black';
+  applyInkUIForTool();
+  stageToast('主線（黒）に戻しました');
 }
 
 // 下書/指示スロットの色を出荷時に戻す（ボタン長押し）。トーン色も一緒に戻す。
@@ -2837,6 +2869,12 @@ function minifyPanel(panelId, force){
   if(!p) return;
   const min = (typeof force === 'boolean') ? force : !p.classList.contains('minified');
   p.classList.toggle('minified', min);
+  // REFパネルを畳んだら MOVE も解除する。
+  // 畳むとボタンが見えないので「ONのままだと指ドラッグが参照移動に取られる」事故になる。
+  if(panelId === 'ref-panel' && min && state.refMoveMode){
+    setRefMoveMode(false);
+    stageToast('REF MOVE OFF（パネル最小化）');
+  }
   const btn = document.getElementById(panelId + '-min');
   if(btn){
     btn.textContent = min ? '+' : '–';
@@ -3170,13 +3208,11 @@ function fitToStage(){
   state.panY = 0;
   applyZoom();
 }
-// 等倍(100%)表示。パンはリセットして中央に戻す
+// 等倍(100%)表示。**最後に絵の上を触った点を起点**に拡大する（その点が画面上で動かない）。
+//   一度も絵に触っていなければ getZoomFocal() がステージ中心を返す＝従来どおり中央。
 function zoomActual(){
-  state.zoom = 1;
-  state.fitMode = false;
-  state.panX = 0;
-  state.panY = 0;
-  applyZoom();
+  const f = getZoomFocal();
+  zoomAt(f.x, f.y, 1);
 }
 // ＋/− の1段（×1.25）。**100% と FIT の倍率には必ず立ち寄る**（2026-09-03）。
 // 網点トーンやペンの粒の「実際の大きさ」は等倍でしか判断できないのに、×1.25 を掛けるだけだと
@@ -3758,6 +3794,14 @@ function eraseDot(ctx, x, y, size){
 function eraseLine(ctx, x0, y0, x1, y1, size){
   bresenham(x0, y0, x1, y1, (x, y) => eraseDot(ctx, x, y, size));
 }
+// 任意半径の消し（筆圧消しゴム用）。drawDotRadius / drawLineRadius と対になる。
+function eraseDotRadius(ctx, x, y, r){
+  if(r <= 0.7){ ctx.clearRect(x, y, 1, 1); return; }
+  fillCircleRows(x, y, r, (px, py, w) => ctx.clearRect(px, py, w, 1));
+}
+function eraseLineRadius(ctx, x0, y0, x1, y1, r0, r1){
+  bresenham(x0, y0, x1, y1, (x, y, t) => eraseDotRadius(ctx, x, y, r0 + (r1 - r0) * t));
+}
 
 // ============================================================
 // FLOOD FILL
@@ -3923,7 +3967,23 @@ function focusRoughInk(hex){
 function applyPickedColor(hex){
   if(!hex) return;
   if(gOniSlot){ setOnionColor(gOniSlot, hex); return; }          // ONIONチップ選択中が最優先
-  if(inkPickActive()){ setActiveInkColor(hex); return; }         // 下書/指示/トーン
+  if(inkPickActive()){                                           // 下書/指示/トーン
+    const c = state.inkColor;
+    // トーン選択中は既定で「網点の色」を触らない。
+    // 代わりに **下書/指示の通常インクへ切り替えて**そこへ拾った色を入れる
+    // （網点のまま色を変えても見分けが付きにくく、戻し方も分かりにくいため）。
+    if(isToneInk(c) && !gTonePick){
+      const slot = (c === 'tone1') ? 'blue' : 'orange';
+      toneMode[slot] = false;
+      INK[slot] = hex;
+      state.inkColor = slot;
+      saveInk();
+      applyInkUIForTool();
+      stageToast((slot === 'blue' ? '下書' : '指示') + ' に色を入れました（トーン解除）');
+      return;
+    }
+    setActiveInkColor(hex); return;
+  }
   // FILL PALETTE の選択スロットへ取り込み（＝カスタムパレット化）
   state.fillColor = hex;
   if(typeof gPalette !== 'undefined' && gPalSlot >= 0 && gPalSlot < gPalette.length){
@@ -5184,16 +5244,79 @@ let tPanning = false, tPanId = null;
 let tPanStartClient = {x:0,y:0}, tPanStartPan = {x:0,y:0};
 let tTapSessionStart = 0, tTapMaxFingers = 0;
 
+// ── ピンチの発動条件とアンカー ────────────────────────────
+//   2本指を置いた瞬間にズームを始めると、**2本指タップ（UNDO）のわずかな指の動きで
+//   絵がガタッと動く**。そこで「置いた時点では待機（armed）」にして、指の間隔か中心が
+//   PINCH_SLOP px 動いてから初めてピンチにする。発動した瞬間を基準に取り直すので、
+//   待機中に動いたぶんが一気に効いて飛ぶこともない。
+const PINCH_SLOP = 16;
+let tPinchArmed = false;
+let tPinchAnchor = {x:0, y:0};   // 2本指の中心の下にあるキャンバス座標（これを指の間に固定）
+let tPinchStageC = {x:0, y:0};   // ステージ中心（ジェスチャ中は動かないので1回測るだけ）
+let tGestureConsumed = false;    // ピンチ/スポイトで使い切った＝離してもタップ扱いにしない
+function pinchBegin(d, c){
+  tPinchStartDist = d;
+  tPinchStartCenter = {x:c.x, y:c.y};
+  tPinchStartZoom = state.zoom;
+  tPinchStartPan = {x:state.panX, y:state.panY};
+  const sr = stage.getBoundingClientRect();
+  tPinchStageC = {x: sr.left + sr.width/2, y: sr.top + sr.height/2};
+  const sgn = state.flipped ? -1 : 1;
+  tPinchAnchor = {
+    x: (c.x - tPinchStageC.x - state.panX) / (state.zoom * sgn) + CFG.WORK_W / 2,
+    y: (c.y - tPinchStageC.y - state.panY) / state.zoom         + CFG.WORK_H / 2,
+  };
+}
+function pinchApply(d, c){
+  if(tPinchStartDist <= 0) return;
+  const nz = Math.max(0.05, Math.min(8, tPinchStartZoom * (d / tPinchStartDist)));
+  const sgn = state.flipped ? -1 : 1;
+  state.zoom = nz;
+  // 掴んだキャンバス座標が「いまの2本指の中心」に居続けるようパンを逆算（zoomAt と同じ式）。
+  // 指を開けばその間から拡大し、2本指をずらせばそのままパンになる。
+  state.panX = c.x - tPinchStageC.x - (tPinchAnchor.x - CFG.WORK_W / 2) * nz * sgn;
+  state.panY = c.y - tPinchStageC.y - (tPinchAnchor.y - CFG.WORK_H / 2) * nz;
+  state.fitMode = false;
+  applyZoom();
+}
+function touchPairMetrics(){
+  const pts = Array.from(touchPtrs.values());
+  return {
+    d: Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y),
+    c: {x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2},
+  };
+}
+
 // ── 指の長押しスポイト（iPad）──────────────────────────────
 //   指1本で絵の上を長押し（600ms・動かさない）＝ Alt+クリックと同じスポイト。
 //   **ペンは対象外**（ペンは描くための道具なので、長押ししても描画のまま）。
 //   拾った色の行き先は applyPickedColor() が一元管理（ONIONチップ→インク→パレット）。
+//   長押しが成立したあとは **指を離すまで滑らせて色を選び直せる**（最初の一点で外したとき用）。
 const TOUCH_EYE_MS = 600;      // 長押し成立
-const TOUCH_EYE_MOVE = 12;     // これ以上動いたら中止（＝パンの意思）
+const TOUCH_EYE_MOVE = 12;     // 成立前にこれ以上動いたら中止（＝パンの意思）
+const TOUCH_EYE_HZ_MS = 50;    // 滑らせている間の再サンプリング間隔
 let tEyeTimer = null, tEyeAt = null;
+let tEyeLive = false, tEyeLastHex = '', tEyeLastT = 0, tEyeInk = null;
 function touchEyedropClear(){
   if(tEyeTimer){ clearTimeout(tEyeTimer); tEyeTimer = null; }
   tEyeAt = null;
+  tEyeLive = false;
+  tEyeLastHex = '';
+  tEyeInk = null;
+}
+// 指の下の色を拾って行き先へ流す。同じ色の上を滑っている間は何もしない（無駄な保存/再描画を避ける）。
+//   滑らせて拾い直すときは **押し始めのインク選択に戻してから** 流す。
+//   そうしないと、1回目で「主線→下書へフォーカス移動」した結果、2回目以降の行き先が
+//   下書だけに変わってしまい、パレットのスロットに最初の色が残る（色が2か所に散る）。
+//   こうしておけば「滑らせた先で長押ししたのと同じ結果」になる。
+function touchEyedropSample(cx, cy){
+  const { x, y } = toCanvasCoord(cx, cy);
+  const hex = sampleCompositeColor(x, y);
+  if(!hex || hex === tEyeLastHex) return;
+  tEyeLastHex = hex;
+  if(tEyeInk !== null) state.inkColor = tEyeInk;
+  applyPickedColor(hex);
+  stageToast('スポイト ' + hex);
 }
 function touchEyedropArm(cx, cy){
   touchEyedropClear();
@@ -5204,15 +5327,22 @@ function touchEyedropArm(cx, cy){
   tEyeTimer = setTimeout(() => {
     tEyeTimer = null;
     if(!tEyeAt) return;
-    const { x, y } = toCanvasCoord(tEyeAt.x, tEyeAt.y);
-    const hex = sampleCompositeColor(x, y);
     tPanning = false;                        // 拾ったあとに画面が流れないように
-    applyPickedColor(hex);
-    stageToast('スポイト ' + (hex || ''));
-    tEyeAt = null;
+    tGestureConsumed = true;                 // 離してもタップ（UNDO）にしない
+    tEyeLive = true;                         // ★ここから「滑らせて選び直せる」モード
+    tEyeLastHex = '';
+    tEyeInk = state.inkColor;                // 拾い直しの基準（押し始めのインク選択）
+    touchEyedropSample(tEyeAt.x, tEyeAt.y);
   }, TOUCH_EYE_MS);
 }
 function touchEyedropMove(cx, cy){
+  if(tEyeLive){
+    const now = performance.now();
+    if(now - tEyeLastT < TOUCH_EYE_HZ_MS) return;
+    tEyeLastT = now;
+    touchEyedropSample(cx, cy);
+    return;
+  }
   if(!tEyeAt) return;
   if(Math.hypot(cx - tEyeAt.x, cy - tEyeAt.y) > TOUCH_EYE_MOVE) touchEyedropClear();
 }
@@ -5226,7 +5356,7 @@ stage.addEventListener('pointerdown', e => {
     startX:e.clientX, startY:e.clientY, startT:now});
 
   // タップセッション追跡
-  if(touchPtrs.size === 1){ tTapSessionStart = now; tTapMaxFingers = 1; }
+  if(touchPtrs.size === 1){ tTapSessionStart = now; tTapMaxFingers = 1; tGestureConsumed = false; }
   else if(touchPtrs.size > tTapMaxFingers){ tTapMaxFingers = touchPtrs.size; }
 
   if(touchPtrs.size === 1){
@@ -5243,20 +5373,19 @@ stage.addEventListener('pointerdown', e => {
       touchEyedropArm(e.clientX, e.clientY);   // 指で長押し＝スポイト（Alt+クリックと同じ行き先）
     }
   } else if(touchPtrs.size === 2){
-    // 2本指: ピンチ開始
+    // 2本指: ピンチ「待機」に入るだけ（ズームは pointermove 側で SLOP を超えてから）
     touchEyedropClear();
     if(drawing) endStroke();
     tPanning = false;
-    const pts = Array.from(touchPtrs.values());
-    const pdist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
-    const pcx = (pts[0].x+pts[1].x)/2, pcy = (pts[0].y+pts[1].y)/2;
+    const m = touchPairMetrics();
     // MOVE中は参照(画像/アニメ/フレーム)の拡縮＋移動を優先（キャンバスズームしない）
-    if(refImgActive() && refPinchBegin(pcx, pcy, pdist)){
-      tPinching = false;
+    if(refImgActive() && refPinchBegin(m.c.x, m.c.y, m.d)){
+      tPinching = false; tPinchArmed = false;
     } else {
-      tPinching = true;
-      tPinchStartDist = pdist;
-      tPinchStartCenter = {x:pcx, y:pcy};
+      tPinching = false;
+      tPinchArmed = true;
+      tPinchStartDist = m.d;
+      tPinchStartCenter = {x:m.c.x, y:m.c.y};
       tPinchStartZoom = state.zoom;
       tPinchStartPan = {x:state.panX, y:state.panY};
     }
@@ -5264,7 +5393,7 @@ stage.addEventListener('pointerdown', e => {
     // 3本以上: 全動作停止（タップ判定は継続）
     touchEyedropClear();
     if(drawing) endStroke();
-    tPinching = false; tPanning = false;
+    tPinching = false; tPinchArmed = false; tPanning = false;
   }
 }, {passive:false});
 
@@ -5283,18 +5412,18 @@ stage.addEventListener('pointermove', e => {
     refPinchMove(c.x, c.y, d);
     return;
   }
-  if(tPinching && touchPtrs.size >= 2){
-    const pts = Array.from(touchPtrs.values());
-    const d = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
-    const c = {x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2};
-    if(tPinchStartDist > 0){
-      const scale = d / tPinchStartDist;
-      state.zoom = Math.max(0.05, Math.min(8, tPinchStartZoom * scale));
-      state.panX = tPinchStartPan.x + (c.x - tPinchStartCenter.x);
-      state.panY = tPinchStartPan.y + (c.y - tPinchStartCenter.y);
-      state.fitMode = false;
-      applyZoom();
+  if((tPinching || tPinchArmed) && touchPtrs.size >= 2){
+    const { d, c } = touchPairMetrics();
+    if(tPinchArmed){
+      // まだ「2本指タップかもしれない」段階。SLOP を超えるまでは絵を動かさない
+      const spread = Math.abs(d - tPinchStartDist);
+      const slide  = Math.hypot(c.x - tPinchStartCenter.x, c.y - tPinchStartCenter.y);
+      if(spread <= PINCH_SLOP && slide <= PINCH_SLOP) return;
+      tPinchArmed = false; tPinching = true;
+      tGestureConsumed = true;       // このセッションは UNDO/REDO にしない
+      pinchBegin(d, c);              // 発動した瞬間を基準に取り直す（飛ばない）
     }
+    pinchApply(d, c);
   } else if(tPanning && e.pointerId === tPanId){
     state.panX = tPanStartPan.x + (e.clientX - tPanStartClient.x);
     state.panY = tPanStartPan.y + (e.clientY - tPanStartClient.y);
@@ -5315,6 +5444,7 @@ function stageTouchEnd(e){
   if(refDragging){ refDragEnd(); }
   if(refPinching && touchPtrs.size < 2) refPinchEnd();
   if(tPinching && touchPtrs.size < 2) tPinching = false;
+  if(tPinchArmed && touchPtrs.size < 2) tPinchArmed = false;
   if(tPanning && e.pointerId === tPanId) tPanning = false;
   if(drawing && e.pointerId === drawingPointerId) endStroke();
 
@@ -5322,11 +5452,13 @@ function stageTouchEnd(e){
   if(touchPtrs.size === 0){
     const elapsed = performance.now() - tTapSessionStart;
     const moved = Math.hypot(p.x - p.startX, p.y - p.startY);
-    if(elapsed < 300 && moved < 12){
+    // ピンチが発動した／スポイトを拾ったセッションはタップ扱いにしない
+    if(!tGestureConsumed && elapsed < 300 && moved < 12){
       if(tTapMaxFingers === 2){ undo(); }
       else if(tTapMaxFingers === 3){ redo(); }
     }
     tTapMaxFingers = 0;
+    tGestureConsumed = false;
   }
 }
 stage.addEventListener('pointerup', stageTouchEnd);
@@ -5386,9 +5518,10 @@ function taperK(){
   if(state.penSmooth !== 'ema+') return 1;
   return Math.min(1, strokeArc / TAPER_PX);
 }
-// 筆圧 → 半径（現在のペンサイズを最大半径とする）
+// 筆圧 → 半径（いま使っている道具のサイズを最大半径とする。消しゴムは eraseSize）
 function pressureRadius(pressure){
-  const maxR = state.penSize === 1 ? 3 : state.penSize === 2 ? 6 : state.penSize * 0.8;
+  const sz = currentToolSize();
+  const maxR = sz === 1 ? 3 : sz === 2 ? 6 : sz * 0.8;
   const plus = (state.penSmooth === 'ema+');
   /* ★あの「線上に点々と残る太い粒」の正体はここだった。
      `pressure || 0.5` は「筆圧が来ていない環境なら 0.5 とみなす」つもりの式だが、
@@ -5453,7 +5586,7 @@ function startStroke(clientX, clientY, pressure){
   drawing = true;
   const ctx = activeDrawCtx();
   const mp = (mx, my) => { const m = mirrorPt(mx, my); return em ? toFrameLocal(m.x, m.y) : m; };
-  const usePressure = state.pressurePen && state.tool === 'pen';
+  const usePressure = state.pressurePen && (state.tool === 'pen' || state.tool === 'erase');
   if(state.tool === 'pen'){
     if(usePressure){
       lastR = pressureRadius(smoothPressure(pressure));
@@ -5464,8 +5597,14 @@ function startStroke(clientX, clientY, pressure){
       if(state.mirrorOn){ const m = mp(x, y); drawDot(ctx, m.x, m.y, currentToolSize(), inkStyle()); }
     }
   } else if(state.tool === 'erase'){
-    eraseDot(ctx, dc.x, dc.y, currentToolSize());
-    if(state.mirrorOn){ const m = mp(x, y); eraseDot(ctx, m.x, m.y, currentToolSize()); }
+    if(usePressure){
+      lastR = pressureRadius(smoothPressure(pressure));
+      eraseDotRadius(ctx, dc.x, dc.y, lastR);
+      if(state.mirrorOn){ const m = mp(x, y); eraseDotRadius(ctx, m.x, m.y, lastR); }
+    } else {
+      eraseDot(ctx, dc.x, dc.y, currentToolSize());
+      if(state.mirrorOn){ const m = mp(x, y); eraseDot(ctx, m.x, m.y, currentToolSize()); }
+    }
   }
 }
 function continueStroke(clientX, clientY, pressure, noSmooth){
@@ -5477,7 +5616,7 @@ function continueStroke(clientX, clientY, pressure, noSmooth){
   const dc = em ? toFrameLocal(sm.x, sm.y) : { x: sm.x, y: sm.y };
   const x = dc.x, y = dc.y;
   const ctx = activeDrawCtx();
-  const usePressure = state.pressurePen && state.tool === 'pen';
+  const usePressure = state.pressurePen && (state.tool === 'pen' || state.tool === 'erase');
   // ミラーは「作業座標」で反転 → 必要ならフレームバッファ座標へ変換
   const curWX = sm.x, curWY = sm.y;
   const mLine = () => {
@@ -5498,8 +5637,15 @@ function continueStroke(clientX, clientY, pressure, noSmooth){
       if(state.mirrorOn){ const [a,b] = mLine(); drawLine(ctx, a.x, a.y, b.x, b.y, currentToolSize(), inkStyle()); }
     }
   } else if(state.tool === 'erase'){
-    eraseLine(ctx, lastX, lastY, x, y, currentToolSize());
-    if(state.mirrorOn){ const [a,b] = mLine(); eraseLine(ctx, a.x, a.y, b.x, b.y, currentToolSize()); }
+    if(usePressure){
+      const r = pressureRadius(smoothPressure(pressure));
+      eraseLineRadius(ctx, lastX, lastY, x, y, lastR, r);
+      if(state.mirrorOn){ const [a,b] = mLine(); eraseLineRadius(ctx, a.x, a.y, b.x, b.y, lastR, r); }
+      lastR = r;
+    } else {
+      eraseLine(ctx, lastX, lastY, x, y, currentToolSize());
+      if(state.mirrorOn){ const [a,b] = mLine(); eraseLine(ctx, a.x, a.y, b.x, b.y, currentToolSize()); }
+    }
   }
   lastX = x; lastY = y;          // バッファ座標（次セグメント用）
   lastWX = curWX; lastWY = curWY; // 作業座標（ミラー用）
@@ -5900,9 +6046,20 @@ function onDoubleActivate(el, handler){
 const penToolBtn = document.querySelector('.tool[data-tool="pen"]');
 function togglePressurePen(){
   state.pressurePen = !state.pressurePen;
-  penToolBtn.classList.toggle('pp-on', state.pressurePen);
-  penToolBtn.title = '筆圧ペン: ' + (state.pressurePen ? 'ON' : 'OFF') + '（Wクリック / P2連打で切替）';
-  stageToast('筆圧ペン ' + (state.pressurePen ? 'ON' : 'OFF'));
+  applyPressurePenUI();
+  stageToast('筆圧 ' + (state.pressurePen ? 'ON' : 'OFF') + '（ペン・消しゴム共通）');
+}
+// 筆圧バッジ/ツールチップを PEN と ERASE の両方に同期（設定は1つ＝state.pressurePen）
+function applyPressurePenUI(){
+  const on = !!state.pressurePen;
+  penToolBtn.classList.toggle('pp-on', on);
+  penToolBtn.title = '筆圧: ' + (on ? 'ON' : 'OFF') + '（Wクリック / P2連打で切替）/ Shift+クリック=直線・Shift+ドラッグ=水平垂直';
+  const eb = document.querySelector('.tool[data-tool="erase"]');
+  if(eb){
+    eb.classList.toggle('pp-on', on);
+    eb.title = '消しゴム (E)　筆圧: ' + (on ? 'ON' : 'OFF') +
+               '（Wクリック / E2連打で切替）／長押しでこのコマを全消去';
+  }
 }
 onDoubleActivate(penToolBtn, togglePressurePen);
 // ロングプレス検出（FILL長押し＝投げ縄透明消し切替）。クリック/ダブルタップとは独立。
@@ -5926,9 +6083,9 @@ const fillToolBtn = document.querySelector('.tool[data-tool="fill"]');
 // 投げ縄塗り(lasso) ⇔ バケツ(flood)。投げ縄透明消しからは「透明消しだけ解く」。
 function fillToggleLasso(){
   lassoCancel();                      // 囲い途中でモードが変わったら捨てる
-  const lassoFill = (state.fillMode === 'lasso' && !state.fillErase);
-  if(lassoFill){
-    state.fillMode = 'flood';           // もう一度で バケツへ戻す
+  // Wクリックは「投げ縄 ⇔ バケツ」の行き来だけを受け持つ（透明消し中でもバケツへ戻れる）
+  if(state.fillMode === 'lasso'){
+    state.fillMode = 'flood'; state.fillErase = false;
   }else{
     state.fillMode = 'lasso'; state.fillErase = false;
   }
@@ -5937,17 +6094,19 @@ function fillToggleLasso(){
   syncFillInkFocus();
   stageToast(fillModeName());
 }
-// 投げ縄透明消し(lasso+erase) ⇔ バケツ(flood)
+// 長押しは「透明消しかどうか」だけを受け持つ。**戻しても投げ縄のまま**（塗りへ戻る）。
+//   囲う形を決めてから「これは塗り／これは消し」を行き来したいので、
+//   バケツへ戻す役はWクリックに任せて、長押しでは投げ縄を解除しない。
 function fillToggleLassoErase(){
   lassoCancel();
-  const lassoErase = (state.fillMode === 'lasso' && state.fillErase);
-  if(lassoErase){
-    state.fillMode = 'flood'; state.fillErase = false;   // もう一度で バケツへ戻す
+  if(state.fillMode === 'lasso' && state.fillErase){
+    state.fillErase = false;                             // 透明消し → 投げ縄塗り（投げ縄は維持）
   }else{
-    state.fillMode = 'lasso'; state.fillErase = true;
+    state.fillMode = 'lasso'; state.fillErase = true;    // → 投げ縄透明消し
   }
   if(state.tool !== 'fill') fillToolBtn.click(); // 切替時はFILLを選択状態に
   applyFillModeUI();
+  syncFillInkFocus();
   stageToast(fillModeName());
 }
 function fillModeName(){
@@ -5973,7 +6132,7 @@ function applyFillModeUI(){
   fillToolBtn.classList.toggle('fe-on', state.fillErase);
   const lbl = fillToolBtn.querySelector('.lbl');
   if(lbl) lbl.textContent = lasso ? (state.fillErase ? 'L-DEL' : 'LASSO') : 'FILL';
-  const hint = '（Wクリック / G2連打＝投げ縄塗り・長押し / G長押し＝投げ縄透明消し）';
+  const hint = '（Wクリック / G2連打＝投げ縄⇔バケツ・長押し / G長押し＝透明消し⇔投げ縄塗り）';
   fillToolBtn.title = (lasso
     ? (state.fillErase
         ? '投げ縄透明消し: 囲った内側を透明に消す'
@@ -6105,10 +6264,12 @@ document.querySelectorAll('.tb-ink').forEach(btn => {
   });
 });
 
-// 下書/指示ボタン 長押し（600ms）→ その色を出荷時の色に戻す
+// インクボタン 長押し（600ms）
+//   下書/指示 … その色を出荷時に戻す
+//   主線      … 元の黒に戻す＋主線を選択（色が下書へ移っていても一手で帰れる）
 document.querySelectorAll('.tb-ink').forEach(btn => {
   const c = btn.dataset.c;
-  if(c !== 'blue' && c !== 'orange') return;
+  if(c !== 'blue' && c !== 'orange' && c !== 'black') return;
   let timer = null, sx = 0, sy = 0;
   const cancel = () => { if(timer){ clearTimeout(timer); timer = null; } };
   btn.addEventListener('pointerdown', e => {
@@ -6117,7 +6278,7 @@ document.querySelectorAll('.tb-ink').forEach(btn => {
     timer = setTimeout(() => {
       timer = null;
       gInkLongPressUntil = performance.now() + 500;  // 直後の click を無効化
-      resetInkSlot(c);
+      if(c === 'black') resetBlackInk(); else resetInkSlot(c);
       btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 420);
     }, 600);
   });
@@ -6242,6 +6403,7 @@ document.getElementById('pal-file-input').addEventListener('change', async e => 
     gPalSlot = Math.min(gPalSlot, gPalette.length-1);
     state.fillColor = gPalette[gPalSlot];
     savePalette(); renderPalette();
+    syncFillInkFocus();   // 読み込んだ色が主線(黒)のまま塗り色になるのを防ぐ
   }catch(err){ await modalAlert('読み込み失敗: '+(err.message||err)); }
 });
 
@@ -6292,32 +6454,50 @@ function clearCanvas(){
   drawCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
   pushHistory();
 }
-// ERASEボタンのダブルクリック/ダブルタップでキャンバスをクリア。
-// click の時刻差で測っているので、Eキー2連打（＝ボタンを2回clickする）でも同じように通る。
+// ERASEボタン: **Wクリック/Wタップ＝筆圧のON/OFF ／ 長押し＝このコマを全消去**。
+//   全消去は「2連打」だと巻き添えで消しやすいので長押しへ移した（Undoで戻せる）。
+//   Wクリックは click の時刻差で測っているので、Eキー2連打（＝2回click）でも筆圧が切り替わる。
 (function(){
-  let lastEraseTap = 0;
+  let lastEraseTap = 0, holdUntil = 0;
   const eraseBtn = document.querySelector('[data-tool="erase"]');
   eraseBtn.addEventListener('click', () => {
     const now = performance.now();
+    if(now < holdUntil){ lastEraseTap = 0; return; }   // 長押し成立直後の click は食う
     if(now - lastEraseTap < 380){
-      clearCanvas();
       lastEraseTap = 0;
-      stageToast('このコマを全消去');
+      togglePressurePen();
     } else {
       lastEraseTap = now;
     }
   });
+  onLongPress(eraseBtn, () => {
+    holdUntil = performance.now() + 700;
+    lastEraseTap = 0;
+    clearCanvas();
+    stageToast('このコマを全消去（Undoで戻せます）');
+  }, 600);
 })();
+applyPressurePenUI();   // 起動時にバッジ/ツールチップを両ボタンへ
 
 // ============================================================
 // ZOOM CONTROLS
 // ============================================================
-// 最後にポインターが触れた画面座標を追跡（ズームボタンの焦点用）
+// 最後に **絵の上** を触った画面座標を追跡（ズームボタン／FIT2回目＝100%の焦点用）。
+//   指・ペン・マウスのどれでも同じ扱い。iPadは hover が無いので pointerdown も拾う
+//   （pointermove だけだと「触ったのに焦点が更新されない」→ 前の場所を起点に拡大してしまう）。
+//   ズームUIやパネルの上は覚えない（そこが焦点になると画面の端から拡大が始まる）。
 let lastPointerClientX = 0, lastPointerClientY = 0;
-stage.addEventListener('pointermove', e => {
+function trackZoomFocal(e){
+  // ステージの上に浮いているUI（ズームUI・左上の解像度ラベル等）のタップは覚えない。
+  // ズームを上げるとキャンバスが画面全体を覆うので、矩形判定だけではUIを弾けない。
+  if(e.target && e.target.closest && e.target.closest('button, #zoom-ctl, #stage-info, #stage-hud')) return;
+  const r = drawCanvas.getBoundingClientRect();
+  if(e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
   lastPointerClientX = e.clientX;
   lastPointerClientY = e.clientY;
-}, { passive: true });
+}
+stage.addEventListener('pointermove', trackZoomFocal, { passive: true });
+stage.addEventListener('pointerdown', trackZoomFocal, { passive: true, capture: true });
 
 function getZoomFocal(){
   // 有効な座標があればそれを使う。なければstageの中心
@@ -8785,9 +8965,11 @@ function selectRefImageSection(){
 function fileToDataURL(file){
   return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=()=>rej(fr.error); fr.readAsDataURL(file); });
 }
-// 共通 MOVE トグル
-document.getElementById('btn-ref-move').addEventListener('click', () => {
-  state.refMoveMode = !state.refMoveMode;
+// 共通 MOVE トグル（minifyPanel からも呼ぶので関数にしてある）
+function setRefMoveMode(on){
+  on = !!on;
+  if(state.refMoveMode === on) return;
+  state.refMoveMode = on;
   // MOVE ON時はFRAMEレイヤーのEDIT(直接描画)を自動でOFF（描画と移動の競合回避）
   if(state.refMoveMode && state.frameLayer.editMode){
     state.frameLayer.editMode = false;
@@ -8795,7 +8977,8 @@ document.getElementById('btn-ref-move').addEventListener('click', () => {
   }
   applyRefImgUI();
   drawCanvas.style.cursor = state.refMoveMode ? 'move' : ((state.tool==='fill')?'cell':'crosshair');
-});
+}
+document.getElementById('btn-ref-move').addEventListener('click', () => setRefMoveMode(!state.refMoveMode));
 // 共通 中央（選択中を原寸中央）
 document.getElementById('btn-ref-center').addEventListener('click', refCenterSel);
 // FRAMEレイヤーを選択（MOVE/中央の対象に）
@@ -9351,6 +9534,22 @@ function commitToneShape(k){
   if(p) p.addEventListener('change', ()=>{ TONE[k].pitch = clampTonePitch(p.value); commitToneShape(k); });
   if(c) c.addEventListener('change', ()=>{ TONE[k].cov   = clampToneCov(parseFloat(c.value)/100); commitToneShape(k); });
 });
+// トーンにスポイト色を入れるか（既定OFF）
+(function(){
+  const b = document.getElementById('tone-pick-toggle'); if(!b) return;
+  const sync = () => {
+    b.textContent = gTonePick ? 'ON' : 'OFF';
+    b.classList.toggle('on', gTonePick);
+    b.title = gTonePick ? '網点そのものの色をスポイトで塗り替えます'
+                        : 'スポイトの色は下書／指示の通常インクへ入ります（網点は黒のまま）';
+  };
+  b.addEventListener('click', () => {
+    gTonePick = !gTonePick;
+    saveInk(); sync();
+    stageToast('トーンにスポイト色: ' + (gTonePick ? 'ON' : 'OFF'));
+  });
+  sync();
+})();
 (function(){
   const b = document.getElementById('tone-reset'); if(!b) return;
   b.addEventListener('click', ()=>{
