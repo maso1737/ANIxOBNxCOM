@@ -383,6 +383,7 @@ html,body{
   background:rgba(255,255,255,0.015);
 }
 .ref-item.hidden-ref{opacity:0.45;}
+.ref-item.locked-ref{border-left:3px solid var(--neon);}
 .ref-item.sel-ref{border-color:var(--acid);box-shadow:0 0 0 1px rgba(255,79,168,0.4) inset;}
 .ref-item-top{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
 .ref-dot{width:9px;height:9px;flex-shrink:0;border-radius:1px;}
@@ -766,6 +767,7 @@ html,body{
 }
 .pal-cell.add-slot:hover{border-color:var(--acid);color:var(--acid);transform:none;}
 .pal-cell:hover{transform:scale(1.15);z-index:2;}
+.pal-cell.fixed-slot:nth-child(11){box-shadow:inset 0 0 0 1px rgba(255,255,255,0.35);}
 .pal-cell.on{
   border-color:var(--acid);
   box-shadow:0 0 0 1px var(--acid);
@@ -1759,28 +1761,15 @@ input[type=range]::-moz-range-thumb{
         <span class="ref-op-val" id="frame-opacity-val">40%</span>
       </div>
     </div>
-    <!-- 参照画像（原寸・中央・ドラッグ移動/拡縮） -->
+    <!-- 参照（貼り付け画像＋コマ同期ANIMATOR を1つのリストで扱う） -->
     <div class="ref-sect">
-      <div class="ref-sect-h" id="refimg-sect-h" style="cursor:pointer;" title="クリックで参照画像を選択（MOVE/中央の対象に）">REF IMAGE（複数・原寸・移動）</div>
-      <div class="ref-frame-row">
-        <button id="btn-refimg-load" class="ref-btn" title="参照画像を読み込み（複数可・原寸・中央）">LOAD</button>
-        <button id="btn-refimg-clear" class="ref-btn del" title="選択中の参照画像を消去">× IMG</button>
-      </div>
-      <div class="ref-op-row" style="margin-top:6px;">
-        <span class="ref-op-tag">表示</span>
-        <input type="range" id="refimg-opacity" min="0" max="100" value="60" title="選択中の参照の表示濃度（0=非表示）">
-        <span class="ref-op-val" id="refimg-opacity-val">60%</span>
-      </div>
-      <div class="sc-hint" id="refimg-sel" style="margin-top:4px;">—</div>
-      <input type="file" id="refimg-input" accept="image/*" multiple style="display:none;">
-    </div>
-    <!-- 参照ANIMATOR（複数ANIMATORをコマ同期で重ね表示） -->
-    <div class="ref-sect">
-      <div class="ref-sect-h">REF ANIMATORS（コマ同期参照）</div>
+      <div class="ref-sect-h">REFERENCES（貼り付け画像 / コマ同期ANIMATOR）</div>
       <div class="ref-add-row">
+        <button id="ref-add-paste" title="クリップボードのスクショを参照として置く（Ctrl+V / ⌘V でも貼り付けられます）">+ PASTE</button>
         <button id="ref-add-json" title="ファイルから参照を追加。JSON=プロジェクト／PNG等の画像を複数選ぶと連番シーケンスとして1つの参照になります（ファイル名の番号順）">+ JSON / SEQ</button>
-        <button id="ref-add-saved" title="共有DBの保存済みプロジェクトから追加">+ FROM SAVED</button>
+        <button id="ref-add-saved" title="共有DBの保存済みプロジェクトから追加">+ SAVED</button>
       </div>
+      <div class="sc-hint" style="margin-bottom:6px;">スクショは <b>Ctrl+V / ⌘V</b> でそのまま置けます（画像ファイルは + JSON / SEQ から）。各行の 🔒 でうっかり動かないよう固定できます</div>
       <div id="ref-list"></div>
     </div>
     <input type="file" id="ref-json-input" accept="application/json,.json,image/*" multiple style="display:none;">
@@ -1841,6 +1830,7 @@ input[type=range]::-moz-range-thumb{
         <input type="number" id="tone1-cov" class="sg-num" min="1" max="95" step="1" title="濃度（%）">
         <span class="sg-x">%</span>
         <span class="tone-prev" id="tone1-prev" title="実寸プレビュー"></span>
+        <span class="sc-hint" id="tone1-real" style="margin:0 0 0 6px;white-space:nowrap;"></span>
       </div>
       <div class="sg-row">
         <span class="sc-label" style="min-width:56px;">T2 指示</span>
@@ -1849,8 +1839,10 @@ input[type=range]::-moz-range-thumb{
         <input type="number" id="tone2-cov" class="sg-num" min="1" max="95" step="1" title="濃度（%）">
         <span class="sg-x">%</span>
         <span class="tone-prev" id="tone2-prev" title="実寸プレビュー"></span>
+        <span class="sc-hint" id="tone2-real" style="margin:0 0 0 6px;white-space:nowrap;"></span>
       </div>
-      <div class="sc-hint" style="margin-top:4px;margin-bottom:0;">プレビューは画面の実寸なので、ズーム 100%（＋ボタンで立ち寄れます）のキャンバスと同じ大きさに見えます</div>
+      <div class="sc-hint" style="margin-top:4px;margin-bottom:0;">プレビューは画面の実寸なので、ズーム 100%（＋ボタンで立ち寄れます）のキャンバスと同じ大きさに見えます。
+      <b>濃度%は狙いの値で、右の「実測」が実際に塗られる面積です</b>——網点は1pxマスに焼くのでピッチが細かいほど段が飛びます（4px＝2段だけ＝20%と90%が同じ網）。見た目で決めて大丈夫です</div>
       <div class="sg-row" style="margin-top:8px;">
         <span class="sc-label" style="flex:1;min-width:0;">トーンにスポイトの色を入れる</span>
         <button id="tone-pick-toggle" class="ref-btn" style="min-width:54px;text-align:center;">OFF</button>
@@ -2043,7 +2035,28 @@ const CFG = {
 // 残したいときは PROJ の ＋保存（スナップショット＝別キー）か EXPORT JSON を使う。
 const AUTOSAVE_OFF = new URLSearchParams(location.search).get('ro') === '1';
 
-// 48色パレット (アニメ塗りでよく使う系統)
+// ── 明度の固定チップ（パレット先頭に必ず並ぶ11枚）──
+//   黒→白を10%刻み。影/ハイライトの当たりを「何%の明度か」で決められるように、
+//   **スポイトでも上書きされない固定スロット**にしてある（上書き先は12番目以降のカスタム枠）。
+//   値は round(255 × 明度%)＝HSLのLを10%ずつ上げたグレーそのもの。
+const PAL_FIXED = [
+  '#000000','#1A1A1A','#333333','#4D4D4D','#666666','#808080',
+  '#999999','#B3B3B3','#CCCCCC','#E6E6E6','#FFFFFF',
+];
+function isPalLocked(i){ return i >= 0 && i < PAL_FIXED.length; }
+// 明度チップのラベル（0%〜100%）
+function palFixedLabel(i){ return (i * 10) + '%'; }
+// 保存/読込されたパレットの先頭を必ず固定チップに揃える（旧保存からの移行もこれ1本）
+function normalizePalette(arr){
+  const src = Array.isArray(arr) ? arr.filter(c => typeof c === 'string').map(c => c[0] === '#' ? c.toUpperCase() : ('#' + c).toUpperCase()) : [];
+  // すでに先頭が固定チップなら、その並びを捨ててから付け直す（二重に増えない）
+  let head = 0;
+  while(head < PAL_FIXED.length && src[head] === PAL_FIXED[head]) head++;
+  const tail = (head === PAL_FIXED.length) ? src.slice(PAL_FIXED.length) : src;
+  return PAL_FIXED.concat(tail);
+}
+
+// カスタム枠の既定色 (アニメ塗りでよく使う系統。純白/純黒は明度チップにあるので入れない)
 const PALETTE_48 = [
   // 肌系 (5)
   '#FFF0E0','#FCE5CE','#F8C99B','#E8A87C','#C68863',
@@ -2059,8 +2072,8 @@ const PALETTE_48 = [
   '#D4B6E8','#A881C5','#7C5BA0','#553B7A',
   // 赤系（影・口） (5)
   '#FFE0E0','#FFD0D0','#FF9090','#E55050','#A02020',
-  // ニュートラル (8)
-  '#FFFFFF','#E0DDD5','#B5B0A4','#888373','#4F4B40','#2A2722','#1A1815','#000000',
+  // ニュートラル (6・わずかに色味のあるグレー。純白/純黒は明度チップ側)
+  '#E0DDD5','#B5B0A4','#888373','#4F4B40','#2A2722','#1A1815',
 ];
 
 // インクカラー（blue=下書 / orange=指示 はスポイト/Altクリックで上書き可・localStorage保持）
@@ -2213,6 +2226,42 @@ function buildTone(key){
   }catch(e){}
 })();
 buildTone('tone1'); buildTone('tone2');
+// 生成タイルの **実測** 被覆率（0..1）。
+//   公称%（cov）は半径の計算式への入力で、実際に塗られるのは1pxグリッドに丸めた結果。
+//   細かいピッチではこの丸めで段が飛ぶ（下の toneLevelCount）。
+function toneActualCov(k){
+  const t = TONE[k];
+  if(!t || !t.mask || !t.mask.length) return 0;
+  let n = 0;
+  for(let i = 0; i < t.mask.length; i++) if(t.mask[i]) n++;
+  return n / t.mask.length;
+}
+// その粗さ(pitch)で **実際に見た目が変わる段** が何段あるか。
+//   タイル1辺が小さいほど画素数が少なく段は激減する（実測 26px=35段 / 14px=13段 / 8px=6段 / 4px=2段）。
+//   ＝「4pxで濃度を20%から95%まで動かしても全部同じ網」になるのはこれが理由。
+//   pitch ごとに結果は不変なのでキャッシュする。
+const _toneLevelCache = new Map();
+function toneLevelCount(pitch){
+  const T = Math.max(1, Math.round(pitch));
+  if(_toneLevelCache.has(T)) return _toneLevelCache.get(T);
+  const px = T * T;
+  const centers = [[0,0],[T,0],[0,T],[T,T],[T/2,T/2]];
+  const seen = new Set();
+  for(let c = 1; c <= 95; c++){
+    const r2 = (c / 100 * px) / (2 * Math.PI);   // buildTone と同じ式
+    let n = 0;
+    for(let y = 0; y < T; y++) for(let x = 0; x < T; x++){
+      const pxc = x + 0.5, pyc = y + 0.5;
+      for(const [cx0, cy0] of centers){
+        const dx = pxc - cx0, dy = pyc - cy0;
+        if(dx*dx + dy*dy <= r2){ n++; break; }
+      }
+    }
+    seen.add(n);
+  }
+  _toneLevelCache.set(T, seen.size);
+  return seen.size;
+}
 // FILL用の網点判定: キャンバス座標(x,y)がドット上か
 function toneOn(t, x, y){
   const T = t.pitch || TONE_PITCH;
@@ -2378,7 +2427,7 @@ const state = {
     safeOn: false, safeA: 90, safeB: 80,     // セーフフレーム（解像度枠に対する%）
   },
   // 参照画像（複数・原寸・中央・移動可。書き出し非合成）
-  refImages: [],            // [{id, img, src, x, y, scale, opacity, visible}]
+  refImages: [],            // 貼り付けた参照画像 [{id, img, src, name, x, y, scale, opacity, visible, locked}]
   refMoveMode: false,       // ON中はドラッグで参照(画像/アニメ)を移動・ホイールで拡縮
   refSel: null,             // 選択中の可動参照 {type:'img'|'anim', id}
   refMasterShow: true,      // REFパネル連動: キャンバス上の参照表示マスター
@@ -2635,12 +2684,46 @@ async function addRefAnimator(json, fallbackName){
     fps: src.fps,
     source: src,
     x: 0, y: 0, scale: 1,
+    locked: false,
   });
   centerRefAnimator(state.refAnimators[0]); // 原寸・中央に初期配置
   buildRefList();
   updateTimeTrack();
   renderRefLayer();
   saveRefs();
+}
+
+// ── 貼り付け画像の行操作（参照ANIMATORの toggleRefVis / setRefOpacity と対になる）──
+function toggleRefImgVis(id){
+  const o = state.refImages.find(x => x.id === id);
+  if(!o) return;
+  o.visible = !o.visible;
+  buildRefList(); renderRefImg(); markMetaDirty(); scheduleSave();
+}
+function setRefImgOpacity(id, v){
+  const o = state.refImages.find(x => x.id === id);
+  if(!o) return;
+  o.opacity = Math.max(0, Math.min(1, v));
+  renderRefImg();
+}
+function removeRefImage(id){
+  const i = state.refImages.findIndex(o => o.id === id);
+  if(i < 0) return;
+  state.refImages.splice(i, 1);
+  if(state.refSel && state.refSel.type === 'img' && state.refSel.id === id) state.refSel = null;
+  buildRefList(); renderRefImg(); applyRefImgUI(); markMetaDirty(); scheduleSave();
+}
+// ── ロック: 掴めない/拡縮できない/中央に戻せない（表示と濃度は触れる）──
+//    「参照を選んだままキャンバスを触ると参照が動いてしまう」事故を止めるための鍵。
+function refIsLocked(e){ return !!(e && e.obj && e.obj.locked); }
+function toggleRefLock(kind, id){
+  const o = (kind === 'img') ? state.refImages.find(x => x.id === id)
+                             : state.refAnimators.find(x => x.id === id);
+  if(!o) return;
+  o.locked = !o.locked;
+  buildRefList(); applyRefImgUI();   // 選択中の表示に 🔒 を出す
+  if(kind === 'img'){ markMetaDirty(); scheduleSave(); } else { saveRefs(); }
+  stageToast((o.name || 'REF') + (o.locked ? ' をロック（動かせません）' : ' のロック解除'));
 }
 
 function removeRefAnimator(id){
@@ -2702,54 +2785,71 @@ function renderRefLayer(tickOverride){
 }
 
 // ── REF パネル UI ──
+// 参照リストは **貼り付け画像（手前から）→ 参照ANIMATOR** を1本に並べる。
+//   行の中身は種類で変わるのは「印の色／メタ表示／削除の相手」だけなので、作りは共通。
 function buildRefList(){
   const list = document.getElementById('ref-list');
   if(!list) return;
   list.innerHTML = '';
-  if(!state.refAnimators.length){
+  const rows = [];
+  for(let i = state.refImages.length - 1; i >= 0; i--) rows.push({ kind:'img', obj: state.refImages[i] });
+  for(const r of state.refAnimators) rows.push({ kind:'anim', obj: r });
+  if(!rows.length){
     const e = document.createElement('div');
     e.className = 'ref-empty';
     e.textContent = '— NO REFERENCE —';
     list.appendChild(e);
     return;
   }
-  state.refAnimators.forEach(r => {
+  rows.forEach(({ kind, obj }) => {
+    const isImg = (kind === 'img');
+    const selType = isImg ? 'img' : 'anim';
     const item = document.createElement('div');
-    item.className = 'ref-item' + (r.visible ? '' : ' hidden-ref') + (isSelected('anim', r.id) ? ' sel-ref' : '');
+    item.className = 'ref-item' + (obj.visible ? '' : ' hidden-ref') +
+                     (isSelected(selType, obj.id) ? ' sel-ref' : '') + (obj.locked ? ' locked-ref' : '');
 
     const top = document.createElement('div');
     top.className = 'ref-item-top';
     top.style.cursor = 'pointer';
     top.title = 'クリックで選択（MOVE移動・中央・濃度の対象に）';
     top.addEventListener('click', () => {
-      state.refSel = { type:'anim', id:r.id };
+      state.refSel = { type: selType, id: obj.id };
       renderRefLayer(); renderRefImg(); buildRefList(); applyRefImgUI();
     });
     const dot = document.createElement('span');
     dot.className = 'ref-dot';
-    dot.style.background = r.color;
+    dot.style.background = isImg ? '#5AE9FF' : obj.color;   // 画像＝アイス色 / ANIMATOR＝各色
     const name = document.createElement('span');
     name.className = 'ref-name';
-    name.textContent = r.name;
-    name.title = r.name;
+    name.textContent = obj.name || (isImg ? 'IMAGE' : 'REF');
+    name.title = name.textContent;
     const meta = document.createElement('span');
     meta.className = 'ref-meta';
-    meta.textContent = `${r.totalTicks}f`;
+    meta.textContent = isImg
+      ? (obj.img ? (obj.img.naturalWidth + '×' + obj.img.naturalHeight) : 'IMG')
+      : (obj.totalTicks + 'f');
     top.appendChild(dot); top.appendChild(name); top.appendChild(meta);
 
     const btns = document.createElement('div');
     btns.className = 'ref-item-btns';
     btns.style.marginTop = '5px';
     const visBtn = document.createElement('button');
-    visBtn.className = 'ref-btn' + (r.visible ? ' on' : '');
-    visBtn.textContent = r.visible ? '● VIS' : '✕ VIS';
-    visBtn.addEventListener('click', () => toggleRefVis(r.id));
+    visBtn.className = 'ref-btn' + (obj.visible ? ' on' : '');
+    visBtn.textContent = obj.visible ? '● VIS' : '✕ VIS';
+    visBtn.addEventListener('click', () => isImg ? toggleRefImgVis(obj.id) : toggleRefVis(obj.id));
+    const lockBtn = document.createElement('button');
+    lockBtn.className = 'ref-btn' + (obj.locked ? ' on' : '');
+    lockBtn.textContent = obj.locked ? '🔒' : '🔓';
+    lockBtn.title = obj.locked ? 'ロック中（MOVEでも動きません）— クリックで解除'
+                               : 'うっかり動かないようロックする';
+    lockBtn.addEventListener('click', () => toggleRefLock(kind, obj.id));
     const delBtn = document.createElement('button');
     delBtn.className = 'ref-btn del';
     delBtn.textContent = '✕';
     delBtn.title = '参照を削除';
-    delBtn.addEventListener('click', () => removeRefAnimator(r.id));
+    delBtn.addEventListener('click', () => isImg ? removeRefImage(obj.id) : removeRefAnimator(obj.id));
     btns.appendChild(visBtn);
+    btns.appendChild(lockBtn);
     btns.appendChild(document.createElement('span')).style.flex = '1';
     btns.appendChild(delBtn);
 
@@ -2758,14 +2858,16 @@ function buildRefList(){
     opRow.style.marginTop = '6px';
     const slider = document.createElement('input');
     slider.type = 'range'; slider.min = '0'; slider.max = '100';
-    slider.value = String(Math.round(r.opacity * 100));
+    slider.value = String(Math.round(obj.opacity * 100));
     const opVal = document.createElement('span');
     opVal.className = 'ref-op-val';
-    opVal.textContent = Math.round(r.opacity * 100) + '%';
+    opVal.textContent = Math.round(obj.opacity * 100) + '%';
     slider.addEventListener('input', () => {
       opVal.textContent = slider.value + '%';
-      setRefOpacity(r.id, (parseInt(slider.value,10)||0) / 100);
+      const v = (parseInt(slider.value,10)||0) / 100;
+      isImg ? setRefImgOpacity(obj.id, v) : setRefOpacity(obj.id, v);
     });
+    if(isImg) slider.addEventListener('change', () => { markMetaDirty(); scheduleSave(); });
     opRow.appendChild(slider); opRow.appendChild(opVal);
 
     item.appendChild(top);
@@ -2813,7 +2915,7 @@ function saveRefs(){
           id:r.id, name:r.name, projectId:r.projectId,
           visible:r.visible, opacity:r.opacity, color:r.color,
           fps:r.fps, source:r.source,
-          x:r.x, y:r.y, scale:r.scale,
+          x:r.x, y:r.y, scale:r.scale, locked:!!r.locked,
         })),
         savedAt: Date.now(),
       }, 'refs');
@@ -2845,6 +2947,7 @@ async function loadRefs(){
         x: (typeof it.x === 'number') ? it.x : 0,
         y: (typeof it.y === 'number') ? it.y : 0,
         scale: (typeof it.scale === 'number') ? it.scale : 1,
+        locked: !!it.locked,
       });
       const justAdded = state.refAnimators[state.refAnimators.length - 1];
       if(typeof it.x !== 'number') centerRefAnimator(justAdded); // 旧データは原寸・中央
@@ -3319,7 +3422,7 @@ function refObjSize(type, obj){
 function hitTestImage(wx, wy){
   for(let i = state.refImages.length - 1; i >= 0; i--){
     const o = state.refImages[i];
-    if(!o.img || !o.visible) continue;
+    if(!o.img || !o.visible || o.locked) continue;   // ロック中は掴めない
     const w = o.img.naturalWidth * o.scale, h = o.img.naturalHeight * o.scale;
     if(wx >= o.x && wy >= o.y && wx <= o.x + w && wy <= o.y + h) return o;
   }
@@ -3377,15 +3480,17 @@ function loadRefImageFromSrc(src, opts){
       const casc = state.refImages.length * 40;
       const o = {
         id: opts.id || newRefImgId(), img: im, src,
+        name: opts.name || 'IMAGE',
         scale: (typeof opts.scale === 'number') ? opts.scale : 1,
         x: (typeof opts.x === 'number') ? opts.x : Math.round((CFG.WORK_W - im.naturalWidth) / 2 + casc),
         y: (typeof opts.y === 'number') ? opts.y : Math.round((CFG.WORK_H - im.naturalHeight) / 2 + casc),
         opacity: (typeof opts.opacity === 'number') ? opts.opacity : 0.6,
         visible: opts.visible !== false,
+        locked: !!opts.locked,
       };
       state.refImages.push(o);
       if(!opts.noSelect){ state.refSel = {type:'img', id:o.id}; }
-      renderRefImg(); applyRefImgUI();
+      renderRefImg(); applyRefImgUI(); buildRefList();
       resolve(o);
     };
     im.onerror = () => resolve(null);
@@ -3395,6 +3500,7 @@ function loadRefImageFromSrc(src, opts){
 // 選択中の可動参照を 原寸(1:1)＆中央 に戻す（画像/アニメ/フレーム共通）
 function refCenterSel(){
   const e = refFindSel(); if(!e) return;
+  if(refIsLocked(e)){ stageToast('ロック中の参照は動かせません（🔒で解除）'); return; }
   if(e.type === 'frame'){
     e.obj.scale = 1;
     e.obj.x = 0; e.obj.y = 0; // フレームは等倍0,0が原寸中央
@@ -3409,11 +3515,12 @@ function refCenterSel(){
   renderSelObj(e.type); markMetaDirty(); scheduleSave();
 }
 // カーソル基点で拡縮（画像はカーソル下／無ければ選択中=アニメ/フレーム）
+// 戻り値: 実際に拡縮したか（false ならキャンバス側のズームに渡す）
 function refImgScaleAt(clientX, clientY, factor){
   const { x:wx, y:wy } = toCanvasCoord(clientX, clientY);
   const imgHit = hitTestImage(wx, wy);
   const e = imgHit ? {type:'img', obj:imgHit} : refFindSel();
-  if(!e) return;
+  if(!e || refIsLocked(e)) return false;
   const o = e.obj;
   const ns = Math.max(0.05, Math.min(12, o.scale * factor));
   const k = ns / o.scale;
@@ -3421,6 +3528,7 @@ function refImgScaleAt(clientX, clientY, factor){
   o.y = wy - (wy - o.y) * k;
   o.scale = ns;
   renderSelObj(e.type); markMetaDirty(); scheduleSave();
+  return true;
 }
 // ドラッグ移動：画像はカーソル下を掴んで最前面化／無ければ選択中(アニメ/フレーム)を移動
 let refDragging = false, refDragObj = null, refDragKind = null, refDragStart = null;
@@ -3430,7 +3538,7 @@ function refDragBegin(clientX, clientY){
   let e;
   if(imgHit){ bringImageFront(imgHit.id); state.refSel = {type:'img', id:imgHit.id}; e = {type:'img', obj:imgHit}; }
   else { e = refFindSel(); }
-  if(!e){ refDragging = false; refDragObj = null; return false; }
+  if(!e || refIsLocked(e)){ refDragging = false; refDragObj = null; return false; }
   refDragObj = e.obj; refDragKind = e.type; refDragging = true;
   refDragStart = { cx:clientX, cy:clientY, x:e.obj.x, y:e.obj.y };
   renderRefImg(); renderRefLayer(); applyRefImgUI(); buildRefList();
@@ -3458,7 +3566,7 @@ function refPinchBegin(cx, cy, dist){
   let e;
   if(refDragObj){ e = {type:refDragKind, obj:refDragObj}; }
   else { const hit = hitTestImage(wx, wy); e = hit ? {type:'img', obj:hit} : refFindSel(); }
-  if(!e){ refPinching = false; refPinchObj = null; return false; }
+  if(!e || refIsLocked(e)){ refPinching = false; refPinchObj = null; return false; }
   refDragging = false; // 単指ドラッグを終了してピンチへ
   refPinchObj = e.obj; refPinchKind = e.type; refPinching = true;
   refPinchStart = { dist, cx, cy, wx, wy, scale:e.obj.scale, x:e.obj.x, y:e.obj.y };
@@ -3984,9 +4092,10 @@ function applyPickedColor(hex){
     }
     setActiveInkColor(hex); return;
   }
-  // FILL PALETTE の選択スロットへ取り込み（＝カスタムパレット化）
+  // FILL PALETTE の選択スロットへ取り込み（＝カスタムパレット化）。
+  // 先頭の明度チップは固定なので上書きしない（色は下の主線→下書の流れでちゃんと使える）。
   state.fillColor = hex;
-  if(typeof gPalette !== 'undefined' && gPalSlot >= 0 && gPalSlot < gPalette.length){
+  if(typeof gPalette !== 'undefined' && gPalSlot >= 0 && gPalSlot < gPalette.length && !isPalLocked(gPalSlot)){
     gPalette[gPalSlot] = hex;
     savePalette();
     renderPalette();
@@ -6290,7 +6399,7 @@ document.querySelectorAll('.tb-ink').forEach(btn => {
 
 // ── FILL PALETTE（カスタム可・データ駆動）──
 const PAL_LS = 'animator_palette_v1';
-let gPalette = PALETTE_48.slice();
+let gPalette = normalizePalette(PALETTE_48);
 let gPalSlot = gPalette.length - 1; // 選択中スロット（スポイトの上書き先）
 const palEl = document.getElementById('palette');
 
@@ -6300,12 +6409,10 @@ function loadPalette(){
     if(raw){
       const o = JSON.parse(raw);
       const cols = Array.isArray(o) ? o : (o && Array.isArray(o.colors) ? o.colors : null);
-      if(cols && cols.length){
-        gPalette = cols.filter(c=>typeof c==='string').map(c=>c[0]==='#'?c:('#'+c));
-      }
+      if(cols && cols.length) gPalette = normalizePalette(cols);
     }
   }catch(e){}
-  if(!gPalette.length) gPalette = PALETTE_48.slice();
+  if(gPalette.length <= PAL_FIXED.length) gPalette = normalizePalette(PALETTE_48);
   gPalSlot = Math.min(Math.max(0, gPalSlot), gPalette.length-1);
 }
 function savePalette(){ try{ localStorage.setItem(PAL_LS, JSON.stringify({format:'PALETTE_v1', colors:gPalette})); }catch(e){} }
@@ -6333,7 +6440,10 @@ function renderPalette(){
     cell.className = 'pal-cell' + (i===gPalSlot ? ' on' : '');
     cell.style.background = c;
     cell.dataset.c = c;
-    cell.title = c + '（クリックで選択／スポイトでこのスロットに上書き。選択後は ↑↓ で色送り）';
+    cell.title = isPalLocked(i)
+      ? ('明度 ' + palFixedLabel(i) + '　' + c + '（固定チップ・スポイトでは上書きされません）')
+      : (c + '（クリックで選択／スポイトでこのスロットに上書き。選択後は ↑↓ で色送り）');
+    if(isPalLocked(i)) cell.classList.add('fixed-slot');
     cell.addEventListener('click', () => { gPalFocus = true; selectPalSlot(i); });
     palEl.appendChild(cell);
   });
@@ -6373,9 +6483,10 @@ document.getElementById('btn-pal-add').addEventListener('click', () => {
   savePalette(); renderPalette();
   const fb = document.querySelector('.tool[data-tool="fill"]'); if(fb) fb.click();
 });
-// − 選択中スロットを削除（最低1色は残す）
+// − 選択中スロットを削除（明度チップは固定なので消せない）
 document.getElementById('btn-pal-del').addEventListener('click', () => {
-  if(gPalette.length <= 1) return;
+  if(isPalLocked(gPalSlot)){ stageToast('明度チップは固定です（消せません）'); return; }
+  if(gPalette.length <= PAL_FIXED.length + 1) return;
   gPalette.splice(gPalSlot, 1);
   gPalSlot = Math.min(gPalSlot, gPalette.length - 1);
   state.fillColor = gPalette[gPalSlot];
@@ -6399,7 +6510,7 @@ document.getElementById('pal-file-input').addEventListener('change', async e => 
     const o = JSON.parse(await file.text());
     const cols = Array.isArray(o) ? o : (o && Array.isArray(o.colors) ? o.colors : null);
     if(!cols || !cols.length){ await modalAlert('パレットJSONに colors がありません'); return; }
-    gPalette = cols.filter(c=>typeof c==='string').map(c=>c[0]==='#'?c:('#'+c));
+    gPalette = normalizePalette(cols);
     gPalSlot = Math.min(gPalSlot, gPalette.length-1);
     state.fillColor = gPalette[gPalSlot];
     savePalette(); renderPalette();
@@ -6516,7 +6627,7 @@ document.getElementById('zoom-fit').addEventListener('click', fitAction);
 stage.addEventListener('wheel', e => {
   if(e.altKey) return; // Alt+ホイールはセル幅伸縮側で使用
   const factor = e.deltaY > 0 ? 0.9 : 1.111;
-  if(refImgActive()){ e.preventDefault(); refImgScaleAt(e.clientX, e.clientY, factor); return; }
+  if(refImgActive() && refImgScaleAt(e.clientX, e.clientY, factor)){ e.preventDefault(); return; }
   e.preventDefault();
   zoomAt(e.clientX, e.clientY, state.zoom * factor);
 }, { passive: false });
@@ -7366,7 +7477,8 @@ async function flushSave(){
       guides: { ...state.guides },
       refMasterShow: state.refMasterShow,
       refImages: state.refImages.map(o => ({
-        src:o.src, x:o.x, y:o.y, scale:o.scale, opacity:o.opacity, visible:o.visible,
+        src:o.src, name:o.name, x:o.x, y:o.y, scale:o.scale,
+        opacity:o.opacity, visible:o.visible, locked:!!o.locked,
       })),
       mirrorAxis: state.mirrorAxis,
       mirrorAxisX: state.mirrorAxisX,
@@ -7553,10 +7665,10 @@ async function loadProject(){
       for(const o of meta.refImages){
         if(!o || !o.src) continue;
         await loadRefImageFromSrc(o.src, {
-          x:o.x|0, y:o.y|0,
+          x:o.x|0, y:o.y|0, name:o.name,
           scale:(typeof o.scale==='number')?o.scale:1,
           opacity:(typeof o.opacity==='number')?o.opacity:0.6,
-          visible:o.visible !== false, noSelect:true,
+          visible:o.visible !== false, locked:!!o.locked, noSelect:true,
         });
       }
     }
@@ -8908,30 +9020,20 @@ document.getElementById('btn-frame-clear').addEventListener('click', async () =>
   pushFrameLayerHistory();
 });
 
-// ── 共通MOVE/中央 ＋ REF IMAGE UI ──
+// ── 共通MOVE/中央のUI同期 ──
+//   参照の表示/濃度/削除/ロックは **各行**（buildRefList）に持たせてあるので、
+//   ここは「MOVEボタンの点灯」「何を選んでいるかの表示」「FRAMEセクションの枠」だけ。
 function applyRefImgUI(){
   const mv = document.getElementById('btn-ref-move');
   if(mv) mv.classList.toggle('on', state.refMoveMode);
   const e = refFindSel();
-  // REF IMAGE 濃度スライダーは「画像/アニメ選択時」のみ（FRAMEは専用スライダー）
-  // ※ REF ANIMATOR は各行に専用スライダーがあるので、ここでは扱わない
-  //   （扱うと「REF ANIMATOR最上段の濃度」と「REF IMAGEの濃度」が連動して見える）
-  const useObj = (e && e.type === 'img') ? e.obj : null;
-  const op = document.getElementById('refimg-opacity');
-  const ov = document.getElementById('refimg-opacity-val');
-  const val = useObj ? Math.round(useObj.opacity*100) : 60;
-  if(op){ op.disabled = !useObj; if(document.activeElement !== op) op.value = val; }
-  if(ov) ov.textContent = val + '%';
-  const info = document.getElementById('refimg-sel');
-  if(info) info.textContent = state.refImages.length ? (state.refImages.length + '枚') : '—';
   const sinfo = document.getElementById('ref-sel-info');
-  if(sinfo) sinfo.textContent = e ? (({img:'IMG', anim:'ANM', frame:'FRAME'})[e.type] + ' 選択中') : '未選択';
-  // 選択中セクションをピンク枠で囲う（REF ANIMATOR行の sel-ref と見た目を揃える）
-  const t = state.refSel && state.refSel.type;
+  if(sinfo){
+    const label = e ? (({img:'IMAGE', anim:'ANIMATOR', frame:'FRAME'})[e.type] + (e.obj.locked ? ' 🔒' : '') + ' 選択中') : '未選択';
+    sinfo.textContent = label;
+  }
   const fsh = document.getElementById('frame-sect-h');
-  if(fsh) fsh.closest('.ref-sect').classList.toggle('sel-sect', t === 'frame');
-  const ish = document.getElementById('refimg-sect-h');
-  if(ish) ish.closest('.ref-sect').classList.toggle('sel-sect', t === 'img');
+  if(fsh) fsh.closest('.ref-sect').classList.toggle('sel-sect', state.refSel && state.refSel.type === 'frame');
 }
 // ── REFパネルの選択候補を1本のリストに並べる（↑↓キーで送る順番）──
 //    FRAME LAYER → REF IMAGE(手前から) → REF ANIMATORS(リスト順)
@@ -8952,15 +9054,6 @@ function refSelStep(dir){
   // 選択された行が隠れていたらパネル内でスクロールして見せる
   const el = document.querySelector('#ref-panel .ref-item.sel-ref, #ref-panel .ref-sect.sel-sect');
   if(el) el.scrollIntoView({ block:'nearest' });
-}
-// REF IMAGE 見出しクリック → 参照画像を MOVE/中央 の対象に選択（最前面＝配列末尾を優先）
-function selectRefImageSection(){
-  if(!state.refImages.length){ modalAlert('参照画像がありません（LOADで読み込んでください）'); return; }
-  const cur = (state.refSel && state.refSel.type === 'img')
-    ? state.refImages.findIndex(o => o.id === state.refSel.id) : -1;
-  const o = (cur >= 0) ? state.refImages[cur] : state.refImages[state.refImages.length - 1];
-  state.refSel = { type:'img', id:o.id };
-  renderRefImg(); renderRefLayer(); buildRefList(); applyRefImgUI();
 }
 function fileToDataURL(file){
   return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=()=>rej(fr.error); fr.readAsDataURL(file); });
@@ -8986,35 +9079,61 @@ document.getElementById('frame-sect-h').addEventListener('click', () => {
   state.refSel = { type:'frame' };
   applyRefImgUI(); buildRefList(); renderRefImg(); renderRefLayer();
 });
-document.getElementById('refimg-sect-h').addEventListener('click', selectRefImageSection);
-document.getElementById('btn-refimg-load').addEventListener('click', () => document.getElementById('refimg-input').click());
-document.getElementById('refimg-input').addEventListener('change', async e => {
-  const files = Array.from(e.target.files || []); e.target.value='';
-  if(!files.length) return;
+// ============================================================
+// スクショを参照として貼る（REF IMAGE の LOAD/×IMG/濃度スライダーは撤去）
+//   ・Ctrl+V / ⌘V … クリップボードの画像をそのまま置く（入力欄にフォーカス中は素通り）
+//   ・+ PASTE ボタン … キーボードが無いiPad向け。navigator.clipboard を直接読む
+//   置いたあとの表示/濃度/削除/ロックは参照リストの各行で操作する。
+//   画像ファイルから読むときは + JSON / SEQ（連番なら1つの参照になる）。
+// ============================================================
+let gPasteSeq = 0;
+async function pasteRefImageFromBlob(blob){
+  if(!blob || !(blob.type || '').startsWith('image/')) return false;
+  const url = await new Promise(res => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = () => res(null);
+    fr.readAsDataURL(blob);
+  });
+  if(!url) return false;
+  const o = await loadRefImageFromSrc(url, { name: 'PASTE ' + (++gPasteSeq) });
+  if(!o) return false;
+  if(!state.refMasterShow){ state.refMasterShow = true; applyRefMaster(); }   // 参照が非表示なら見せる
+  buildRefList(); applyRefImgUI(); markMetaDirty(); scheduleSave();
+  stageToast('スクショを参照に置きました（' + o.img.naturalWidth + '×' + o.img.naturalHeight + '）');
+  return true;
+}
+window.addEventListener('paste', async e => {
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if(tag === 'INPUT' || tag === 'TEXTAREA') return;      // 入力欄では普通のペースト
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  for(const it of items){
+    if(it.kind !== 'file') continue;
+    const f = it.getAsFile();
+    if(f && (f.type || '').startsWith('image/')){
+      e.preventDefault();
+      await pasteRefImageFromBlob(f);
+      return;
+    }
+  }
+});
+document.getElementById('ref-add-paste').addEventListener('click', async () => {
+  if(!navigator.clipboard || !navigator.clipboard.read){
+    stageToast('このブラウザはボタンから読めません（Ctrl+V / ⌘V で貼り付け）');
+    return;
+  }
   try{
-    for(const f of files){ const url = await fileToDataURL(f); await loadRefImageFromSrc(url, {}); }
-    markMetaDirty(); scheduleSave();
-  }catch(err){ await modalAlert('画像の読み込みに失敗しました'); }
+    const items = await navigator.clipboard.read();
+    for(const it of items){
+      const type = (it.types || []).find(t => t.startsWith('image/'));
+      if(!type) continue;
+      if(await pasteRefImageFromBlob(await it.getType(type))) return;
+    }
+    stageToast('クリップボードに画像がありません');
+  }catch(err){
+    stageToast('クリップボードを読めませんでした（Ctrl+V / ⌘V で貼り付け）');
+  }
 });
-// × IMG: 選択中の参照画像を削除（未選択なら最後の画像）
-document.getElementById('btn-refimg-clear').addEventListener('click', () => {
-  const e = refFindSel();
-  if(e && e.type === 'img'){
-    const i = state.refImages.findIndex(o => o.id === e.obj.id);
-    if(i >= 0) state.refImages.splice(i, 1);
-    state.refSel = null;
-  } else if(state.refImages.length){
-    state.refImages.pop();
-  } else { return; }
-  renderRefImg(); applyRefImgUI(); markMetaDirty(); scheduleSave();
-});
-document.getElementById('refimg-opacity').addEventListener('input', e => {
-  const sel = refFindSel(); if(!sel || sel.type !== 'img') return;  // 画像のみ（ANM/FRAMEは専用スライダー）
-  sel.obj.opacity = Math.max(0, Math.min(1, (parseInt(e.target.value,10)||0)/100));
-  document.getElementById('refimg-opacity-val').textContent = Math.round(sel.obj.opacity*100)+'%';
-  renderRefImg();
-});
-document.getElementById('refimg-opacity').addEventListener('change', () => { markMetaDirty(); scheduleSave(); });
 // ＋FRAME / DUPLICATE / DELETE ボタンは撤去（ストリップ末尾の「+ TAP」とショートカット D / Del で操作）
 
 // フレーム分割（現在フレームを前半/後半2コマに分割）
@@ -9522,6 +9641,15 @@ function applyToneShapeUI(){
     if(p && document.activeElement!==p) p.value = t.pitch;
     if(c && document.activeElement!==c) c.value = Math.round(t.cov*100);
     if(v) v.style.background = '#FFF url(' + t.tileURL + ') repeat';
+    // 「%を変えても変わらない」の種明かし: 実測面積と、この粗さで選べる段数を出す
+    const rl = document.getElementById(k+'-real');
+    if(rl){
+      const act = Math.round(toneActualCov(k) * 100);
+      const lv = toneLevelCount(t.pitch);
+      rl.textContent = '実測 ' + act + '% / ' + lv + '段';
+      rl.title = 'このタイルで実際に塗られる面積は ' + act + '%。ピッチ ' + t.pitch +
+                 'px では濃度1〜95%のうち見た目が変わる段が ' + lv + '段しかありません（1pxマスへの丸め）';
+    }
   });
 }
 function commitToneShape(k){

@@ -88,6 +88,7 @@
 | `SPEC_16_ECONTE_V4` | 枠ごとの画（`cut.fr[k]`） | **残り §5-D（iPad）だけ** |
 | `SPEC_17_INPUT_GRAMMAR` | 操作文法の統一（キーの押し方） | animator / econte / manga-plate 済／**OBAN 未** |
 | `SPEC_18_IPAD_GRAMMAR` | iPad 操作文法（実機測定値） | P0・P1(composer) 済／**P2 スキル化・P3 横展開 未** |
+| `SPEC_19_ECONTE_V5` | 画の単位を枠→**プレート**（同倍率の枠群）・GRID 統一解像度配置・SINGLE→FOCUS 統合 | **未着手**（2026-09-13 起草）。**ブラシ登録より先に P0** |
 | `MOTION_COMIC_SPEC` | composer モーションコミック | Phase 1〜3 済／**Phase 4〜5 要判定** |
 | `EXPORT_WEB_SPEC` | スクロールビューアHTML書き出し | 実装済 |
 | `申し送り_MANGA_PLATE_to_OBAN_TEXT.md` | 読み文字の往復 | P0〜P2 済。残っている選択肢だけ書いてある |
