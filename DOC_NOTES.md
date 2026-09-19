@@ -89,6 +89,21 @@
   左レール `PRS` の下に **`SM` トグル（RAW → EMA → EMA+）** を追加。**既定 RAW ＝従来と完全に同じ**なので、
   描き比べて好きなほうを選べる（`localStorage['animator_pensmooth_v1']`）。
   §6 に「probe を作って実際に踏んだ落とし穴7件」（getCoalescedEvents が空配列を返す・setPointerCapture が投げる 等）
+- `SPEC_20_ANIMATOR_LINE_FILL.md` — **ANIMATOR「線と塗りの2レーン」＋ REF レーン ＋ 変形。未着手（2026-09-18 起草・発注者合意済み）**。
+  コマ＝`line`＋`fill`（`fill` は最初の塗りまで null）。**タイムラインは1本・レーン2つ**（線と塗りは同じコマ打ちなので独立させない）。
+  塗りは線 α を壁にして **1px 潜る**（AE で線と塗りを別に重ねても隙間が出ない＝分離の最大の実利）。REF は `time-track` の下に**帯**（サムネ無し・`offset`/`step`）。
+  ★ **`renderRefLayer` と `animTickImg` の添字の式を必ず同じにする**（HANDOVER で踏んだ「中央ボタンが黙る」の再発防止）。
+  ★ **共有DB／LIVE に流す JSON は合体1枚のまま（`layers` を載せない）**＝COMPOSER / OBAN / MANGA PLATE は改修ゼロ。`layers` はファイルの EXPORT JSON と PROJ 保存箱だけ。
+  ★ **新設 UI は新 OBAN 規約**（`--acc` 系変数・3テーマ・44px ヘッダ・`.qd-*`・CVC 橋）。`--acid` は `var(--acc)` のエイリアスにして既定 ROUGE＝現行の見え方を保つ。
+  ★ 変形は REF パネルに入れない（道具側の `SEL`）。`flPaint` の `imageSmoothingEnabled` を `state.selAA`（既定 false）にする以外、econte の数式は変えない。
+- `SPEC_21_LIVE_PLATE.md` — **一本化アプリ LIVE PLATE（仮）の設計・仕様書。起草のみ（2026-09-18）。着手前に §13 の発注者判断7件**。
+  作るのは「5本の機能を足したアプリ」ではなく **1つの BOOK（sheets[] / plates{} / take / fx）に4つの見方（01 SHEET / 02 DRAW / 03 TAKE / 04 SHOW）**。
+  ★ **変えない軸3つ**＝同期を作らない（econte）／フレームは `t` の純関数 `renderFrame()` 1本（OBAN の P）／紙が世界・カメラが出口。
+  ★ **SPEC_19（プレート・FOCUS・統一解像度セル）と SPEC_20（線＋塗・REF 帯・変形・SEQ 4択）はそのまま DRAW の仕様**＝旧アプリで実装せず新アプリに直接載せる推奨（§13-1）。
+  ★ カメラの式は **composer の透視 1本**（OBAN の撮影台式は捨てる。UI の「奥⇄手前」定規だけ残す＝SPEC_12 のズレが起きない）。時間はフレーム基準、OBAN の dwell/travel は `take.auto` の自動配分。
+  ★ 連携（`tdr_live` / `tdr_exchange` / `?open=` / `BOOK.links` / COPY FOR COMPOSER …）は**全部消える**。旧5形式の読み込み（§5-2）だけ残す。
+  ★ ファイル構成は **`live-plate/` 複数ファイル・古典 `<script src>`・ビルド無し**（単一 HTML 2MB は Claude が読めない）。`tools/check.js` に複数ファイル対応を足すのが P0 の仕事。
+  §10 の「良いとこどり表」が移植元の関数名一覧。新しく書く前にここを見る。
 - `SPEC_16_ECONTE_V4.md` — **ECONTE V4「枠ごとの画」。§1〜§3＋§5-B＋E1＋§5-C(C1〜C10) 実装済み（2026-08-18〜19）。残りは §5-D（iPad）だけ**。
   画は **枠（`cam[k]`）ごとに1枚**（`cut.fr[k] = {line 1280×720, plate 512×288, rect}`。`cam[]` と1対1・`ensureFr()` を必ず通す）。
   写真（`baseC`）だけ全枠で共有。パッチは **紙（ベイク空間）の上に `camBakeRect(cut,k)` の位置で置く**ので

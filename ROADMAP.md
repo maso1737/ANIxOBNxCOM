@@ -29,6 +29,10 @@
    **このリポジトリで唯一の `type="module"`**（three.js r170 / importmap）＝ローカルサーバで開く（port 8146）。
    次は LAB B（トーンが何度で崩れるか）/ C（生成線）/ D（部屋の中）/ E（嘘パース）のどれか。
    設計と実測は `DEPTH_PLATE_HANDOVER.md`。**SPEC_19 は「これだ」が出るまで書かない。**
+6. **ANIMATOR の「線＋塗の2レーン」が仕様化された**（2026-09-18・`SPEC_20_ANIMATOR_LINE_FILL.md`・発注者合意済み）。
+   コマを `line`/`fill` に分け（塗りは遅延確保）、タイムラインは1本のままセルを上下2レーンに割る。REF は時間軸上の帯。
+   HANDOVER で見送っていた「線のコピペ＆選択変形」は econte の `箱+rot+warp` を移植して P4 で引き取る。
+   **新設 UI は新 OBAN の規約**（`OBAN_BUILDER_UI_HANDOVER.md`）で作る。着手順は P0（データ＋2枚 canvas）→ 見せる → P1（レーン UI）。
 
 ---
 
