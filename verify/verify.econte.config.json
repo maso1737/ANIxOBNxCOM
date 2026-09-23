@@ -12,7 +12,13 @@
     { "label": "e06_c4_lasso",     "timeMs": 1879 },
     { "label": "e07_c5_empty",     "timeMs": 2170 },
     { "label": "e08_grid_c2_tu",   "timeMs": 10587 },
-    { "label": "e09_grid_c3_pan",  "timeMs": 11545 }
+    { "label": "e09_grid_c3_pan",  "timeMs": 11545 },
+    { "label": "e10_c6_vpan_mid",  "timeMs": 2544 },
+    { "label": "e11_c7_pan_mid",   "timeMs": 2961 },
+    { "label": "e12_c7_tu_mid",    "timeMs": 3377 },
+    { "label": "e13_c7_tu_end",    "timeMs": 3711 },
+    { "label": "e14_grid_c6_vpan", "timeMs": 12544 },
+    { "label": "e15_grid_c7",      "timeMs": 12961 }
   ],
 
   "vrt": { "colorThreshold": 0.1, "allowedPixelRatio": 0.0002 },
@@ -22,7 +28,7 @@
   "budget": {
     "maxTTFFms": 800,
     "maxLongestFrameMs": 300,
-    "maxVramBytes": 67108864
+    "maxVramBytes": 117440512
   },
 
   "timeoutMs": 30000

@@ -264,6 +264,7 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   「Sで開きます」とtoastを出す。開閉状態は`gUi.sheet`でlocalStorage保存＝**閉じたままリロードしても`S`で復帰できる**
 
 ■ カラースクリプト層（V2-E2 / E2c・SPEC_13 §9b）
+> ⚠ 色の置き場所は V4 で枠ごと（`fr[k].plate`）、**V5 でプレートごと（`pl[j].plate`）**になった。下は経緯。
 - **`cut.colors[k]`＝枠ごとに1枚**（`{c, blob, blend, alpha, dirty}`）。
   `c` は 512×288 で **出力枠(1280×720)の空間**。アクセサは `colorSlots()/colorSlot()/getColorAt()`
   - **ベイク空間で持ってはいけない**: T.U.のB枠はA枠の内側なので、A/Bが必ず同じ色になる
@@ -284,6 +285,8 @@ ECONTE（SPEC_10）の続き開発用ハンドオフ。単一HTML `econte.html`�
   `openEdit()` は `setEditMode('single', true)` で単票を強制する＝✎/ダブルクリック専用の入口
 
 ■ GRIDの作り（V2-E2b・参考画像＝TS3カラースクリプト準拠）
+> ⚠ **V5（SPEC_19・2026-09-23）でセル＝プレート・統一解像度の段詰め・色帯はセルごとに置き換わった**（行 `.gr` は無くなった）。
+> 下は V2〜V4 の経緯。今の姿は【フェーズ状況】の「V5」表と SPEC_19 §6-3。
 - **DOM構成**: `#grid-wrap` > `.gr`（行） > `.gr-cells`（セル列）＋`.gr-pal`（行カラー帯canvas）。
   行を明示的に組むのは**行ごとのカラー帯**を出すため（CSS gridのauto-fillだと行境界が取れない）
 - **拡縮は `gGridZoom`**（セル幅 = `GC_BASE(200) × zoom`）。列数は幅から自動計算するので
@@ -983,7 +986,35 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
   - 多角形: 3頂点＋Enter で 33928px、Ctrl+Z で 0 ／ 始点クリックでも同じ ／ Esc は 0 のまま「投げ縄 取消」 ／ ツール変更でも捨てる ／ **ドラッグは従来どおりフリーハンド**（67600px）
   - ボタン側の Wクリック・長押しも**同じ関数**を通ることを確認（筆圧トグル・`L-DEL` ラベル）
 
-- **次にやること**: §5-D（iPad）。SPEC_16 で残っているのはこれだけ（§5-E の `.touch-only` はその前渡し）。
+- **V5「プレート」＋ GRID 一本化: 実装済み（2026-09-23・SPEC_19 P0〜P2）**
+
+  画の単位を **枠 → プレート（同じ倍率で写す枠の集まり）** にした。PAN は1枚の長い紙、T.U./T.B. だけ別の紙。
+  PAN の途中コマに出ていた紙の縁（S1）・SINGLE で枠外に描くと消える（S2）・SINGLE と GRID の単位の食い違い（S3）が同時に消えた。
+  **下書き（SPEC_19 §1〜§2）から変えた点は SPEC_19 §6**。ここは次に触る人向けの要点だけ。
+
+  | | 変えたこと | 要点（次に触る人向け） |
+  |---|---|---|
+  | 1 | `cut.fr[k]`（枠ごと）→ **`cut.pl[j]`**（プレートごと） | `{uid, ids[], ks[], rect, ref, lw, lh, pk, line, plate, *Blob, dirty*, pristine}`。**設計図は `planPlates(cut)`（純関数）**、並びの用意は `ensurePl`、枠が変わったら **`syncPlates` 1本**（rebakeFromCam が呼ぶ・常駐前提）。`cam[k].id` を新設（保存・ZIP にも入る） |
+  | 2 | 紙の矩形 | その紙に乗る枠の外接矩形＋のりしろ4%（紙の内側）。FIX はのりしろ無し＝1280×720 のまま。**物差しの枠（いちばん寄った枠）で line が 1280px**、4K 面積を超えたら縮めて `pk` で太さを合わせる（`plK`） |
+  | 3 | 描画の入口 **`drawPlates(ctx,cut,src,dw,dh,kind,o)` 1本** | `o.only=j`（セル・FOCUS・C.SCRIPT）／ `o.f=コマ`（**出力**：その瞬間の持ち主の紙だけ＝`homePlate`）／ どちらも無し（紙全面・種まき用）。旧 `drawPatchStack` / `patchHides` / `drawTakeoverGuide` は削除 |
+  | 4 | ★ **隠す規則は時刻で**（`homePlate`） | 区間 A→B が別の紙なら「寄った側の紙が画面を覆えている間は寄った側、それ以外は引いた側」。画面に出る紙は常に1枚＝縁が出ない。判定は画ブレ無しの `camAt`。差し替えの時刻の式は SPEC_19 §6-2 |
+  | 5 | 描く先は **ストロークの頭で1枚**（`gStrokePl` ← `paintPlateFor`） | セル＝その紙／FOCUS＝開いている紙／STUDIO＝そのコマの持ち主。V4 の「区間が枠をまたいだら2枚に引く」は無くなった。`gStrokePl<0`（検証フック）は重なる紙全部へ |
+  | 6 | GRID ＝ **セル＝プレート・統一解像度・段詰め** | `packCells`（GRID と C.SCRIPT 共通）・`cellDispSize`・`plNominal`。`.gc` は絶対配置。色帯はセルごと（`drawRowPalette` は名前据え置きでセル単位）。セルに枠ガイド（`drawCellGuide`・表示専用）。選択キーは `"i:j"`、`state.curFrame` → **`state.curPlate`** |
+  | 7 | **SINGLE → FOCUS**（`gEditMode = 'grid'|'focus'`） | 入口 `openEdit(i, j)`（j 省略＝再生位置の持ち主の紙）。出口 `closeFocus`（Esc・⤢ GRID・ピンチで FIT の半分）。`editCv` は紙の line 寸法。**座標は toBakeCoord で紙（ベイク空間）へ戻す**ので、投げ縄・スポイト・浮いた選択は紙の座標のまま。浮いた選択の表示だけ `renderEditCanvas` で紙→キャンバスの変換を掛ける（`floatScreenK` も同じ縮尺） |
+  | 8 | Undo | 控えは **紙のオブジェクト**に結ぶ（`txTouch` の key = `p.uid`）。追い出された線は起こしてから戻す（空キャンバスに書かない）。`snapshotCam` は cam だけ |
+  | 9 | 墓場（`cut.plGrave`・6枚）と `pristine` | 外れた紙を覚えておき、同じ枠の集まり・同じ矩形で戻ったら画ごと戻す。**ただし今の紙が描かれていない写しのときだけ**（描いてあれば今の紙から描き写す）。`markPl` が pristine を落とす |
+  | 10 | 保存 | IndexedDB: `cut.pl[] = {ids, rect, ref, line, plate}`（寸法は矩形と物差しから決まるので書かない）。ZIP `ver:5`: `cuts/<id>.p<j>.line.png` `.plate.png`。**ver4 は `frRecordsToPlates` で貼り合わせ**（読み込み時1回・line は焼いて Blob に戻す＝非常駐のまま）、ver3 は `splitBakeToPlates`、ver2 は `migrateColorsToPlates` |
+  | 11 | C.SCRIPT | 書き出しは GRID と同じ段詰め＋**PNG に設計図（tEXt `econte-cs`：セル矩形・枠の位置・尺）**。読み戻しは設計図があればそれで分け、**PAN の帯は PAN のカット**に戻る（`csSliceManifest` / `placeCutImageFrames`）。旧 PNG は従来の `csSlice` |
+  | 12 | ★ LRU の競合（V4 から潜んでいた） | 読み込み中を追い出すと「常駐なのに線が無い紙」が残り、描くと元の線が消えた。`isResident` は Blob があるのに線が無い紙があれば false／`evictLru` は読み込み中を末尾へ回す／`plCanvas` は Blob がある線に空キャンバスを作らない |
+  | 13 | 撤去 | SHEET の ★（`cam[].key` はデータだけ残る）・EDIT の GRID/SINGLE ボタン・キー `3`/`4`・`compositeTo`・`drawCamGuide`・`PATCH_W/H` |
+
+  **実測（Browser pane）**: PAN の帯で A→B をまたぐ1本は紙の上 153〜2307px に1本／FOCUS で枠外に描いた 405px が残る／
+  枠の追加→Undo で紙が画素一致（27742=27742）／ZIP ver5 往復 12カット全一致／ver4 → V5 移行（FIX 1280×720・T.U. 2枚・PAN 2448×778）。
+  **verify:econte は 15コマ**（C6 縦PAN・C7 PAN→T.U. を追加）。詳細は SPEC_19 §4 の動作チェック表。
+
+- **次にやること**: ① SPEC_19 P3＝ブラシ登録をプレート API（`strokePatchSeg(cut, j, kind, a, b)` / `plK`）に乗せる
+  （ROADMAP §3。PAN については「区間が2枚に二重に描かれる」問題はもう無い）。② §5-D（iPad）と V5 の iPad 実機確認
+  （横長セルのスクロール・FOCUS のつまんで閉じる）。
 - **SPEC_15（V3）は P1 / P2 / P3 とも実装済み**。P3-2〜P3-4 は SPEC_16 §5-B として V4 と同じ回に入った
 - **旧 V2-E3 の `cut.layers[]` は不採用のまま**（SPEC_15 P2 のとおり「浮いた選択」で置き換えた）。
   原本Blobを5枚持つ案は LRU と保存形式の作り直しが要るので、**要望が出ても戻らないこと**
