@@ -52,7 +52,7 @@ html,body{
 #app{
   display:grid;
   grid-template-columns:72px 1fr 96px;
-  grid-template-rows:calc(36px + var(--safe-t)) 1fr 138px calc(32px + var(--safe-b));
+  grid-template-rows:calc(36px + var(--safe-t)) 1fr calc(138px + var(--fill-band) + var(--ref-lane-h, 0px)) calc(32px + var(--safe-b));
   grid-template-areas:
     "top  top   top"
     "tool stage side"
@@ -108,6 +108,7 @@ html,body{
   color:var(--acid);
   box-shadow:0 0 8px rgba(255,79,168,0.35);
 }
+
 
 /* ── 左ツールバー ── */
 #toolbar{
@@ -312,6 +313,13 @@ html,body{
   z-index:10;
 }
 #stage-info b{color:var(--acid);font-weight:400;}
+/* 描く先のレーン（SPEC_20）。線＝白／塗＝桃の枠つきで、ひと目で分かる大きさにする */
+#stage-info #info-lane{
+  display:inline-block;padding:0 6px;margin-left:2px;
+  font-size:12px;line-height:16px;border:1px solid currentColor;border-radius:2px;
+  color:#fff;text-shadow:none;
+}
+#stage-info #info-lane.fill{color:var(--acid);background:rgba(255,79,168,0.12);}
 #info-res{pointer-events:auto;cursor:pointer;}
 #info-res:hover{color:#fff;text-decoration:underline;}
 
@@ -608,6 +616,21 @@ html,body{
 #stage-toast.show{opacity:1;}
 
 /* ズームコントロール */
+/* 変形 HUD（SPEC_20 P4）。#zoom-ctl と同じ作りで上端に置く */
+#sel-hud{
+  position:absolute;top:8px;left:50%;transform:translateX(-50%);
+  display:flex;gap:4px;align-items:center;z-index:10;
+}
+#sel-hud button{
+  height:24px;min-width:30px;padding:0 7px;
+  background:rgba(10,4,24,0.82);border:1px solid var(--border);
+  color:rgba(255,255,255,0.7);font-family:var(--mono);font-size:10px;letter-spacing:0.05em;cursor:pointer;
+}
+#sel-hud button:hover{border-color:var(--border-bright);color:var(--acid);}
+#sel-hud button.on{background:rgba(255,79,168,0.14);border-color:var(--acid);color:var(--acid);}
+#sel-hud button.off{opacity:0.3;pointer-events:none;}
+#sel-hud .sel-sep{width:1px;height:16px;background:var(--border);margin:0 2px;}
+@media (pointer:coarse){ #sel-hud button{height:32px;min-width:38px;} }
 #zoom-ctl{
   position:absolute;bottom:8px;right:10px;
   display:flex;gap:4px;align-items:center;
@@ -895,8 +918,8 @@ input[type=range]::-moz-range-thumb{
   background:var(--panel);
   border-top:1px solid var(--border);
   display:grid;
-  grid-template-columns:auto 1fr auto;
-  grid-template-rows:32px 22px 1fr 14px;
+  grid-template-columns:auto auto 1fr auto;   /* レーン見出し / ‹ / ストリップ / › */
+  grid-template-rows:32px 22px auto 1fr 14px; /* ツールバー / 時間 / REF レーン / コマ / スクロール */
   padding:0;
   overflow:hidden;
 }
@@ -913,6 +936,96 @@ input[type=range]::-moz-range-thumb{
   scrollbar-width:none;
 }
 #strip-toolbar::-webkit-scrollbar{display:none;}
+
+/* ── レーン見出し列（SPEC_20 P1）──
+   行の高さはセルの中身に合わせる：線＝サムネ（伸びる）／塗＝帯（--fill-band）／下＝コマ番号の段(18px) */
+:root{ --fill-band:14px; }
+@media (pointer:coarse){ :root{ --fill-band:18px; } }
+#lane-head{
+  display:flex;flex-direction:column;
+  padding:8px 0 8px 6px;
+  border-right:1px solid var(--border);
+  font-family:var(--mono);font-size:9px;letter-spacing:0.05em;
+  color:rgba(255,255,255,0.55);
+  user-select:none;-webkit-user-select:none;
+}
+.lh-row{display:flex;align-items:center;gap:3px;padding-right:6px;border:1px solid transparent;}
+.lh-row[data-lane="line"]{flex:1;min-height:0;}
+.lh-row[data-lane="fill"]{height:var(--fill-band);flex-shrink:0;margin-top:1px;}
+.lh-row.cur{border-color:rgba(255,79,168,0.55);background:rgba(255,79,168,0.08);}
+.lh-row.cur .lh-name{color:var(--acid);}
+.lh-spacer{height:18px;flex-shrink:0;}
+.lh-name{width:14px;text-align:center;font-size:11px;cursor:pointer;color:rgba(255,255,255,0.75);}
+.lh-name:hover{color:var(--acid);}
+.lh-vis,.lh-lock{
+  width:16px;height:13px;padding:0;
+  background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.18);border-radius:2px;
+  color:rgba(255,255,255,0.65);font-size:8px;line-height:11px;text-align:center;cursor:pointer;
+}
+.lh-vis.off{color:rgba(90,233,255,0.9);border-color:rgba(90,233,255,0.5);background:rgba(60,0,0,0.65);}
+.lh-lock{opacity:0.35;}
+.lh-lock.on{opacity:1;border-color:var(--neon);background:rgba(255,210,122,0.15);}
+.lh-opa{
+  width:24px;text-align:right;color:rgba(255,210,122,0.75);
+  cursor:ew-resize;touch-action:none;
+}
+.lh-opa.drag{color:var(--neon);}
+@media (pointer:coarse){
+  .lh-vis,.lh-lock{width:20px;height:16px;line-height:14px;}
+  .lh-opa{width:28px;}
+}
+
+/* ── REF レーン（SPEC_20 P2）──
+   参照ごとに1行。横位置は時間メモリと同じ物差し（tickToPx）で、同じ横スクロールに乗る。
+   閉じている／参照が無いときは高さ0（コマの段を食わない）。 */
+#ref-lane{
+  grid-column:1/-1;
+  position:relative;overflow:hidden;
+  background:#0b0519;
+  border-bottom:1px solid var(--border);
+  height:0;
+}
+#ref-lane.off{display:none;}
+#ref-lane.master-off #ref-lane-inner{opacity:0.45;}
+#ref-lane-inner{position:absolute;top:0;left:0;height:100%;}
+#ref-lane-head{
+  position:absolute;top:0;left:0;bottom:0;z-index:6;
+  background:#0b0519;border-right:1px solid var(--border);
+  font-family:var(--mono);font-size:8px;letter-spacing:0.05em;color:rgba(255,255,255,0.55);
+}
+.rl-row{position:absolute;left:0;right:0;height:13px;}
+.rl-lbl{
+  position:absolute;left:6px;right:4px;height:13px;line-height:13px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;
+}
+.rl-lbl .rl-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:0;}
+.rl-lbl.sel{color:var(--acid);}
+.rl-bar{
+  position:absolute;height:12px;
+  border-radius:2px;box-sizing:border-box;
+  font-family:var(--mono);font-size:8px;line-height:12px;color:#0a0517;
+  white-space:nowrap;overflow:hidden;
+  cursor:grab;touch-action:none;
+  display:flex;align-items:center;gap:4px;padding:0 3px;
+}
+.rl-bar:active{cursor:grabbing;}
+.rl-bar.static{height:4px;margin-top:4px;cursor:pointer;padding:0;}
+.rl-bar.hidden-ref{opacity:0.35;outline:1px dashed rgba(255,255,255,0.5);}
+.rl-bar.locked{cursor:pointer;}
+.rl-bar.sel{box-shadow:0 0 0 1px var(--acid),0 0 6px rgba(255,79,168,0.6);}
+.rl-bar .rl-name{flex:1;overflow:hidden;text-overflow:ellipsis;}
+.rl-bar .rl-step{
+  flex-shrink:0;padding:0 3px;border-radius:2px;
+  background:rgba(10,5,23,0.55);color:var(--neon);cursor:pointer;
+}
+#ref-lane-toggle{
+  position:absolute;top:0;left:0;bottom:0;z-index:6;
+  background:#0b0519;border:none;border-right:1px solid var(--border);
+  font-family:var(--mono);font-size:8px;letter-spacing:0.1em;text-align:left;padding:0 6px;
+  color:rgba(255,255,255,0.45);cursor:pointer;
+}
+#ref-lane-toggle.has{color:var(--acid);}
+#ref-lane-toggle:hover{color:var(--acid);}
 
 /* ── 時間メモリ + ワークエリアトラック ── */
 #time-track{
@@ -1139,6 +1252,19 @@ input[type=range]::-moz-range-thumb{
   position:relative;
   overflow:hidden;
 }
+/* 塗レーンの帯（SPEC_20 P1）。塗りがあるコマだけ色が付く */
+.fc-fill{
+  height:var(--fill-band);flex-shrink:0;
+  margin-top:1px;
+  border:1px dashed rgba(255,255,255,0.14);
+  background:transparent;
+  cursor:pointer;
+}
+.fc-fill.has{border-style:solid;border-color:rgba(255,79,168,0.35);background:rgba(255,79,168,0.45);}
+#frame-strip.lane-fill .fc-thumb{opacity:0.6;}
+#frame-strip.lane-line .fc-fill{opacity:0.6;}
+#frame-strip.lane-line .fc.active .fc-thumb{box-shadow:inset 0 0 0 2px var(--acid);}
+#frame-strip.lane-fill .fc.active .fc-fill{border:1px solid var(--acid);box-shadow:0 0 6px rgba(255,79,168,0.5);}
 .fc-thumb canvas{
   width:100%;height:100%;
   display:block;
@@ -1189,7 +1315,7 @@ input[type=range]::-moz-range-thumb{
 .fc-empty .fc-dur{color:rgba(255,210,122,0.5);}
 /* duration 4以上のときの目盛り表示 */
 .fc-ruler{
-  position:absolute;left:0;right:0;bottom:18px;
+  position:absolute;left:0;right:0;bottom:calc(19px + var(--fill-band));
   height:6px;
   display:flex;
   pointer-events:none;
@@ -1390,7 +1516,7 @@ input[type=range]::-moz-range-thumb{
        grid-template-areas が4行のまま（top/tool-stage-side/strip/bot）なので `bot` は4行目に載り、
        5行目の 32px は誰も居ない余白＝ホームインジケータはそこに収まる。
        足すと「空白がもう20px増えるだけ」になる。横持ち（基本レイアウト）の方は bot が最終行なので必要。 */
-    grid-template-rows:calc(36px + var(--safe-t)) 1fr 180px 130px 32px;
+    grid-template-rows:calc(36px + var(--safe-t)) 1fr 180px calc(130px + var(--fill-band) + var(--ref-lane-h, 0px)) 32px;
   }
   #side{
     grid-column:1/-1;
@@ -1506,7 +1632,7 @@ input[type=range]::-moz-range-thumb{
       <button id="btn-settings" title="設定（ショートカット変更）">⚙</button>
       <span class="sep">/</span>
       <button id="btn-export" title="現在のコマを1枚PNGで書き出し / Shift+クリック: BG透明で書き出し">PNG</button>
-      <button id="btn-export-seq" title="全コマをBG透過の連番PNGでZIP書き出し（AE合成用）">SEQ PNG</button>
+      <button id="btn-export-seq" title="全コマをBG透過の連番PNGでZIP書き出し（AE合成用）。押すと 合体／線だけ／塗りだけ／線と塗りを別フォルダ から選べます">SEQ PNG</button>
       <button id="btn-export-mov" title="全体をmp4で書き出し（実時間）">VIDEO</button>
       <span class="sep">/</span>
       <button id="btn-send-composer" title="COMPOSERを別ウィンドウで開く（ANIMATORは開いたまま・LIVE連携）／OBANへは OBAN側の + FROM ANIMATOR から">→ COMPOSER</button>
@@ -1539,6 +1665,12 @@ input[type=range]::-moz-range-thumb{
         <circle cx="20" cy="18" r="2"></circle>
       </svg>
       <span class="lbl">FILL</span>
+    </button>
+    <button class="tool" data-tool="sel" title="選択 (A)：なぞって囲むと持ち上がる／Shift+ドラッグ=四角／Ctrl+ドラッグ=コピー（元を残す）&#10;隅=拡縮（Shiftで比率維持）／Ctrl+隅=自由変形／隅の外=回転（Shiftで15°）&#10;Wクリック / A2連打で WARP（3×3）&#10;Enter か枠の外=確定 ／ Esc=取り消し">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2">
+        <rect x="4" y="5" width="16" height="14" rx="1"></rect>
+      </svg>
+      <span class="lbl">SEL</span>
     </button>
 
     <div class="tool-sep"></div>
@@ -1615,16 +1747,18 @@ input[type=range]::-moz-range-thumb{
   <!-- STAGE -->
   <div id="stage" class="">
     <div id="stage-info">
-      <b id="info-res">2048×1152</b> · ZOOM <b id="info-zoom">41%</b>
+      <b id="info-res">2048×1152</b> · ZOOM <b id="info-zoom">41%</b> · <b id="info-lane">線</b>
     </div>
     <div id="canvas-wrap" style="width: 842.457px; height: 473.882px; transform: translate(85.2755px, 5.00258px) scaleX(1); transform-origin: 50% 50%;">
       <canvas class="layer" id="bg-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px;"></canvas>
       <canvas class="layer" id="ref-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px;"></canvas>
       <canvas class="layer" id="frame-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px; display: none; opacity: 1;"></canvas>
       <canvas class="layer" id="refimg-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px;"></canvas>
+      <canvas class="layer" id="fill-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px;"></canvas>
       <canvas class="layer" id="onion-prev" width="2048" height="1152" style="width: 842.457px; height: 473.882px;"></canvas>
       <canvas class="layer" id="onion-next" width="2048" height="1152" style="width: 842.457px; height: 473.882px;"></canvas>
       <canvas class="layer" id="draw-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px; opacity: 1; cursor: crosshair;"></canvas>
+      <canvas class="layer" id="float-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px; pointer-events: none; z-index: 14;"></canvas>
       <canvas class="layer" id="guide-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px; pointer-events: none; z-index: 15;"></canvas>
     </div>
     <!-- ミラーガイド: stage基準で配置（ズーム/パンに追従しない固定ライン） -->
@@ -1633,6 +1767,17 @@ input[type=range]::-moz-range-thumb{
       <span id="hud-coord">16 · 698</span>
     </div>
     <div id="stage-toast"></div>
+    <div id="sel-hud" style="display:none;">
+      <button id="sel-aa" title="OFF＝アンチ無しのまま（ドットと色がそのまま。あとでバケツが効く）／ON＝なめらかに貼る">AA</button>
+      <button id="sel-both" title="ON＝線レーンと塗レーンを同じ形でまとめて持ち上げる（セルの一部をまるごと動かすとき）">線+塗</button>
+      <button id="sel-warp" title="WARP（3×3）の格子。OFF にしても形はそのまま残ります（SEL の Wクリック / A2連打と同じ）">WARP</button>
+      <span class="sel-sep"></span>
+      <button id="sel-copy" title="いま浮いている形をコピー（Ctrl+C）。別のコマで PASTE すると同じ位置に浮きます">COPY</button>
+      <button id="sel-paste" title="コピーした形を同じ位置に浮かせる（Ctrl+V）">PASTE</button>
+      <span class="sel-sep"></span>
+      <button id="sel-ok" title="確定（Enter / 枠の外をクリック）。Ctrl+Z 1回で持ち上げる前に戻ります">✓</button>
+      <button id="sel-cancel" title="取り消し（Esc）。持ち上げる前に戻します">✕</button>
+    </div>
     <div id="zoom-ctl">
       <button id="zoom-out" title="1段 縮小（100% と FIT には必ず立ち寄ります）">−</button>
       <span class="zval" id="zoom-val">41%</span>
@@ -1708,8 +1853,28 @@ input[type=range]::-moz-range-thumb{
         </div>
         <div id="timeline-cursor" style="left: 333px;"></div>
       <div class="time-tick tick-sec" style="left: 40.5px;"></div><div class="time-tick major" style="left: 81px;">6k</div><div class="time-tick tick-sec" style="left: 151.5px;"></div><div class="time-tick major" style="left: 192px;">12k</div><div class="time-tick tick-sec" style="left: 234.333px;"></div><div class="time-tick major" style="left: 271.333px;">18k</div><div class="time-tick tick-sec" style="left: 308.333px;"></div><div class="time-tick major" style="left: 347.75px;">24k</div><div class="time-tick tick-sec" style="left: 383px;"></div><div class="time-tick major" style="left: 418.25px;">30k</div><div class="time-tick tick-sec" style="left: 453.5px;"></div><div class="time-tick major" style="left: 492.625px;">36k</div><div class="time-tick tick-sec" style="left: 530.5px;"></div><div class="time-tick major" style="left: 568.375px;">42k</div><div class="time-tick tick-sec" style="left: 635px;"></div><div class="time-tick major" style="left: 670.333px;">48k</div><div class="time-tick tick-sec" style="left: 702.667px;"></div><div class="time-tick major" style="left: 735px;">54k</div><div class="time-tick tick-sec" style="left: 767.333px;"></div><div class="time-tick major" style="left: 799.667px;">60k</div><div class="time-tick tick-sec" style="left: 832px;"></div><div class="time-tick major" style="left: 864.333px;">66k</div><div class="time-tick tick-sec" style="left: 896.667px;"></div><div class="time-tick major" style="left: 929px;">72k</div></div>
+      <button id="ref-lane-toggle" title="REF レーンを開く／閉じる（参照がいつ出ているかを時間の上で見る）">REF</button>
+    </div>
+    <div id="ref-lane" class="off">
+      <div id="ref-lane-inner"></div>
+      <div id="ref-lane-head"></div>
     </div>
 
+    <div id="lane-head">
+      <div class="lh-row" data-lane="line">
+        <span class="lh-name" title="線レーンに描く（L で切替）">線</span>
+        <button class="lh-vis" title="線レーンの表示 ON/OFF">●</button>
+        <button class="lh-lock" title="線レーンをロック（描けなくする）">🔒</button>
+        <span class="lh-opa" title="線レーンの表示濃度。左右ドラッグで変更・Wクリックで100%（書き出しには影響しません）">100</span>
+      </div>
+      <div class="lh-row" data-lane="fill">
+        <span class="lh-name" title="塗レーンに描く（L で切替）">塗</span>
+        <button class="lh-vis" title="塗レーンの表示 ON/OFF">●</button>
+        <button class="lh-lock" title="塗レーンをロック（描けなくする）">🔒</button>
+        <span class="lh-opa" title="塗レーンの表示濃度。左右ドラッグで変更・Wクリックで100%（書き出しには影響しません）">100</span>
+      </div>
+      <div class="lh-spacer"></div>
+    </div>
     <button id="strip-prev" title="前のフレーム (←)">‹</button>
     <div id="strip-wrap">
       <div id="frame-strip"><div class="fc" data-idx="0" style="width: 81px;"><div class="fc-thumb"><canvas width="80" height="45"></canvas></div><button class="fc-vis-btn" title="表示（タップで非表示）">●</button><div class="fc-ruler"><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="fc-meta"><span class="fc-num">001</span><span class="fc-dur" title="コマ打ち（クリックで変更）">×6</span></div><div class="fc-handle" title="ドラッグでコマ打ち変更"></div></div><div class="fc" data-idx="1" style="width: 51px;"><div class="fc-thumb"><canvas width="80" height="45"></canvas></div><button class="fc-vis-btn" title="表示（タップで非表示）">●</button><div class="fc-divs"><span></span><span></span></div><div class="fc-meta"><span class="fc-num">002</span><span class="fc-dur" title="コマ打ち（クリックで変更）">×2</span></div><div class="fc-handle" title="ドラッグでコマ打ち変更"></div></div><div class="fc" data-idx="2" style="width: 81px;"><div class="fc-thumb"><canvas width="80" height="45"></canvas></div><button class="fc-vis-btn" title="表示（タップで非表示）">●</button><div class="fc-ruler"><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="fc-meta"><span class="fc-num">003</span><span class="fc-dur" title="コマ打ち（クリックで変更）">×6</span></div><div class="fc-handle" title="ドラッグでコマ打ち変更"></div></div><div class="fc" data-idx="3" style="width: 111px;"><div class="fc-thumb"><canvas width="80" height="45"></canvas></div><button class="fc-vis-btn" title="表示（タップで非表示）">●</button><div class="fc-ruler"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="fc-meta"><span class="fc-num">004</span><span class="fc-dur" title="コマ打ち（クリックで変更）">×9</span></div><div class="fc-handle" title="ドラッグでコマ打ち変更"></div></div><div class="fc active" data-idx="4" style="width: 141px;"><div class="fc-thumb"><canvas width="80" height="45"></canvas></div><button class="fc-vis-btn" title="表示（タップで非表示）">●</button><div class="fc-ruler"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="fc-meta"><span class="fc-num">005</span><span class="fc-dur" title="コマ打ち（クリックで変更）">×12</span></div><div class="fc-handle" title="ドラッグでコマ打ち変更"></div></div><div class="fc-empty" data-idx="5" style="width: 101px;"><div class="fc-meta"><span class="fc-num">空</span><span class="fc-dur" title="コマ打ち（クリックで変更）">×8</span></div><div class="fc-handle" title="ドラッグでコマ打ち変更"></div></div><div class="fc" data-idx="6" style="width: 51px;"><div class="fc-thumb"><canvas width="80" height="45"></canvas></div><button class="fc-vis-btn" title="表示（タップで非表示）">●</button><div class="fc-divs"><span></span><span></span></div><div class="fc-meta"><span class="fc-num">007</span><span class="fc-dur" title="コマ打ち（クリックで変更）">×2</span></div><div class="fc-handle" title="ドラッグでコマ打ち変更"></div></div><div class="fc" data-idx="7" style="width: 291px;"><div class="fc-thumb"><canvas width="80" height="45"></canvas></div><button class="fc-vis-btn" title="表示（タップで非表示）">●</button><div class="fc-ruler"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="fc-meta"><span class="fc-num">008</span><span class="fc-dur" title="コマ打ち（クリックで変更）">×27</span></div><div class="fc-handle" title="ドラッグでコマ打ち変更"></div></div><div class="fc-empty-tail" style="flex-grow: 1; min-width: 200px;"><span class="lbl">+ TAP</span></div></div>
@@ -1849,6 +2014,19 @@ input[type=range]::-moz-range-thumb{
       </div>
       <div class="sc-hint" style="margin-top:4px;margin-bottom:0;"><b>OFF（既定）</b>＝トーン選択中にスポイトすると、網点はそのままで<b>下書／指示の通常インクに切り替わって</b>そこへ色が入ります。<b>ON</b>＝従来どおり網点そのものの色を塗り替えます</div>
       <button id="tone-reset" class="ref-btn" style="width:100%;margin-top:6px;padding:5px 0;">RESET（T1 8px/6%・T2 4px/40%）</button>
+    </div>
+    <div class="ref-sect">
+      <div class="ref-sect-h">LINE / FILL（線レーンと塗レーン）</div>
+      <div class="sc-hint">塗レーンのバケツは線レーンを壁にして塗ります。潜り幅は、塗りを線の下へ何pxはみ出させるか（線の縁に白い隙間を出さないため。0で従来どおり）</div>
+      <div class="sg-row">
+        <span class="sc-label" style="flex:1;min-width:0;">塗りの潜り幅</span>
+        <input type="number" id="fill-under" class="sg-num" min="0" max="3" step="1" title="塗りを線の下へ潜らせる幅（0〜3px）">
+        <span class="sg-x">px</span>
+      </div>
+      <div class="sg-row" style="margin-top:6px;">
+        <span class="sc-label" style="flex:1;min-width:0;">オニオンに塗りも含める</span>
+        <button id="onion-fill-toggle" class="ref-btn" style="min-width:54px;text-align:center;">OFF</button>
+      </div>
     </div>
     <div class="ref-sect">
       <div class="ref-sect-h">TIMELAPSE（作画タイムラプス）</div>
@@ -2015,7 +2193,7 @@ const CFG = {
   MAX_DURATION_SEC: 15,
   // IndexedDB
   DB_NAME: 'animator',
-  DB_VERSION: 5,
+  DB_VERSION: 6,
   STORE_FRAMES: 'frames',
   STORE_META:   'meta',
   STORE_REFS:   'refs',
@@ -2270,7 +2448,11 @@ function toneOn(t, x, y){
 // ペンに渡すインクスタイル（トーン中は CanvasPattern、それ以外は単色hex）
 function inkStyle(){
   const c = state.inkColor;
-  return isToneInk(c) ? TONE[c].pattern : INK[c];
+  if(isToneInk(c)) return TONE[c].pattern;
+  // SPEC_20: 塗レーンのペンは「塗り残しの補修」なので塗り色で描く。
+  // 下書/指示インクを選んでいるときはその色のままにする（意図して選んだ色を勝手に変えない）。
+  if(c === 'black' && !state.frameLayer.editMode && curLane() === 'fill') return state.fillColor;
+  return INK[c];
 }
 // FILLで塗る色。下書/指示が選択中はそのインク色で塗る（主線=黒のときだけパレット色）。
 // ※トーンインク時の網点塗りは floodFill 側が state.inkColor から直接扱う。
@@ -2451,6 +2633,8 @@ const state = {
   loop: true,
   // オニオンスキン
   onionOn: false,
+  // SPEC_20: オニオンが拾うのは既定で線レーンだけ（前後のコマの線を読むための道具なので）
+  onionIncludeFill: false,
   // ストローク補正の強さ (0=なし, 推奨: 3) — 旧方式（互換用）
   smoothing: 3,
   // ブラシ補正: mode='off'|'avg'(プロクリエイト的 指数移動平均)|'pull'(ZBrushレイジー的)
@@ -2500,6 +2684,14 @@ const state = {
   lastEditWas: 'canvas',
   // 複数選択中のフレームID集合（id基準で安定）
   selectedFrameIds: new Set(),
+  // SPEC_20: 描く先のレーン。'line'=主線 / 'fill'=塗り。コマは line/fill の2枚を持つ。
+  lane: 'line',
+  lanes: {
+    line: { visible: true, locked: false, opacity: 1 },
+    fill: { visible: true, locked: false, opacity: 1 },
+  },
+  // 塗りを線の下へ潜らせる幅(px)。線のアンチエイリアスの縁に白い隙間を作らないため。
+  fillUnderPx: 1,
   // FRAMEレイヤー（全コマ共通の下絵レイヤー、書き出しに含まれない）
   frameLayer: {
     visible: true,
@@ -2519,6 +2711,807 @@ const state = {
 };
 
 // ============================================================
+// LANES（線レーン / 塗レーン・SPEC_20）
+//   コマの絵は line(=drawCanvas) と fill(=fillCanvas) の2枚。合成はブラウザの
+//   コンポジタに任せるので、ストローク中の JS の仕事は今までと同じ「1枚に描く」だけ。
+// ============================================================
+const LANES = ['line', 'fill'];
+const LANE_JP = { line: '線', fill: '塗' };
+const FILL_WALL_A = 128;   // 塗レーンの FILL が「壁」とみなす線レーンのα
+function laneCtx(L){ return L === 'fill' ? fillCtx : lineCtx; }
+function laneCanvas(L){ return L === 'fill' ? fillCanvas : lineCanvas; }
+function curLane(){ return state.lane === 'fill' ? 'fill' : 'line'; }
+function laneLocked(L){ return !!(state.lanes[L || curLane()] || {}).locked; }
+// 表示・不透明度を canvas の CSS へ。FRAMEレイヤー編集中のフェードもここで一緒に掛ける
+// （drawCanvas.style.opacity を2箇所から書くと踏み合うため、入口を1つにしてある）。
+function applyLaneStyle(){
+  const fade = state.frameLayer.editMode ? 0.45 : 1;
+  for(const L of LANES){
+    const cfg = state.lanes[L];
+    const cv  = laneCanvas(L);
+    cv.style.display = cfg.visible ? 'block' : 'none';
+    cv.style.opacity = fade * (typeof cfg.opacity === 'number' ? cfg.opacity : 1);
+  }
+  const info = document.getElementById('info-lane');
+  if(info){ info.textContent = LANE_JP[curLane()]; info.classList.toggle('fill', curLane() === 'fill'); }
+  // タイムラインの見出し列
+  document.querySelectorAll('#lane-head .lh-row').forEach(row => {
+    const L = row.dataset.lane, cfg = state.lanes[L];
+    row.classList.toggle('cur', L === curLane());
+    const v = row.querySelector('.lh-vis');
+    v.classList.toggle('off', !cfg.visible); v.textContent = cfg.visible ? '●' : '✕';
+    row.querySelector('.lh-lock').classList.toggle('on', !!cfg.locked);
+    const o = row.querySelector('.lh-opa');
+    if(!o.classList.contains('drag')) o.textContent = Math.round((cfg.opacity ?? 1) * 100);
+  });
+  const strip = document.getElementById('frame-strip');
+  if(strip){ strip.classList.toggle('lane-fill', curLane() === 'fill'); strip.classList.toggle('lane-line', curLane() === 'line'); }
+  // 設定パネル
+  const fu = document.getElementById('fill-under');
+  if(fu && document.activeElement !== fu) fu.value = state.fillUnderPx;
+  const of = document.getElementById('onion-fill-toggle');
+  if(of){ of.textContent = state.onionIncludeFill ? 'ON' : 'OFF'; of.classList.toggle('on', !!state.onionIncludeFill); }
+}
+// 塗レーンに絵があるか（帯の色付けに使う）。配列は編集のたびに作り直されるので WeakMap で覚える
+const _fillInkCache = new WeakMap();
+function fillHasInk(f){
+  if(!f || !f.fill) return false;
+  const hit = _fillInkCache.get(f.fill);
+  if(hit !== undefined) return hit;
+  const a = f.fill;
+  let has = false;
+  for(let i = 3; i < a.length; i += 4){ if(a[i]){ has = true; break; } }
+  _fillInkCache.set(f.fill, has);
+  return has;
+}
+function refreshFillBand(f){
+  const idx = state.frames.indexOf(f);
+  if(idx < 0) return;
+  const band = document.querySelector('#frame-strip [data-idx="' + idx + '"] .fc-fill');
+  if(band) band.classList.toggle('has', fillHasInk(f));
+}
+function setLane(L, opts){
+  L = (L === 'fill') ? 'fill' : 'line';
+  if(state.lane === L){ applyLaneStyle(); return; }
+  // 描きかけを取りこぼさない（レーンをまたぐ前に確定する）
+  if(typeof drawing !== 'undefined' && drawing) endStroke();
+  floatSettle();
+  if(typeof lassoing !== 'undefined' && lassoing) lassoCancel();
+  state.lane = L;
+  applyLaneStyle();
+  applyInkUIForTool();
+  if(!(opts && opts.quiet)) stageToast(LANE_JP[L] + 'レーン');
+}
+// ※P0 ではトップバーに 線/塗 を置いたが、P1 で見出し列に移して撤去した。
+//   トップバーが 1095px → 1169px に伸び、iPad mini 横（1133px）で HOME がはみ出したため（2026-09-23 実測）。
+// タイムラインの見出し列：名前＝切替 / ●＝表示 / 🔒＝ロック / 数字＝左右ドラッグで濃度
+(function wireLaneHead(){
+  document.querySelectorAll('#lane-head .lh-row').forEach(row => {
+    const L = row.dataset.lane;
+    row.querySelector('.lh-name').addEventListener('click', () => setLane(L));
+    row.querySelector('.lh-vis').addEventListener('click', () => {
+      state.lanes[L].visible = !state.lanes[L].visible;
+      applyLaneStyle(); markMetaDirty();
+      if(!state.lanes[L].visible) stageToast(LANE_JP[L] + 'レーンを非表示（書き出しには出ます）');
+    });
+    row.querySelector('.lh-lock').addEventListener('click', () => {
+      state.lanes[L].locked = !state.lanes[L].locked;
+      applyLaneStyle(); markMetaDirty();
+      stageToast(LANE_JP[L] + 'レーン ' + (state.lanes[L].locked ? '🔒 ロック' : 'ロック解除'));
+    });
+    // 濃度：1px = 1%。ドラッグ中は数字と canvas の CSS だけ（DOM を作り直さない）
+    const o = row.querySelector('.lh-opa');
+    let drag = null;
+    o.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      o.setPointerCapture(e.pointerId);
+      drag = { x: e.clientX, v: Math.round((state.lanes[L].opacity ?? 1) * 100) };
+      o.classList.add('drag');
+    });
+    o.addEventListener('pointermove', e => {
+      if(!drag) return;
+      const v = Math.max(0, Math.min(100, drag.v + Math.round(e.clientX - drag.x)));
+      o.textContent = v;
+      state.lanes[L].opacity = v / 100;
+      applyLaneStyle();
+    });
+    const end = () => {
+      if(!drag) return;
+      drag = null; o.classList.remove('drag');
+      applyLaneStyle(); markMetaDirty();
+    };
+    o.addEventListener('pointerup', end);
+    o.addEventListener('pointercancel', end);
+    onDoubleActivate(o, () => { state.lanes[L].opacity = 1; applyLaneStyle(); markMetaDirty(); });
+  });
+  const fu = document.getElementById('fill-under');
+  if(fu) fu.addEventListener('change', () => {
+    state.fillUnderPx = Math.max(0, Math.min(3, parseInt(fu.value, 10) || 0));
+    fu.value = state.fillUnderPx;
+    markMetaDirty();
+    stageToast('塗りの潜り幅 ' + state.fillUnderPx + 'px（これから塗るぶん）');
+  });
+  const of = document.getElementById('onion-fill-toggle');
+  if(of) of.addEventListener('click', () => {
+    state.onionIncludeFill = !state.onionIncludeFill;
+    applyLaneStyle(); updateOnion(); markMetaDirty();
+    stageToast('オニオンに塗り: ' + (state.onionIncludeFill ? 'ON' : 'OFF'));
+  });
+})();
+// ロック中のレーンに描こうとしたら理由を出して止める（黙って効かないを作らない）
+function laneBlocked(){
+  const L = curLane();
+  if(state.frameLayer.editMode) return false;
+  if(!laneLocked(L)) return false;
+  stageToast('🔒 ' + LANE_JP[L] + 'レーンはロック中');
+  return true;
+}
+// コマの2枚をキャンバスへ（履歴は触らない）
+function paintLanesFrom(frame){
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  if(frame && frame.kind === 'draw' && frame.line){
+    lineCtx.putImageData(new ImageData(new Uint8ClampedArray(frame.line), W, H), 0, 0);
+  } else {
+    lineCtx.clearRect(0, 0, W, H);
+  }
+  if(frame && frame.kind === 'draw' && frame.fill){
+    fillCtx.putImageData(new ImageData(new Uint8ClampedArray(frame.fill), W, H), 0, 0);
+  } else {
+    fillCtx.clearRect(0, 0, W, H);
+  }
+}
+// コマ1枚ぶんの「絵」（塗→線の順で合成）を作業解像度の canvas で返す。使い回しの1枚。
+let _artCv = null, _artCx = null, _artTmpCv = null, _artTmpCx = null;
+function frameArtCanvas(frame){
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  if(!_artCv){
+    _artCv = document.createElement('canvas'); _artCx = _artCv.getContext('2d');
+    _artTmpCv = document.createElement('canvas'); _artTmpCx = _artTmpCv.getContext('2d');
+  }
+  for(const cv of [_artCv, _artTmpCv]){ if(cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; } }
+  _artCx.imageSmoothingEnabled = false;
+  _artCx.clearRect(0, 0, W, H);
+  if(!frame || frame.kind !== 'draw') return _artCv;
+  // putImageData は下を上書きするので、重ねる側は必ず drawImage を通す
+  if(frame.fill){
+    _artTmpCx.putImageData(new ImageData(new Uint8ClampedArray(frame.fill), W, H), 0, 0);
+    _artCx.drawImage(_artTmpCv, 0, 0);
+  }
+  if(frame.line){
+    if(frame.fill){
+      _artTmpCx.putImageData(new ImageData(new Uint8ClampedArray(frame.line), W, H), 0, 0);
+      _artCx.drawImage(_artTmpCv, 0, 0);
+    } else {
+      _artCx.putImageData(new ImageData(new Uint8ClampedArray(frame.line), W, H), 0, 0);
+    }
+  }
+  return _artCv;
+}
+// ============================================================
+// SEL（選択 → 拡縮・回転・自由変形・WARP・コピペ）SPEC_20 P4
+//   形の持ち方と貼り方は econte の gFloat をそのまま移した（ECONTE_HANDOVER の変形表 #1〜#8）:
+//     x,y,w,h … 回転前の「箱」（作業座標）／ rot … 箱の中心まわりの回転
+//     warp … null | 制御点の **箱ローカル正規化座標** {u,v} を wn×wn 個
+//            wn=2 … Ctrl＋隅 の自由変形（射影変換）／ wn=4 … WARP（Catmull-Rom）
+//   animator 向けに変えたのは:
+//     ① 持ち上げ元＝いまのレーン（HUD の「線+塗」で両方を同じ形で）。焼き込み先＝持ち上げ元のレーン
+//     ② **アンチ無しのまま（AA OFF・既定）**。確定は canvas に描かせず、1px ずつ逆写像して元の画素を
+//        そのまま拾う（flBakeNearest）。canvas の三角形クリップは縁に半透明を作り、色も1段ずれるので、
+//        あとでバケツの「同じ色の連続」が途切れる。AA ON のときだけ econte と同じ flPaint で滑らかに貼る
+//     ③ 浮いている間は syncFrameFromCanvas がそのコマを吸い上げない＝取り消しは paintLanesFrom だけ、
+//        確定は pushHistory 1回＝Ctrl+Z 1回で持ち上げる前に戻る
+//     ④ ペーストは同じ座標（コマは全部同じ寸法。中割りの流用は同位置が欲しい）
+// ============================================================
+const FLOAT_HANDLE_PX = 9;
+const FL_ROT_PX = 42;
+const FL_WARP_N = 4;
+const FL_HANDLES = [[0,0],[0.5,0],[1,0],[1,0.5],[1,1],[0.5,1],[0,1],[0,0.5]];
+const FL_ROT_CURSOR = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'><g fill='none' stroke='white' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6.5 13a6.5 6.5 0 1 1 2.6 5.2'/><path d='M5 8.4 6.6 13l4.6-1.1'/></g><g fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6.5 13a6.5 6.5 0 1 1 2.6 5.2'/><path d='M5 8.4 6.6 13l4.6-1.1'/></g></svg>\") 13 13, crosshair";
+const SEL_LS = 'animator_sel_v1';
+let gFloat = null;     // 浮いている形
+let gSelDraw = null;   // 囲っている途中 { pts, rect, start, copy }
+let gSelClip = null;   // COPY した形 { lanes, cvs:{line,fill}, x, y, w, h }
+(function loadSelPrefs(){
+  try{
+    const o = JSON.parse(localStorage.getItem(SEL_LS) || 'null');
+    state.selAA = !!(o && o.aa); state.selBoth = !!(o && o.both); state.selWarp = !!(o && o.warp);
+  }catch(e){ state.selAA = false; state.selBoth = false; state.selWarp = false; }
+})();
+function saveSelPrefs(){
+  try{ localStorage.setItem(SEL_LS, JSON.stringify({ aa: !!state.selAA, both: !!state.selBoth, warp: !!state.selWarp })); }catch(e){}
+}
+function flClamp(v, a, b){ return v < a ? a : (v > b ? b : v); }
+
+/* --- 形（箱＋回転＋warp）: econte と同じ式 --- */
+function flAxes(g){ const c = Math.cos(g.rot || 0), s = Math.sin(g.rot || 0); return { ex: { x: c, y: s }, ey: { x: -s, y: c } }; }
+function flCenterWorld(g){ return { x: g.x + g.w / 2, y: g.y + g.h / 2 }; }
+function flBox(g, u, v){
+  const c = Math.cos(g.rot || 0), s = Math.sin(g.rot || 0);
+  const lx = (u - 0.5) * g.w, ly = (v - 0.5) * g.h;
+  return { x: g.x + g.w / 2 + lx * c - ly * s, y: g.y + g.h / 2 + lx * s + ly * c };
+}
+function flToLocal(g, p){
+  const c = Math.cos(g.rot || 0), s = Math.sin(g.rot || 0);
+  const dx = p.x - (g.x + g.w / 2), dy = p.y - (g.y + g.h / 2);
+  return { u: (dx * c + dy * s) / Math.max(1e-6, g.w) + 0.5, v: (-dx * s + dy * c) / Math.max(1e-6, g.h) + 0.5 };
+}
+function flHomo(g){
+  if(g._h) return g._h;
+  const W = g.warp, P0 = W[0], P1 = W[1], P3 = W[2], P2 = W[3];   // 0=TL 1=TR 2=BL 3=BR
+  const dx1 = P1.u - P2.u, dy1 = P1.v - P2.v, dx2 = P3.u - P2.u, dy2 = P3.v - P2.v;
+  const sx = P0.u - P1.u + P2.u - P3.u, sy = P0.v - P1.v + P2.v - P3.v;
+  const den = dx1 * dy2 - dx2 * dy1;
+  let gg = 0, hh = 0;
+  if((Math.abs(sx) > 1e-9 || Math.abs(sy) > 1e-9) && Math.abs(den) > 1e-9){
+    gg = (sx * dy2 - dx2 * sy) / den; hh = (dx1 * sy - sx * dy1) / den;
+  }
+  g._h = { a: P1.u - P0.u + gg * P1.u, b: P3.u - P0.u + hh * P3.u, c: P0.u,
+           d: P1.v - P0.v + gg * P1.v, e: P3.v - P0.v + hh * P3.v, f: P0.v, g: gg, h: hh };
+  return g._h;
+}
+function flCr1(vals, t){
+  const n = vals.length;
+  if(n < 2) return vals[0] || 0;
+  if(n === 2) return vals[0] + (vals[1] - vals[0]) * t;
+  const s = flClamp(t, 0, 1) * (n - 1);
+  const i = Math.min(n - 2, Math.floor(s)), f = s - i;
+  const at = k => (k < 0) ? 2 * vals[0] - vals[1] : (k > n - 1 ? 2 * vals[n - 1] - vals[n - 2] : vals[k]);
+  const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+  return 0.5 * (2 * p1 + (-p0 + p2) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (-p0 + 3 * p1 - 3 * p2 + p3) * f * f * f);
+}
+function flLocalWarp(g, u, v){
+  if(!g.warp) return { u, v };
+  if(g.wn === 2){
+    const m = flHomo(g);
+    const w = m.g * u + m.h * v + 1, iw = Math.abs(w) < 1e-9 ? 1e9 : 1 / w;
+    return { u: (m.a * u + m.b * v + m.c) * iw, v: (m.d * u + m.e * v + m.f) * iw };
+  }
+  const n = g.wn, ru = [], rv = [];
+  for(let i = 0; i < n; i++){
+    const ro = [], rw = [];
+    for(let j = 0; j < n; j++){ ro.push(g.warp[i * n + j].u); rw.push(g.warp[i * n + j].v); }
+    ru.push(flCr1(ro, u)); rv.push(flCr1(rw, u));
+  }
+  return { u: flCr1(ru, v), v: flCr1(rv, v) };
+}
+function flMap(g, u, v){ const l = flLocalWarp(g, u, v); return flBox(g, l.u, l.v); }
+function flEnsureWarp(g, n){
+  if(g.warp && g.wn >= n) return;
+  const old = g.warp ? (u, v) => flLocalWarp(g, u, v) : (u, v) => ({ u, v });
+  const pts = [];
+  for(let i = 0; i < n; i++) for(let j = 0; j < n; j++) pts.push(old(j / (n - 1), i / (n - 1)));
+  g.warp = pts; g.wn = n; g._h = null;
+}
+function flCornerIndex(g, hx, hy){ const n = g.wn; return (hy === 0 ? 0 : n - 1) * n + (hx === 0 ? 0 : n - 1); }
+function flOutline(g, seg){
+  const s = seg || 8, pts = [];
+  for(let i = 0; i < s; i++) pts.push(flMap(g, i / s, 0));
+  for(let i = 0; i < s; i++) pts.push(flMap(g, 1, i / s));
+  for(let i = 0; i < s; i++) pts.push(flMap(g, 1 - i / s, 1));
+  for(let i = 0; i < s; i++) pts.push(flMap(g, 0, 1 - i / s));
+  return pts;
+}
+function flShapeBBox(g){
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for(let i = 0; i <= 8; i++) for(let j = 0; j <= 8; j++){
+    const p = flMap(g, j / 8, i / 8);
+    x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
+  }
+  return { x0, y0, x1, y1 };
+}
+function flInside(g, bx, by){
+  const p = flOutline(g, 8);
+  let hit = false;
+  for(let i = 0, j = p.length - 1; i < p.length; j = i++){
+    if((p[i].y > by) !== (p[j].y > by) && bx < (p[j].x - p[i].x) * (by - p[i].y) / (p[j].y - p[i].y) + p[i].x) hit = !hit;
+  }
+  return hit;
+}
+/* --- 表示用の貼り付け（canvas に描かせる＝速い。AA OFF でもプレビューはこれで十分） --- */
+function flDrawTri(ctx, img, s, d){
+  const den = s[0].x * (s[2].y - s[1].y) + s[1].x * (s[0].y - s[2].y) + s[2].x * (s[1].y - s[0].y);
+  if(Math.abs(den) < 1e-9) return;
+  const m11 = (d[0].x * (s[2].y - s[1].y) + d[1].x * (s[0].y - s[2].y) + d[2].x * (s[1].y - s[0].y)) / den;
+  const m12 = (d[0].y * (s[2].y - s[1].y) + d[1].y * (s[0].y - s[2].y) + d[2].y * (s[1].y - s[0].y)) / den;
+  const m21 = (d[0].x * (s[1].x - s[2].x) + d[1].x * (s[2].x - s[0].x) + d[2].x * (s[0].x - s[1].x)) / den;
+  const m22 = (d[0].y * (s[1].x - s[2].x) + d[1].y * (s[2].x - s[0].x) + d[2].y * (s[0].x - s[1].x)) / den;
+  const dx = (d[0].x * (s[2].x * s[1].y - s[1].x * s[2].y) + d[1].x * (s[0].x * s[2].y - s[2].x * s[0].y) + d[2].x * (s[1].x * s[0].y - s[0].x * s[1].y)) / den;
+  const dy = (d[0].y * (s[2].x * s[1].y - s[1].x * s[2].y) + d[1].y * (s[0].x * s[2].y - s[2].x * s[0].y) + d[2].y * (s[1].x * s[0].y - s[0].x * s[1].y)) / den;
+  const cx = (d[0].x + d[1].x + d[2].x) / 3, cy = (d[0].y + d[1].y + d[2].y) / 3;
+  ctx.save();
+  ctx.beginPath();
+  for(let i = 0; i < 3; i++){
+    const vx = d[i].x - cx, vy = d[i].y - cy, len = Math.hypot(vx, vy) || 1;
+    const x = d[i].x + vx / len * 0.45, y = d[i].y + vy / len * 0.45;
+    if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath(); ctx.clip();
+  ctx.transform(m11, m12, m21, m22, dx, dy);
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
+}
+function flMeshSub(g){ return !g.warp ? 1 : (g.wn === 2 ? 10 : 14); }
+function flPaint(ctx, g, cv, smooth){
+  ctx.save();
+  ctx.imageSmoothingEnabled = !!smooth;
+  if(smooth) ctx.imageSmoothingQuality = 'high';
+  if(!g.warp){
+    const p0 = flMap(g, 0, 0), p1 = flMap(g, 1, 0), p3 = flMap(g, 0, 1);
+    const W = cv.width, H = cv.height;
+    ctx.transform((p1.x - p0.x) / W, (p1.y - p0.y) / W, (p3.x - p0.x) / H, (p3.y - p0.y) / H, p0.x, p0.y);
+    ctx.drawImage(cv, 0, 0);
+  } else {
+    const sub = flMeshSub(g), P = [];
+    for(let i = 0; i <= sub; i++){ const row = []; for(let j = 0; j <= sub; j++) row.push(flMap(g, j / sub, i / sub)); P.push(row); }
+    const W = cv.width, H = cv.height;
+    for(let i = 0; i < sub; i++) for(let j = 0; j < sub; j++){
+      const u0 = j / sub * W, u1 = (j + 1) / sub * W, v0 = i / sub * H, v1 = (i + 1) / sub * H;
+      const s00 = { x: u0, y: v0 }, s10 = { x: u1, y: v0 }, s11 = { x: u1, y: v1 }, s01 = { x: u0, y: v1 };
+      flDrawTri(ctx, cv, [s00, s10, s11], [P[i][j], P[i][j + 1], P[i + 1][j + 1]]);
+      flDrawTri(ctx, cv, [s00, s11, s01], [P[i][j], P[i + 1][j + 1], P[i + 1][j]]);
+    }
+  }
+  ctx.restore();
+}
+/* --- 確定用の貼り付け（AA OFF）: 1px ずつ逆写像して元の画素をそのまま拾う ---
+   メッシュ（warp なし＝2三角形）の三角形ごとに、画素の中心が入るかを重心座標で調べ、
+   入れば元画像の座標を同じ重心で補間して **ニアレストで1画素** 取る。
+   ＝出る色は元の色だけ・α は元の α（アンチ無しの絵なら 0 か 255 のまま）。
+   同じ画素は1回しか書かない（三角形の境目で二度書きしない）。透明な元画素は下を残す。 */
+function flBakeNearest(dstCtx, g, srcCv){
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  const bb = flShapeBBox(g);
+  const bx0 = Math.max(0, Math.floor(bb.x0) - 1), by0 = Math.max(0, Math.floor(bb.y0) - 1);
+  const bx1 = Math.min(W, Math.ceil(bb.x1) + 1),  by1 = Math.min(H, Math.ceil(bb.y1) + 1);
+  const bw = bx1 - bx0, bh = by1 - by0;
+  if(bw <= 0 || bh <= 0) return;
+  const sw = srcCv.width, sh = srcCv.height;
+  const sd = srcCv.getContext('2d').getImageData(0, 0, sw, sh).data;
+  const dst = dstCtx.getImageData(bx0, by0, bw, bh), dd = dst.data;
+  const done = new Uint8Array(bw * bh);
+  const sub = flMeshSub(g), P = [];
+  for(let i = 0; i <= sub; i++){ const row = []; for(let j = 0; j <= sub; j++) row.push(flMap(g, j / sub, i / sub)); P.push(row); }
+  const tri = (a, b, c, sa, sb, sc) => {
+    const den = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+    if(Math.abs(den) < 1e-12) return;
+    const minx = Math.max(bx0, Math.floor(Math.min(a.x, b.x, c.x))), maxx = Math.min(bx1 - 1, Math.ceil(Math.max(a.x, b.x, c.x)));
+    const miny = Math.max(by0, Math.floor(Math.min(a.y, b.y, c.y))), maxy = Math.min(by1 - 1, Math.ceil(Math.max(a.y, b.y, c.y)));
+    for(let py = miny; py <= maxy; py++){
+      const Y = py + 0.5;
+      for(let px = minx; px <= maxx; px++){
+        const X = px + 0.5;
+        const l0 = ((b.y - c.y) * (X - c.x) + (c.x - b.x) * (Y - c.y)) / den;
+        const l1 = ((c.y - a.y) * (X - c.x) + (a.x - c.x) * (Y - c.y)) / den;
+        const l2 = 1 - l0 - l1;
+        if(l0 < -1e-9 || l1 < -1e-9 || l2 < -1e-9) continue;
+        const q = (py - by0) * bw + (px - bx0);
+        if(done[q]) continue;
+        done[q] = 1;
+        const ix = flClamp(Math.floor(l0 * sa.x + l1 * sb.x + l2 * sc.x), 0, sw - 1);
+        const iy = flClamp(Math.floor(l0 * sa.y + l1 * sb.y + l2 * sc.y), 0, sh - 1);
+        const si = (iy * sw + ix) * 4;
+        if(sd[si + 3] === 0) continue;
+        const di = q * 4;
+        dd[di] = sd[si]; dd[di + 1] = sd[si + 1]; dd[di + 2] = sd[si + 2]; dd[di + 3] = sd[si + 3];
+      }
+    }
+  };
+  for(let i = 0; i < sub; i++) for(let j = 0; j < sub; j++){
+    const u0 = j / sub * sw, u1 = (j + 1) / sub * sw, v0 = i / sub * sh, v1 = (i + 1) / sub * sh;
+    tri(P[i][j], P[i][j + 1], P[i + 1][j + 1], { x: u0, y: v0 }, { x: u1, y: v0 }, { x: u1, y: v1 });
+    tri(P[i][j], P[i + 1][j + 1], P[i + 1][j], { x: u0, y: v0 }, { x: u1, y: v1 }, { x: u0, y: v1 });
+  }
+  dstCtx.putImageData(dst, bx0, by0);
+}
+/* 多角形の内側（画素の中心で偶奇判定＝投げ縄塗りと同じ規則）を w×h のマスクで返す */
+function selPolyMask(pts, x0, y0, w, h){
+  const m = new Uint8Array(w * h), n = pts.length, xs = [];
+  for(let y = 0; y < h; y++){
+    const yc = y0 + y + 0.5;
+    xs.length = 0;
+    for(let i = 0, j = n - 1; i < n; j = i++){
+      const yi = pts[i].y, yj = pts[j].y;
+      if((yi > yc) !== (yj > yc)) xs.push(pts[i].x + (yc - yi) / (yj - yi) * (pts[j].x - pts[i].x));
+    }
+    if(xs.length < 2) continue;
+    xs.sort((a, b) => a - b);
+    for(let k = 0; k + 1 < xs.length; k += 2){
+      const a = Math.max(0, Math.ceil(xs[k] - 0.5) - x0), b = Math.min(w - 1, Math.floor(xs[k + 1] - 0.5) - x0);
+      for(let x = a; x <= b; x++) m[y * w + x] = 1;
+    }
+  }
+  return m;
+}
+/* 画面 px / 作業 px。ハンドルと枠線をズームしても同じ太さに保つ */
+function floatScreenK(){ return Math.max(1e-6, drawCanvas.getBoundingClientRect().width / CFG.WORK_W); }
+
+/* --- 持ち上げ --- */
+function selLift(pts, copy){
+  if(state.frameLayer.editMode){ stageToast('FRAME 編集中は SEL を使えません（EDIT を切ってから）'); return; }
+  const f = curDrawFrame();
+  if(!f){ stageToast('空ブロックには選択できません'); return; }
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  pts.forEach(p => { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); });
+  x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0));
+  x1 = Math.min(W, Math.ceil(x1) + 1); y1 = Math.min(H, Math.ceil(y1) + 1);
+  const w = x1 - x0, h = y1 - y0;
+  if(w < 2 || h < 2){ renderFloatLayer(); return; }
+  let lanes = state.selBoth ? ['line', 'fill'] : [curLane()];
+  const locked = lanes.filter(L => laneLocked(L));
+  if(locked.length){ stageToast('🔒 ' + locked.map(L => LANE_JP[L]).join('・') + 'レーンはロック中'); renderFloatLayer(); return; }
+  const mask = selPolyMask(pts, x0, y0, w, h);
+  const cvs = {}, imgs = {};
+  for(const L of lanes){
+    const id = laneCtx(L).getImageData(x0, y0, w, h), d = id.data;
+    const out = new ImageData(w, h), o = out.data;
+    let ink = false;
+    for(let q = 0; q < mask.length; q++){
+      if(!mask[q]) continue;
+      const i = q * 4;
+      if(!d[i + 3]) continue;
+      o[i] = d[i]; o[i + 1] = d[i + 1]; o[i + 2] = d[i + 2]; o[i + 3] = d[i + 3];
+      ink = true;
+    }
+    if(!ink) continue;                         // 何も無いレーンは持ち上げない（空の塗りを作らない）
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    cv.getContext('2d').putImageData(out, 0, 0);
+    cvs[L] = cv; imgs[L] = id;
+  }
+  lanes = lanes.filter(L => cvs[L]);
+  if(!lanes.length){ stageToast('選んだ範囲に画がありません'); renderFloatLayer(); return; }
+  gFloat = { frame: f, lanes, cvs, copy: !!copy, x: x0, y: y0, w, h, rot: 0, warp: null, wn: 0, _h: null, drag: null };
+  if(!copy){                                   // 切り取り＝抜き跡を作る（画面だけ。frame.line/fill は触らない）
+    for(const L of lanes){
+      const d = imgs[L].data;
+      for(let q = 0; q < mask.length; q++) if(mask[q]) d[q * 4 + 3] = 0;
+      laneCtx(L).putImageData(imgs[L], x0, y0);
+    }
+  }
+  if(state.selWarp) flEnsureWarp(gFloat, FL_WARP_N);
+  renderFloatLayer(); syncSelHud();
+  stageToast((copy ? 'コピー' : '切り取り') + '（' + lanes.map(L => LANE_JP[L]).join('+') + '）：隅=拡縮／Ctrl+隅=自由変形／隅の外=回転／Enter確定・Esc取消');
+}
+
+/* --- 当たり判定・ドラッグ（econte と同じ） --- */
+function floatHitTest(bx, by){
+  const g = gFloat;
+  if(!g) return null;
+  const k = floatScreenK(), hp = (FLOAT_HANDLE_PX * 0.75 + 3) / k;
+  if(g.warp && g.wn > 2 && state.selWarp){
+    const n = g.wn;
+    for(let i = 0; i < n * n; i++){
+      const r = (i / n) | 0, c = i % n;
+      if((r === 0 || r === n - 1) && (c === 0 || c === n - 1)) continue;
+      const p = flBox(g, g.warp[i].u, g.warp[i].v);
+      if(Math.abs(bx - p.x) <= hp && Math.abs(by - p.y) <= hp) return { type: 'warp', i };
+    }
+  }
+  for(let i = 0; i < FL_HANDLES.length; i++){
+    const p = flMap(g, FL_HANDLES[i][0], FL_HANDLES[i][1]);
+    if(Math.abs(bx - p.x) <= hp && Math.abs(by - p.y) <= hp) return { type: 'scale', i };
+  }
+  if(flInside(g, bx, by)) return { type: 'move' };
+  const rp = FL_ROT_PX / k;
+  for(const [hx, hy] of [[0, 0], [1, 0], [1, 1], [0, 1]]){
+    const p = flMap(g, hx, hy);
+    if(Math.hypot(bx - p.x, by - p.y) <= rp) return { type: 'rotate' };
+  }
+  return null;
+}
+function floatDragStart(hit, b, e){
+  const g = gFloat;
+  if(!g) return;
+  if(hit.type === 'warp'){ g.drag = { type: 'warp', i: hit.i }; return; }
+  if(hit.type === 'rotate'){
+    const c = flCenterWorld(g);
+    g.drag = { type: 'rotate', a0: Math.atan2(b.y - c.y, b.x - c.x), rot0: g.rot };
+    return;
+  }
+  if(hit.type === 'scale'){
+    const hx = FL_HANDLES[hit.i][0], hy = FL_HANDLES[hit.i][1];
+    if(e && (e.ctrlKey || e.metaKey) && hx !== 0.5 && hy !== 0.5){
+      flEnsureWarp(g, 2);
+      g.drag = { type: 'warp', i: flCornerIndex(g, hx, hy) };
+      return;
+    }
+    const qa = flLocalWarp(g, 1 - hx, 1 - hy), qh = flLocalWarp(g, hx, hy);
+    g.drag = { type: 'scale', hx, hy, qa, A: flBox(g, qa.u, qa.v), du: qh.u - qa.u, dv: qh.v - qa.v, w: g.w, h: g.h };
+    return;
+  }
+  g.drag = { type: 'move', sx: b.x, sy: b.y, x: g.x, y: g.y };
+}
+function floatDragMove(b, shift){
+  const g = gFloat;
+  if(!g || !g.drag) return;
+  const d = g.drag;
+  if(d.type === 'move'){ g.x = d.x + (b.x - d.sx); g.y = d.y + (b.y - d.sy); return; }
+  if(d.type === 'warp'){ const l = flToLocal(g, b); g.warp[d.i] = { u: l.u, v: l.v }; g._h = null; return; }
+  if(d.type === 'rotate'){
+    const c = flCenterWorld(g);
+    let a = Math.atan2(b.y - c.y, b.x - c.x) - d.a0 + d.rot0;
+    if(shift) a = Math.round(a / (Math.PI / 12)) * (Math.PI / 12);
+    g.rot = a;
+    return;
+  }
+  const ax = flAxes(g);
+  const dx = b.x - d.A.x, dy = b.y - d.A.y;
+  const pu = dx * ax.ex.x + dy * ax.ex.y, pv = dx * ax.ey.x + dy * ax.ey.y;
+  let w = d.w, h = d.h;
+  if(Math.abs(d.du) > 1e-6) w = Math.max(4, Math.abs(pu / d.du));
+  if(Math.abs(d.dv) > 1e-6) h = Math.max(4, Math.abs(pv / d.dv));
+  if(shift && Math.abs(d.du) > 1e-6 && Math.abs(d.dv) > 1e-6){
+    const kx = w / d.w, ky = h / d.h;
+    const s = Math.max(0.02, Math.abs(kx - 1) > Math.abs(ky - 1) ? kx : ky);
+    w = d.w * s; h = d.h * s;
+  }
+  const cx = d.A.x - ax.ex.x * ((d.qa.u - 0.5) * w) - ax.ey.x * ((d.qa.v - 0.5) * h);
+  const cy = d.A.y - ax.ex.y * ((d.qa.u - 0.5) * w) - ax.ey.y * ((d.qa.v - 0.5) * h);
+  g.w = w; g.h = h; g.x = cx - w / 2; g.y = cy - h / 2;
+}
+function floatCursorFor(hit){
+  if(!hit) return 'crosshair';
+  if(hit.type === 'move') return 'move';
+  if(hit.type === 'warp') return 'crosshair';
+  if(hit.type === 'rotate') return FL_ROT_CURSOR;
+  const g = gFloat, c = flCenterWorld(g);
+  const p = flMap(g, FL_HANDLES[hit.i][0], FL_HANDLES[hit.i][1]);
+  const a = (Math.atan2(p.y - c.y, p.x - c.x) * 180 / Math.PI + 360) % 180;
+  if(a < 22.5 || a >= 157.5) return 'ew-resize';
+  if(a < 67.5) return 'nwse-resize';
+  if(a < 112.5) return 'ns-resize';
+  return 'nesw-resize';
+}
+
+/* --- 表示（float-layer。書き出し・サムネ・タイムラプスには出ない） --- */
+let gFloatRAF = 0;
+function scheduleFloatRender(){ if(!gFloatRAF) gFloatRAF = requestAnimationFrame(() => { gFloatRAF = 0; renderFloatLayer(); }); }
+function renderFloatLayer(){
+  const ctx = floatCtx;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
+  const k = floatScreenK();
+  if(gSelDraw && gSelDraw.pts.length){
+    const d = gSelDraw;
+    ctx.save();
+    ctx.lineWidth = 1.5 / k;
+    ctx.setLineDash([6 / k, 4 / k]);
+    ctx.strokeStyle = 'rgba(255,79,168,0.95)';
+    ctx.beginPath();
+    if(d.rect){
+      const a = d.start, b = d.pts[d.pts.length - 1];
+      ctx.rect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+    } else {
+      ctx.moveTo(d.pts[0].x, d.pts[0].y);
+      for(let i = 1; i < d.pts.length; i++) ctx.lineTo(d.pts[i].x, d.pts[i].y);
+      ctx.closePath();
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  const g = gFloat;
+  if(!g) return;
+  for(const L of ['fill', 'line']) if(g.cvs[L]) flPaint(ctx, g, g.cvs[L], !!state.selAA);   // 塗→線の順（画面と同じ重なり）
+  const hs = FLOAT_HANDLE_PX / k;
+  ctx.save();
+  const out = flOutline(g, 16);
+  ctx.lineWidth = 1.5 / k;
+  ctx.strokeStyle = 'rgba(255,79,168,0.95)';
+  ctx.setLineDash([8 / k, 5 / k]);
+  ctx.beginPath();
+  ctx.moveTo(out[0].x, out[0].y);
+  for(let i = 1; i < out.length; i++) ctx.lineTo(out[i].x, out[i].y);
+  ctx.closePath(); ctx.stroke();
+  ctx.setLineDash([]);
+  if(g.warp && g.wn > 2 && state.selWarp){
+    ctx.strokeStyle = 'rgba(90,233,255,0.55)';
+    ctx.lineWidth = 1 / k;
+    for(let a = 1; a < g.wn - 1; a++){
+      for(const dir of [0, 1]){
+        ctx.beginPath();
+        for(let t = 0; t <= 24; t++){
+          const u = dir ? t / 24 : a / (g.wn - 1), v = dir ? a / (g.wn - 1) : t / 24;
+          const p = flMap(g, u, v);
+          if(t === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = 'rgba(90,233,255,0.95)';
+    for(let i = 0; i < g.wn * g.wn; i++){
+      const r = (i / g.wn) | 0, c = i % g.wn;
+      if((r === 0 || r === g.wn - 1) && (c === 0 || c === g.wn - 1)) continue;
+      const p = flBox(g, g.warp[i].u, g.warp[i].v);
+      ctx.beginPath(); ctx.arc(p.x, p.y, hs * 0.42, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.fillStyle = 'rgba(255,79,168,0.95)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.lineWidth = 1 / k;
+  FL_HANDLES.forEach(([hx, hy]) => {
+    const p = flMap(g, hx, hy);
+    ctx.fillRect(p.x - hs / 2, p.y - hs / 2, hs, hs);
+    ctx.strokeRect(p.x - hs / 2, p.y - hs / 2, hs, hs);
+  });
+  // 行き先のレーンと変形の種類を出す（見えないと「どこに焼けるのか」で迷う）
+  const lp = flMap(g, 0, 0), fs = 11 / k;
+  ctx.font = 'bold ' + fs.toFixed(2) + 'px monospace';
+  ctx.textBaseline = 'bottom';
+  const label = g.lanes.map(L => LANE_JP[L]).join('+') + (state.selAA ? ' / AA' : '') +
+                (g.warp ? (g.wn > 2 ? ' / WARP' : ' / 自由変形') : '') +
+                (g.rot ? ' / ' + Math.round(g.rot * 180 / Math.PI) + '°' : '');
+  const tw = ctx.measureText(label).width;
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(lp.x, lp.y - fs * 1.7, tw + fs * 0.6, fs * 1.5);
+  ctx.fillStyle = 'rgba(255,210,122,0.98)';
+  ctx.fillText(label, lp.x + fs * 0.3, lp.y - fs * 0.35);
+  ctx.restore();
+}
+
+/* --- 確定・取り消し --- */
+function floatCommit(silent){
+  const g = gFloat;
+  if(!g) return false;
+  gFloat = null;
+  drawCanvas.style.cursor = 'crosshair';
+  if(g.frame !== curFrame() || state.frames.indexOf(g.frame) < 0){   // コマが消えていたら黙って捨てる
+    renderFloatLayer(); syncSelHud(); return true;
+  }
+  for(const L of g.lanes){
+    const src = g.cvs[L];
+    if(!src) continue;
+    if(state.selAA) flPaint(laneCtx(L), g, src, true);
+    else flBakeNearest(laneCtx(L), g, src);
+  }
+  pushHistory(g.lanes);          // 持ち上げる前がひとつ前の履歴＝Ctrl+Z 1回で戻る
+  renderFloatLayer(); syncSelHud();
+  if(!silent) stageToast('確定しました（Ctrl+Z で持ち上げる前に戻ります）');
+  return true;
+}
+function floatCancel(){
+  const g = gFloat;
+  if(!g) return false;
+  gFloat = null;
+  drawCanvas.style.cursor = 'crosshair';
+  if(g.frame === curFrame()) paintLanesFrom(g.frame);   // 画面の抜き跡を戻すだけ（frame は持ち上げ前のまま）
+  renderFloatLayer(); syncSelHud();
+  stageToast('取り消しました');
+  return true;
+}
+/* 別の操作に移る前に、浮いているものを紙へ落とす（PS と同じで「他のことをしたら確定」） */
+function floatSettle(){ if(gFloat) floatCommit(true); if(gSelDraw){ gSelDraw = null; renderFloatLayer(); } }
+
+/* --- コピー／ペースト（同じ座標に浮かせる） --- */
+function selCopy(){
+  const g = gFloat;
+  if(!g){ stageToast('SEL で囲って持ち上げてから COPY（Ctrl+C）'); return; }
+  const W = CFG.WORK_W, H = CFG.WORK_H, bb = flShapeBBox(g);
+  const x0 = Math.max(0, Math.floor(bb.x0) - 1), y0 = Math.max(0, Math.floor(bb.y0) - 1);
+  const x1 = Math.min(W, Math.ceil(bb.x1) + 1), y1 = Math.min(H, Math.ceil(bb.y1) + 1);
+  const w = x1 - x0, h = y1 - y0;
+  if(w < 1 || h < 1){ stageToast('範囲が画面の外です'); return; }
+  const cvs = {};
+  const full = document.createElement('canvas'); full.width = W; full.height = H;
+  const fx = full.getContext('2d');
+  for(const L of g.lanes){
+    fx.clearRect(0, 0, W, H);
+    if(state.selAA) flPaint(fx, g, g.cvs[L], true); else flBakeNearest(fx, g, g.cvs[L]);   // 見えている形を焼いて控える
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    cv.getContext('2d').drawImage(full, x0, y0, w, h, 0, 0, w, h);
+    cvs[L] = cv;
+  }
+  gSelClip = { lanes: g.lanes.slice(), cvs, x: x0, y: y0, w, h };
+  syncSelHud();
+  stageToast('コピーしました（' + w + '×' + h + '・' + g.lanes.map(L => LANE_JP[L]).join('+') + '）— 別のコマで PASTE（Ctrl+V）');
+}
+function selPaste(){
+  if(!gSelClip){ stageToast('コピーした形がありません（SEL で持ち上げて COPY）'); return; }
+  floatSettle();
+  if(state.frameLayer.editMode){ stageToast('FRAME 編集中は貼れません'); return; }
+  let f = curFrame();
+  if(f && f.kind === 'empty'){                      // 空ブロックなら描くときと同じく絵のコマに昇格させる
+    f = promoteEmptyToFrame(state.currentFrame);
+    loadFrameToCanvas(f); buildStrip();
+  }
+  if(!f || f.kind !== 'draw') return;
+  const locked = gSelClip.lanes.filter(L => laneLocked(L));
+  if(locked.length){ stageToast('🔒 ' + locked.map(L => LANE_JP[L]).join('・') + 'レーンはロック中'); return; }
+  const cvs = {};
+  for(const L of gSelClip.lanes){
+    const cv = document.createElement('canvas'); cv.width = gSelClip.w; cv.height = gSelClip.h;
+    cv.getContext('2d').drawImage(gSelClip.cvs[L], 0, 0);
+    cvs[L] = cv;
+  }
+  gFloat = { frame: f, lanes: gSelClip.lanes.slice(), cvs, copy: true, x: gSelClip.x, y: gSelClip.y,
+             w: gSelClip.w, h: gSelClip.h, rot: 0, warp: null, wn: 0, _h: null, drag: null };
+  if(state.selWarp) flEnsureWarp(gFloat, FL_WARP_N);
+  if(state.tool !== 'sel') document.querySelector('.tool[data-tool="sel"]')?.click();
+  renderFloatLayer(); syncSelHud();
+  stageToast('同じ位置に貼りました（' + gFloat.lanes.map(L => LANE_JP[L]).join('+') + '）：Enter確定・Esc取消');
+}
+function toggleSelWarp(){
+  state.selWarp = !state.selWarp;
+  if(state.selWarp && gFloat) flEnsureWarp(gFloat, FL_WARP_N);
+  saveSelPrefs(); syncSelHud(); renderFloatLayer();
+  stageToast('WARP（3×3）: ' + (state.selWarp ? 'ON（格子の点をドラッグ）' : 'OFF（形はそのまま残ります）'));
+}
+function syncSelHud(){
+  const hud = document.getElementById('sel-hud');
+  if(!hud) return;
+  const show = state.tool === 'sel' || !!gFloat;
+  hud.style.display = show ? 'flex' : 'none';
+  const set = (id, on, enabled) => {
+    const b = document.getElementById(id);
+    if(!b) return;
+    if(on !== null) b.classList.toggle('on', !!on);
+    b.classList.toggle('off', enabled === false);
+  };
+  set('sel-aa', state.selAA, true);
+  set('sel-both', state.selBoth, !gFloat);          // 持ち上げたあとは対象レーンを変えない
+  set('sel-warp', state.selWarp, true);
+  set('sel-copy', null, !!gFloat);
+  set('sel-paste', null, !!gSelClip);
+  set('sel-ok', null, !!gFloat);
+  set('sel-cancel', null, !!gFloat);
+  const aa = document.getElementById('sel-aa'); if(aa) aa.textContent = state.selAA ? 'AA ON' : 'AA OFF';
+  const btn = document.querySelector('.tool[data-tool="sel"]');
+  if(btn){
+    btn.classList.toggle('fe-on', !!state.selWarp);
+    const lbl = btn.querySelector('.lbl'); if(lbl) lbl.textContent = state.selWarp ? 'WARP' : 'SEL';
+  }
+}
+(function wireSelHud(){
+  const on = (id, fn) => { const b = document.getElementById(id); if(b) b.addEventListener('click', fn); };
+  on('sel-aa', () => { state.selAA = !state.selAA; saveSelPrefs(); syncSelHud(); renderFloatLayer();
+    stageToast(state.selAA ? 'AA ON：なめらかに貼る' : 'AA OFF：アンチ無しのまま（色も変わらない）'); });
+  on('sel-both', () => { state.selBoth = !state.selBoth; saveSelPrefs(); syncSelHud();
+    stageToast(state.selBoth ? '線+塗：両レーンを同じ形で持ち上げる' : 'いまのレーンだけ持ち上げる'); });
+  on('sel-warp', toggleSelWarp);
+  on('sel-copy', selCopy);
+  on('sel-paste', selPaste);
+  on('sel-ok', () => floatCommit());
+  on('sel-cancel', () => floatCancel());
+  onDoubleActivate(document.querySelector('.tool[data-tool="sel"]'), toggleSelWarp);
+})();
+/* --- キャンバスのポインタ（SEL を持っているとき） --- */
+function selPointerDown(e){
+  const b = toCanvasCoord(e.clientX, e.clientY);
+  if(gFloat){
+    const hit = floatHitTest(b.x, b.y);
+    if(hit){ floatDragStart(hit, b, e); return; }
+    floatCommit();                     // 枠の外をクリック＝確定（PS と同じ）
+    return;
+  }
+  gSelDraw = { pts: [b], rect: !!e.shiftKey, start: b, copy: !!(e.ctrlKey || e.metaKey) };
+  renderFloatLayer();
+}
+function selPointerMove(e){
+  const b = toCanvasCoord(e.clientX, e.clientY);
+  if(gFloat && gFloat.drag){ floatDragMove(b, e.shiftKey); scheduleFloatRender(); return; }
+  if(gSelDraw){
+    const last = gSelDraw.pts[gSelDraw.pts.length - 1];
+    if(gSelDraw.rect) gSelDraw.pts[1] = b;
+    else if(Math.abs(b.x - last.x) + Math.abs(b.y - last.y) >= 2) gSelDraw.pts.push(b);
+    scheduleFloatRender();
+    return;
+  }
+  if(gFloat) drawCanvas.style.cursor = floatCursorFor(floatHitTest(b.x, b.y));
+}
+function selPointerUp(){
+  if(gFloat && gFloat.drag){ gFloat.drag = null; renderFloatLayer(); return; }
+  if(!gSelDraw) return;
+  const d = gSelDraw;
+  gSelDraw = null;
+  let pts = d.pts;
+  if(d.rect){
+    const a = d.start, b = d.pts[d.pts.length - 1];
+    pts = [{ x: a.x, y: a.y }, { x: b.x, y: a.y }, { x: b.x, y: b.y }, { x: a.x, y: b.y }];
+  }
+  if(pts.length < 3){ renderFloatLayer(); return; }
+  selLift(pts, d.copy);
+}
+
+// ============================================================
 // FRAME LAYER (全コマ共通の下絵レイヤー)
 // ============================================================
 function applyFrameLayerStyle(){
@@ -2536,13 +3529,23 @@ function applyFrameLayerStyle(){
   // 不透明度の数値表示
   const val = document.getElementById('frame-opacity-val');
   if(val) val.textContent = Math.round(fl.opacity * 100) + '%';
-  // 編集中は描画レイヤーを少しフェードして区別
-  drawCanvas.style.opacity = fl.editMode ? 0.45 : 1;
+  // 編集中は描画レイヤーを少しフェードして区別（レーンの表示/濃度と一緒に applyLaneStyle が掛ける）
+  applyLaneStyle();
   // ステージにモード表示
   const stageEl = document.getElementById('stage');
   if(stageEl) stageEl.classList.toggle('frame-edit', fl.editMode);
 }
+let gFlHasInk = null;   // null = 未計測（編集のたびに落とす）
+function frameLayerHasInk(){
+  if(gFlHasInk !== null) return gFlHasInk;
+  const d = frameLayerCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H).data;
+  gFlHasInk = false;
+  for(let i = 3; i < d.length; i += 4){ if(d[i]){ gFlHasInk = true; break; } }
+  return gFlHasInk;
+}
 function scheduleFrameLayerSave(){
+  gFlHasInk = null;
+  if(typeof updateRefLane === 'function') updateRefLane();
   // FRAMEレイヤー画像はメタに乗っているのでmetaを汚す
   if(typeof markMetaDirty === 'function') markMetaDirty();
   else if(typeof scheduleSave === 'function') scheduleSave();
@@ -2573,6 +3576,7 @@ function loadFrameLayerFromDataURL(dataURL){
     im.onload = () => {
       frameLayerCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
       frameLayerCtx.drawImage(im, 0, 0, CFG.WORK_W, CFG.WORK_H);
+      gFlHasInk = null; updateRefLane();
       resolve();
     };
     im.onerror = () => resolve();
@@ -2685,6 +3689,7 @@ async function addRefAnimator(json, fallbackName){
     source: src,
     x: 0, y: 0, scale: 1,
     locked: false,
+    offset: 0, step: 1,   // SPEC_20 P2: 時間のずらし（tick）／1枚を何コマ見せるか
   });
   centerRefAnimator(state.refAnimators[0]); // 原寸・中央に初期配置
   buildRefList();
@@ -2753,6 +3758,192 @@ function setRefOpacity(id, v){
 }
 
 // ref-layer に現在ティックの参照フレームを合成
+// ============================================================
+// REF レーン（SPEC_20 P2）
+//   参照 ANIMATOR ＝ 色の帯（offset から 枚数×step ぶん）。横ドラッグで offset・×N で step。
+//   PASTE 画像 / FRAME 下絵 ＝ 全長の細い帯（時間を持たないもの）。タップで選択（REF パネルと同じ refSel）。
+// ============================================================
+const REF_LANE_LS = 'animator_reflane_v1';
+let gRefLaneOpen = (() => { try{ return localStorage.getItem(REF_LANE_LS) !== '0'; }catch(e){ return true; } })();
+let gRefLaneDrag = null;   // { r, bar, grab, moved }
+const RL_ROW = 14;         // 1行の高さ（13 + 隙間1）
+const RL_STEPS = [1, 2, 3, 4];
+function refLaneRows(){
+  const rows = [];
+  for(const r of state.refAnimators) rows.push({ type: 'anim', obj: r });
+  for(let i = state.refImages.length - 1; i >= 0; i--) rows.push({ type: 'img', obj: state.refImages[i] });
+  if(frameLayerHasInk()) rows.push({ type: 'frame', obj: state.frameLayer });
+  return rows;
+}
+function selectRefFromLane(type, id){
+  state.refSel = (type === 'frame') ? { type: 'frame' } : { type, id };
+  renderRefLayer(); renderRefImg(); applyRefImgUI(); buildRefList();   // buildRefList → updateRefLane
+}
+function setRefLaneHeight(px){
+  const lane = document.getElementById('ref-lane');
+  if(lane) lane.style.height = px + 'px';
+  const app = document.getElementById('app');
+  const before = app.style.getPropertyValue('--ref-lane-h');
+  const next = (px > 0 ? px + 1 : 0) + 'px';   // +1 = 下の区切り線
+  if(before !== next) app.style.setProperty('--ref-lane-h', next);
+}
+function updateRefLane(){
+  const lane = document.getElementById('ref-lane');
+  const inner = document.getElementById('ref-lane-inner');
+  const head = document.getElementById('ref-lane-head');
+  const tg = document.getElementById('ref-lane-toggle');
+  if(!lane || !inner || !head) return;
+  const rows = refLaneRows();
+  if(tg){
+    tg.textContent = (rows.length ? (gRefLaneOpen ? '▾' : '▸') : '·') + ' REF ' + rows.length;
+    tg.classList.toggle('has', rows.length > 0);
+  }
+  const open = gRefLaneOpen && rows.length > 0;
+  lane.classList.toggle('off', !open);
+  lane.classList.toggle('master-off', !state.refMasterShow);
+  lane.title = state.refMasterShow ? '' : 'REF パネルが閉じているので、参照は画面に出ていません（帯の操作はできます）';
+  inner.innerHTML = ''; head.innerHTML = '';
+  if(!open){ setRefLaneHeight(0); return; }
+  const endPx = tickToPx(effectiveTotalTicks());
+  inner.style.width = Math.max(endPx, timelineTotalPx()) + 'px';
+  rows.forEach((row, i) => {
+    const top = 1 + i * RL_ROW;
+    const o = row.obj;
+    const sel = row.type === 'frame' ? isSelected('frame') : isSelected(row.type, o.id);
+    // 左の見出し
+    const lbl = document.createElement('div');
+    lbl.className = 'rl-lbl' + (sel ? ' sel' : '');
+    lbl.style.top = top + 'px';
+    const color = row.type === 'anim' ? o.color : (row.type === 'img' ? '#5AE9FF' : '#FFFFFF');
+    const name = row.type === 'frame' ? '下絵 FRAME' : (o.name || (row.type === 'img' ? 'IMAGE' : 'REF'));
+    lbl.innerHTML = '<span class="rl-dot"></span>';
+    lbl.firstChild.style.background = color;
+    lbl.appendChild(document.createTextNode(name));
+    lbl.title = name + '（クリックで選択）';
+    lbl.addEventListener('click', () => selectRefFromLane(row.type, o.id));
+    head.appendChild(lbl);
+    // 帯
+    const bar = document.createElement('div');
+    const timed = row.type === 'anim' && o.ticks && o.ticks.length > 1;
+    bar.className = 'rl-bar' + (timed ? '' : ' static') + (sel ? ' sel' : '') +
+                    (o.visible === false ? ' hidden-ref' : '') + (o.locked ? ' locked' : '');
+    bar.style.top = (top + (timed ? 0 : 0)) + 'px';
+    bar.style.background = color;
+    if(timed){
+      const x0 = tickToPx(o.offset | 0), x1 = tickToPx(refEndTick(o));
+      bar.style.left = x0 + 'px';
+      bar.style.width = Math.max(6, x1 - x0) + 'px';
+      const nm = document.createElement('span');
+      nm.className = 'rl-name';
+      nm.textContent = (o.locked ? '🔒 ' : '') + name;
+      const st = document.createElement('span');
+      st.className = 'rl-step';
+      st.textContent = '×' + refStep(o);
+      st.title = '1枚を何コマ見せるか（タップで ×1→×2→×3→×4）';
+      st.addEventListener('pointerdown', e => e.stopPropagation());
+      st.addEventListener('click', e => {
+        e.stopPropagation();
+        const cur = RL_STEPS.indexOf(refStep(o));
+        o.step = RL_STEPS[(cur + 1) % RL_STEPS.length];
+        refTimingChanged(o);
+        stageToast(name + ' ×' + o.step + '（1枚を' + o.step + 'コマ）');
+      });
+      bar.appendChild(nm); bar.appendChild(st);
+      bar.title = name + '：横ドラッグで出るタイミングをずらす（Wクリックで先頭に戻す）' +
+                  ((o.offset | 0) ? '／いま ' + ((o.offset | 0) > 0 ? '+' : '') + (o.offset | 0) + 'コマ' : '');
+      wireRefBarDrag(bar, o);
+    } else {
+      bar.style.left = '0px';
+      bar.style.width = Math.max(endPx, timelineTotalPx()) + 'px';
+      bar.title = name + '（時間を持たない参照・タップで選択）';
+      bar.addEventListener('click', () => selectRefFromLane(row.type, o.id));
+    }
+    inner.appendChild(bar);
+  });
+  setRefLaneHeight(rows.length * RL_ROW + 1);
+  syncTimeTrackScroll();
+}
+// offset / step を変えたあとの後始末（表示・尺・保存）
+function refTimingChanged(r){
+  renderRefLayer();
+  updateTimeTrack();   // 尺が伸び縮みする＋帯の置き直し
+  buildRefList();
+  saveRefs();
+}
+function wireRefBarDrag(bar, r){
+  bar.addEventListener('pointerdown', e => {
+    if(e.button !== 0 && e.pointerType === 'mouse') return;
+    e.preventDefault(); e.stopPropagation();
+    const inner = document.getElementById('ref-lane-inner');
+    const xIn = e.clientX - inner.getBoundingClientRect().left;
+    gRefLaneDrag = { r, bar, grab: pxToTick(xIn) - (r.offset | 0), x0: e.clientX, moved: false, id: e.pointerId };
+    bar.setPointerCapture(e.pointerId);
+  });
+  bar.addEventListener('pointermove', e => {
+    const d = gRefLaneDrag;
+    if(!d || d.bar !== bar) return;
+    if(!d.moved && Math.abs(e.clientX - d.x0) < 4) return;
+    if(r.locked){ if(!d.moved) stageToast('🔒 ロック中の参照は動かせません'); d.moved = true; return; }
+    d.moved = true;
+    const inner = document.getElementById('ref-lane-inner');
+    const xIn = e.clientX - inner.getBoundingClientRect().left;
+    const span = r.ticks.length * refStep(r);
+    const next = Math.max(-(span - 1), Math.min(effectiveTotalTicks(), pxToTick(xIn) - d.grab));
+    if(next === (r.offset | 0)) return;
+    r.offset = next;
+    // ドラッグ中は帯の位置とキャンバスだけ（DOM を作り直さない）
+    const x0 = tickToPx(r.offset), x1 = tickToPx(refEndTick(r));
+    bar.style.left = x0 + 'px';
+    bar.style.width = Math.max(6, x1 - x0) + 'px';
+    renderRefLayer();
+  });
+  const end = () => {
+    const d = gRefLaneDrag;
+    if(!d || d.bar !== bar) return;
+    gRefLaneDrag = null;
+    if(d.moved && !r.locked){
+      r._laneTap = 0;
+      refTimingChanged(r);
+      stageToast(r.name + ' ' + ((r.offset | 0) > 0 ? '+' : '') + (r.offset | 0) + 'コマ');
+      return;
+    }
+    if(d.moved) return;
+    // Wクリック判定は参照そのものに持たせる。1回目のタップで選択→帯が作り直されるので、
+    // DOM 要素に持たせると2回目が「新しい帯」に落ちて判定が消える（2026-09-23 に踏んだ）
+    const now = performance.now();
+    if(r._laneTap && now - r._laneTap < 400){
+      r._laneTap = 0;
+      if(r.locked){ stageToast('🔒 ロック中の参照は動かせません'); return; }
+      if((r.offset | 0) === 0){ stageToast(r.name + ' はもう先頭です'); return; }
+      r.offset = 0;
+      refTimingChanged(r);
+      stageToast(r.name + ' を先頭に戻しました');
+      return;
+    }
+    r._laneTap = now;
+    selectRefFromLane('anim', r.id);
+  };
+  bar.addEventListener('pointerup', end);
+  bar.addEventListener('pointercancel', () => { gRefLaneDrag = null; });
+}
+(function wireRefLaneToggle(){
+  const tg = document.getElementById('ref-lane-toggle');
+  if(!tg) return;
+  // 時間メモリの pointerdown（スクラブ／拡縮）を起こさない
+  ['pointerdown', 'dblclick'].forEach(ev => tg.addEventListener(ev, e => e.stopPropagation()));
+  tg.addEventListener('click', e => {
+    e.stopPropagation();
+    if(!refLaneRows().length){ stageToast('参照がありません（REF パネルで追加）'); return; }
+    gRefLaneOpen = !gRefLaneOpen;
+    try{ localStorage.setItem(REF_LANE_LS, gRefLaneOpen ? '1' : '0'); }catch(err){}
+    updateRefLane();
+  });
+})();
+// REF レーンの高さが変わるとステージが縮む/伸びる。FIT 中ならキャンバスを合わせ直す
+if(typeof ResizeObserver === 'function'){
+  new ResizeObserver(() => { if(state.fitMode) fitToStage(); }).observe(document.getElementById('stage'));
+}
+
 function renderRefLayer(tickOverride){
   if(!refLayerCtx) return;
   refLayerCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
@@ -2765,12 +3956,10 @@ function renderRefLayer(tickOverride){
   for(let ri = refs.length - 1; ri >= 0; ri--){
     const r = refs[ri];
     if(!r.visible || !r.ticks) continue;
-    if(t < 0) continue;
-    // 1コマだけの参照＝静止画（MANGA PLATEのコマ枠など）は全ティックで出しっぱなしにする。
-    // 複数コマの参照は従来どおり、尽きたら非表示。
-    const still = r.ticks.length === 1;
-    if(!still && t >= r.ticks.length) continue;   // 参照側が尽きたら非表示
-    const img = r.ticks[still ? 0 : t];
+    // 1コマだけの参照＝静止画は全ティックで出しっぱなし。複数コマは offset / step で読み、尽きたら非表示。
+    const k = refTickIndex(r, t);
+    if(k < 0) continue;
+    const img = r.ticks[k];
     if(!img) continue;
     // 各参照に transform(x,y,scale) を適用（原寸基準・移動可）
     const sc = (typeof r.scale === 'number') ? r.scale : 1;
@@ -2799,6 +3988,7 @@ function buildRefList(){
     e.className = 'ref-empty';
     e.textContent = '— NO REFERENCE —';
     list.appendChild(e);
+    updateRefLane();
     return;
   }
   rows.forEach(({ kind, obj }) => {
@@ -2827,7 +4017,8 @@ function buildRefList(){
     meta.className = 'ref-meta';
     meta.textContent = isImg
       ? (obj.img ? (obj.img.naturalWidth + '×' + obj.img.naturalHeight) : 'IMG')
-      : (obj.totalTicks + 'f');
+      : (obj.totalTicks + 'f' + (refStep(obj) > 1 ? ' ×' + refStep(obj) : '') +
+         ((obj.offset | 0) ? ' @' + ((obj.offset | 0) > 0 ? '+' : '') + (obj.offset | 0) : ''));
     top.appendChild(dot); top.appendChild(name); top.appendChild(meta);
 
     const btns = document.createElement('div');
@@ -2875,6 +4066,7 @@ function buildRefList(){
     item.appendChild(opRow);
     list.appendChild(item);
   });
+  updateRefLane();
 }
 
 function toggleRefPanel(force){
@@ -2916,6 +4108,7 @@ function saveRefs(){
           visible:r.visible, opacity:r.opacity, color:r.color,
           fps:r.fps, source:r.source,
           x:r.x, y:r.y, scale:r.scale, locked:!!r.locked,
+          offset: r.offset | 0, step: refStep(r),
         })),
         savedAt: Date.now(),
       }, 'refs');
@@ -2948,6 +4141,8 @@ async function loadRefs(){
         y: (typeof it.y === 'number') ? it.y : 0,
         scale: (typeof it.scale === 'number') ? it.scale : 1,
         locked: !!it.locked,
+        offset: (typeof it.offset === 'number') ? (it.offset | 0) : 0,
+        step: Math.max(1, (it.step | 0) || 1),
       });
       const justAdded = state.refAnimators[state.refAnimators.length - 1];
       if(typeof it.x !== 'number') centerRefAnimator(justAdded); // 旧データは原寸・中央
@@ -3096,7 +4291,7 @@ document.getElementById('ref-add-saved').addEventListener('click', async () => {
 // ============================================================
 // FRAME SELECTION (複数選択 + コピペ)
 // ============================================================
-let frameClipboard = null; // {frames:[{kind,duration,hidden,drawData(Uint8ClampedArray|null)}]}
+let frameClipboard = null; // {frames:[{kind,duration,hidden,line,fill(Uint8ClampedArray|null)}]}
 
 function toggleFrameSelection(id){
   if(state.selectedFrameIds.has(id)) state.selectedFrameIds.delete(id);
@@ -3142,7 +4337,8 @@ function copySelectedFrames(){
         kind: 'draw',
         duration: f.duration,
         hidden: !!f.hidden,
-        drawData: f.drawData ? new Uint8ClampedArray(f.drawData) : null,
+        line: f.line ? new Uint8ClampedArray(f.line) : null,
+        fill: f.fill ? new Uint8ClampedArray(f.fill) : null,
       };
     }),
   };
@@ -3158,25 +4354,17 @@ function pasteFramesAfterCurrent(){
     if(cf.kind === 'empty'){
       const ef = createBlankFrame();
       ef.kind = 'empty';
-      ef.drawData = null;
+      ef.line = null; ef.fill = null;
       ef.duration = cf.duration;
       return ef;
     }
     const f = createBlankFrame();
     f.duration = cf.duration;
     f.hidden = cf.hidden;
-    if(cf.drawData){
-      f.drawData = new Uint8ClampedArray(cf.drawData);
-      // サムネ更新
-      const tmp = document.createElement('canvas');
-      tmp.width = CFG.WORK_W; tmp.height = CFG.WORK_H;
-      const tctx = tmp.getContext('2d');
-      tctx.putImageData(new ImageData(new Uint8ClampedArray(f.drawData), CFG.WORK_W, CFG.WORK_H), 0, 0);
-      const tc = f.thumbCanvas.getContext('2d');
-      tc.imageSmoothingEnabled = false;
-      tc.fillStyle = '#fff';
-      tc.fillRect(0, 0, CFG.THUMB_W, CFG.THUMB_H);
-      tc.drawImage(tmp, 0, 0, CFG.THUMB_W, CFG.THUMB_H);
+    if(cf.line || cf.fill){
+      if(cf.line) f.line = new Uint8ClampedArray(cf.line);
+      if(cf.fill) f.fill = new Uint8ClampedArray(cf.fill);
+      regenThumb(f);
     }
     f.dirty = true;
     state.pendingSaveFrames.add(f.id);
@@ -3209,7 +4397,7 @@ function moveSelectedFrames(insertIdx){
     const f = state.frames[i];
     const ef = createBlankFrame();
     ef.kind = 'empty';
-    ef.drawData = null;
+    ef.line = null; ef.fill = null;
     ef.duration = f.duration;
     state.frames[i] = ef;
   }
@@ -3263,6 +4451,8 @@ const onionPrev  = document.getElementById('onion-prev');
 const onionNext  = document.getElementById('onion-next');
 const frameLayerCanvas = document.getElementById('frame-layer');
 const refLayerCanvas = document.getElementById('ref-layer');
+const fillCanvas = document.getElementById('fill-layer');
+const floatCanvas = document.getElementById('float-layer');   // SPEC_20 P4: 変形中の絵と枠（書き出しに出ない）
 const refImgLayerCanvas = document.getElementById('refimg-layer');
 const refImgCtx = refImgLayerCanvas.getContext('2d');
 const guideLayerCanvas = document.getElementById('guide-layer');
@@ -3270,13 +4460,17 @@ const guideCtx = guideLayerCanvas.getContext('2d');
 const refLayerCtx = refLayerCanvas.getContext('2d');
 const bgCtx      = bgCanvas.getContext('2d');
 const drawCtx    = drawCanvas.getContext('2d', { willReadFrequently: true });
+const fillCtx    = fillCanvas.getContext('2d', { willReadFrequently: true });
+const floatCtx   = floatCanvas.getContext('2d');
+// SPEC_20: drawCanvas/drawCtx は「線レーン」。読みやすさのための別名（実体は同じ）。
+const lineCanvas = drawCanvas, lineCtx = drawCtx;
 const onionPrevCtx = onionPrev.getContext('2d');
 const onionNextCtx = onionNext.getContext('2d');
 const frameLayerCtx = frameLayerCanvas.getContext('2d', { willReadFrequently: true });
 
 // 内部解像度設定
 function setupCanvas(){
-  [bgCanvas, drawCanvas, onionPrev, onionNext, frameLayerCanvas, refLayerCanvas, refImgLayerCanvas, guideLayerCanvas].forEach(c => {
+  [bgCanvas, drawCanvas, fillCanvas, floatCanvas, onionPrev, onionNext, frameLayerCanvas, refLayerCanvas, refImgLayerCanvas, guideLayerCanvas].forEach(c => {
     c.width  = CFG.WORK_W;
     c.height = CFG.WORK_H;
   });
@@ -3284,7 +4478,7 @@ function setupCanvas(){
   bgCtx.fillStyle = '#fff';
   bgCtx.fillRect(0, 0, CFG.WORK_W, CFG.WORK_H);
   // アンチエイリアスOFF
-  [drawCtx, bgCtx, onionPrevCtx, onionNextCtx, frameLayerCtx].forEach(c => {
+  [drawCtx, fillCtx, bgCtx, onionPrevCtx, onionNextCtx, frameLayerCtx].forEach(c => {
     c.imageSmoothingEnabled = false;
   });
 }
@@ -3357,7 +4551,7 @@ function applyZoom(){
   const sx = state.flipped ? -1 : 1;
   wrap.style.transform = `translate(${state.panX}px, ${state.panY}px) scaleX(${sx})`;
   wrap.style.transformOrigin = '50% 50%';
-  [bgCanvas, drawCanvas, onionPrev, onionNext, frameLayerCanvas, refLayerCanvas, refImgLayerCanvas, guideLayerCanvas].forEach(c => {
+  [bgCanvas, drawCanvas, fillCanvas, floatCanvas, onionPrev, onionNext, frameLayerCanvas, refLayerCanvas, refImgLayerCanvas, guideLayerCanvas].forEach(c => {
     c.style.width  = w + 'px';
     c.style.height = h + 'px';
   });
@@ -3392,15 +4586,24 @@ function toFrameLocal(x, y){
 let _refId = 0;
 function newRefImgId(){ return 'ri_' + (++_refId) + '_' + Date.now().toString(36); }
 // あるアニメ参照の現在ティック画像
+// SPEC_20 P2: 参照のどの1枚を出すかは **この1関数だけ** が決める（renderRefLayer / animTickImg 共通）。
+//   k = floor((t - offset) / step)。範囲外は -1（出さない）。1コマだけの参照は静止画として常に 0。
+//   ★2つの関数で規則がズレると「画は見えているのに 中央 が効かない」が再発する（2026-09-03 に踏んだ）
+function refStep(r){ return Math.max(1, (r.step | 0) || 1); }
+function refTickIndex(r, t){
+  if(!r || !r.ticks || !r.ticks.length || t < 0) return -1;
+  if(r.ticks.length === 1) return 0;
+  const k = Math.floor((t - (r.offset | 0)) / refStep(r));
+  return (k < 0 || k >= r.ticks.length) ? -1 : k;
+}
+// 参照が尽きる tick（タイムライン延長の基準）
+function refEndTick(r){
+  if(!r || !r.ticks || r.ticks.length <= 1) return 0;
+  return Math.max(0, (r.offset | 0) + r.ticks.length * refStep(r));
+}
 function animTickImg(r){
-  const t = currentSyncTick();
-  if(!r.ticks || !r.ticks.length || t < 0) return null;
-  // renderRefLayer と**同じ規則**にする。1コマだけの参照（MANGA PLATE のコマ枠など）は
-  // 全ティックで出しっぱなしなのに、ここだけ t>=1 で null を返していた
-  // ＝「画は見えているのに 中央 が効かない」の真因（2026-09-03）
-  if(r.ticks.length === 1) return r.ticks[0] || null;
-  if(t >= r.ticks.length) return null;
-  return r.ticks[t] || null;
+  const k = refTickIndex(r, currentSyncTick());
+  return k < 0 ? null : (r.ticks[k] || null);
 }
 function firstTickImg(r){ if(!r.ticks) return null; for(const im of r.ticks){ if(im) return im; } return null; }
 // アニメ参照を 原寸(1:1)＆中央 に配置
@@ -3605,6 +4808,7 @@ function applyRefMaster(){
   renderRefImg();
   renderRefLayer();
   if(typeof applyRefImgUI === 'function') applyRefImgUI();
+  updateRefLane();   // 画面に出ていないときは REF レーンを薄くする
 }
 
 // 解像度枠 / セーフフレームのガイドを描画（表示のみ・書き出しには含めない）
@@ -3696,16 +4900,14 @@ function recanvasDrawData(data, sw, sh, dw, dh){
   }
   return out;
 }
-// フレームのサムネをdrawDataから再生成
+// フレームのサムネを line/fill から再生成（塗→線で合成）
 function regenThumb(f){
   if(!f || f.kind !== 'draw' || !f.thumbCanvas) return;
-  const tmp = document.createElement('canvas');
-  tmp.width = CFG.WORK_W; tmp.height = CFG.WORK_H;
-  tmp.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(f.drawData), CFG.WORK_W, CFG.WORK_H), 0, 0);
+  const art = frameArtCanvas(f);
   const tc = f.thumbCanvas.getContext('2d');
   tc.imageSmoothingEnabled = false;
   tc.fillStyle = '#fff'; tc.fillRect(0, 0, CFG.THUMB_W, CFG.THUMB_H);
-  tc.drawImage(tmp, 0, 0, CFG.THUMB_W, CFG.THUMB_H);
+  tc.drawImage(art, 0, 0, CFG.THUMB_W, CFG.THUMB_H);
 }
 function updateResLabel(){
   const el = document.getElementById('info-res');
@@ -3713,6 +4915,7 @@ function updateResLabel(){
 }
 // メインのサイズ変更処理（呼び出し側で確認ダイアログ）
 function setCanvasSize(newW, newH){
+  floatSettle();
   [newW, newH] = clampCanvasSize(newW, newH);
   const oldW = CFG.WORK_W, oldH = CFG.WORK_H;
   if(newW === oldW && newH === oldH) return false;
@@ -3721,8 +4924,9 @@ function setCanvasSize(newW, newH){
   if(cur) syncFrameFromCanvas(cur);
   // 既存の絵は等倍のまま保持（中央アンカーのカンバスサイズ変更。拡縮しない）
   for(const f of state.frames){
-    if(f.kind !== 'draw' || !f.drawData) continue;
-    f.drawData = recanvasDrawData(f.drawData, oldW, oldH, newW, newH);
+    if(f.kind !== 'draw' || !f.line) continue;
+    f.line = recanvasDrawData(f.line, oldW, oldH, newW, newH);
+    if(f.fill) f.fill = recanvasDrawData(f.fill, oldW, oldH, newW, newH);
     f.history = []; f.histIdx = -1; // サイズ非互換の履歴は破棄
     f.dirty = true; state.pendingSaveFrames.add(f.id);
   }
@@ -3923,6 +5127,17 @@ function floodFill(startX, startY, fillHex){
   const data = img.data;
   const W = CFG.WORK_W, H = CFG.WORK_H;
   const idx = (x,y) => (y * W + x) * 4;
+  // SPEC_20 §1-3: 塗レーンで塗るときは「線レーンのα」が壁になる。
+  //   自分のバッファの色の連続だけを見ていた従来（＝線も塗りも同じ1枚だった頃）の規則は、
+  //   線が別レーンに移った時点で成り立たない（塗レーンは一面が透明で仕切りが無い）。
+  const onFill = (ctx === fillCtx);
+  let wall = null;
+  if(onFill){
+    const ld = lineCtx.getImageData(0, 0, W, H).data;
+    wall = new Uint8Array(W * H);
+    for(let i = 0, q = 0; q < wall.length; i += 4, q++) if(ld[i + 3] >= FILL_WALL_A) wall[q] = 1;
+    if(wall[startY * W + startX]) return;   // 線の上を突いたときは何もしない
+  }
   const startI = idx(startX, startY);
   const tR = data[startI], tG = data[startI+1], tB = data[startI+2], tA = data[startI+3];
   const erase = !!state.fillErase;
@@ -3936,9 +5151,12 @@ function floodFill(startX, startY, fillHex){
   else if(!tone && tR === fc.r && tG === fc.g && tB === fc.b && tA === 255) return;
   // トーン塗りは網点の隙間に書き込まないピクセルが残るため、走査済みを visited で管理
   const visited = tone ? new Uint8Array(W * H) : null;
+  // 実際に色を書いた画素（＝あとで線の下へ膨らませる種）
+  const painted = onFill ? new Uint8Array(W * H) : null;
   // スキャンライン
   const stack = [[startX, startY]];
   const matches = (i) =>
+    !(wall && wall[i >> 2]) &&
     data[i] === tR && data[i+1] === tG && data[i+2] === tB && data[i+3] === tA &&
     (!visited || !visited[i >> 2]);
   while(stack.length){
@@ -3952,6 +5170,7 @@ function floodFill(startX, startY, fillHex){
       if(visited) visited[i >> 2] = 1;
       if(!tone || toneOn(tone, lx, y)){
         data[i] = fc.r; data[i+1] = fc.g; data[i+2] = fc.b; data[i+3] = fA;
+        if(painted) painted[i >> 2] = 1;
       }
       if(y > 0){
         if(matches(idx(lx, y-1))){
@@ -3964,6 +5183,32 @@ function floodFill(startX, startY, fillHex){
         } else spanBelow = false;
       }
       lx++;
+    }
+  }
+  // ── 線の下へ潜らせる（SPEC_20 §1-3）──
+  //   線のアンチエイリアスの縁は α<128 なので壁にならず、塗レーンでは透明のまま残る。
+  //   そこへ数px はみ出させておくと、線を上に重ねたときに白い隙間が出ない。
+  //   伸ばす先は「線の上」か「まだ透明」だけ＝隣の色域は侵さない。
+  //   網点(tone)と透明消し(erase)は縁が滲むので対象外。
+  const under = onFill && !erase && !tone ? Math.max(0, Math.min(3, state.fillUnderPx | 0)) : 0;
+  if(under > 0){
+    let cur = painted;
+    for(let step = 0; step < under; step++){
+      const next = new Uint8Array(cur);
+      for(let y = 0; y < H; y++){
+        for(let x = 0; x < W; x++){
+          const q = y * W + x;
+          if(cur[q]) continue;
+          const i = q * 4;
+          if(!(wall[q] || data[i + 3] === 0)) continue;
+          if((x > 0 && cur[q - 1]) || (x < W - 1 && cur[q + 1]) ||
+             (y > 0 && cur[q - W]) || (y < H - 1 && cur[q + W])){
+            next[q] = 1;
+            data[i] = fc.r; data[i+1] = fc.g; data[i+2] = fc.b; data[i+3] = fA;
+          }
+        }
+      }
+      cur = next;
     }
   }
   ctx.putImageData(img, 0, 0);
@@ -4041,7 +5286,8 @@ function rgbToHex(r,g,b){
 function sampleCompositeColor(cx, cy){
   if(cx < 0 || cy < 0 || cx >= CFG.WORK_W || cy >= CFG.WORK_H) return null;
   const layers = [];
-  layers.push(drawCtx);
+  layers.push(lineCtx);
+  layers.push(fillCtx);
   if(state.refMasterShow && state.refImages.some(o => o.img && o.visible && o.opacity > 0)) layers.push(refImgCtx);
   if(state.frameLayer && state.frameLayer.visible) layers.push(frameLayerCtx);
   if(state.refAnimators && state.refAnimators.length) layers.push(refLayerCtx);
@@ -4124,11 +5370,26 @@ function screenEyedrop(){
 // HISTORY (Undo/Redo) — カレントフレーム単位
 // ImageDataのスナップショット方式
 // ============================================================
-function snapshot(){
-  return drawCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H);
+// 履歴エントリ = { lane:'line'|'fill'|'both'|'base', line?:ImageData, fill?:ImageData|'empty' }
+//   'base' … コマを開いた時点の姿（両レーン）。undo の底なので HISTORY_MAX で捨てない。
+//   'empty' … そのレーンはまだ無かった＝戻すときは clear する、という印。
+function laneSnap(L){ return laneCtx(L).getImageData(0, 0, CFG.WORK_W, CFG.WORK_H); }
+function baseSnapshot(frame){
+  return { lane: 'base', line: laneSnap('line'), fill: (frame && frame.fill) ? laneSnap('fill') : 'empty' };
 }
-function restoreSnap(snap){
-  drawCtx.putImageData(snap, 0, 0);
+function entryLanes(e){ return (e.lane === 'both' || e.lane === 'base') ? ['line', 'fill'] : [e.lane]; }
+// idx から手前に遡って、そのレーンが最後に記録された姿を返す（見つからなければ undefined）
+function laneImgAt(f, idx, L){
+  for(let i = idx; i >= 0; i--){
+    const e = f.history[i];
+    if(e && e[L] !== undefined) return e[L];
+  }
+  return undefined;
+}
+function applyLaneImg(L, v){
+  if(v === undefined) return;
+  if(v === 'empty') laneCtx(L).clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
+  else laneCtx(L).putImageData(v, 0, 0);
 }
 // カレントセル取得（フレーム or 空）
 function curFrame(){ return state.frames[state.currentFrame]; }
@@ -4138,19 +5399,22 @@ function curDrawFrame(){
   return (f && f.kind === 'draw') ? f : null;
 }
 
-function pushHistory(){
+// lanes 省略 = いま描いているレーン1枚ぶん
+function pushHistory(lanes){
   const f = curDrawFrame();
   if(!f) return;
+  const want = lanes ? (Array.isArray(lanes) ? lanes : [lanes]) : [curLane()];
   if(f.histIdx < f.history.length - 1){
     f.history = f.history.slice(0, f.histIdx + 1);
   }
-  f.history.push(snapshot());
-  if(f.history.length > CFG.HISTORY_MAX){
-    f.history.shift();
-  }
+  const e = { lane: want.length > 1 ? 'both' : want[0] };
+  for(const L of want) e[L] = laneSnap(L);
+  f.history.push(e);
+  // 先頭の base だけは残す（捨てると undo の底が無くなってレーンを戻せなくなる）
+  while(f.history.length > CFG.HISTORY_MAX + 1) f.history.splice(1, 1);
   f.histIdx = f.history.length - 1;
   f.strokeCount++;
-  syncFrameFromCanvas(f);
+  syncFrameFromCanvas(f, want);
   updateStats();
   markFrameDirty(f);
   state.lastEditWas = 'canvas'; // キャンバス操作を記録
@@ -4197,7 +5461,8 @@ function snapshotTL(){
       id: f.id, kind: f.kind, duration: f.duration, hidden: !!f.hidden,
     };
     if(f.kind === 'draw'){
-      s.drawData    = f.drawData;          // syncFrameFromCanvas が新Array割当するので参照で安全
+      s.line        = f.line;              // syncFrameFromCanvas が新Array割当するので参照で安全
+      s.fill        = f.fill;
       s.thumbCanvas = f.thumbCanvas;
       s.history     = (f.history || []).slice(); // shallow copy（各snap自体は不変）
       s.histIdx     = f.histIdx;
@@ -4214,7 +5479,7 @@ function tlSnapEquals(a, b){
   for(let i = 0; i < a.length; i++){
     const x = a[i], y = b[i];
     if(x.id !== y.id || x.kind !== y.kind || x.duration !== y.duration || !!x.hidden !== !!y.hidden) return false;
-    if(x.kind === 'draw' && x.drawData !== y.drawData) return false;
+    if(x.kind === 'draw' && (x.line !== y.line || x.fill !== y.fill)) return false;
   }
   return true;
 }
@@ -4257,7 +5522,7 @@ function restoreTL(snap){
     return {
       id: s.id, kind: 'draw',
       duration: s.duration, hidden: s.hidden,
-      drawData: s.drawData, thumbCanvas: s.thumbCanvas,
+      line: s.line, fill: s.fill, thumbCanvas: s.thumbCanvas,
       history: (s.history || []).slice(), histIdx: s.histIdx,
       strokeCount: s.strokeCount || 0, dirty: true,
     };
@@ -4282,9 +5547,12 @@ function stepCanvasUndo(frameId){
   const f = state.frames[idx];
   if(!f || f.kind !== 'draw' || !f.history || f.histIdx <= 0) return false;
   if(idx !== state.currentFrame) switchToFrame(idx); // 触ったコマを表示
+  const eU = f.history[f.histIdx];
+  const lsU = entryLanes(eU);
+  // 戻す先は「そのレーンが1つ前に記録されていた姿」。base まで遡れば 'empty' で clear になる
+  for(const L of lsU) applyLaneImg(L, laneImgAt(f, f.histIdx - 1, L));
   f.histIdx--;
-  restoreSnap(f.history[f.histIdx]);
-  syncFrameFromCanvas(f);
+  syncFrameFromCanvas(f, lsU);
   updateStats(); markFrameDirty(f);
   return true;
 }
@@ -4295,8 +5563,10 @@ function stepCanvasRedo(frameId){
   if(!f || f.kind !== 'draw' || !f.history || f.histIdx >= f.history.length - 1) return false;
   if(idx !== state.currentFrame) switchToFrame(idx);
   f.histIdx++;
-  restoreSnap(f.history[f.histIdx]);
-  syncFrameFromCanvas(f);
+  const eR = f.history[f.histIdx];
+  const lsR = entryLanes(eR);
+  for(const L of lsR) applyLaneImg(L, eR[L]);
+  syncFrameFromCanvas(f, lsR);
   updateStats(); markFrameDirty(f);
   return true;
 }
@@ -4330,6 +5600,7 @@ function stepTimelineRedo(){
 // 「最後に触った系統」を1ステップ戻す。実行不可エントリ（履歴上限で消えた等）は
 // 飛ばして次の有効なエントリを探す。
 function undo(){
+  if(gFloat){ floatCancel(); return; }   // SPEC_20 P4: 浮いている間の Ctrl+Z ＝ 持ち上げる前に戻す
   while(gUndo.length){
     const e = gUndo.pop();
     let ok = false;
@@ -4342,6 +5613,7 @@ function undo(){
   updateUndoButtons();
 }
 function redo(){
+  if(gFloat){ floatCommit(true); return; }
   while(gRedo.length){
     const e = gRedo.pop();
     let ok = false;
@@ -4370,14 +5642,15 @@ function updateStats(){
 // 新規描画フレーム
 function createBlankFrame(){
   const id = newFrameId();
-  const drawData = new Uint8ClampedArray(CFG.WORK_W * CFG.WORK_H * 4);
+  const line = new Uint8ClampedArray(CFG.WORK_W * CFG.WORK_H * 4);
   const thumbCanvas = document.createElement('canvas');
   thumbCanvas.width = CFG.THUMB_W;
   thumbCanvas.height = CFG.THUMB_H;
   return {
     id,
     kind: 'draw',
-    drawData, thumbCanvas,
+    // SPEC_20: 線は必ず持つ。塗りは最初に塗るまで null（メモリを増やさない）
+    line, fill: null, thumbCanvas,
     duration: 2,
     history: [],
     histIdx: -1,
@@ -4387,32 +5660,38 @@ function createBlankFrame(){
   };
 }
 
-// drawCanvasの内容をフレームに同期（drawフレームのみ）
-function syncFrameFromCanvas(frame){
+// キャンバスの内容をフレームに同期（drawフレームのみ）。
+// lanes: 'line' | 'fill' | ['line','fill'] | 省略（＝既に持っている方だけ吸い上げる）
+//   ★省略時に fill を作らないのが肝。線だけのコマは今までと同じメモリ量のまま。
+function syncFrameFromCanvas(frame, lanes){
   if(!frame || frame.kind !== 'draw') return;
-  const img = drawCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H);
-  frame.drawData = new Uint8ClampedArray(img.data);
+  // SPEC_20 P4: SEL で持ち上げている間は画面に「抜き跡」があるだけなので吸い上げない。
+  //   こうしておくと autosave も取り消し（paintLanesFrom）も「持ち上げる前」の絵で済む。
+  if(gFloat && gFloat.frame === frame) return;
+  const want   = lanes ? (Array.isArray(lanes) ? lanes : [lanes]) : null;
+  const doLine = want ? want.indexOf('line') >= 0 : true;
+  const doFill = want ? want.indexOf('fill') >= 0 : !!frame.fill;
+  if(doLine) frame.line = new Uint8ClampedArray(lineCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H).data);
+  if(doFill){
+    frame.fill = new Uint8ClampedArray(fillCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H).data);
+    refreshFillBand(frame);
+  }
+  // サムネはいつも合成（塗→線）。現在コマなので画面の2枚をそのまま縮める
   const tc = frame.thumbCanvas.getContext('2d');
   tc.imageSmoothingEnabled = false;
   tc.fillStyle = '#fff';
   tc.fillRect(0, 0, CFG.THUMB_W, CFG.THUMB_H);
-  tc.drawImage(drawCanvas, 0, 0, CFG.THUMB_W, CFG.THUMB_H);
+  if(frame.fill) tc.drawImage(fillCanvas, 0, 0, CFG.THUMB_W, CFG.THUMB_H);
+  tc.drawImage(lineCanvas, 0, 0, CFG.THUMB_W, CFG.THUMB_H);
 }
 
 // フレーム→キャンバス。空ブロックの場合は白紙に
 function loadFrameToCanvas(frame){
   if(!frame) return;
-  if(frame.kind === 'empty'){
-    drawCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
-    return;
-  }
-  const img = new ImageData(
-    new Uint8ClampedArray(frame.drawData),
-    CFG.WORK_W, CFG.WORK_H
-  );
-  drawCtx.putImageData(img, 0, 0);
+  paintLanesFrom(frame);
+  if(frame.kind === 'empty') return;
   if(frame.history.length === 0){
-    frame.history.push(snapshot());
+    frame.history.push(baseSnapshot(frame));
     frame.histIdx = 0;
   }
 }
@@ -4441,6 +5720,7 @@ function promoteEmptyToFrame(idx){
 // 描画中でも安全に切り替え可能
 function switchToFrame(idx){
   if(idx < 0 || idx >= state.frames.length) return;
+  floatSettle();   // SPEC_20 P4: コマを移る前に浮いている形を今のコマへ落とす
   if(idx === state.currentFrame && state.frames[idx]){
     // 念のため再描画は行う
   }
@@ -4478,7 +5758,8 @@ function addFrame(copyFromCurrent = false){
     // 現在のフレームの内容をコピー
     const src = curFrame();
     syncFrameFromCanvas(src); // 念のため最新を吸い上げ
-    newF.drawData = new Uint8ClampedArray(src.drawData);
+    newF.line = new Uint8ClampedArray(src.line);
+    if(src.fill) newF.fill = new Uint8ClampedArray(src.fill);
     // サムネイルも複製
     const tc = newF.thumbCanvas.getContext('2d');
     tc.drawImage(src.thumbCanvas, 0, 0);
@@ -4501,6 +5782,7 @@ function addFrame(copyFromCurrent = false){
 
 // 現在フレーム削除
 async function deleteCurrentFrame(){
+  floatSettle();
   // 確認ダイアログなし版
   if(state.frames.length <= 1){
     await modalAlert('最低1フレーム必要です。');
@@ -4510,7 +5792,7 @@ async function deleteCurrentFrame(){
   if(drawing) endStroke();
   const removed = state.frames[state.currentFrame];
   if(removed.kind === 'draw'){
-    // 空ブロックに変換（drawDataは持たない）
+    // 空ブロックに変換（line/fill は持たない）
     const emptyBlock = {
       id: removed.id,
       kind: 'empty',
@@ -4567,7 +5849,7 @@ function maxRefTicks(){
   let m = 0;
   for(const r of state.refAnimators){
     if(!r.visible || !r.ticks) continue;
-    const n = r.totalTicks || r.ticks.length;
+    const n = refEndTick(r);
     if(n > m) m = n;
   }
   return m;
@@ -4642,8 +5924,14 @@ function buildStrip(){
     if(!isEmpty){
       const thumb = document.createElement('div');
       thumb.className = 'fc-thumb';
+      thumb.title = '線レーン（タップでこのコマの線を描く）';
       thumb.appendChild(f.thumbCanvas);
       cell.appendChild(thumb);
+      // SPEC_20 P1: 塗レーンの帯。タップするとこのコマの塗レーンへ
+      const band = document.createElement('div');
+      band.className = 'fc-fill' + (fillHasInk(f) ? ' has' : '');
+      band.title = '塗レーン（タップでこのコマの塗りを描く）';
+      cell.appendChild(band);
 
       // 表示/非表示トグルボタン
       const visBtn = document.createElement('button');
@@ -4766,6 +6054,7 @@ function buildStrip(){
 
   updateScrollThumb();
   updateTimeTrack();
+  applyLaneStyle();   // ストリップの lane-line / lane-fill クラスを付け直す
 }
 
 // 全体尺が上限超えてないか確認、超えてたら最後のフレームを縮める
@@ -4790,14 +6079,17 @@ function setupCellInteraction(cell, frame, idx){
   let dragStart = null;
   let dragging = false;
   let isTouch = false;
+  // SPEC_20 P1: 押した段でレーンが決まる（サムネ＝線 / 帯＝塗 / それ以外＝そのまま）
+  const laneOfTarget = t => t.closest('.fc-fill') ? 'fill' : (t.closest('.fc-thumb') ? 'line' : null);
   cell.addEventListener('pointerdown', e => {
     if(e.target.classList.contains('fc-dur')) return;
     if(e.target.classList.contains('fc-handle')) return;
     isTouch = (e.pointerType === 'touch');
+    const lane = (e.shiftKey || e.altKey) ? null : laneOfTarget(e.target);
     // 指の場合: ネイティブスクロールに任せる（preventDefaultしない、capture もしない）
     if(isTouch){
       // タップ判定だけ（短時間+小移動で switchToFrame）
-      dragStart = { x: e.clientX, y: e.clientY, t: performance.now(), tap: true };
+      dragStart = { x: e.clientX, y: e.clientY, t: performance.now(), tap: true, lane };
       dragging = false;
       return;
     }
@@ -4806,6 +6098,7 @@ function setupCellInteraction(cell, frame, idx){
     cell.setPointerCapture(e.pointerId);
     dragStart = { x: e.clientX, y: e.clientY, t: performance.now(), tap: false };
     dragging = false;
+    if(lane) setLane(lane, { quiet: true });
     handleCellTap(idx);
   });
   cell.addEventListener('pointermove', e => {
@@ -4844,6 +6137,7 @@ function setupCellInteraction(cell, frame, idx){
       if(dragStart.tap){
         const elapsed = performance.now() - dragStart.t;
         if(elapsed < 400){
+          if(dragStart.lane) setLane(dragStart.lane, { quiet: true });
           handleCellTap(idx);
         }
       }
@@ -5120,6 +6414,7 @@ function updateTimeTrack(){
     const curT = state.frames.slice(0, state.currentFrame).reduce((s, f) => s + f.duration, 0);
     cursor.style.left = tickToPx(curT) + 'px';
   }
+  if(!gRefLaneDrag) updateRefLane();
   syncTimeTrackScroll();
 }
 
@@ -5140,6 +6435,14 @@ function syncTimeTrackScroll(){
   }
   inner.style.left = offsetLeft + 'px';
   inner.style.transform = `translateX(${-strip.scrollLeft}px)`;
+  // REF レーンも同じ原点・同じスクロール。左の見出し幅＝レーン見出し列＋‹ の幅
+  const rli = document.getElementById('ref-lane-inner');
+  if(rli){ rli.style.left = offsetLeft + 'px'; rli.style.transform = inner.style.transform; }
+  const headW = Math.max(0, offsetLeft - 4) + 'px';
+  const rlh = document.getElementById('ref-lane-head');
+  if(rlh) rlh.style.width = headW;
+  const tg = document.getElementById('ref-lane-toggle');
+  if(tg) tg.style.width = headW;
 }
 
 // ============================================================
@@ -5170,7 +6473,7 @@ function drawOnionSide(ctx, dir){
   const tmp = onionTmp();
   // 遠い→近い の順に重ねる（近いコマほど濃く残る）
   for(let k = picks.length - 1; k >= 0; k--){
-    onionTmpCtx.putImageData(onionTint(picks[k].drawData, color), 0, 0);
+    onionTmpCtx.putImageData(onionTint(onionSrcOf(picks[k]), color), 0, 0);
     ctx.globalAlpha = Math.pow(0.55, k);   // 1枚目=1.0, 2枚目=0.55, 3枚目=0.30 …
     ctx.drawImage(tmp, 0, 0);
   }
@@ -5191,7 +6494,19 @@ function applyOnionOpacity(){
   onionNext.style.opacity = ONION.opacity;
 }
 
-// drawDataのうち不透明ピクセルを指定色に置き換えた新しいImageData配列を返す
+// SPEC_20: オニオンが拾うのは既定で線レーンだけ（塗りまで乗せると前後のコマが読めなくなる）。
+// 設定で「塗りも含める」にしたときは合成した1枚をソースにする。
+const _oniMixCache = new WeakMap();   // frame -> Uint8ClampedArray（合成の作り置き）
+function onionSrcOf(f){
+  if(!state.onionIncludeFill || !f.fill) return f.line;
+  const hit = _oniMixCache.get(f);
+  if(hit && hit.line === f.line && hit.fill === f.fill) return hit.data;
+  const art = frameArtCanvas(f);
+  const data = new Uint8ClampedArray(art.getContext('2d').getImageData(0, 0, CFG.WORK_W, CFG.WORK_H).data);
+  _oniMixCache.set(f, { line: f.line, fill: f.fill, data });
+  return data;
+}
+// 不透明ピクセルを指定色に置き換えた新しいImageData配列を返す
 function tintImageData(srcData, r, g, b){
   const out = new Uint8ClampedArray(srcData.length);
   for(let i = 0; i < srcData.length; i += 4){
@@ -5236,6 +6551,7 @@ function frameAtTick(tick){
   return { idx: state.frames.length - 1, showIdx: lastDrawIdx };
 }
 function play(){
+  floatSettle();
   if(state.frames.length === 0) return;
   // ワークエリアが妥当か確認
   ensureWorkAreaValid();
@@ -5289,16 +6605,10 @@ function play(){
       // 表示フレームのキャンバス更新
       if(showIdx >= 0){
         const f = state.frames[showIdx];
-        if(f && f.kind === 'draw'){
-          const img = new ImageData(
-            new Uint8ClampedArray(f.drawData),
-            CFG.WORK_W, CFG.WORK_H
-          );
-          drawCtx.putImageData(img, 0, 0);
-        }
+        if(f && f.kind === 'draw') paintLanesFrom(f);
       } else {
         // 表示すべきdrawがない: 白紙
-        drawCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
+        paintLanesFrom(null);
       }
       updateStripUI();
       updateFramePos();
@@ -5594,9 +6904,11 @@ function smoothPoint(x, y){
   return { x: Math.round(smX), y: Math.round(smY) };
 }
 
-// 描画ターゲット: FRAMEレイヤー編集モード時は frameLayerCtx
+// 描画ターゲット: FRAMEレイヤー編集モード時は frameLayerCtx、
+// そうでなければ「いま選んでいるレーン」（SPEC_20 §1-2）
 function activeDrawCtx(){
-  return state.frameLayer.editMode ? frameLayerCtx : drawCtx;
+  if(state.frameLayer.editMode) return frameLayerCtx;
+  return curLane() === 'fill' ? fillCtx : lineCtx;
 }
 // 筆圧カーブ適用（0..1 → 0..1）
 function applyPressureCurve(p){
@@ -5909,6 +7221,8 @@ drawCanvas.addEventListener('pointerdown', e => {
   drawCanvas.setPointerCapture(e.pointerId);
   drawingPointerId = e.pointerId;
   if(refImgActive()){ refDragBegin(e.clientX, e.clientY); return; } // 参照画像の移動モード
+  if(state.tool === 'sel' && !e.altKey){ selPointerDown(e); return; }   // SPEC_20 P4
+  if(state.tool !== 'eyedrop' && !e.altKey && laneBlocked()) return;
   if(state.tool === 'eyedrop' || e.altKey){
     eyedropDispatch(e.clientX, e.clientY);
   } else if(state.tool === 'fill'){
@@ -5936,6 +7250,7 @@ drawCanvas.addEventListener('pointerdown', e => {
 drawCanvas.addEventListener('pointermove', e => {
   if(e.pointerType === 'touch') return;
   if(refDragging){ refDragMove(e.clientX, e.clientY); return; }
+  if(state.tool === 'sel' || gFloat){ selPointerMove(e); if(state.tool === 'sel') return; }
   const {x, y} = toCanvasCoord(e.clientX, e.clientY);
   document.getElementById('hud-coord').textContent = `${x} · ${y}`;
   if(lassoing && lassoPoly){
@@ -5976,6 +7291,7 @@ drawCanvas.addEventListener('pointermove', e => {
 function onPenEnd(e){
   if(e.pointerType === 'touch') return;
   if(refDragging){ refDragEnd(); return; }
+  if(state.tool === 'sel'){ selPointerUp(e); return; }
   if(lassoing && lassoPoly) return;                    // 多角形モード中の離しは無視
   if(lassoing && e.pointerId === drawingPointerId){
     // 動かさずに離した＝クリックで始めた → 多角形モードに入る（塗らない）
@@ -6002,7 +7318,10 @@ document.querySelectorAll('.tool').forEach(btn => {
     if(t === 'undo'){ undo(); return; }
     if(t === 'redo'){ redo(); return; }
     if(lassoing && t !== 'fill') lassoCancel();   // 囲い途中でツールを変えたら捨てる
+    if(t !== 'sel') floatSettle();                 // SPEC_20 P4: 別の道具を持ったら浮いている形は確定
     state.tool = t;
+    // SPEC_20: FILL は塗レーンの道具。線レーンで押されたら黙って効かないのではなく移る。
+    if(t === 'fill' && !state.frameLayer.editMode) setLane('fill');
     document.querySelectorAll('.tool').forEach(b => {
       const tb = b.dataset.tool;
       if(tb === 'undo' || tb === 'redo') return;
@@ -6013,6 +7332,7 @@ document.querySelectorAll('.tool').forEach(btn => {
     refreshPenSizeUI();
     applyInkUIForTool();
     if(t === 'fill') syncFillInkFocus();
+    syncSelHud();
   });
 });
 
@@ -6560,10 +7880,14 @@ bgTrack.addEventListener('pointermove', e => {
 // 初期表示
 setBgBright(100);
 
-// クリア関数
+// クリア関数（ロックされていないレーンだけ消す。両方ロックなら理由を出して何もしない）
 function clearCanvas(){
-  drawCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
-  pushHistory();
+  floatSettle();
+  const ls = LANES.filter(L => !laneLocked(L));
+  if(!ls.length){ stageToast('🔒 どちらのレーンもロック中'); return; }
+  for(const L of ls) laneCtx(L).clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
+  pushHistory(ls);
+  if(ls.length === 1) stageToast(LANE_JP[ls[0]] + 'レーンを消去');
 }
 // ERASEボタン: **Wクリック/Wタップ＝筆圧のON/OFF ／ 長押し＝このコマを全消去**。
 //   全消去は「2連打」だと巻き添えで消しやすいので長押しへ移した（Undoで戻せる）。
@@ -6755,17 +8079,34 @@ document.getElementById('btn-export').title = '現在のコマを1枚PNGで書�
 //   }
 // 旧 ANIMATOR_v1 (frames配列・id無し) も読み込み可能（後方互換）。
 // 画像はキャンバス内部解像度(2048x1152)のBG透明PNG。COMPOSER側で4Kへnearest拡大。
+// SPEC_20 P3: 1レーンだけの絵（line / fill）を作業解像度の canvas で返す。使い回しの1枚。
+//   塗りが無いコマの fill は透明1枚（AE で重ねたときに「その番号のファイルが無い」を作らない）
+let _laneCv = null, _laneCx = null;
+function frameLaneCanvas(frame, lane){
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  if(!_laneCv){ _laneCv = document.createElement('canvas'); _laneCx = _laneCv.getContext('2d'); }
+  if(_laneCv.width !== W || _laneCv.height !== H){ _laneCv.width = W; _laneCv.height = H; }
+  const a = frame && frame.kind === 'draw' ? (lane === 'fill' ? frame.fill : frame.line) : null;
+  if(a) _laneCx.putImageData(new ImageData(new Uint8ClampedArray(a), W, H), 0, 0);
+  else _laneCx.clearRect(0, 0, W, H);
+  return _laneCv;
+}
+// EXPORT JSON / PROJ 保存箱に同梱するレーン別 PNG。塗りが無いコマは null（＝image と同じなので持たない）
+function frameLayersForJSON(frame){
+  if(!frame || frame.kind !== 'draw' || !fillHasInk(frame)) return null;
+  return {
+    line: frameLaneCanvas(frame, 'line').toDataURL('image/png'),
+    fill: frameLaneCanvas(frame, 'fill').toDataURL('image/png'),
+  };
+}
 function frameToPNGDataURL(frame){
-  if(!frame || frame.kind !== 'draw' || !frame.drawData) return null;
+  if(!frame || frame.kind !== 'draw' || !frame.line) return null;
   const c = document.createElement('canvas');
   c.width = CFG.WORK_W;
   c.height = CFG.WORK_H;
   const ctx = c.getContext('2d');
-  const img = new ImageData(
-    new Uint8ClampedArray(frame.drawData),
-    CFG.WORK_W, CFG.WORK_H
-  );
-  ctx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(frameArtCanvas(frame), 0, 0);   // 塗→線の合成1枚（下流の形式は不変）
   return c.toDataURL('image/png');
 }
 
@@ -6779,6 +8120,7 @@ function ensureProjectId(){
 
 // 現在のプロジェクト全体を PROJECT_v1 オブジェクトとして構築（EXPORT JSON / スナップショット共用）
 function buildProjectJSON(){
+  floatSettle();
   const cur = curFrame();
   if(cur) syncFrameFromCanvas(cur); // 最新の編集中フレームを取り込む
   return {
@@ -6804,13 +8146,17 @@ function buildProjectJSON(){
       if(f.kind === 'empty'){
         return { id: f.id, kind: 'empty', duration: f.duration };
       }
-      return {
+      const c = {
         id: f.id,
         kind: 'draw',
         duration: f.duration,
         hidden: !!f.hidden,
-        image: frameToPNGDataURL(f),
+        image: frameToPNGDataURL(f),   // 合体1枚（COMPOSER / OBAN など下流が読むのはこれだけ）
       };
+      // SPEC_20 P3: 線と塗りを分けたまま戻すための同梱。共有DB／LIVE（buildProjectPayload）には載せない
+      const layers = frameLayersForJSON(f);
+      if(layers) c.layers = layers;
+      return c;
     }),
     composer: state.composerData || null,
   };
@@ -6869,7 +8215,7 @@ async function applyProjectJSON(json){
     if(fj.kind === 'empty'){
       const ef = createBlankFrame();
       ef.kind = 'empty';
-      ef.drawData = null;
+      ef.line = null; ef.fill = null;
       ef.duration = Math.max(1, fj.duration | 0);
       if(fj.id) ef.id = fj.id;
       newFrames.push(ef);
@@ -6880,17 +8226,15 @@ async function applyProjectJSON(json){
       if(fj.id) f.id = fj.id;
       if(fj.image){
         try{
-          f.drawData = await loadImageToDrawData(fj.image);
-          // サムネ更新
-          const c = document.createElement('canvas');
-          c.width = CFG.WORK_W; c.height = CFG.WORK_H;
-          const ctx = c.getContext('2d');
-          ctx.putImageData(new ImageData(new Uint8ClampedArray(f.drawData), CFG.WORK_W, CFG.WORK_H), 0, 0);
-          const tc = f.thumbCanvas.getContext('2d');
-          tc.imageSmoothingEnabled = false;
-          tc.fillStyle = '#fff';
-          tc.fillRect(0, 0, CFG.THUMB_W, CFG.THUMB_H);
-          tc.drawImage(c, 0, 0, CFG.THUMB_W, CFG.THUMB_H);
+          if(fj.layers && fj.layers.line){
+            // SPEC_20 P3: 分けて書き出したものは分けたまま戻す
+            f.line = await loadImageToDrawData(fj.layers.line);
+            f.fill = fj.layers.fill ? await loadImageToDrawData(fj.layers.fill) : null;
+          } else {
+            f.line = await loadImageToDrawData(fj.image);
+            f.fill = null;   // 合体1枚で来たものは丸ごと線レーンへ（SPEC_20 §5-1）
+          }
+          regenThumb(f);   // 塗→線の合成でサムネを作り直す
         } catch(e){
           console.warn('image decode failed', e);
         }
@@ -7161,6 +8505,7 @@ document.getElementById('btn-live').addEventListener('click', () => {
 
 function exportPNG(opts){
   opts = opts || {};
+  floatSettle();
   // 作業解像度そのままで書き出し（ビューと同じ解像度）
   const W = CFG.WORK_W, H = CFG.WORK_H;
   const ex = document.createElement('canvas');
@@ -7172,7 +8517,8 @@ function exportPNG(opts){
   if(!opts.transparentBG){
     exCtx.drawImage(bgCanvas, 0, 0, W, H);
   }
-  // 描画レイヤー
+  // 描画レイヤー（塗 → 線）
+  exCtx.drawImage(fillCanvas, 0, 0, W, H);
   exCtx.drawImage(drawCanvas, 0, 0, W, H);
   // ダウンロード
   ex.toBlob(blob => {
@@ -7204,15 +8550,32 @@ document.getElementById('eov-cancel').addEventListener('click', () => { gExportC
 
 // 連番PNG（4K・BG透過）をZIP一括書き出し（AE等での合成前提）
 // 1ティック=1枚（保持コマは同一画像を複製、empty/hidden=完全透明）
+const SEQ_MODE_LS = 'animator_seq_mode_v1';
 async function exportSequencePNG(){
   if(typeof JSZip === 'undefined'){ await modalAlert('ZIPライブラリの読込に失敗しました'); return; }
+  floatSettle();
   const cur = curFrame();
   if(cur) syncFrameFromCanvas(cur);
   const total = totalTicks();
   if(total <= 0){ await modalAlert('書き出すコマがありません'); return; }
   const W = CFG.WORK_W, H = CFG.WORK_H;
-  const ok = await modalConfirm(`全 ${total} コマを ${W}×${H} BG透過の連番PNGで書き出します。\nコマ数が多いと時間がかかります。続行しますか？`);
-  if(!ok) return;
+  // SPEC_20 P3: 何を書き出すかを選ぶ（前回の選択を覚える）。AE へは「別フォルダ」、COMPOSER 等へは合体
+  let last = 'both';
+  try{ last = localStorage.getItem(SEQ_MODE_LS) || 'both'; }catch(e){}
+  const opts = [
+    { value: 'both',  label: '合体（線＋塗り）', sub: 'frames/ ・従来どおり' },
+    { value: 'line',  label: '線だけ',           sub: 'line/' },
+    { value: 'fill',  label: '塗りだけ',         sub: 'fill/' },
+    { value: 'split', label: '線と塗りを別フォルダ（AE用）', sub: 'line/ ＋ fill/ を1つのZIPに・同じ番号で揃う' },
+  ].map(o => o.value === last ? Object.assign({}, o, { sub: o.sub + ' ・前回' }) : o);
+  const mode = await showModal({
+    msg: `全 ${total} コマを ${W}×${H} BG透過の連番PNGで書き出します（コマ数が多いと時間がかかります）。どれを書き出しますか？`,
+    list: opts,
+    buttons: [{ label: 'キャンセル', value: null }],
+  });
+  if(!mode) return;
+  try{ localStorage.setItem(SEQ_MODE_LS, mode); }catch(e){}
+  const lanesOut = mode === 'split' ? ['line', 'fill'] : [mode];   // 'both' | 'line' | 'fill'
 
   const btn = document.getElementById('btn-export-seq');
   btn.disabled = true;
@@ -7225,23 +8588,26 @@ async function exportSequencePNG(){
   exCtx.imageSmoothingEnabled = false;
 
   const zip = new JSZip();
-  const folder = zip.folder('frames');
+  const folders = {};
+  for(const L of lanesOut) folders[L] = zip.folder(L === 'both' ? 'frames' : L);
   let tick = 0, canceled = false;
   try{
     for(let i = 0; i < state.frames.length; i++){
       if(gExportCancel){ canceled = true; break; }
       const f = state.frames[i];
       const dur = Math.max(1, f.duration | 0);
-      // このセルの1枚を生成（draw かつ非hidden のときのみ絵を描く）
-      exCtx.clearRect(0, 0, W, H);
-      if(f.kind === 'draw' && !f.hidden && f.drawData){
-        exCtx.putImageData(new ImageData(new Uint8ClampedArray(f.drawData), W, H), 0, 0);
+      const show = f.kind === 'draw' && !f.hidden && f.line;
+      const startTick = tick;
+      for(const L of lanesOut){
+        // このセルの1枚を生成（draw かつ非hidden のときのみ絵を描く）。無い番号を作らない＝空でも透明1枚
+        exCtx.clearRect(0, 0, W, H);
+        if(show) exCtx.drawImage(L === 'both' ? frameArtCanvas(f) : frameLaneCanvas(f, L), 0, 0);
+        const dataURL = ex.toDataURL('image/png').split(',')[1];
+        for(let d = 0; d < dur; d++){
+          folders[L].file(`frame_${String(startTick + d + 1).padStart(5,'0')}.png`, dataURL, { base64: true });
+        }
       }
-      const dataURL = ex.toDataURL('image/png').split(',')[1];
-      for(let d = 0; d < dur; d++){
-        tick++;
-        folder.file(`frame_${String(tick).padStart(5,'0')}.png`, dataURL, { base64: true });
-      }
+      tick += dur;
       setExportOv(tick / total * 100, `${tick} / ${total}`);
       await new Promise(r => setTimeout(r, 0));
     }
@@ -7253,7 +8619,8 @@ async function exportSequencePNG(){
         const a = document.createElement('a');
         const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
         a.href = url;
-        a.download = `sequence_${ts}_${W}x${H}_alpha.zip`;
+        const tag = mode === 'both' ? '' : ('_' + mode);   // 合体は従来のファイル名のまま
+        a.download = `sequence_${ts}_${W}x${H}_alpha${tag}.zip`;
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -7308,9 +8675,10 @@ async function exportVideo(){
   let cellOf = null; // cellCv に描かれているフレーム
   const drawTick = (f) => {
     exCtx.drawImage(bgCanvas, 0, 0, W, H); // 背景（bgBright反映）
-    if(f && f.kind === 'draw' && !f.hidden && f.drawData){
+    if(f && f.kind === 'draw' && !f.hidden && f.line){
       if(cellOf !== f){
-        cellCtx.putImageData(new ImageData(new Uint8ClampedArray(f.drawData), W, H), 0, 0);
+        cellCtx.clearRect(0, 0, W, H);
+        cellCtx.drawImage(frameArtCanvas(f), 0, 0);
         cellOf = f;
       }
       exCtx.drawImage(cellCv, 0, 0);
@@ -7362,7 +8730,8 @@ document.getElementById('btn-export-mov').addEventListener('click', exportVideo)
 // ============================================================
 // INDEXED DB (自動保存・複数フレーム対応)
 // ストア構成:
-//   STORE_FRAMES: key=frame.id, value={drawData, duration, width, height, savedAt}
+//   STORE_FRAMES: key=frame.id, value={line, fill, duration, width, height, savedAt}
+//     ★v5 までは {drawData} 1枚。読み込み側が drawData -> line に読み替える（SPEC_20 §2-1）
 //   STORE_META:   key='project', value={frameOrder:[id,...], currentFrame, fps, bgBright, frameIdCounter}
 // ============================================================
 let db = null;
@@ -7448,7 +8817,8 @@ async function flushSave(){
         fs.put({
           id: f.id,
           kind: 'draw',
-          drawData: new Uint8ClampedArray(f.drawData),
+          line: new Uint8ClampedArray(f.line),
+          fill: f.fill ? new Uint8ClampedArray(f.fill) : null,
           duration: f.duration,
           width: CFG.WORK_W,
           height: CFG.WORK_H,
@@ -7476,6 +8846,10 @@ async function flushSave(){
       workW: CFG.WORK_W, workH: CFG.WORK_H,
       guides: { ...state.guides },
       refMasterShow: state.refMasterShow,
+      lane: state.lane,
+      lanes: state.lanes,
+      onionIncludeFill: !!state.onionIncludeFill,
+      fillUnderPx: state.fillUnderPx,
       refImages: state.refImages.map(o => ({
         src:o.src, name:o.name, x:o.x, y:o.y, scale:o.scale,
         opacity:o.opacity, visible:o.visible, locked:!!o.locked,
@@ -7610,17 +8984,25 @@ async function loadProject(){
       const thumbCanvas = document.createElement('canvas');
       thumbCanvas.width = CFG.THUMB_W;
       thumbCanvas.height = CFG.THUMB_H;
-      // drawData を現在の作業サイズに合わせる（保存時と異なる場合は再サンプル）
-      let dd = data.drawData ? new Uint8ClampedArray(data.drawData) : null;
+      // 絵を現在の作業サイズに合わせる（保存時と異なる場合は再サンプル）。
+      // ★v5 以前は {drawData} の1枚だけ＝丸ごと線レーンに入れる（SPEC_20 §5-1）
       const dsw = data.width || CFG.WORK_W, dsh = data.height || CFG.WORK_H;
-      if(dd && (dsw !== CFG.WORK_W || dsh !== CFG.WORK_H || dd.length !== CFG.WORK_W * CFG.WORK_H * 4)){
-        dd = resampleDrawData(dd, dsw, dsh, CFG.WORK_W, CFG.WORK_H);
-      }
+      const fitLane = (src) => {
+        if(!src) return null;
+        let a = new Uint8ClampedArray(src);
+        if(dsw !== CFG.WORK_W || dsh !== CFG.WORK_H || a.length !== CFG.WORK_W * CFG.WORK_H * 4){
+          a = resampleDrawData(a, dsw, dsh, CFG.WORK_W, CFG.WORK_H);
+        }
+        return a;
+      };
+      let dd = fitLane(data.line || data.drawData);
+      const df = fitLane(data.fill);
       if(!dd) dd = new Uint8ClampedArray(CFG.WORK_W * CFG.WORK_H * 4);
       const f = {
         id: data.id,
         kind: 'draw',
-        drawData: dd,
+        line: dd,
+        fill: df,
         thumbCanvas,
         duration: data.duration || 2,
         history: [],
@@ -7628,18 +9010,8 @@ async function loadProject(){
         strokeCount: 0,
         dirty: false,
       };
-      // サムネ生成
-      const tc = thumbCanvas.getContext('2d');
-      tc.imageSmoothingEnabled = false;
-      tc.fillStyle = '#fff';
-      tc.fillRect(0, 0, CFG.THUMB_W, CFG.THUMB_H);
-      const tmp = document.createElement('canvas');
-      tmp.width = CFG.WORK_W; tmp.height = CFG.WORK_H;
-      tmp.getContext('2d').putImageData(
-        new ImageData(new Uint8ClampedArray(f.drawData), CFG.WORK_W, CFG.WORK_H),
-        0, 0
-      );
-      tc.drawImage(tmp, 0, 0, CFG.THUMB_W, CFG.THUMB_H);
+      // サムネ生成（塗→線の合成）
+      regenThumb(f);
       loadedFrames.push(f);
     }
     if(loadedFrames.length === 0) return false;
@@ -7660,6 +9032,18 @@ async function loadProject(){
     if(meta.paletteFloatPos && typeof meta.paletteFloatPos === 'object') state.paletteFloatPos = meta.paletteFloatPos;
     if(meta.guides && typeof meta.guides === 'object') state.guides = Object.assign(state.guides, meta.guides);
     if(typeof meta.refMasterShow === 'boolean') state.refMasterShow = meta.refMasterShow;
+    if(meta.lane === 'fill' || meta.lane === 'line') state.lane = meta.lane;
+    if(meta.lanes){
+      for(const L of ['line', 'fill']){
+        const src = meta.lanes[L];
+        if(!src) continue;
+        if(typeof src.visible === 'boolean') state.lanes[L].visible = src.visible;
+        if(typeof src.locked  === 'boolean') state.lanes[L].locked  = src.locked;
+        if(typeof src.opacity === 'number')  state.lanes[L].opacity = src.opacity;
+      }
+    }
+    if(typeof meta.onionIncludeFill === 'boolean') state.onionIncludeFill = meta.onionIncludeFill;
+    if(typeof meta.fillUnderPx === 'number') state.fillUnderPx = Math.max(0, Math.min(3, meta.fillUnderPx | 0));
     if(Array.isArray(meta.refImages)){
       state.refImages = [];
       for(const o of meta.refImages){
@@ -7819,6 +9203,7 @@ function tlComposeShot(){
     ctx.drawImage(onionNext, 0, 0);
     ctx.globalAlpha = 1;
   }
+  ctx.drawImage(fillCanvas, 0, 0);
   ctx.drawImage(drawCanvas, 0, 0);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   return { w, h };
@@ -7889,7 +9274,7 @@ async function tlShoot(){
 function tlTick(){
   if(!tlEnabled() || tlBusy) return;
   if(!tlDirty) return;                                                   // ② 変化なし＝撮らない
-  if(drawing || lassoing) return;                                        // ③ ストローク途中は撮らない
+  if(drawing || lassoing || gFloat || gSelDraw) return;                  // ③ ストローク途中・SEL で浮かせている間は撮らない（抜き跡が写る）
   if(Date.now() - tlLastShotAt < tlMeta.settings.intervalMs) return;     // ① 間隔
   tlShoot();
 }
@@ -9150,7 +10535,8 @@ function splitCurrentFrame(splitAt){
   markFrameDirty(f);
   // 後半コマを同内容の新フレームとして直後に挿入
   const newF = createBlankFrame();
-  newF.drawData = new Uint8ClampedArray(f.drawData);
+  newF.line = new Uint8ClampedArray(f.line);
+  if(f.fill) newF.fill = new Uint8ClampedArray(f.fill);
   const tc = newF.thumbCanvas.getContext('2d');
   tc.drawImage(f.thumbCanvas, 0, 0);
   newF.duration = d2;
@@ -9254,6 +10640,8 @@ const SHORTCUT_ACTIONS = [
   { id:'size2',     label:'サイズ 2px',         def:'',           run:()=>document.querySelector('.tb-pen[data-size="2"]')?.click() },
   { id:'size3',     label:'サイズ 20px',        def:'',           run:()=>document.querySelector('.tb-pen[data-size="20"]')?.click() },
   { id:'onion',     label:'オニオンスキン',     def:'O',          run:()=>document.getElementById('btn-onion')?.click() },
+  { id:'lane',      label:'線/塗レーン切替',    def:'L',          run:()=>setLane(curLane() === 'fill' ? 'line' : 'fill') },
+  { id:'sel',       label:'選択（SEL）／2連打でWARP', def:'A',    run:()=>document.querySelector('.tool[data-tool="sel"]')?.click() },
   { id:'waIn',      label:'ワークエリア IN（インジケータ位置）', def:'B', run:()=>setWaInAtPlayhead() },
   { id:'waOut',     label:'ワークエリア OUT（インジケータ位置）',def:'N', run:()=>setWaOutAtPlayhead() },
   { id:'newFrame',  label:'新規フレーム',       def:'',           run:()=>addFrame(false) },
@@ -9307,6 +10695,7 @@ const KEY_GESTURES = {
   fill:  { dbl: () => fillToggleLasso(), hold: () => fillToggleLassoErase(),
            shift: () => fillToggleLassoErase() },
   pen:   { dbl: () => togglePressurePen(), spring: true },
+  sel:   { dbl: () => toggleSelWarp() },   // SPEC_20 P4: A2連打＝WARP（ボタンのWクリックと同じ）
   // erase は dbl を持たない（＝2回のclickがボタン側の380ms判定で全消去になる）。
   // ここに登録するのは **オートリピート除け** が目的：押しっぱなしにすると
   // click が連射されて全消去がUndoに何手も積まれてしまう。
@@ -9813,17 +11202,24 @@ window.addEventListener('keydown', e => {
   // Ctrl/Cmd 系（固定）
   if((e.ctrlKey||e.metaKey) && e.key === 'z'){ e.preventDefault(); undo(); return; }
   if((e.ctrlKey||e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))){ e.preventDefault(); redo(); return; }
-  if((e.ctrlKey||e.metaKey) && (e.key === 'c' || e.key === 'C')){ e.preventDefault(); copySelectedFrames(); return; }
-  if((e.ctrlKey||e.metaKey) && (e.key === 'v' || e.key === 'V')){ e.preventDefault(); pasteFramesAfterCurrent(); return; }
+  // SPEC_20 P4: 浮いている形があれば Ctrl+C はその形を、SEL を持っていてコピーがあれば Ctrl+V は形を貼る
+  if((e.ctrlKey||e.metaKey) && (e.key === 'c' || e.key === 'C')){ e.preventDefault(); if(gFloat) selCopy(); else copySelectedFrames(); return; }
+  if((e.ctrlKey||e.metaKey) && (e.key === 'v' || e.key === 'V')){
+    if(gSelClip && (state.tool === 'sel' || gFloat)){ e.preventDefault(); selPaste(); return; }
+    e.preventDefault(); pasteFramesAfterCurrent(); return;
+  }
   if(e.ctrlKey || e.metaKey || e.altKey) return; // その他の修飾付きは無視
   // 固定: Escape=（タイムラプス再生中ならまず停止→）選択解除 / Backspace=削除（Deleteの別名）
   if(e.key === 'Escape'){
+    if(gFloat){ floatCancel(); return; }          // SPEC_20 P4: 変形の取り消しが最優先
+    if(gSelDraw){ gSelDraw = null; renderFloatLayer(); return; }
     if(lassoing){ lassoCancel(); return; }        // 囲い途中が最優先
     if(tlPlaying){ tlPlayStop(); return; }
     clearFrameSelection(); return;
   }
   // Enter: 多角形の投げ縄を確定
   if(e.key === 'Enter' && lassoing && lassoPoly){ e.preventDefault(); lassoEnd(); return; }
+  if(e.key === 'Enter' && gFloat){ e.preventDefault(); floatCommit(); return; }
   if(e.key === 'Backspace'){ e.preventDefault(); SC_BY_ID.delFrame.run(); return; }
   // 可変ショートカット（keymap照合）
   const k = normKey(e);
@@ -10030,12 +11426,13 @@ function hDrawTestArt(i, n){
   for(let k = 0; k < 12; k++) drawDot(drawCtx, 8 + k * 7, 8 + (i % 3) * 3, 1, '#000000');
 }
 
-// 画面と同じ重ね順でレイヤーを1枚に合成（bg → onion → draw → guide）
+// 画面と同じ重ね順でレイヤーを1枚に合成（bg → fill → onion → line → guide）
 function hComposite(){
   if(!hShotCtx) return;
   const W = CFG.WORK_W, H = CFG.WORK_H;
   hShotCtx.clearRect(0, 0, W, H);
   hShotCtx.drawImage(bgCanvas, 0, 0);
+  hShotCtx.drawImage(fillCanvas, 0, 0);
   if(state.onionOn){
     hShotCtx.globalAlpha = ONION.opacity;   // CSS opacity と同値
     hShotCtx.drawImage(onionPrev, 0, 0);
@@ -10062,6 +11459,10 @@ async function hBuildFixture(){
   state.tool = 'pen'; state.inkColor = 'black'; state.fillColor = '#2f6ad0';
   state.fillErase = false; state.pressurePen = false; state.mirrorOn = false;
   state.flipped = false; state.frameLayer.editMode = false;
+  state.lane = 'line';
+  state.lanes.line = { visible: true, locked: false, opacity: 1 };
+  state.lanes.fill = { visible: true, locked: false, opacity: 1 };
+  state.onionIncludeFill = false;
   state.frameLayer.x = 0; state.frameLayer.y = 0; state.frameLayer.scale = 1;
   state.refImages = []; state.refAnimators = []; state.bgBright = 100;
   state.fps = H_FIX.fps;
@@ -10079,7 +11480,7 @@ async function hBuildFixture(){
     }
     const f = createBlankFrame();
     f.duration = H_FIX.durations[i];
-    drawCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
+    paintLanesFrom(null);
     hDrawTestArt(i, H_FIX.durations.length);
     syncFrameFromCanvas(f);
     f.dirty = false;
@@ -10150,11 +11551,7 @@ window.__HARNESS__ = {
   // 現在状態を1回だけ同期描画
   render(){
     const f = hShowIdx >= 0 ? state.frames[hShowIdx] : null;
-    if(f && f.kind === 'draw'){
-      drawCtx.putImageData(new ImageData(new Uint8ClampedArray(f.drawData), CFG.WORK_W, CFG.WORK_H), 0, 0);
-    } else {
-      drawCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
-    }
+    paintLanesFrom(f && f.kind === 'draw' ? f : null);
     updateOnion();
     renderGuides();
     hComposite();
@@ -10164,8 +11561,12 @@ window.__HARNESS__ = {
   info(){
     let px = 0, snaps = 0;
     for(const f of state.frames){
-      if(f.drawData) px += f.drawData.length;
-      if(f.history) for(const s of f.history){ if(s && s.data) snaps += s.data.length; }
+      if(f.line) px += f.line.length;
+      if(f.fill) px += f.fill.length;
+      if(f.history) for(const s of f.history){
+        if(!s) continue;
+        for(const L of ['line', 'fill']){ if(s[L] && s[L].data) snaps += s[L].data.length; }
+      }
     }
     return {
       frames: state.frames.length,

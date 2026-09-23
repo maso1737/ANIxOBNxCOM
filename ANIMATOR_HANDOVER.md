@@ -15,6 +15,48 @@ _新チャット冒頭にこのファイルを貼り付けてください_
   ```
   （3ファイルの構文 / JS→HTML id配線 / id重複 / 未参照関数を一括検査。問題があれば exit 1）
 
+### 2026-09-23 SPEC_20 P1〜P4（レーン UI・REF レーン・書き出し4択・SEL 変形）
+
+発注者判断「一本化の新アプリの前に、旧 animator をこのまま極める」（SPEC_21 §13-1 の答え）を受けて P0 の続きを通しで入れた。
+
+- **P1 タイムラインのレーン化**：ストリップ左端に見出し列 `#lane-head`（`線 ● 🔒 100` / `塗 ● 🔒 100`）。
+  名前＝切替、●＝表示、🔒＝ロック、数字＝左右ドラッグで表示濃度（Wクリックで100・書き出しには効かない）。
+  セルはサムネ（線）の下に塗レーンの帯 `.fc-fill`（`--fill-band` 14px／coarse 18px・塗りがあると桃色）。**押した段でレーンが決まる**。
+  HUD（左上の `線`/`塗` 枠）、L キーで切替、⚙ に「LINE / FILL」欄（潜り幅 0〜3px・オニオンに塗りも含める）。
+  ★ **P0 のトップバー `線`/`塗` は撤去**。トップバーが 1095→1169px になり iPad mini 横（1133px）で HOME がはみ出したため。
+- **P2 REF レーン**：時間メモリの下に参照ごとの帯（参照 ANIMATOR＝色の帯・PASTE 画像＝水色の細帯・下絵 FRAME＝白の細帯）。
+  開閉は時間メモリ左端の `▸ REF n`（閉じる/0件で高さ0）。参照 ANIMATOR の帯は**横ドラッグ＝出るタイミング（`r.offset`）**、
+  **`×N`＝1枚を何コマ見せるか（`r.step`・×1〜×4）**、Wクリックで先頭へ。ロック中は動かない。
+  ★ **表示コマの式は `refTickIndex(r, t)` の1本**（`renderRefLayer` と `animTickImg` が共有）。ずらすと「中央」ボタンが黙る問題を再発させないため。
+- **P3 書き出し**：SEQ PNG が4択（合体 `frames/`・線だけ `line/`・塗りだけ `fill/`・線と塗りを別フォルダ）。
+  EXPORT JSON / PROJ 保存箱は塗りがあるコマだけ `cells[].layers={line,fill}` を同梱＝読み戻すと分かれたまま戻る。
+  共有DB／LIVE（`buildProjectPayload`）は従来どおり合体1枚。
+- **P4 SEL（A キー）**：なぞって囲む／Shift+ドラッグ＝四角／Ctrl+ドラッグ＝コピーで持ち上げ → 隅＝拡縮・Ctrl+隅＝自由変形・
+  隅の外＝回転・Wクリック/A2連打＝WARP → Enter・枠の外・別の操作で確定、Esc・Ctrl+Z で取り消し。
+  上部 HUD：`AA OFF/ON`・`線+塗`・`WARP`・`COPY`・`PASTE`（同じ座標に貼る）・`✓`・`✕`。
+  ★ **AA OFF の確定は `flBakeNearest()`**（1pxずつ逆写像して元の画素を拾う）。canvas に描かせると縁に半透明・色ずれが出てバケツが途切れるため。
+  ★ **浮いている間は `syncFrameFromCanvas` がそのコマを吸い上げない**＝取り消しは `paintLanesFrom` だけ、確定は `pushHistory` 1回。
+  他の操作へ移るときは `floatSettle()` で確定（道具・コマ・レーン・再生・書き出し・全消去・サイズ変更・コマ削除）。
+- 実測・決めごとの詳細は `SPEC_20_ANIMATOR_LINE_FILL.md` §7-5〜§7-9。VRT は P0〜P4 のどの段でも 6コマ 0.000%。
+
+### 2026-09-23 線と塗りの2レーン（SPEC_20 P0）
+
+- **コマ＝線レーン `f.line` ＋ 塗レーン `f.fill`**（旧 `drawData` は廃止）。塗は**最初に塗るまで null**＝線だけのコマは今までと同じメモリ量。
+  キャンバスは `draw-layer`（線・id据え置き。JS では `lineCanvas`/`lineCtx` の別名あり）と新設 `fill-layer`（塗）。P4 で `float-layer`（SEL 表示専用）も追加。
+  重ね順は `bg / ref / frame / refimg / fill / onion×2 / 線 / guide`＝**オニオンは塗の上・線の下**（塗ったコマでもオニオンが読める）。
+- **描く先は `activeDrawCtx()` の1か所**：FRAME EDIT ＞ `state.lane`（`'line'|'fill'`）。トップバーに `線` `塗`（クリック＝切替／**Wクリック＝そのレーンをロック**）、
+  ステージ左上の情報に現在レーン。**FILL ボタンを押すと塗レーンへ自動で移る**。塗レーンの PEN は主線(黒)選択時だけ `fillColor` で描く。
+- **塗レーンのバケツは線レーンの α≥128 を壁にする**（`FILL_WALL_A`）。結果を `state.fillUnderPx`（既定1・0〜3）だけ**線の下へ潜らせる**。
+  伸ばす先は「線の上」か「まだ透明」だけ＝隣の色域は侵さない。投げ縄塗り・網点・透明消しは潜らせない。
+- **Undo はレーン印つき**：`history[0]` が `{lane:'base', line, fill|'empty'}`（HISTORY_MAX でも捨てない）。
+  戻すときは「そのレーンが手前で最後に記録された姿」を当てる（`laneImgAt()`）。全消去はロックされていないレーンだけ・Undo 1手。
+  ★ `syncFrameFromCanvas(f)` をレーン省略で呼ぶと**塗は既に持っているときだけ**吸い上げる（ここで塗を作ると遅延確保が崩れる）。
+- **DB v6**：`STORE_FRAMES` は `{line, fill, …}`。v5 の `{drawData}` は読み込み時に**丸ごと線レーン**へ。IMPORT JSON の合体画像も線レーンへ。
+  EXPORT JSON / →COMPOSER / LIVE / SEQ PNG / VIDEO / PNG は**塗→線の合体1枚**で形式不変（下流は改修ゼロ）。
+- オニオンは既定で**線だけ**（`state.onionIncludeFill` で塗も）。meta に `lane` / `lanes` / `onionIncludeFill` / `fillUnderPx` を保存。
+- **P1〜P4 も同日に実装済み**（下の「2026-09-23 SPEC_20 P1〜P4」）。
+- 詳細・実測・起草から変えた4点は `SPEC_20_ANIMATOR_LINE_FILL.md` §7。
+
 ### 2026-09-15 参照まわりを1本化（REF IMAGE撤去→ペースト＋ロック）／明度チップ／トーンの種明かし
 
 - **REF IMAGE セクションを撤去**（LOAD / ×IMG / 専用の濃度スライダー / 見出しクリック選択）。
@@ -155,7 +197,7 @@ _新チャット冒頭にこのファイルを貼り付けてください_
   - composer: `bindPropInputs()`（kf-/fx- プロパティ入力配線）/ `makeFloatDrag()`（フローティングパネルのドラッグ）/ `exportZipPNG()`（ZIP書き出し骨格）
 - **描き味**: pointermove で `getCoalescedEvents()` 全点処理。筆圧カーブ `PRS` ウィジェット（LIN/SOFT/HARD、`animator_pcurve_v1`）
 - **PROJECTS 保存箱**: DB v4 で `snap_meta`/`snap_data` ストア追加。トップバー PROJ →一覧/保存/開く/複製/削除＋ストレージ残量表示。`buildProjectJSON()` を EXPORT JSON と共用
-- **オニオンスキン**: ティント結果を drawData 配列キーの WeakMap でキャッシュ（drawData は編集で新配列割当のため自動無効化）
+- **オニオンスキン**: ティント結果を 線レーン配列（`f.line`）キーの WeakMap でキャッシュ（編集で新配列割当のため自動無効化。旧 `drawData`）
 - **動画書き出し**: ANIMATOR `VIDEO` / COMPOSER `EXPORT VIDEO`。MediaRecorder + captureStream 実時間レンダリング（Safari=MP4/Chrome=WebM 自動選択）。SEQ PNG / 4K PNG SEQUENCE はキャンセル可能に
 
 ### 未着手・次チャット候補
@@ -180,8 +222,8 @@ _新チャット冒頭にこのファイルを貼り付けてください_
      採用するなら「→ANM 代替動線」を解決した後（2窓運用が安全になってから）が順当。
 
 **将来フェーズ（大規模）**
-- **線のコピペ＆選択移動/回転/スケール**（Ctrl矩形・Alt投げ縄）：~~大規模・見送り中~~ → **2026-09-18 `SPEC_20_ANIMATOR_LINE_FILL.md` P4 で引き取り**（econte の `箱+rot+warp` を移植・AA off・線+塗）。
-- **線＋塗の2レーン／REF レーン／SEQ PNG 4択**：`SPEC_20_ANIMATOR_LINE_FILL.md`（2026-09-18 起草・発注者合意済み・**未着手**）。着手順は P0 → 見せる → P1。
+- ~~**線のコピペ＆選択移動/回転/スケール**~~ → **2026-09-23 実装済み（SPEC_20 P4・SEL ツール＝A キー）**。econte の `箱+rot+warp` を移植・AA off・線+塗。
+- ~~**線＋塗の2レーン／REF レーン／SEQ PNG 4択**~~ → **2026-09-23 SPEC_20 P0〜P4 すべて実装済み**。残りは SPEC_20 §7-9（任意項目と実機確認）だけ。
 - **ドックマネージャ（UI配置）**：設計コストが大きい。今はフローティング/リサイズで代替。
 
 **✅ 2026-08-01 完了（その3）**
@@ -275,7 +317,7 @@ COMPOSERと BroadcastChannel でリアルタイム連携。
 ---
 
 ## 技術スタック
-- Canvas 2D（内部解像度可変・上限≒4K面積。各コマは `drawData` Uint8ClampedArray W×H×4）
+- Canvas 2D（内部解像度可変・上限≒4K面積。各コマは `line`（必須）＋`fill`（塗るまで null）の Uint8ClampedArray W×H×4。SPEC_20）
 - アンチエイリアスOFF、ブレゼンハム直線、自前ピクセル描画
 - Pointer Events API（Apple Pencil / マウス / タッチ 統合）
 - IndexedDB自動保存（差分・debounce 800ms）
@@ -291,8 +333,10 @@ COMPOSERと BroadcastChannel でリアルタイム連携。
 | `ref-layer` | REF ANIMATOR（コマ同期） | ✕ |
 | `refimg-layer` | REF IMAGE（原寸・複数・移動可） | ✕ |
 | `frame-layer` | FRAME LAYER（描ける下絵・移動可） | ✕ |
+| `fill-layer` | **塗レーン**（SPEC_20・オニオンの下） | ○（合体） |
 | `onion-prev/next` | オニオンスキン | ✕ |
-| `draw-layer` | 描画レイヤー | ○ |
+| `draw-layer` | **線レーン**（SPEC_20。JS 別名 `lineCanvas`/`lineCtx`） | ○（合体） |
+| `float-layer` | **SEL で浮かせている形と変形枠**（SPEC_20 P4・入力は受けない） | ✕ |
 | `guide-layer` | 解像度枠/セーフ（表示のみ） | ✕ |
 
 ---
@@ -311,7 +355,7 @@ COMPOSERと BroadcastChannel でリアルタイム連携。
     B4/600dpi に置き換えると10線ちょっと＝「貼りトーン」ではなく「大きい水玉」に見えていた
     （発注者報告「ドット2種がかなり大きい比率に見える」）。**この数字を書き換えるときは
     この行も一緒に直すこと**（HANDOVER が 16 のまま取り残されていた）
-  - **すでに描いた絵は変わらない。** トーンは描いた時点で `drawData` に実ピクセルとして焼ける
+  - **すでに描いた絵は変わらない。** トーンは描いた時点で `line`/`fill` に実ピクセルとして焼ける
 - **太ブラシスロット（20 のボタン）＝押したまま上下スライドでサイズ可変**（上=太く/下=細く、3〜50px、6px/1px）。
   20px 付近(±2)では **20 にスナップ**。デスクトップの右ドラッグ（CLIP STUDIO風）と同じ `state.penBig` を触る（`animator_penbig_v1`）
 - 消しゴム（サイズ独立記憶）
@@ -432,6 +476,9 @@ COMPOSERと BroadcastChannel でリアルタイム連携。
 | B / E / G | ペン / 消し / 塗り |
 | 1 / 2 / 3 | サイズ 1px / 2px / 20px |
 | O | オニオンスキン |
+| L | 線/塗レーン切替（SPEC_20） |
+| A | SEL（選択→変形）／**2連打で WARP**（SPEC_20 P4） |
+| Enter / Esc | SEL の確定 / 取り消し（浮いているとき） |
 | N / D | 新規 / 複製フレーム |
 | S | SPLIT（スクラブ位置で分割） |
 | W | ワークエリア=選択FRAME範囲 / 全範囲 |
@@ -445,7 +492,8 @@ COMPOSERと BroadcastChannel でリアルタイム連携。
 | , | 設定パネル開閉 |
 | Tab | ツールバー左右入替 |
 | Alt+クリック | スポイト（選択スロット上書き） |
-| Ctrl+Z / Y | Undo / Redo |
+| Ctrl+Z / Y | Undo / Redo（SEL で浮いている間の Ctrl+Z は取り消し） |
+| Ctrl+C / V | コマのコピー/ペースト。**SEL で浮いている形があれば形をコピー、SEL を持っていれば形を同じ位置に貼る** |
 | 指2本タップ / 指3本タップ | Undo / Redo |
 
 ---
@@ -457,7 +505,9 @@ const state = {
   tool, penSize, eraseSize, inkColor, fillColor,
   pressurePen, fillErase,
   bgBright, zoom, fitMode, panX, panY,
-  frames,              // [{id, kind, duration, hidden, drawData, thumbCanvas, history, histIdx, ...}]
+  frames,              // [{id, kind, duration, hidden, line, fill(null=未塗り), thumbCanvas, history, histIdx, ...}]
+  lane, lanes,         // SPEC_20: 'line'|'fill' ／ {line:{visible,locked,opacity}, fill:{…}}
+  fillUnderPx, onionIncludeFill,   // 塗りの潜り幅(0〜3) ／ オニオンに塗りを含めるか
   currentFrame, fps, playing, loop, onionOn, smoothing,
   cellBaseW, cellStretchPerTick,
   workStart, workEnd,  // ワークエリア (tick単位, exclusive)
@@ -491,7 +541,7 @@ let gKeymap = {};
 - **タッチ**：全タッチは `#stage` の pointerdown/move/up で一元管理（`touchPtrs: Map`）。drawCanvas は pen/mouse のみ。
 - **FRAMEレイヤー移動**：`applyFrameLayerTransform()` で CSS transform。描画時は `toFrameLocal(x,y)` で逆変換してバッファ座標へ。
 - **REF IMAGE 最前面化**：`bringImageFront(id)` が `state.refImages` 末尾へ splice → `renderRefImg` が後に描画。
-- **CANVAS SIZE 変更**：`setCanvasSize()` → `setupCanvas()` → 全フレームの `drawData` を `resampleDrawData()` で中央フィット（nearest）再サンプル。Undo履歴はリセット。
+- **CANVAS SIZE 変更**：`setCanvasSize()` → `setupCanvas()` → 全フレームの `line`/`fill` を `recanvasDrawData()` で中央アンカー再配置。Undo履歴はリセット。
 - **ショートカット**：`SHORTCUT_ACTIONS` 配列にアクション登録 → `gKeymap`(localStorage) で照合。`handleShortcutCapture()` がキャプチャモード中は全 keydown を横取り。
 - **LIVE 連携**：`flushSave` 完了後 `broadcastProjectDebounced()` が `gLiveActive` なら送信。`gComposerWin` で別窓への参照を保持（再クリックで前面化）。
 - **削除＝空ブロック変換**：drawフレーム→empty（タイムライン尺維持）。emptyの削除は完全splice。
