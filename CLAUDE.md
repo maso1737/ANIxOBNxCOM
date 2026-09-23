@@ -88,7 +88,7 @@
 | `SPEC_16_ECONTE_V4` | 枠ごとの画（`cut.fr[k]`） | **残り §5-D（iPad）だけ** |
 | `SPEC_17_INPUT_GRAMMAR` | 操作文法の統一（キーの押し方） | animator / econte / manga-plate 済／**OBAN 未** |
 | `SPEC_18_IPAD_GRAMMAR` | iPad 操作文法（実機測定値） | P0・P1(composer) 済／**P2 スキル化・P3 横展開 未** |
-| `SPEC_19_ECONTE_V5` | 画の単位を枠→**プレート**（同倍率の枠群）・GRID 統一解像度配置・SINGLE→FOCUS 統合 | **P0〜P2 実装済**（2026-09-23）。下書きから変えた点は §6（紙の差し替えは時刻で・段詰め・C.SCRIPT に設計図）。残りは P3（ブラシ登録をプレート API に乗せる）と iPad 実機確認 |
+| `SPEC_19_ECONTE_V5` | 画の単位を枠→**プレート**（同倍率の枠群）・GRID 統一解像度配置・SINGLE→FOCUS 統合 | **P0〜P2 実装済**（2026-09-23）。下書きから変えた点は §6（紙の差し替えは時刻で・段詰め・C.SCRIPT に設計図）。P3 ブラシ暫定5種も実装済（2026-09-24・§7。PEN / MARKER / FLAT / AIR / GLOW、画像は端末のブラウザにだけ保存）。iPad 実機 OK |
 | `SPEC_20_ANIMATOR_LINE_FILL` | ANIMATOR：コマを**線＋塗の2レーン**（1本のタイムライン）・塗りは線を壁にして1px潜る・**REF レーン**（帯・`offset`/`×N`）・SEQ PNG 4択・econte の変形（`箱+rot+warp`）移植・UI は**現行デザインのまま** | **P0〜P4 実装済**（2026-09-23）。レーン見出し列・REF レーン（offset/×N）・SEQ PNG 4択・EXPORT JSON `layers`・SEL（A キー・AA OFF はニアレスト焼き込み）。残りは §7-9 の任意項目と実機確認だけ |
 | `SPEC_21_LIVE_PLATE` | **一本化アプリ LIVE PLATE（仮）の設計・仕様**。5本を足すのではなく「1つの BOOK に4つの見方（SHEET/DRAW/TAKE/SHOW）」。プレート（SPEC_19）・線＋塗（SPEC_20）・composer の透視式・OBAN の手つき・新 OBAN 規約を土台に、連携（10ルート・3チャンネル）を構造ごと消す。複数ファイル・ビルド無し | **起草のみ**（2026-09-18）。§13-1 は 2026-09-23 に答えが出た＝**旧 animator を先に極める**（SPEC_20 は旧アプリで実装済み）。残り6件は未判断 |
 | `MOTION_COMIC_SPEC` | composer モーションコミック | Phase 1〜3 済／**Phase 4〜5 要判定** |

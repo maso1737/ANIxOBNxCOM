@@ -339,6 +339,11 @@ body.ui-big #cam-expand-label input[type=range]{width:78px}
   box-shadow:0 0 12px rgba(139,63,224,.45);
 }
 .etool.off{opacity:.35;pointer-events:none}
+/* ブラシのチップ（SPEC_19 P3）。取り込んだ画像を使っているブラシは右上に金の点 */
+#brush-pick .etool{padding-left:6px;padding-right:6px}
+.etool.br-img::after{content:'';position:absolute;right:2px;top:2px;width:5px;height:5px;border-radius:50%;background:var(--gold)}
+.br-io{margin-top:5px}
+.br-io .etool{font-size:9px;padding:3px 7px}
 .etool{position:relative}
 .etool.pp-on::after{                 /* 筆圧ペンON（ANIMATOR と同じ金の丸・右上） */
   content:'';position:absolute;right:3px;top:3px;width:6px;height:6px;border-radius:50%;
@@ -880,6 +885,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
             <div class="etool on" data-tool="pen" title="ペン (B) ／ Wクリックで筆圧">PEN</div>
             <div class="etool" data-tool="eraser" title="消しゴム (E) ／ WクリックでCLEAR">ERASE</div>
             <div class="etool lasso-on" data-tool="fill" title="投げ縄 (G) ／ 長押しで透明消しに切替">LASSO</div>
+            <div class="etool" id="btn-tl-brush" title="ブラシを切り替える（押すたびに 1 PEN → 2 MARKER → 3 FLAT → 4 AIR → 5 GLOW）">1 PEN</div>
           </div>
           <span class="tb-div"></span>
           <div class="sld-row">
@@ -1074,9 +1080,18 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
       </div>
       <div>
         <div class="pnl-t">BRUSH</div>
-        <div class="sld-row">
-          <input type="range" id="brush-size" min="1" max="64" value="6">
+        <!-- ブラシ5種（SPEC_19 P3・暫定）。チップは renderBrushPick が作る -->
+        <div class="etools" id="brush-pick"></div>
+        <div class="sld-row" style="margin-top:5px">
+          <input type="range" id="brush-size" min="1" max="64" value="6" title="太さ（ブラシごとに覚える）／ [ ] ・右ドラッグでも">
           <span class="sld-val" id="brush-size-val">6</span>
+        </div>
+        <!-- 調整の入口。形・粒の画像は **この端末のブラウザにだけ**保存（econte.html には入れない） -->
+        <div class="etools br-io">
+          <div class="etool" id="btn-brush-lab" title="brush-lab.html で COPY PARAMS した JSON を取り込む&#10;（MARKER / FLAT / AIR / GLOW が入れ替わる。PEN は変わらない）">&#8681; LAB</div>
+          <div class="etool" id="btn-brush-shape" title="形の画像（ハンコの絵）を取り込む＝白が筆／灰色の下地は自動で黒に&#10;スタンプ式（FLAT / AIR / GLOW）のときだけ">形</div>
+          <div class="etool" id="btn-brush-grain" title="粒の画像（テクスチャ）を取り込む＝周りの枠は自動で切り落とす&#10;スタンプ式（FLAT / AIR / GLOW）のときだけ">粒</div>
+          <div class="etool" id="btn-brush-reset" title="いまのブラシを既定に戻す（取り込んだ画像も外す）&#10;PEN のときは押せない">既定</div>
         </div>
       </div>
       <div>
@@ -5448,6 +5463,10 @@ function gridStrokeStart(e, cv){
   e.preventDefault();
   try{ cv.setPointerCapture(e.pointerId); }catch(err){}
   txBegin();
+  brushStrokeBegin();
+  gLastPress = .5;
+  smoothBegin(e.clientX, e.clientY);
+  gStrokePress = pressFactor(e);                // ★ 以前は GRID のまたぎ塗りで筆圧を一度も更新していなかった
   gGridStroke = { id: e.pointerId, kind: paintKind(), touched: new Map(), last: null };
   gridStrokeTo(cell, e.clientX, e.clientY);
 }
@@ -5467,7 +5486,8 @@ function gridStrokeTo(cell, cx, cy){
   g.last = { key, p };
   // 引いている最中は区間を重ねるだけ（下の previewSegOnCell 参照）。
   // 色帯・正確な合成は gridStrokeUp でまとめて追いつかせる
-  if(state.etool === 'eraser' || first) drawCellSoon(cell);
+  // 丸ペンは1区間だけ重ねる速い見え方。ブラシ（加算・まとめ合成・スタンプ）は重ねて表せないので描き直す
+  if(state.etool === 'eraser' || first || !curBrush().legacy) drawCellSoon(cell);
   else previewSegOnCell(cell, prev, p);
 }
 /* --- ストローク中の速い見え方（2026-08-18） ---
@@ -5501,15 +5521,22 @@ function previewSegOnCell(cell, a, b){
 }
 function gridStrokeMove(e){
   if(!gGridStroke || e.pointerId !== gGridStroke.id) return;
-  const cell = cellAtPoint(e.clientX, e.clientY);
-  if(!cell){ gGridStroke.last = null; return; }   // 隙間では描かない＝渡り線が出ない
-  gridStrokeTo(cell, e.clientX, e.clientY);
+  for(const ev of coalescedOf(e)){
+    const c = smoothTo(ev.clientX, ev.clientY);
+    gStrokePress = pressFactor(ev);
+    const cell = cellAtPoint(c.x, c.y);
+    if(!cell){ gGridStroke.last = null; continue; }   // 隙間では描かない＝渡り線が出ない
+    gridStrokeTo(cell, c.x, c.y);
+  }
 }
 function gridStrokeUp(e){
   if(!gGridStroke || (e && e.pointerId !== gGridStroke.id)) return;
+  const t = smoothTail();                    // 手ブレ補正で遅れていた最後の区間
+  if(t){ const cell = cellAtPoint(t.x, t.y); if(cell) gridStrokeTo(cell, t.x, t.y); }
   const g = gGridStroke;
   gGridStroke = null;
   txEnd();                                   // 変更矩形だけを1手にまとめる（SPEC_16 E1）
+  brushStrokeEnd();
   if(!g.touched.size) return;
   const touched = [...g.touched.values()];
   touched.forEach(t => { drawCell(t.cell); refreshRow(t.i); });
@@ -5825,6 +5852,8 @@ const BRUSH_MAX = 300;
 function brushMax(){ return BRUSH_MAX; }
 function setBrush(v){
   state.brush = clamp(Math.round(v), 1, brushMax());
+  const cb = curBrush();                            // 太さはブラシごとに覚える（AIR 120 / PEN 6 …）
+  if(cb.size !== state.brush){ cb.size = state.brush; saveBrushes(); }
   ['#brush-size', '#tl-brush'].forEach(id => {
     const el = $(id);
     if(el){ el.max = brushMax(); el.value = state.brush; }
@@ -6022,15 +6051,23 @@ function strokePlSegBake(cut, j, kind, a, b){
    どの紙も **物差しの枠で 1280px** なので、`brush` の数値はそのまま出力px
    （＝GRIDでまたいで塗っても同じ太さ）。4K 面積で縮めた紙と色（0.4倍）だけ plK で合わせる。 */
 let gStrokePress = 1;
-/* 筆圧（ペン軸のみ・PENツール時だけ）。0でも消えないよう下限を持たせる */
+/* 筆圧（ペン軸のみ・描く道具のときだけ）。0でも消えないよう下限を持たせる。
+   PEN（丸ペン）は PEN のWクリック（筆圧ON）のときだけ・従来の式。2〜5 のブラシはペンなら常に効く。
+   ★ 筆圧ちょうど 0 は直前の値を保つ（rawPressure）。旧式は 0.5 に化かしていて、抜きの途中に太い粒が出た */
 function pressFactor(e){
-  if(!state.pressurePen || state.etool !== 'pen') return 1;
+  if(state.etool !== 'pen') return 1;
   if(!e || e.pointerType !== 'pen') return 1;
-  const p = (typeof e.pressure === 'number' && e.pressure > 0) ? e.pressure : 0.5;
-  return 0.2 + 0.8 * p;
+  const b = curBrush();
+  if(b.legacy){
+    if(!state.pressurePen) return 1;
+    return 0.2 + 0.8 * rawPressure(e);
+  }
+  return .02 + .98 * rawPressure(e);          // 下限 0.02＝抜きが尖る（brush-lab と同じ式）
 }
 /* プレート j に1区間引く。a/b は **プレート内のピクセル座標** */
 function strokePatchSeg(cut, j, kind, a, b){
+  const br = curBrush();
+  if(!br.legacy && state.etool !== 'eraser'){ brushStrokeSeg(cut, j, kind, a, b, br); return; }   // 2〜5 のブラシ
   const d = plLayer(cut, j, kind, true);
   if(!d) return;
   const lw = Math.max(0.5, state.brush * plK(cut, j, kind) * gStrokePress);
@@ -6052,6 +6089,587 @@ function strokePatchSeg(cut, j, kind, a, b){
   markPatch(cut, j, kind);
 }
 
+/* ============================================================================
+   ブラシ（SPEC_19 P3・2026-09-24）— BRUSH LAB の §ENGINE を移植した暫定5種
+   ---------------------------------------------------------------------------
+   1 PEN    … いままでの硬い丸ペン（legacy。描き方も Undo も変えていない＝検証の絵も同じ）
+   2 MARKER … 線モード。濃度<1 は **1本まとめて合成**（区間の重なりで継ぎ目が濃くならない）
+   3 FLAT   … スタンプ。平筆（角度で太さが変わる）
+   4 AIR    … スタンプ。ボケ足の大きいエアブラシ
+   5 GLOW   … スタンプ＋加算。形＝光の筋・粒＝パルスの縦縞。重ねるほど白へ飛ぶ
+              （ライトペンの「押すたびに光る」）。進行方向に筋がそろう（rotate＋angle 90°）
+   ★ 物差し: 数値は出力 px。紙（プレート）の上では plK を掛ける（PEN と同じ）
+   ★ 1区間につき plan 1回・draw 1回（描く紙はストロークの頭で1枚に決まっている＝SPEC_19 §6）
+   ★ 消しゴムはどのブラシでも丸ペン（いままでどおり）
+   ★ 画像（形・粒）は **この端末のブラウザにだけ**保存する（localStorage）。econte.html には入れない
+     （公開リポジトリなので、Procreate などの素材を配らない）。既定の筋と縞は自前で作った絵
+   ★ 調整は brush-lab.html で詰めて COPY PARAMS → ここの「⇩ LAB」で取り込む（id で対応・未知キーは無視）
+   ========================================================================= */
+const BRUSH_LS = 'econte_brush_v1';
+const BR_DEF = {
+  mode: 'stamp', shape: 'soft', size: 24, opacity: 1, flow: .5,
+  spacing: .10, jitter: 0, sizeJit: 0, angJit: 0,
+  hardness: 0, grain: 0, grainTex: null, roundness: 1, rotate: false, angle: 0,
+  blend: 'source-over', pSize: .5, pOpa: .4, smooth: .25, taperIn: 0,
+  halo: 0              // 暈（光のにじみ）。0〜1。形を中央へ縮めて、周りに柔らかい光を敷く（GLOW 用）
+};
+const BR_KEYS = Object.keys(BR_DEF);
+function brMk(o){ return Object.assign({}, BR_DEF, o); }
+const BR_FACTORY = [
+  { id: 'pen', name: 'PEN', jp: '丸ペン（いままでのペン）', legacy: true, size: 6, smooth: 0 },
+  brMk({ id: 'marker', name: 'MARKER', jp: 'マーカー・面', mode: 'line', size: 34, opacity: .55, flow: 1,
+         hardness: 1, pSize: .3, pOpa: .2, smooth: .4 }),
+  brMk({ id: 'flat', name: 'FLAT', jp: '平筆・角度で太さが変わる', shape: 'flat', size: 40, opacity: .85, flow: .9,
+         spacing: .06, roundness: .16, angle: 38, pSize: .6, pOpa: .3, smooth: .3 }),
+  brMk({ id: 'air', name: 'AIR', jp: 'エアブラシ・ボケ足大', shape: 'soft', size: 120, opacity: .7, flow: .06,
+         spacing: .05, hardness: 0, pSize: .3, pOpa: .7, smooth: .5 }),
+  brMk({ id: 'glow', name: 'GLOW', jp: '光（筋＋パルス・加算）', shape: 'streak', grainTex: 'pulse', grain: .55,
+         size: 100, opacity: 1, flow: .50, spacing: .05, blend: 'lighter', rotate: true, angle: 90, halo: .60,
+         pSize: .8, pOpa: .5, smooth: .5 })   // 2026-09-24 ブラウザで参考（ライトペン1）と見比べて決めた暫定値
+];
+function brFresh(b){ const o = Object.assign({}, b); o.rev = 0; o.shapeMask = null; o.shapeSrc = null; o.grainMask = null; o.grainSrc = null; return o; }
+let gBrushes = BR_FACTORY.map(brFresh);
+let gBrushIdx = 0;
+function curBrush(){ return gBrushes[gBrushIdx] || gBrushes[0]; }
+
+/* --- 筆圧（ブラシ共通）------------------------------------------------------
+   ペン軸のときだけ効く。**筆圧ちょうど 0 は「読み取れなかった」**なので直前の値を保つ
+   （iPad の実測で1本1363点中37点が 0。0.5 に化かすと抜きの途中に太い粒が出て「抜きが効かない」に見えた）。
+   PEN は従来どおり PEN のWクリック（筆圧ON）のときだけ、2〜5 はペンなら常に効く（Procreate と同じ） */
+let gLastPress = .5;
+function rawPressure(e){
+  let p = e && e.pressure;
+  if(typeof p === 'number' && p > 0){ gLastPress = p; return p; }
+  return gLastPress;
+}
+
+/* --- ストロークの状態（間隔の持ち越し・進んだ距離・粒の番号）。plan だけが進める --- */
+let gBS = null, gBrWhole = null;
+function brushStrokeBegin(){
+  gBS = { carry: 0, dist: 0, n: 0, seed: (Math.random() * 1e9) | 0, lastAng: 0 };
+  gBrWhole = new Map();
+}
+function brushStrokeEnd(){ gBS = null; gBrWhole = null; }
+function brRnd(i){
+  let x = (gBS ? gBS.seed : 1) ^ Math.imul(i, 0x9E3779B1);
+  x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
+  return x / 4294967296;
+}
+function brDynSize(B, env){
+  let k = 1 - B.pSize + B.pSize * env.press;                 // 筆圧→太さ
+  if(B.taperIn > 0 && gBS){
+    const need = env.size * B.taperIn * 6;
+    if(gBS.dist < need) k *= .12 + .88 * (gBS.dist / need);
+  }
+  return Math.max(.35, env.size * k);
+}
+function brDynAlpha(B, env){ return clamp(B.opacity * (1 - B.pOpa + B.pOpa * env.press), 0, 1); }
+
+/* --- (1) 計画: 何をどこに置くか。gBS を進めるのはここだけ -------------------- */
+function brushPlanSeg(a, b, B, env){
+  if(!gBS) brushStrokeBegin();
+  if(B.mode === 'line'){
+    const lw = brDynSize(B, env);
+    gBS.dist += Math.hypot(b.x - a.x, b.y - a.y);
+    const pad = lw / 2 + 1;
+    return { mode: 'line', B, color: env.color, lw, alpha: brDynAlpha(B, env), a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y },
+             bbox: [Math.min(a.x, b.x) - pad, Math.min(a.y, b.y) - pad, Math.max(a.x, b.x) + pad, Math.max(a.y, b.y) + pad] };
+  }
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
+  const size0 = brDynSize(B, env);
+  const sp = Math.max(.6, size0 * B.spacing);                  // ★重さを決めるのはここ
+  const dirAng = len > .001 ? Math.atan2(dy, dx) : gBS.lastAng;
+  gBS.lastAng = dirAng;
+  const stamps = [];
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  const put = (px, py, sz, an) => {
+    const tw = brTipPx(sz);
+    const rot = B.rotate ? an + B.angle * Math.PI / 180 : (B.angJit > 0 ? an : B.angle * Math.PI / 180);
+    const ext = Math.abs(rot) > 1e-4 ? tw * .7072 : tw / 2;   // 回すとタイルの角まで届く＝Undo の矩形も広く
+    stamps.push({ x: px, y: py, tw, rot, variant: (B.grain > 0 && !B.grainTex) ? ((gBS.n + stamps.length) & 3) : 0 });
+    x0 = Math.min(x0, px - ext); y0 = Math.min(y0, py - ext);
+    x1 = Math.max(x1, px + ext); y1 = Math.max(y1, py + ext);
+  };
+  let d = gBS.carry;
+  if(len < .001 && gBS.n === 0) put(a.x, a.y, size0, dirAng);
+  while(d <= len){
+    const t = len > 0 ? d / len : 0;
+    const i = gBS.n + stamps.length;
+    let px = a.x + dx * t, py = a.y + dy * t, sz = size0, an = dirAng;
+    if(B.jitter > 0){ px += (brRnd(i * 3 + 1) - .5) * size0 * B.jitter; py += (brRnd(i * 3 + 2) - .5) * size0 * B.jitter; }
+    if(B.sizeJit > 0) sz *= 1 + ((.35 + brRnd(i * 3 + 3) * .9) - 1) * B.sizeJit;
+    if(B.angJit > 0) an += (brRnd(i * 5 + 7) - .5) * Math.PI * 2 * B.angJit;
+    put(px, py, sz, an);
+    d += sp;
+  }
+  gBS.n += stamps.length;
+  gBS.carry = d - len;
+  gBS.dist += len;
+  return { mode: 'stamp', B, color: env.color, alpha: brDynAlpha(B, env) * B.flow, stamps,
+           bbox: stamps.length ? [x0, y0, x1, y1] : [0, 0, -1, -1] };
+}
+/* --- (2) 描画: gBS に触らない純関数 ------------------------------------------ */
+function brushDrawSeg(ctx, plan, alpha, blend){
+  const B = plan.B;
+  ctx.save();
+  ctx.globalCompositeOperation = blend || B.blend || 'source-over';
+  ctx.globalAlpha = clamp(alpha == null ? plan.alpha : alpha, 0, 1);
+  if(plan.mode === 'line'){
+    ctx.strokeStyle = plan.color;
+    ctx.lineWidth = Math.max(.5, plan.lw);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(plan.a.x, plan.a.y);
+    ctx.lineTo(plan.b.x + (plan.a.x === plan.b.x && plan.a.y === plan.b.y ? .01 : 0), plan.b.y);
+    ctx.stroke();
+  }else{
+    for(const st of plan.stamps){
+      const tip = brGetTip(B, st.tw, plan.color, st.variant);
+      if(!tip) continue;
+      const half = tip.width / 2;
+      if(Math.abs(st.rot) < 1e-4 && B.roundness >= .999){
+        ctx.drawImage(tip, st.x - half, st.y - half);
+      }else{
+        ctx.translate(st.x, st.y);
+        ctx.rotate(st.rot);
+        ctx.scale(1, B.roundness);
+        ctx.drawImage(tip, -half, -half);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      }
+    }
+  }
+  ctx.restore();
+}
+/* 紙（プレート j）に1区間。a/b はプレート内のピクセル座標（strokePatchSeg と同じ約束） */
+function brushStrokeSeg(cut, j, kind, a, b, B){
+  const d = plLayer(cut, j, kind, true);
+  if(!d) return;
+  const env = { color: state.fillColor, size: state.brush * plK(cut, j, kind), press: gStrokePress };
+  const plan = brushPlanSeg(a, b, B, env);
+  if(plan.bbox[2] < plan.bbox[0]) return;                     // 間隔の途中（まだ1粒も置かない区間）
+  txTouch(cut, j, kind, plan.bbox[0], plan.bbox[1], plan.bbox[2], plan.bbox[3]);   // ★Undo の矩形＝実際に描く範囲
+  if(plan.mode === 'line' && B.opacity < .999) brushWholeSeg(cut, j, kind, d, plan);
+  else brushDrawSeg(ctx2d(d), plan);
+  markPatch(cut, j, kind);
+}
+/* --- 線モードの「1本まとめて合成」（BRUSH LAB の実測③）-------------------------
+   区間ごとに濃度を掛けて描くと、区間の端が重なった所だけ二重に濃くなる。
+   1本ぶんを不透明で控え（scratch）に引き、**描いた範囲だけ** 描く前の紙（tx の控え）に戻してから
+   控えを濃度1回ぶんで乗せる。Undo の控え（txTouch の snap）をそのまま使うので追加の控えは要らない。
+   ★ このあいだ「筆圧→濃さ」は効かない（1本で1つの濃さ）。太さの筆圧は効く */
+function brushWholeSeg(cut, j, kind, d, plan){
+  const p = plAt(cut, j);
+  const key = p.uid + ':' + kind;
+  const e = gTx && gTx.get(key);
+  if(!e || !gBrWhole){ brushDrawSeg(ctx2d(d), plan); return; }
+  let w = gBrWhole.get(key);
+  if(!w){ w = blankCanvas(d.width, d.height); gBrWhole.set(key, w); }
+  brushDrawSeg(ctx2d(w), plan, 1, 'source-over');
+  const x = clamp(Math.floor(plan.bbox[0]), 0, d.width), y = clamp(Math.floor(plan.bbox[1]), 0, d.height);
+  const x2 = clamp(Math.ceil(plan.bbox[2]), 0, d.width), y2 = clamp(Math.ceil(plan.bbox[3]), 0, d.height);
+  if(x2 <= x || y2 <= y) return;
+  const ctx = ctx2d(d);
+  ctx.save();
+  ctx.clearRect(x, y, x2 - x, y2 - y);
+  ctx.drawImage(e.snap, x, y, x2 - x, y2 - y, x, y, x2 - x, y2 - y);
+  ctx.globalAlpha = clamp(plan.B.opacity, 0, 1);
+  ctx.globalCompositeOperation = plan.B.blend || 'source-over';
+  ctx.drawImage(w, x, y, x2 - x, y2 - y, x, y, x2 - x, y2 - y);
+  ctx.restore();
+}
+
+/* --- 筆先（色つきハンコ）のキャッシュ ----------------------------------------- */
+const BR_TIP = new Map();
+const BR_TIP_MAX = 200;
+function brTipPx(size){
+  const q = Math.max(2, Math.round(size / 16));
+  return Math.max(2, Math.round(size / q) * q);
+}
+function brGetTip(B, size, color, variant){
+  const px = brTipPx(size);
+  const key = B.id + '|' + px + '|' + color + '|' + B.hardness.toFixed(2) + '|' + B.grain.toFixed(2) + '|' +
+              B.shape + '|' + (B.grainTex || '') + '|' + (+(B.halo || 0)).toFixed(2) + '|' + variant + '|' + (B.rev | 0);
+  let c = BR_TIP.get(key);
+  if(c) return c;
+  const m = brMask(B, px, variant);
+  c = blankCanvas(px, px);
+  const x = ctx2d(c);
+  x.drawImage(m, 0, 0);
+  x.globalCompositeOperation = 'source-in';
+  x.fillStyle = color;
+  x.fillRect(0, 0, px, px);
+  if(BR_TIP.size > BR_TIP_MAX) BR_TIP.delete(BR_TIP.keys().next().value);
+  BR_TIP.set(key, c);
+  return c;
+}
+/* 形のマスク（白＝筆）。形の画像があればそれ、無ければ内蔵の形 */
+function brMask(B, px, variant){
+  const c = blankCanvas(px, px);
+  const x = ctx2d(c);
+  const r = px / 2;
+  x.imageSmoothingEnabled = true;
+  x.imageSmoothingQuality = 'high';
+  const shape = (B.shape === 'img' && !B.shapeMask) ? 'streak' : B.shape;
+  // 暈があるときは形を中央へ縮める（周りの余白に光を敷く）
+  const hk = 1 - .45 * clamp(B.halo || 0, 0, 1), ho = px * (1 - hk) / 2, hs = px * hk;
+  if(shape === 'img'){
+    x.drawImage(B.shapeMask, ho, ho, hs, hs);
+  }else if(shape === 'streak'){
+    x.drawImage(brStreakMask(), ho, ho, hs, hs);
+  }else if(shape === 'glow'){
+    const g = x.createRadialGradient(r, r, 0, r, r, r);
+    for(let i = 0; i <= 12; i++){
+      const t = i / 12;
+      g.addColorStop(t, 'rgba(255,255,255,' + clamp(.95 * Math.pow(1 - t, 5) + .30 * Math.pow(1 - t, 1.5), 0, 1).toFixed(4) + ')');
+    }
+    x.fillStyle = g; x.fillRect(0, 0, px, px);
+  }else if(shape === 'flat'){
+    x.fillStyle = '#fff';
+    x.beginPath(); x.ellipse(r, r, r, r, 0, 0, Math.PI * 2); x.fill();
+    if(B.hardness < .98){
+      const g = x.createRadialGradient(r, r, r * B.hardness, r, r, r);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.globalCompositeOperation = 'destination-in';
+      x.fillStyle = g; x.fillRect(0, 0, px, px);
+      x.globalCompositeOperation = 'source-over';
+    }
+  }else{   // soft
+    const h = clamp(B.hardness, 0, .98);
+    const g = x.createRadialGradient(r, r, 0, r, r, r);
+    for(let i = 0; i <= 12; i++){
+      const t = i / 12;
+      const a = t <= h ? 1 : Math.pow(1 - (t - h) / (1 - h), 1.9);
+      g.addColorStop(t, 'rgba(255,255,255,' + clamp(a, 0, 1).toFixed(4) + ')');
+    }
+    x.fillStyle = g; x.fillRect(0, 0, px, px);
+  }
+  // 粒: テクスチャ（パルスの縞／画像）は **濃さ grain の深さ**で掛ける。無ければ従来の粒ノイズ
+  if(B.grain > 0){
+    const tex = B.grainTex ? brGrainDepth(B) : brNoiseTile(Math.round(B.grain * 20) / 20, variant);
+    x.globalCompositeOperation = 'destination-in';
+    x.drawImage(tex, 0, 0, px, px);
+    x.globalCompositeOperation = 'source-over';
+  }
+  // 暈: 形の下に柔らかい光を敷く（粒は掛けない＝にじみは滑らか）。加算で重なると色の光の輪になる
+  if(B.halo > 0){
+    const g = x.createRadialGradient(r, r, 0, r, r, r);
+    for(let i = 0; i <= 10; i++){
+      const t = i / 10;
+      g.addColorStop(t, 'rgba(255,255,255,' + clamp(B.halo * .55 * Math.pow(1 - t, 2.2), 0, 1).toFixed(4) + ')');
+    }
+    x.globalCompositeOperation = 'destination-over';
+    x.fillStyle = g; x.fillRect(0, 0, px, px);
+    x.globalCompositeOperation = 'source-over';
+  }
+  return c;
+}
+/* 内蔵の「光の筋」: 縦の筋が並んだ四角いハンコ。進行方向に回すと筋が線に沿う（GLOW の既定の形） */
+let gBrStreak = null;
+function brStreakMask(){
+  if(gBrStreak) return gBrStreak;
+  const N = 128, c = blankCanvas(N, N), x = ctx2d(c);
+  const im = x.createImageData(N, N), p = im.data;
+  let s = 0x51F15EED;
+  const r = () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
+  const col = [], top = [], bot = [];
+  for(let i = 0; i < N; i++){ col.push(.2 + .8 * Math.pow(r(), .55)); top.push(r() * .25); bot.push(r() * .25); }
+  const sm = col.map((v, i) => (v * 2 + (col[i - 1] || v) + (col[i + 1] || v)) / 4);
+  const ss = (e0, e1, v) => { const t = clamp((v - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+  for(let yy = 0; yy < N; yy++){
+    for(let xx = 0; xx < N; xx++){
+      const u = Math.abs((xx + .5) / N * 2 - 1), v = (yy + .5) / N;
+      const ex = 1 - ss(.55, .95, u);
+      const ey = ss(.08 + top[xx], .30 + top[xx], v) * (1 - ss(.70 - bot[xx], .92 - bot[xx], v));
+      const o = (yy * N + xx) * 4;
+      p[o] = p[o + 1] = p[o + 2] = 255;
+      p[o + 3] = Math.round(255 * clamp(sm[xx] * ex * ey, 0, 1));
+    }
+  }
+  x.putImageData(im, 0, 0);
+  gBrStreak = c;
+  return c;
+}
+/* 内蔵の「パルス」: 柔らかい縦縞＋芯の細い光の線（GLOW の既定の粒） */
+let gBrPulse = null;
+function brPulseMask(){
+  if(gBrPulse) return gBrPulse;
+  const N = 128, P = 32, c = blankCanvas(N, N), x = ctx2d(c);
+  const im = x.createImageData(N, N), p = im.data;
+  for(let xx = 0; xx < N; xx++){
+    const t = ((xx + .5) % P) / P;
+    const soft = .5 + .5 * Math.cos((t - .5) * Math.PI * 2);
+    const line = Math.exp(-Math.pow((t - .5) * P, 2) / 2);
+    const a = clamp(.18 + .55 * soft + .45 * line, 0, 1);
+    for(let yy = 0; yy < N; yy++){
+      const o = (yy * N + xx) * 4;
+      p[o] = p[o + 1] = p[o + 2] = 255;
+      p[o + 3] = Math.round(255 * a);
+    }
+  }
+  x.putImageData(im, 0, 0);
+  gBrPulse = c;
+  return c;
+}
+/* 粒の深さ: 1 − grain × (1 − テクスチャ)。grain=0 なら何も抜かない、1 なら縞の暗い所が抜ける */
+const BR_DEPTH = new Map();
+function brGrainDepth(B){
+  const src = (B.grainTex === 'img' && B.grainMask) ? B.grainMask : brPulseMask();
+  const key = B.id + '|' + (B.grainTex || '') + '|' + B.grain.toFixed(2) + '|' + (B.rev | 0);
+  let c = BR_DEPTH.get(key);
+  if(c) return c;
+  const N = src.width;
+  c = blankCanvas(N, N);
+  const x = ctx2d(c);
+  x.drawImage(src, 0, 0);
+  const im = x.getImageData(0, 0, N, N), p = im.data, g = clamp(B.grain, 0, 1);
+  for(let i = 0; i < p.length; i += 4){
+    p[i] = p[i + 1] = p[i + 2] = 255;
+    p[i + 3] = Math.round(255 * (1 - g * (1 - p[i + 3] / 255)));
+  }
+  x.putImageData(im, 0, 0);
+  if(BR_DEPTH.size > 24) BR_DEPTH.delete(BR_DEPTH.keys().next().value);
+  BR_DEPTH.set(key, c);
+  return c;
+}
+/* 従来の粒ノイズ（BRUSH LAB と同じ。128×128 を量・種ごとに1回だけ作る） */
+const BR_NOISE = new Map();
+function brNoiseTile(amt, variant){
+  const key = amt.toFixed(2) + '|' + variant;
+  let c = BR_NOISE.get(key);
+  if(c) return c;
+  c = blankCanvas(128, 128);
+  const x = ctx2d(c), im = x.createImageData(128, 128), p = im.data;
+  let sd = (0x2545F491 ^ Math.imul(variant, 0x9E3779B1) ^ ((amt * 1000) | 0)) >>> 0;
+  for(let i = 0; i < p.length; i += 4){
+    sd ^= sd << 13; sd >>>= 0; sd ^= sd >> 17; sd ^= sd << 5; sd >>>= 0;
+    const n = sd / 4294967296;
+    p[i] = p[i + 1] = p[i + 2] = 255;
+    p[i + 3] = Math.round(255 * clamp(1 - amt + amt * n * n * 1.6, 0, 1));
+  }
+  x.putImageData(im, 0, 0);
+  BR_NOISE.set(key, c);
+  return c;
+}
+
+/* --- 画像 → マスク（形・粒の取り込み）--------------------------------------------
+   Procreate の素材は「黒地に白」だが、画面の写しには **灰色の下地や角丸の枠**が写り込む。
+   そのまま明るさ＝濃さにすると、加算で何十枚も重なったとき下地の四角が光って見える。
+   ・形: 黒点＝明るさの中央値＋(最明−中央値)×10%（下地を黒へ）・白点＝最明
+   ・粒: 周り 6% を切り落としてから（枠を捨てる）黒点＝暗い5%・白点＝最明
+   ・縁が明るい画像（白地に黒）は自動で反転
+   出来上がりは 256px の「白＋濃さ」。これをそのまま保存する（元の画像は保存しない） */
+function brImportMask(img, kind){
+  const N = 256, iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const c = blankCanvas(N, N), x = ctx2d(c);
+  x.imageSmoothingEnabled = true;
+  x.imageSmoothingQuality = 'high';
+  const m = kind === 'grain' ? .06 : 0;
+  x.drawImage(img, iw * m, ih * m, iw * (1 - 2 * m), ih * (1 - 2 * m), 0, 0, N, N);
+  const im = x.getImageData(0, 0, N, N), p = im.data;
+  const L = new Float32Array(N * N);
+  for(let i = 0, k = 0; i < p.length; i += 4, k++) L[k] = (p[i] * .299 + p[i + 1] * .587 + p[i + 2] * .114) / 255 * (p[i + 3] / 255);
+  let edge = 0, en = 0;
+  for(let k = 0; k < N; k++){ edge += L[k] + L[(N - 1) * N + k] + L[k * N] + L[k * N + N - 1]; en += 4; }
+  const inv = edge / en > .6;
+  if(inv) for(let k = 0; k < L.length; k++) L[k] = 1 - L[k];
+  const sorted = Float32Array.from(L).sort();
+  const q = f => sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))];
+  const hi = Math.max(q(.995), 1e-3);
+  const lo = kind === 'grain' ? q(.05) : q(.5) + (hi - q(.5)) * .10;
+  const span = Math.max(1e-3, hi - lo);
+  for(let i = 0, k = 0; i < p.length; i += 4, k++){
+    p[i] = p[i + 1] = p[i + 2] = 255;
+    p[i + 3] = Math.round(255 * clamp((L[k] - lo) / span, 0, 1));
+  }
+  x.putImageData(im, 0, 0);
+  return c;
+}
+function brLoadMask(src){
+  return new Promise(res => {
+    if(!src){ res(null); return; }
+    const im = new Image();
+    im.onload = () => { const c = blankCanvas(im.width, im.height); ctx2d(c).drawImage(im, 0, 0); res(c); };
+    im.onerror = () => res(null);
+    im.src = src;
+  });
+}
+function brClearCaches(){ BR_TIP.clear(); BR_DEPTH.clear(); }
+
+/* --- 保存（この端末だけ）---------------------------------------------------- */
+let gBrSaveT = 0;
+function saveBrushes(){
+  clearTimeout(gBrSaveT);
+  gBrSaveT = setTimeout(() => {
+    try{
+      localStorage.setItem(BRUSH_LS, JSON.stringify({ v: 1, cur: gBrushIdx, list: gBrushes.map(b => {
+        // **既定から変えた値だけ**書く（こちらで既定を調整したとき、触っていない値には新しい既定が届くように）
+        const o = { id: b.id, size: b.size };
+        const f = BR_FACTORY.find(x => x.id === b.id) || {};
+        if(!b.legacy){ BR_KEYS.forEach(k => { if(b[k] !== f[k]) o[k] = b[k]; }); o.shapeSrc = b.shapeSrc || null; o.grainSrc = b.grainSrc || null; }
+        return o;
+      }) }));
+    }catch(e){ toast('ブラシの画像が大きすぎて保存できませんでした（この端末の保存枠を超えた）'); }
+  }, 300);
+}
+async function loadBrushes(){
+  let o = null;
+  try{ o = JSON.parse(localStorage.getItem(BRUSH_LS) || 'null'); }catch(e){ o = null; }
+  if(!o || !Array.isArray(o.list)) return;
+  for(const r of o.list){
+    const b = gBrushes.find(x => x.id === r.id);
+    if(!b) continue;
+    if(typeof r.size === 'number') b.size = clamp(r.size, 1, BRUSH_MAX);
+    if(b.legacy) continue;
+    BR_KEYS.forEach(k => { if(k in r) b[k] = r[k]; });
+    b.shapeSrc = r.shapeSrc || null; b.shapeMask = await brLoadMask(b.shapeSrc);
+    b.grainSrc = r.grainSrc || null; b.grainMask = await brLoadMask(b.grainSrc);
+    if(b.shape === 'img' && !b.shapeMask) b.shape = 'streak';
+    if(b.grainTex === 'img' && !b.grainMask) b.grainTex = 'pulse';
+    b.rev = (b.rev | 0) + 1;
+  }
+  if(typeof o.cur === 'number') gBrushIdx = clamp(o.cur | 0, 0, gBrushes.length - 1);
+  brClearCaches();
+}
+
+/* --- 選ぶ・取り込む -------------------------------------------------------- */
+function setBrushIdx(i, quiet){
+  gBrushIdx = clamp(i | 0, 0, gBrushes.length - 1);
+  const b = curBrush();
+  if(state.etool !== 'pen') setETool('pen');       // ブラシを選んだら描く道具へ（Procreate と同じ）
+  setBrush(b.size);
+  renderBrushPick();
+  saveBrushes();
+  if(!quiet) stageToast(b.name + '（' + b.jp + '）');
+}
+function cycleBrush(d){ setBrushIdx((gBrushIdx + (d || 1) + gBrushes.length) % gBrushes.length); }
+function renderBrushPick(){
+  const b = curBrush();
+  const pick = $('#brush-pick');
+  if(pick){
+    if(pick.children.length !== gBrushes.length){
+      pick.innerHTML = '';
+      gBrushes.forEach((x, i) => {
+        const el = document.createElement('div');
+        el.className = 'etool br-chip';
+        el.dataset.brush = i;
+        el.textContent = (i + 1) + ' ' + x.name;
+        el.addEventListener('click', () => setBrushIdx(i));
+        pick.appendChild(el);
+      });
+    }
+    [...pick.children].forEach((el, i) => {
+      const x = gBrushes[i];
+      el.classList.toggle('on', i === gBrushIdx);
+      el.classList.toggle('br-img', !!(x.shapeMask || x.grainMask));
+      el.title = (i + 1) + ' ' + x.name + '：' + x.jp + '（太さは ' + x.size + '）'
+               + (x.legacy ? '\n筆圧は PEN のWクリックで ON/OFF' : '\n筆圧はペンなら常に効く（太さ・濃さ）。消しゴムは丸ペンのまま')
+               + ((x.shapeMask || x.grainMask) ? '\n●＝この端末に取り込んだ画像を使用中' : '');
+    });
+  }
+  const stamp = !b.legacy && b.mode === 'stamp';
+  const sh = $('#btn-brush-shape'), gr = $('#btn-brush-grain'), rs = $('#btn-brush-reset');
+  if(sh){ sh.classList.toggle('off', !stamp); sh.classList.toggle('on', !!b.shapeMask); }
+  if(gr){ gr.classList.toggle('off', !stamp); gr.classList.toggle('on', !!b.grainMask); }
+  if(rs) rs.classList.toggle('off', !!b.legacy);
+  const mini = $('#btn-tl-brush');
+  if(mini) mini.textContent = (gBrushIdx + 1) + ' ' + b.name;
+  document.querySelectorAll('.etool[data-tool="pen"]').forEach(el => { el.textContent = b.legacy ? 'PEN' : b.name; });
+}
+function brushImportFile(kind){
+  const b = curBrush();
+  if(b.legacy || b.mode !== 'stamp'){ toast('形・粒の画像はスタンプ式のブラシ（FLAT / AIR / GLOW）だけに入ります'); return; }
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  inp.addEventListener('change', () => {
+    const f = inp.files && inp.files[0];
+    if(!f) return;
+    blobToImage(f).then(im => brushSetImage(b, kind, im)).catch(() => toast('画像を読めませんでした'));
+  });
+  inp.click();
+}
+function brushSetImage(b, kind, im){
+  const m = brImportMask(im, kind);
+  const src = m.toDataURL('image/png');
+  if(kind === 'grain'){ b.grainMask = m; b.grainSrc = src; b.grainTex = 'img'; if(!(b.grain > 0)) b.grain = .55; }
+  else { b.shapeMask = m; b.shapeSrc = src; b.shape = 'img'; }
+  b.rev = (b.rev | 0) + 1;
+  brClearCaches();
+  renderBrushPick();
+  saveBrushes();
+  toast(b.name + ' の' + (kind === 'grain' ? '粒' : '形') + 'を差し替えました（この端末のブラウザにだけ保存）');
+}
+function brushReset(){
+  const b = curBrush();
+  if(b.legacy) return;
+  const f = BR_FACTORY.find(x => x.id === b.id);
+  Object.assign(b, brFresh(f), { rev: (b.rev | 0) + 1 });
+  brClearCaches();
+  setBrush(b.size);
+  renderBrushPick();
+  saveBrushes();
+  toast(b.name + ' を既定に戻しました（取り込んだ画像も外しました）');
+}
+/* brush-lab の COPY PARAMS（JSON）を取り込む。id が同じブラシだけ・知っているキーだけ。
+   形の画像（imgSrc）・粒の画像（grainSrc）も同じ取り込み（黒点合わせ）を通す */
+async function brushApplyLab(txt){
+  let o = null;
+  try{ o = JSON.parse(txt); }catch(e){ o = null; }
+  if(!o || !Array.isArray(o.presets)){ toast('BRUSH LAB の COPY PARAMS（JSON）ではありません'); return false; }
+  const done = [];
+  for(const p of o.presets){
+    const b = gBrushes.find(x => x.id === p.id && !x.legacy);
+    if(!b) continue;
+    BR_KEYS.forEach(k => { if(k in p && k !== 'grainTex') b[k] = p[k]; });
+    if(typeof p.size === 'number') b.size = clamp(p.size, 1, BRUSH_MAX);
+    if(p.grainTex === 'pulse' || p.grainTex === null) b.grainTex = p.grainTex;
+    const load = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+    if(p.shape === 'img' && p.imgSrc){ const im = await load(p.imgSrc); if(im){ b.shapeMask = brImportMask(im, 'shape'); b.shapeSrc = b.shapeMask.toDataURL('image/png'); } }
+    else { b.shapeMask = null; b.shapeSrc = null; }
+    if(p.grainTex === 'img' && p.grainSrc){ const im = await load(p.grainSrc); if(im){ b.grainMask = brImportMask(im, 'grain'); b.grainSrc = b.grainMask.toDataURL('image/png'); b.grainTex = 'img'; } }
+    else if(b.grainTex === 'img'){ b.grainTex = 'pulse'; b.grainMask = null; b.grainSrc = null; }
+    if(b.shape === 'img' && !b.shapeMask) b.shape = 'streak';
+    b.rev = (b.rev | 0) + 1;
+    done.push(b.name);
+  }
+  brClearCaches();
+  setBrush(curBrush().size);
+  renderBrushPick();
+  saveBrushes();
+  toast(done.length ? ('BRUSH LAB から取り込みました: ' + done.join(' / ')) : '取り込めるブラシがありませんでした（MARKER / FLAT / AIR / GLOW の id が要ります）');
+  return done.length > 0;
+}
+async function brushPasteLab(){
+  let txt = null;
+  try{ if(navigator.clipboard && navigator.clipboard.readText) txt = await navigator.clipboard.readText(); }catch(e){ txt = null; }
+  if(!txt || txt.indexOf('BRUSH_LAB') < 0) txt = await modalPrompt('brush-lab.html の COPY PARAMS で写した JSON を貼り付けてください（MARKER / FLAT / AIR / GLOW が入れ替わります。PEN は変わりません）');
+  if(txt) await brushApplyLab(txt);
+}
+
+/* --- 入力の下ごしらえ（手ブレ補正・細かい入力点）--------------------------------
+   手ブレ補正は **画面座標**で掛ける（どの面＝FOCUS / セル / プレビューでも同じ手触り）。
+   離したときは補正で遅れていた最後の区間を足す（しっぽが欠けない）。PEN は補正0＝従来どおり */
+let gSm = null;
+function smoothBegin(cx, cy){ gSm = { x: cx, y: cy, rx: cx, ry: cy }; }
+function smoothTo(cx, cy){
+  if(!gSm){ smoothBegin(cx, cy); return { x: cx, y: cy }; }
+  const k = 1 - clamp(curBrush().smooth || 0, 0, .92);
+  gSm.rx = cx; gSm.ry = cy;
+  gSm.x += (cx - gSm.x) * k; gSm.y += (cy - gSm.y) * k;
+  return { x: gSm.x, y: gSm.y };
+}
+function smoothTail(){
+  if(!gSm || (Math.abs(gSm.x - gSm.rx) < .5 && Math.abs(gSm.y - gSm.ry) < .5)) return null;
+  gSm.x = gSm.rx; gSm.y = gSm.ry;
+  return { x: gSm.rx, y: gSm.ry };
+}
+/* ペンの入力は1回の pointermove に何点も詰まっている（iPad で 240Hz）。抜きの筆圧の落ち方を
+   取りこぼさないよう、ペンのときは全部使う */
+function coalescedOf(e){
+  if(e && e.pointerType === 'pen' && typeof e.getCoalescedEvents === 'function'){
+    try{ const a = e.getCoalescedEvents(); if(a && a.length) return a; }catch(err){}
+  }
+  return [e];
+}
 /* --- 投げ縄塗り（正準: animator の lassoFillPolygon）---
    手描き多角形の内側をスキャンラインで一括塗り。ブラシで塗るより桁違いに軽い。 */
 function lassoFillPolygon(ctx, W, H, pts, hex, erase){
@@ -7199,6 +7817,9 @@ function paintDown(e, cv){
   }
   beginPaintUndo();
   stroking = true;
+  brushStrokeBegin();
+  gLastPress = .5;
+  smoothBegin(e.clientX, e.clientY);
   strokeLast = toBakeCoord(e.clientX, e.clientY, cv);
   gStrokePl = cut ? paintPlateFor(cut, cv, strokeLast) : -1;   // 行き先はストロークの頭で1枚に決める
   gStrokePress = pressFactor(e);
@@ -7226,10 +7847,14 @@ function paintMove(e){
     return;
   }
   if(!stroking || !paintCv) return;
-  const p = toBakeCoord(e.clientX, e.clientY, paintCv);
-  gStrokePress = pressFactor(e);
-  strokeSeg(strokeLast, p);
-  strokeLast = p;
+  // ペンは詰まっている入力点を全部使う（抜きの筆圧の落ち方を取りこぼさない）。手ブレ補正は画面座標で
+  for(const ev of coalescedOf(e)){
+    const c = smoothTo(ev.clientX, ev.clientY);
+    const p = toBakeCoord(c.x, c.y, paintCv);
+    gStrokePress = pressFactor(ev);
+    strokeSeg(strokeLast, p);
+    strokeLast = p;
+  }
   renderPaintViewsSoon();   // 60Hzに間引く（引き終わりに paintUp が同期で描き直す）
 }
 function paintUp(){
@@ -7240,12 +7865,17 @@ function paintUp(){
     if(!gLasso.moved){ lassoPolyBegin(); paintCv = null; return; }
     lassoEnd(); paintCv = null; return;
   }
+  if(stroking && paintCv){                      // 手ブレ補正で遅れていた最後の区間（しっぽ）を足す
+    const t = smoothTail();
+    if(t){ const p = toBakeCoord(t.x, t.y, paintCv); strokeSeg(strokeLast, p); strokeLast = p; }
+  }
   paintCv = null;
   if(!stroking) return;
   stroking = false;
   gStrokePress = 1;
   gStrokePl = -1;
   endPaintUndo();
+  brushStrokeEnd();
   renderPaintViews();                            // 間引いた最後の1回を確実に反映させる
   if(inGrid()) refreshGridCells(state.curCut);   // ストローク中に省いた色帯をここで作る
   refreshRow(state.curCut);   // 右パネルのサムネを更新
@@ -9917,6 +10547,12 @@ function wire(){
   });
   // EDIT
   $('#btn-focus-back').addEventListener('click', closeFocus);
+  // ブラシ（SPEC_19 P3）
+  $('#btn-brush-lab').addEventListener('click', brushPasteLab);
+  $('#btn-brush-shape').addEventListener('click', () => brushImportFile('shape'));
+  $('#btn-brush-grain').addEventListener('click', () => brushImportFile('grain'));
+  $('#btn-brush-reset').addEventListener('click', brushReset);
+  $('#btn-tl-brush').addEventListener('click', e => cycleBrush(e.shiftKey ? -1 : 1));
   document.querySelectorAll('.etool[data-target]').forEach(el => {
     el.addEventListener('click', () => setPaintTarget(el.dataset.target));
   });
@@ -10267,6 +10903,9 @@ async function init(){
   loadPalette();
   loadUi();
   applyUi();
+  await loadBrushes();          // ブラシ5種（この端末の調整・取り込んだ画像）
+  renderBrushPick();
+  setBrush(curBrush().size);
   initClipBridge();
   state.fillColor = gPalette[gPalSlot] || '#000000';
   buildHsv();
@@ -10439,6 +11078,7 @@ async function ehBuildFixture(){
 
   // 描画状態を既定に固定（localStorage 復元値の影響を消す）
   state.etool = 'pen'; state.paintTarget = 'draw'; state.brush = 6;
+  gBrushIdx = 0;                 // 検証は丸ペン（PEN）で描く。この窓の localStorage のブラシ選択に左右されない
   state.pressurePen = false; state.fillColor = '#101018';
   state.curPlate = 0;
   gPaint.colorAlpha = 1; gPaint.colorBlend = 'multiply';

@@ -1012,7 +1012,12 @@ SPEC_13 §5 が 2026-07 に差し替わっている（旧「1.2xのりしろ固�
   枠の追加→Undo で紙が画素一致（27742=27742）／ZIP ver5 往復 12カット全一致／ver4 → V5 移行（FIX 1280×720・T.U. 2枚・PAN 2448×778）。
   **verify:econte は 15コマ**（C6 縦PAN・C7 PAN→T.U. を追加）。詳細は SPEC_19 §4 の動作チェック表。
 
-- **次にやること**: ① SPEC_19 P3＝ブラシ登録をプレート API（`strokePatchSeg(cut, j, kind, a, b)` / `plK`）に乗せる
+- **ブラシ暫定5種: 実装済み（2026-09-24・SPEC_19 §7）**。`strokePatchSeg` の頭で PEN 以外は `brushStrokeSeg` へ。
+  状態 `gBS`（plan だけが進める）・`gBrWhole`（MARKER の1本まとめ合成。Undo の控え `gTx.snap` を下地に使う）。
+  入力は `coalescedOf` / `smoothTo` / `smoothTail`・筆圧は `pressFactor` → `rawPressure`（0 は直前を保つ）。
+  GLOW は `halo`（暈）・`grainTex:'pulse'|'img'`・`shape:'streak'|'img'`。画像は `brImportMask`（黒点合わせ）→ localStorage。
+  **検証フックは PEN 固定**（`gBrushIdx = 0`）。ブラシの見た目の回帰はまだ VRT に無い
+- **次にやること**: ① ブラシの調整（brush-lab → ⇩ LAB）と筆圧カーブ。① 旧: SPEC_19 P3＝ブラシ登録をプレート API（`strokePatchSeg(cut, j, kind, a, b)` / `plK`）に乗せる
   （ROADMAP §3。PAN については「区間が2枚に二重に描かれる」問題はもう無い）。② §5-D（iPad）と V5 の iPad 実機確認
   （横長セルのスクロール・FOCUS のつまんで閉じる）。
 - **SPEC_15（V3）は P1 / P2 / P3 とも実装済み**。P3-2〜P3-4 は SPEC_16 §5-B として V4 と同じ回に入った

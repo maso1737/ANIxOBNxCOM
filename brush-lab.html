@@ -357,23 +357,30 @@ const DEF = {
   blend:'source-over',
   pSize:.5, pOpa:.4, spdSize:0, spdOpa:0,
   smooth:.25, taperIn:0, taperOut:0,
-  img:null, imgInvert:false, imgRev:0
+  img:null, imgInvert:false, imgRev:0,
+  /* 2026-09-24 追加（econte の GLOW と同じ）:
+     grainTex … 粒の絵。null＝従来の粒ノイズ ／ 'pulse'＝内蔵の縦縞 ／ 'img'＝取り込んだ画像（grainImg）
+     halo     … 暈（光のにじみ）。形を中央へ縮めて周りに柔らかい光を敷く */
+  grainTex:null, grainImg:null, halo:0
 };
 function mk(o){ return Object.assign({}, DEF, o); }
 
 const PRESETS = [
   mk({ id:'pencil', name:'PENCIL', jp:'鉛筆・線', mode:'line', shape:'soft',
-       size:5, opacity:.9, flow:1, hardness:1, pSize:.6, pOpa:.5, smooth:.3, taperIn:.10 }),
+       size:5, opacity:.9, flow:1, hardness:1, pSize:.85, pOpa:.5, smooth:.3, taperIn:.10 }),
+  /* ↓ MARKER / FLAT / AIR / GLOW は econte.html の 2〜5 と同じ既定値（2026-09-24）。
+       ここで詰めて COPY PARAMS → econte の「⇩ LAB」で渡す（id で対応） */
   mk({ id:'marker', name:'MARKER', jp:'マーカー・面', mode:'line', shape:'soft',
-       size:34, opacity:.55, flow:1, hardness:1, pSize:.15, pOpa:.2, smooth:.4 }),
+       size:34, opacity:.55, flow:1, hardness:1, pSize:.3, pOpa:.2, smooth:.4 }),
   mk({ id:'flat', name:'FLAT', jp:'平筆・角度で太さが変わる', mode:'stamp', shape:'flat',
        size:40, opacity:.85, flow:.9, spacing:.06, roundness:.16, rotate:false, angle:38,
-       pSize:.4, pOpa:.3, smooth:.3 }),
+       pSize:.6, pOpa:.3, smooth:.3 }),
   mk({ id:'air', name:'AIR', jp:'エアブラシ・ボケ足大', mode:'stamp', shape:'soft',
        size:120, opacity:.7, flow:.06, spacing:.05, hardness:0, pSize:.3, pOpa:.7, smooth:.5 }),
-  mk({ id:'glow', name:'GLOW', jp:'光・1ストロークで光る', mode:'stamp', shape:'glow',
-       size:90, opacity:.9, flow:.10, spacing:.05, blend:'lighter', hardness:0,
-       pSize:.35, pOpa:.6, smooth:.5 }),
+  mk({ id:'glow', name:'GLOW', jp:'光（筋＋パルス・加算）', mode:'stamp', shape:'streak',
+       grainTex:'pulse', grain:.55, halo:.6,
+       size:100, opacity:1, flow:.5, spacing:.05, blend:'lighter', hardness:0,
+       rotate:true, angle:90, pSize:.8, pOpa:.5, smooth:.5 }),
   mk({ id:'grit', name:'GRIT', jp:'ざらつき・汚れ', mode:'stamp', shape:'soft',
        size:52, opacity:.8, flow:.45, spacing:.16, jitter:.35, sizeJit:.4, angJit:1,
        hardness:.25, grain:.75, pSize:.5, pOpa:.5, smooth:.2 })
@@ -480,11 +487,12 @@ function planStamp(a, b, B, env){
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
   function put(px, py, sz, an){
     const tw = tipPx(sz);
-    const rot = B.rotate ? an : (B.angJit > 0 ? an : B.angle * Math.PI / 180);
+    /* 追従 ON のときの ANGLE は「進行方向からのずれ」（GLOW は 90°＝縦の筋が線に沿う） */
+    const rot = B.rotate ? an + B.angle * Math.PI / 180 : (B.angJit > 0 ? an : B.angle * Math.PI / 180);
     /* 回すと正方形のタイルの角まで届きうるので、そのぶん広く取る。
        この bbox がそのまま econte の txTouch に渡る＝Undo の取りこぼし対策 */
     const ext = (Math.abs(rot) > 1e-4 ? tw * 0.7072 : tw / 2);
-    stamps.push({ x:px, y:py, tw:tw, rot:rot, variant:B.grain > 0 ? ((BS.n + stamps.length) & 3) : 0 });
+    stamps.push({ x:px, y:py, tw:tw, rot:rot, variant:(B.grain > 0 && !B.grainTex) ? ((BS.n + stamps.length) & 3) : 0 });
     if(px - ext < x0) x0 = px - ext;
     if(py - ext < y0) y0 = py - ext;
     if(px + ext > x1) x1 = px + ext;
@@ -580,7 +588,8 @@ function tipPx(size){
 function getTip(B, size, color, variant){
   const px = tipPx(size);
   const key = B.id + '|' + px + '|' + color + '|' + B.hardness.toFixed(2) + '|' +
-              B.grain.toFixed(2) + '|' + B.shape + '|' + variant + '|' + B.imgRev;
+              B.grain.toFixed(2) + '|' + B.shape + '|' + (B.grainTex || '') + '|' +
+              (+(B.halo || 0)).toFixed(2) + '|' + variant + '|' + B.imgRev;
   let c = TIP_CACHE.get(key);
   if(c){ if(MET) MET.hit++; return c; }
   if(MET) MET.miss++;
@@ -608,9 +617,12 @@ function maskFor(B, px, variant){
   c.width = c.height = px;
   const x = c.getContext('2d');
   const r = px / 2;
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+  const hk = 1 - .45 * clamp(B.halo || 0, 0, 1), ho = px * (1 - hk) / 2, hs = px * hk;   // 暈のぶん形を中央へ
   if(B.shape === 'img' && B.img && B.img.complete && B.img.naturalWidth){
-    x.drawImage(B.img, 0, 0, px, px);
-    lumaToAlpha(x, px, B.imgInvert);
+    x.drawImage(imgMask(B, 'shape'), ho, ho, hs, hs);
+  }else if(B.shape === 'streak' || B.shape === 'img'){
+    x.drawImage(streakMask(), ho, ho, hs, hs);
   }else if(B.shape === 'glow'){
     const g = x.createRadialGradient(r, r, 0, r, r, r);
     for(let i = 0; i <= 12; i++){
@@ -640,20 +652,113 @@ function maskFor(B, px, variant){
     }
     x.fillStyle = g; x.fillRect(0, 0, px, px);
   }
-  if(B.grain > 0) applyGrain(x, px, B.grain, variant);
+  if(B.grain > 0){
+    if(B.grainTex){
+      x.globalCompositeOperation = 'destination-in';
+      x.drawImage(grainDepth(B), 0, 0, px, px);
+      x.globalCompositeOperation = 'source-over';
+    }else applyGrain(x, px, B.grain, variant);
+  }
+  if(B.halo > 0){                               // 暈: 形の下に柔らかい光を敷く（粒は掛けない）
+    const g = x.createRadialGradient(r, r, 0, r, r, r);
+    for(let i = 0; i <= 10; i++){
+      const t = i / 10;
+      g.addColorStop(t, 'rgba(255,255,255,' + clamp(B.halo * .55 * Math.pow(1 - t, 2.2), 0, 1).toFixed(4) + ')');
+    }
+    x.globalCompositeOperation = 'destination-over';
+    x.fillStyle = g; x.fillRect(0, 0, px, px);
+    x.globalCompositeOperation = 'source-over';
+  }
+  return c;
+}
+/* --- 2026-09-24 追加: 内蔵の「光の筋」「パルス」と、画像の取り込み（黒点合わせ） ---------
+   econte.html の brStreakMask / brPulseMask / brImportMask と同じ中身（数値をそろえてある）。 */
+let STREAK = null;
+function streakMask(){
+  if(STREAK) return STREAK;
+  const N = 128, c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d'), im = x.createImageData(N, N), p = im.data;
+  let s = 0x51F15EED;
+  const r = () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
+  const col = [], top = [], bot = [];
+  for(let i = 0; i < N; i++){ col.push(.2 + .8 * Math.pow(r(), .55)); top.push(r() * .25); bot.push(r() * .25); }
+  const sm = col.map((v, i) => (v * 2 + (col[i - 1] || v) + (col[i + 1] || v)) / 4);
+  const ss = (e0, e1, v) => { const t = clamp((v - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+  for(let yy = 0; yy < N; yy++) for(let xx = 0; xx < N; xx++){
+    const u = Math.abs((xx + .5) / N * 2 - 1), v = (yy + .5) / N;
+    const ex = 1 - ss(.55, .95, u);
+    const ey = ss(.08 + top[xx], .30 + top[xx], v) * (1 - ss(.70 - bot[xx], .92 - bot[xx], v));
+    const o = (yy * N + xx) * 4;
+    p[o] = p[o+1] = p[o+2] = 255; p[o+3] = Math.round(255 * clamp(sm[xx] * ex * ey, 0, 1));
+  }
+  x.putImageData(im, 0, 0);
+  return (STREAK = c);
+}
+let PULSE = null;
+function pulseMask(){
+  if(PULSE) return PULSE;
+  const N = 128, P = 32, c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d'), im = x.createImageData(N, N), p = im.data;
+  for(let xx = 0; xx < N; xx++){
+    const t = ((xx + .5) % P) / P;
+    const a = clamp(.18 + .55 * (.5 + .5 * Math.cos((t - .5) * Math.PI * 2)) + .45 * Math.exp(-Math.pow((t - .5) * P, 2) / 2), 0, 1);
+    for(let yy = 0; yy < N; yy++){ const o = (yy * N + xx) * 4; p[o] = p[o+1] = p[o+2] = 255; p[o+3] = Math.round(255 * a); }
+  }
+  x.putImageData(im, 0, 0);
+  return (PULSE = c);
+}
+/* 画像 → マスク（白＝筆）。灰色の下地は黒へ・粒は周り6%（角丸の枠）を切り落とす・白地は自動反転。
+   「画像の白黒を反転」トグルは自動判定をさらに裏返す */
+const IMGMASK = new Map();
+function imgMask(B, kind){
+  const img = kind === 'grain' ? B.grainImg : B.img;
+  const key = B.id + '|' + kind + '|' + B.imgRev + '|' + (B.imgInvert ? 1 : 0);
+  let c = IMGMASK.get(key);
+  if(c) return c;
+  const N = 256, iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d');
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+  const m = kind === 'grain' ? .06 : 0;
+  x.drawImage(img, iw * m, ih * m, iw * (1 - 2 * m), ih * (1 - 2 * m), 0, 0, N, N);
+  const im = x.getImageData(0, 0, N, N), p = im.data, L = new Float32Array(N * N);
+  for(let i = 0, k = 0; i < p.length; i += 4, k++) L[k] = (p[i] * .299 + p[i+1] * .587 + p[i+2] * .114) / 255 * (p[i+3] / 255);
+  let edge = 0, en = 0;
+  for(let k = 0; k < N; k++){ edge += L[k] + L[(N-1)*N + k] + L[k*N] + L[k*N + N-1]; en += 4; }
+  let inv = edge / en > .6;
+  if(kind === 'shape' && B.imgInvert) inv = !inv;
+  if(inv) for(let k = 0; k < L.length; k++) L[k] = 1 - L[k];
+  const sorted = Float32Array.from(L).sort();
+  const q = f => sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))];
+  const hi = Math.max(q(.995), 1e-3);
+  const lo = kind === 'grain' ? q(.05) : q(.5) + (hi - q(.5)) * .10;
+  const span = Math.max(1e-3, hi - lo);
+  for(let i = 0, k = 0; i < p.length; i += 4, k++){ p[i] = p[i+1] = p[i+2] = 255; p[i+3] = Math.round(255 * clamp((L[k] - lo) / span, 0, 1)); }
+  x.putImageData(im, 0, 0);
+  if(IMGMASK.size > 24) IMGMASK.delete(IMGMASK.keys().next().value);
+  IMGMASK.set(key, c);
+  return c;
+}
+/* 粒の深さ: 1 − grain × (1 − テクスチャ) */
+const DEPTH = new Map();
+function grainDepth(B){
+  const useImg = B.grainTex === 'img' && B.grainImg && B.grainImg.naturalWidth;
+  const src = useImg ? imgMask(B, 'grain') : pulseMask();
+  const key = B.id + '|' + (useImg ? 'img' : 'pulse') + '|' + B.grain.toFixed(2) + '|' + B.imgRev;
+  let c = DEPTH.get(key);
+  if(c) return c;
+  const N = src.width;
+  c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d');
+  x.drawImage(src, 0, 0);
+  const im = x.getImageData(0, 0, N, N), p = im.data, g = clamp(B.grain, 0, 1);
+  for(let i = 0; i < p.length; i += 4){ p[i] = p[i+1] = p[i+2] = 255; p[i+3] = Math.round(255 * (1 - g * (1 - p[i+3] / 255))); }
+  x.putImageData(im, 0, 0);
+  if(DEPTH.size > 24) DEPTH.delete(DEPTH.keys().next().value);
+  DEPTH.set(key, c);
   return c;
 }
 
-function lumaToAlpha(x, px, invert){
-  const d = x.getImageData(0, 0, px, px), p = d.data;
-  for(let i = 0; i < p.length; i += 4){
-    const l = (p[i] * .299 + p[i+1] * .587 + p[i+2] * .114) / 255;
-    const v = invert ? 1 - l : l;
-    p[i] = p[i+1] = p[i+2] = 255;
-    p[i+3] = Math.round(clamp(v, 0, 1) * (p[i+3] / 255) * 255);
-  }
-  x.putImageData(d, 0, 0);
-}
 
 /* 粒ノイズ。tip ごとに getImageData すると桁で重くなる（実測 136枚で 60.9ms）ので、
    128×128 のタイルを (量, 種) ごとに1回だけ作って destination-in で抜く。 */
@@ -782,6 +887,7 @@ function pDown(e){
   if(e.altKey){ eyedrop(e); return; }
   const c = cvA;
   const p = toCv(e, c);
+  lastPress = .5;
   pushUndo();
   SHOW_DOTS = S.showDots; DOTS = [];
   brushDown();
@@ -803,18 +909,39 @@ function pDown(e){
   syncMeasure();
   e.preventDefault();
 }
+/* 筆圧（2026-09-24 に3点直した。econte の rawPressure / pressFactor と同じ）
+   ① **筆圧ちょうど 0 は直前の値を保つ**。旧式は 0.5 に化かしていて、抜きの途中で太り直していた
+      （実測: PENCIL 40px の抜きで 22→28px。iPad は1本1363点中37点が 0）
+   ② 下限を 0.15 → 0.02。旧式は「筆圧→太さ 60%」だと半分（40px 中 20px）より細くならず、抜きが尖らなかった
+   ③ 1回の pointermove に詰まっている点（getCoalescedEvents）を全部使う＝筆圧の落ち方を取りこぼさない */
+let lastPress = .5;
 function mkEnv(e, speed){
   const B = cur();
-  const press = (S.press && e && e.pointerType === 'pen' && e.pressure > 0) ? (0.15 + 0.85*e.pressure)
-              : (S.press && e && e.pointerType === 'pen') ? 0.5 : 1;
+  let press = 1;
+  if(S.press && e && e.pointerType === 'pen'){
+    if(typeof e.pressure === 'number' && e.pressure > 0) lastPress = e.pressure;
+    press = .02 + .98 * lastPress;
+  }
   return { color:S.color, size:B.size * (S.target==='COLOR' ? 1 : 1), press, speed, tailT:null };
+}
+function coalesced(e){
+  if(e && e.pointerType === 'pen' && typeof e.getCoalescedEvents === 'function'){
+    try{ const a = e.getCoalescedEvents(); if(a && a.length) return a; }catch(err){}
+  }
+  return [e];
 }
 function pMove(e){
   if(!drawing || e.pointerId !== drawing.id) return;
+  for(const ev of coalesced(e)) pMoveOne(ev);
+  syncMeasure();
+  e.preventDefault();
+}
+function pMoveOne(e, tail){
   const B = cur();
   const raw = toCv(e, cvA);
-  // 手ブレ補正（plotSmoothing 相当。1点前へ引き寄せる）
-  const k = 1 - clamp(B.smooth, 0, .92);
+  drawing.raw = raw;
+  // 手ブレ補正（plotSmoothing 相当。1点前へ引き寄せる）。tail＝離したときの追いつき（補正なし）
+  const k = tail ? 1 : 1 - clamp(B.smooth, 0, .92);
   drawing.sm.x = lerp(drawing.sm.x, raw.x, k);
   drawing.sm.y = lerp(drawing.sm.y, raw.y, k);
   const p = { x:drawing.sm.x, y:drawing.sm.y };
@@ -823,16 +950,21 @@ function pMove(e){
   const d = Math.hypot(p.x - drawing.last.x, p.y - drawing.last.y);
   drawing.speed = clamp(lerp(drawing.speed, (d / dt) / 3.2, .3), 0, 1);
   drawing.tPrev = now;
-  const env = mkEnv(e, drawing.speed);
+  const env = tail ? Object.assign({}, drawing.env || mkEnv(e, drawing.speed)) : mkEnv(e, drawing.speed);
+  drawing.env = env;
   if(drawing.pts) drawing.pts.push({x:p.x, y:p.y, press:env.press});
   strokeSegBrush(ctxA, drawing.last, p, B, env);
   if(S.mode === 'SPLIT') segEconte(ctxB, drawing.last, p, B.size, S.color, env.press);
   drawing.last = p;
-  syncMeasure();
-  e.preventDefault();
 }
 function pUp(e){
   if(!drawing) return;
+  // 手ブレ補正で遅れていた最後の区間を、最後の筆圧のまま足す（しっぽが丸く切れない）
+  if(drawing.raw && Math.hypot(drawing.raw.x - drawing.last.x, drawing.raw.y - drawing.last.y) > .5){
+    const r = cvA.getBoundingClientRect();
+    pMoveOne({ clientX: r.left + drawing.raw.x * r.width / cvA.width, clientY: r.top + drawing.raw.y * r.height / cvA.height,
+               pointerType: 'mouse' }, true);
+  }
   const d = drawing;
   drawing = null;
   if(d.whole && d.pts && d.pts.length > 1) wholeFlush(d);
@@ -1135,9 +1267,9 @@ function buildSide(){
   /* SHAPE */
   h += '<div class="sp"><div class="spl">SHAPE <em>筆先の絵</em></div>';
   h += '<div class="fps" style="margin-bottom:7px">'
-    + ['soft','glow','flat','img'].map(s =>
+    + ['soft','glow','flat','streak','img'].map(s =>
         '<span class="fp' + (B.shape===s?' on':'') + '" data-shape="' + s + '">'
-        + ({soft:'SOFT 丸',glow:'GLOW 光',flat:'FLAT 平',img:'IMG 画像'})[s] + '</span>').join('')
+        + ({soft:'SOFT 丸',glow:'GLOW 光',flat:'FLAT 平',streak:'STREAK 筋',img:'IMG 画像'})[s] + '</span>').join('')
     + '</div>';
   h += '<div class="drop" id="drop-shape">'
     + (hasImg ? '<img class="thumb" src="' + B.img.src + '">' : '')
@@ -1147,7 +1279,21 @@ function buildSide(){
     + '<span class="cond">白＝筆 が既定（Procreate と同じ）</span></span>'
     + '<span class="tg' + (B.imgInvert?' on':'') + '" data-tg="imgInvert"></span></div>';
   h += '<div class="hint">Procreate のカスタムブラシは <b>.brush を ZIP として開くと Shape.png</b> が入っています。'
-     + '内蔵ブラシ由来のものは入っていないので、<b>白地に一発押して PNG 書き出し</b>が確実です。</div>';
+     + '内蔵ブラシ由来のものは入っていないので、<b>白地に一発押して PNG 書き出し</b>が確実です。'
+     + '画面の写しでも大丈夫：<b>灰色の下地は自動で黒に</b>します。</div>';
+  /* 粒の絵（2026-09-24）。Procreate の Grain Source に当たる */
+  const gOn = stamp && B.grain > 0;
+  h += '<div class="tr' + (stamp?'':' off') + '" style="margin-top:8px"><span class="lb">粒の絵 GRAIN SOURCE'
+    + '<span class="cond">' + (stamp ? (B.grain > 0 ? '下の STAMP の GRAIN（深さ）で効く' : 'GRAIN を上げると効く') : 'スタンプ式のみ') + '</span></span></div>';
+  h += '<div class="fps' + (stamp?'':' off') + '" style="margin-bottom:7px">'
+    + [['','NOISE 粒'],['pulse','PULSE 縞'],['img','IMG 画像']].map(([v, n]) =>
+        '<span class="fp' + ((B.grainTex||'')===v?' on':'') + '" data-gtex="' + v + '">' + n + '</span>').join('')
+    + '</div>';
+  h += '<div class="drop' + (stamp?'':' off') + '" id="drop-grain">'
+    + (B.grainImg ? '<img class="thumb" src="' + B.grainImg.src + '">GRAIN 差し替え' : 'GRAIN ▸ PNG をドロップ / クリック（周りの枠は自動で切る）')
+    + '</div>';
+  h += sld('暈 HALO', stamp ? '形を中央へ縮めて周りに光を敷く（GLOW 用）' : 'スタンプ式のみ', 'halo', 0, 1, .01,
+           v => (v*100).toFixed(0) + '%', stamp);
   h += '</div>';
 
   /* CORE */
@@ -1190,8 +1336,8 @@ function buildSide(){
            v => (v*100).toFixed(0) + '%', stamp);
   h += sld('楕円率 ROUNDNESS', stamp ? '1=真円 / 小さいほど平筆' : 'スタンプ式のみ', 'roundness', .08, 1, .01,
            v => (v*100).toFixed(0) + '%', stamp);
-  h += sld('筆の角度 ANGLE', stamp && !B.rotate ? '進行方向追従が OFF のときだけ' : (stamp?'追従 ON では無効':'スタンプ式のみ'),
-           'angle', 0, 180, 1, v => v + '°', stamp && !B.rotate);
+  h += sld('筆の角度 ANGLE', !stamp ? 'スタンプ式のみ' : (B.rotate ? '追従 ON＝進行方向からのずれ（90°で縦の筋が線に沿う）' : '追従 OFF＝固定の角度（カリグラフィ）'),
+           'angle', 0, 180, 1, v => v + '°', stamp);
   h += '<div class="tr' + (stamp?'':' off') + '"><span class="lb">進行方向に追従 ROTATE'
     + '<span class="cond">OFF＝カリグラフィ（角度固定で太さが変わる）</span></span>'
     + '<span class="tg' + (B.rotate?' on':'') + '" data-tg="rotate"></span></div>';
@@ -1210,9 +1356,9 @@ function buildSide(){
            v => (v*100).toFixed(0) + '%', true);
   h += sld('入り TAPER IN', '描き始めから細く立ち上げる', 'taperIn', 0, .5, .01,
            v => (v*100).toFixed(0) + '%', true);
-  h += sld('抜き TAPER OUT', 'SHEET のサンプル線のみ（フリーハンドは終点が未定）', 'taperOut', 0, .5, .01,
+  h += sld('抜き TAPER OUT', 'SHEET のサンプル線のみ（フリーハンドの抜きは 筆圧→太さ で出る）', 'taperOut', 0, .5, .01,
            v => (v*100).toFixed(0) + '%', false);
-  h += '<div class="tr"><span class="lb">筆圧を使う PRESSURE<span class="cond">ペン(pointerType=pen)のときだけ効く</span></span>'
+  h += '<div class="tr"><span class="lb">筆圧を使う PRESSURE<span class="cond">ペン(pointerType=pen)のときだけ効く。筆圧0は直前の値を保つ</span></span>'
     + '<span class="tg' + (S.press?' on':'') + '" data-tg2="press"></span></div>';
   h += '</div>';
 
@@ -1297,6 +1443,15 @@ function wireSide(){
   if(pc) pc.addEventListener('input', e => { S.color = e.target.value; TIP_CACHE.clear(); buildSide(); save(); });
 
   wireDrop($('#drop-shape'), setShapeImg);
+  wireDrop($('#drop-grain'), setGrainImg);
+  document.querySelectorAll('[data-gtex]').forEach(el =>
+    el.addEventListener('click', () => {
+      const v = el.dataset.gtex || null;
+      if(v === 'img' && !cur().grainImg){ pickFile(setGrainImg); return; }
+      cur().grainTex = v;
+      if(v && !(cur().grain > 0)) cur().grain = .55;
+      TIP_CACHE.clear(); buildSide(); if(S.mode==='SHEET') drawSheet(); save();
+    }));
   wireDrop($('#drop-bg'), setBgImg);
 
   $('#b-copy').addEventListener('click', copyParams);
@@ -1305,7 +1460,7 @@ function wireSide(){
   $('#b-reset').addEventListener('click', () => {
     if(!confirm('6種すべてを初期設定に戻します。よろしいですか？')) return;
     PRESETS.forEach((p, i) => Object.assign(p, JSON.parse(JSON.stringify(DEFAULT_JSON[i]))));
-    PRESETS.forEach(p => { p.img = null; p.shape = p.shape === 'img' ? 'soft' : p.shape; });
+    PRESETS.forEach(p => { p.img = null; p.grainImg = null; p.shape = p.shape === 'img' ? 'soft' : p.shape; });
     TIP_CACHE.clear(); buildSide(); clearCanvas(); save();
   });
 }
@@ -1341,6 +1496,13 @@ function setShapeImg(im){
   if(B.mode === 'line') B.mode = 'stamp';
   TIP_CACHE.clear(); buildSide(); if(S.mode==='SHEET') drawSheet(); save();
 }
+function setGrainImg(im){
+  const B = cur();
+  B.grainImg = im; B.grainTex = 'img'; B.imgRev++;
+  if(!(B.grain > 0)) B.grain = .55;
+  if(B.mode === 'line') B.mode = 'stamp';
+  TIP_CACHE.clear(); buildSide(); if(S.mode==='SHEET') drawSheet(); save();
+}
 function setBgImg(im){ S.bgImg = im; S.bg = 'IMAGE'; clearCanvas(); buildSide(); save(); }
 
 /* --- COPY / PASTE PARAMS（未知キーは無視） --- */
@@ -1348,8 +1510,9 @@ function serial(){
   return {
     _lab:'BRUSH_LAB', _v:1,
     presets: PRESETS.map(p => {
-      const o = {}; for(const k in p) if(k !== 'img') o[k] = p[k];
+      const o = {}; for(const k in p) if(k !== 'img' && k !== 'grainImg') o[k] = p[k];
       o.imgSrc = p.img ? p.img.src : null;
+      o.grainSrc = p.grainImg ? p.grainImg.src : null;       // 粒の画像（econte の「⇩ LAB」が受け取る）
       return o;
     }),
     color:S.color, target:S.target, bg:S.bg, press:S.press
@@ -1377,8 +1540,9 @@ function pasteParams(){
       if(!o || !Array.isArray(o.presets)) throw 0;
       o.presets.forEach((p, i) => {
         if(!PRESETS[i]) return;
-        for(const k in p){ if(k === 'imgSrc' || k === 'img') continue; if(k in DEF || k==='id'||k==='name'||k==='jp') PRESETS[i][k] = p[k]; }
+        for(const k in p){ if(k === 'imgSrc' || k === 'img' || k === 'grainSrc' || k === 'grainImg') continue; if(k in DEF || k==='id'||k==='name'||k==='jp') PRESETS[i][k] = p[k]; }
         if(p.imgSrc){ const im = new Image(); im.onload = () => { PRESETS[i].img = im; PRESETS[i].imgRev++; TIP_CACHE.clear(); buildSide(); }; im.src = p.imgSrc; }
+        if(p.grainSrc){ const im = new Image(); im.onload = () => { PRESETS[i].grainImg = im; PRESETS[i].imgRev++; TIP_CACHE.clear(); buildSide(); }; im.src = p.grainSrc; }
       });
       if(o.color) S.color = o.color;
       if(o.target) S.target = o.target;
@@ -1413,8 +1577,9 @@ function load(){
     if(!o || !Array.isArray(o.presets)) return;
     o.presets.forEach((p, i) => {
       if(!PRESETS[i]) return;
-      for(const k in p){ if(k === 'imgSrc' || k === 'img') continue; if(k in DEF) PRESETS[i][k] = p[k]; }
+      for(const k in p){ if(k === 'imgSrc' || k === 'img' || k === 'grainSrc' || k === 'grainImg') continue; if(k in DEF) PRESETS[i][k] = p[k]; }
       if(p.imgSrc){ const im = new Image(); im.onload = () => { PRESETS[i].img = im; PRESETS[i].imgRev++; TIP_CACHE.clear(); buildSide(); }; im.src = p.imgSrc; }
+      if(p.grainSrc){ const im = new Image(); im.onload = () => { PRESETS[i].grainImg = im; PRESETS[i].imgRev++; TIP_CACHE.clear(); buildSide(); }; im.src = p.grainSrc; }
     });
     if(o.color) S.color = o.color;
     if(o.target) S.target = o.target;
