@@ -225,19 +225,6 @@ html,body{
   gap:6px;padding:6px 0;
   width:44px;
 }
-.tb-undoredo{
-  width:38px;height:34px;
-  background:transparent;border:1px solid var(--border);
-  color:rgba(255,255,255,0.55);
-  font-size:16px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  transition:all 0.12s;
-  border-radius:2px;
-}
-.tb-undoredo:hover{border-color:var(--border-bright);color:var(--acid);}
-.tb-undoredo:active{background:rgba(255,79,168,0.1);}
-.tb-undoredo:disabled{opacity:0.25;cursor:default;border-color:var(--border);color:rgba(255,255,255,0.3);}
-.tb-undoredo:disabled:hover{border-color:var(--border);color:rgba(255,255,255,0.3);}
 /* ブラシ補正ウィジェット */
 .tb-stab{
   display:flex;flex-direction:column;align-items:center;gap:4px;
@@ -277,7 +264,10 @@ html,body{
   border:1px solid var(--border);
   position:relative;
   cursor:pointer;
+  touch-action:none;   /* iPad: 指で動かすとツールバーのスクロールに取られていた（2026-09-23） */
 }
+/* 指の的を左右に広げる（見た目の太さは変えない） */
+.tb-bg-track::before{content:'';position:absolute;top:-6px;bottom:-6px;left:-10px;right:-10px;}
 .tb-bg-thumb{
   position:absolute;left:-4px;right:-4px;
   height:6px;
@@ -943,6 +933,7 @@ input[type=range]::-moz-range-thumb{
 @media (pointer:coarse){ :root{ --fill-band:18px; } }
 #lane-head{
   display:flex;flex-direction:column;
+  min-width:112px;   /* REF レーンの名前欄もこの幅（濃度欄を外した分を名前に回す） */
   padding:8px 0 8px 6px;
   border-right:1px solid var(--border);
   font-family:var(--mono);font-size:9px;letter-spacing:0.05em;
@@ -965,14 +956,8 @@ input[type=range]::-moz-range-thumb{
 .lh-vis.off{color:rgba(90,233,255,0.9);border-color:rgba(90,233,255,0.5);background:rgba(60,0,0,0.65);}
 .lh-lock{opacity:0.35;}
 .lh-lock.on{opacity:1;border-color:var(--neon);background:rgba(255,210,122,0.15);}
-.lh-opa{
-  width:24px;text-align:right;color:rgba(255,210,122,0.75);
-  cursor:ew-resize;touch-action:none;
-}
-.lh-opa.drag{color:var(--neon);}
 @media (pointer:coarse){
   .lh-vis,.lh-lock{width:20px;height:16px;line-height:14px;}
-  .lh-opa{width:28px;}
 }
 
 /* ── REF レーン（SPEC_20 P2）──
@@ -1009,7 +994,25 @@ input[type=range]::-moz-range-thumb{
   display:flex;align-items:center;gap:4px;padding:0 3px;
 }
 .rl-bar:active{cursor:grabbing;}
-.rl-bar.static{height:4px;margin-top:4px;cursor:pointer;padding:0;}
+/* 時間を持たない／画像の帯：見た目は 4px の細線のまま、掴める高さは 12px */
+.rl-bar.static{background:transparent !important;cursor:pointer;padding:0;overflow:visible;}
+.rl-bar.static::before{content:'';position:absolute;left:0;right:0;top:4px;height:4px;border-radius:2px;background:currentColor;}
+.rl-bar.static.img{cursor:grab;}
+.rl-bar.static.sel{box-shadow:none;}
+.rl-bar.static.sel::before{box-shadow:0 0 0 1px var(--acid),0 0 6px rgba(255,79,168,0.6);}
+.rl-trim{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;touch-action:none;z-index:1;}
+.rl-trim.l{left:-3px;} .rl-trim.r{right:-3px;}
+.rl-trim::after{content:'';position:absolute;top:1px;bottom:1px;left:3px;width:2px;background:currentColor;opacity:0;border-radius:1px;}
+.rl-bar:hover .rl-trim::after,.rl-bar.sel .rl-trim::after{opacity:0.9;}
+@media (pointer:coarse){ .rl-trim{width:14px;} .rl-trim.l{left:-6px;} .rl-trim.r{right:-6px;} }
+.rl-lbl .rl-tag{font-size:7px;letter-spacing:0.05em;color:rgba(255,255,255,0.4);margin-right:3px;}
+.rl-lbl.drag{background:rgba(255,79,168,0.18);}
+.rl-drop{position:absolute;left:0;right:0;height:2px;background:var(--acid);z-index:7;pointer-events:none;}
+.rl-rename{
+  position:absolute;left:2px;right:2px;height:13px;z-index:8;
+  font:inherit;font-size:9px;padding:0 3px;background:#1a0c30;color:#fff;border:1px solid var(--acid);outline:none;
+}
+.ref-tag{font-size:8px;letter-spacing:0.05em;color:rgba(255,255,255,0.4);margin-right:4px;}
 .rl-bar.hidden-ref{opacity:0.35;outline:1px dashed rgba(255,255,255,0.5);}
 .rl-bar.locked{cursor:pointer;}
 .rl-bar.sel{box-shadow:0 0 0 1px var(--acid),0 0 6px rgba(255,79,168,0.6);}
@@ -1713,11 +1716,6 @@ input[type=range]::-moz-range-thumb{
 
     <div class="tool-sep"></div>
 
-    <!-- UNDO / REDO (iPadタイムライン用) -->
-    <button class="tb-undoredo" id="tb-undo" title="Undo (Ctrl+Z)">↩</button>
-    <button class="tb-undoredo" id="tb-redo" title="Redo (Ctrl+Y)">↪</button>
-
-    <div class="tool-sep"></div>
 
     <!-- ブラシ補正 (手ブレ補正) -->
     <div class="tb-stab" id="tb-stab">
@@ -1865,13 +1863,11 @@ input[type=range]::-moz-range-thumb{
         <span class="lh-name" title="線レーンに描く（L で切替）">線</span>
         <button class="lh-vis" title="線レーンの表示 ON/OFF">●</button>
         <button class="lh-lock" title="線レーンをロック（描けなくする）">🔒</button>
-        <span class="lh-opa" title="線レーンの表示濃度。左右ドラッグで変更・Wクリックで100%（書き出しには影響しません）">100</span>
       </div>
       <div class="lh-row" data-lane="fill">
         <span class="lh-name" title="塗レーンに描く（L で切替）">塗</span>
         <button class="lh-vis" title="塗レーンの表示 ON/OFF">●</button>
         <button class="lh-lock" title="塗レーンをロック（描けなくする）">🔒</button>
-        <span class="lh-opa" title="塗レーンの表示濃度。左右ドラッグで変更・Wクリックで100%（書き出しには影響しません）">100</span>
       </div>
       <div class="lh-spacer"></div>
     </div>
@@ -2591,6 +2587,7 @@ const state = {
   bgBright: 100,
   // ペンボタン Wクリックで筆圧ペン / 塗りつぶしボタン長押しで投げ縄透明消し
   pressurePen: false,
+  pressureErase: false,   // 2026-09-23 調整: 消しゴムの筆圧はペンと別に持つ
   fillErase: false,
   // 塗りつぶしの方式: 'flood'=バケツ（クリックで領域） / 'lasso'=投げ縄（囲って一括塗り）
   // FILLボタン Wクリック=投げ縄塗り / 長押し=投げ縄透明消し。
@@ -2741,8 +2738,6 @@ function applyLaneStyle(){
     const v = row.querySelector('.lh-vis');
     v.classList.toggle('off', !cfg.visible); v.textContent = cfg.visible ? '●' : '✕';
     row.querySelector('.lh-lock').classList.toggle('on', !!cfg.locked);
-    const o = row.querySelector('.lh-opa');
-    if(!o.classList.contains('drag')) o.textContent = Math.round((cfg.opacity ?? 1) * 100);
   });
   const strip = document.getElementById('frame-strip');
   if(strip){ strip.classList.toggle('lane-fill', curLane() === 'fill'); strip.classList.toggle('lane-line', curLane() === 'line'); }
@@ -2799,30 +2794,6 @@ function setLane(L, opts){
       applyLaneStyle(); markMetaDirty();
       stageToast(LANE_JP[L] + 'レーン ' + (state.lanes[L].locked ? '🔒 ロック' : 'ロック解除'));
     });
-    // 濃度：1px = 1%。ドラッグ中は数字と canvas の CSS だけ（DOM を作り直さない）
-    const o = row.querySelector('.lh-opa');
-    let drag = null;
-    o.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      o.setPointerCapture(e.pointerId);
-      drag = { x: e.clientX, v: Math.round((state.lanes[L].opacity ?? 1) * 100) };
-      o.classList.add('drag');
-    });
-    o.addEventListener('pointermove', e => {
-      if(!drag) return;
-      const v = Math.max(0, Math.min(100, drag.v + Math.round(e.clientX - drag.x)));
-      o.textContent = v;
-      state.lanes[L].opacity = v / 100;
-      applyLaneStyle();
-    });
-    const end = () => {
-      if(!drag) return;
-      drag = null; o.classList.remove('drag');
-      applyLaneStyle(); markMetaDirty();
-    };
-    o.addEventListener('pointerup', end);
-    o.addEventListener('pointercancel', end);
-    onDoubleActivate(o, () => { state.lanes[L].opacity = 1; applyLaneStyle(); markMetaDirty(); });
   });
   const fu = document.getElementById('fill-under');
   if(fu) fu.addEventListener('change', () => {
@@ -3690,6 +3661,8 @@ async function addRefAnimator(json, fallbackName){
     x: 0, y: 0, scale: 1,
     locked: false,
     offset: 0, step: 1,   // SPEC_20 P2: 時間のずらし（tick）／1枚を何コマ見せるか
+    kind: json.refKind === 'seq' ? 'seq' : 'ani',
+    z: refTopZ(),         // 追加したものは一番手前
   });
   centerRefAnimator(state.refAnimators[0]); // 原寸・中央に初期配置
   buildRefList();
@@ -3768,11 +3741,72 @@ let gRefLaneOpen = (() => { try{ return localStorage.getItem(REF_LANE_LS) !== '0
 let gRefLaneDrag = null;   // { r, bar, grab, moved }
 const RL_ROW = 14;         // 1行の高さ（13 + 隙間1）
 const RL_STEPS = [1, 2, 3, 4];
+// 2026-09-23 調整: REF の並びは種類をまたいで1本。z が大きいほど手前。
+//   パネルの行・REF レーンの行・キャンバスの重なりがすべてこの順（上＝手前）。
+//   旧保存（z が無い）は「画像が手前・ANIMATOR が奥」だった見え方のまま z を振る。
+function ensureRefZ(){
+  const imgs = state.refImages, anims = state.refAnimators;
+  if(imgs.every(o => typeof o.z === 'number') && anims.every(r => typeof r.z === 'number')) return;
+  let z = 1;
+  for(let i = anims.length - 1; i >= 0; i--) if(typeof anims[i].z !== 'number') anims[i].z = z++;   // 先頭＝手前
+  z = Math.max(z, ...anims.map(r => r.z || 0)) + 1;
+  for(let i = 0; i < imgs.length; i++) if(typeof imgs[i].z !== 'number') imgs[i].z = z++;             // 末尾＝手前
+}
+function refTopZ(){
+  ensureRefZ();
+  let m = 0;
+  for(const o of state.refImages) m = Math.max(m, o.z || 0);
+  for(const r of state.refAnimators) m = Math.max(m, r.z || 0);
+  return m + 1;
+}
+// 奥 → 手前
+function refStack(){
+  ensureRefZ();
+  const all = state.refImages.map(o => ({ type: 'img', obj: o }))
+    .concat(state.refAnimators.map(r => ({ type: 'anim', obj: r })));
+  all.sort((a, b) => (a.obj.z || 0) - (b.obj.z || 0));
+  return all;
+}
+// 手前 → 奥（パネルと REF レーンの並び）
+function refStackFront(){ return refStack().reverse(); }
+// 並び替え：手前→奥の並びで index を newIdx へ動かし、z を振り直す
+function refMoveTo(type, id, newIdx){
+  const list = refStackFront();
+  const i = list.findIndex(it => it.type === type && it.obj.id === id);
+  if(i < 0) return;
+  newIdx = Math.max(0, Math.min(list.length - 1, newIdx));
+  if(newIdx === i) return;
+  const [it] = list.splice(i, 1);
+  list.splice(newIdx, 0, it);
+  list.forEach((x, k) => { x.obj.z = list.length - k; });
+  refOrderChanged();
+}
+function refMove(type, id, dir){
+  const list = refStackFront();
+  const i = list.findIndex(it => it.type === type && it.obj.id === id);
+  if(i >= 0) refMoveTo(type, id, i + dir);
+}
+function refOrderChanged(){
+  renderRefLayer(); buildRefList(); saveRefs(); markMetaDirty();
+}
+// 画像の出る範囲（SPEC_20 調整）。tin＝イン点（tick）、tout＝アウト点（null＝最後まで）
+function refImgEnd(o){ return (o.tout == null) ? null : (o.tout | 0); }
+function refImgVisibleAt(o, t){
+  if(t < 0) return false;
+  if((o.tin | 0) > t) return false;
+  const e = refImgEnd(o);
+  return e == null || t < e;
+}
+// 種類の札（名前の前に付ける。名前を短くしても種類が分かる）
+function refTag(type, o){
+  if(type === 'frame') return '下絵';
+  if(type === 'img') return 'IMG';
+  return (o && o.kind === 'seq') ? 'SEQ' : 'ANI';
+}
 function refLaneRows(){
   const rows = [];
-  for(const r of state.refAnimators) rows.push({ type: 'anim', obj: r });
-  for(let i = state.refImages.length - 1; i >= 0; i--) rows.push({ type: 'img', obj: state.refImages[i] });
-  if(frameLayerHasInk()) rows.push({ type: 'frame', obj: state.frameLayer });
+  if(frameLayerHasInk()) rows.push({ type: 'frame', obj: state.frameLayer });   // 下絵は参照より手前の別の層
+  for(const it of refStackFront()) rows.push(it);
   return rows;
 }
 function selectRefFromLane(type, id){
@@ -3806,30 +3840,33 @@ function updateRefLane(){
   if(!open){ setRefLaneHeight(0); return; }
   const endPx = tickToPx(effectiveTotalTicks());
   inner.style.width = Math.max(endPx, timelineTotalPx()) + 'px';
+  const frameRows = rows.length && rows[0].type === 'frame' ? 1 : 0;
   rows.forEach((row, i) => {
     const top = 1 + i * RL_ROW;
     const o = row.obj;
     const sel = row.type === 'frame' ? isSelected('frame') : isSelected(row.type, o.id);
-    // 左の見出し
+    const color = row.type === 'anim' ? o.color : (row.type === 'img' ? '#5AE9FF' : '#FFFFFF');
+    const tag = refTag(row.type, o);
+    const name = row.type === 'frame' ? 'FRAME' : (o.name || (row.type === 'img' ? 'IMAGE' : 'REF'));
+    // 左の見出し：● 札 名前。上下ドラッグで並べ替え、Wタップで名前を変える
     const lbl = document.createElement('div');
     lbl.className = 'rl-lbl' + (sel ? ' sel' : '');
     lbl.style.top = top + 'px';
-    const color = row.type === 'anim' ? o.color : (row.type === 'img' ? '#5AE9FF' : '#FFFFFF');
-    const name = row.type === 'frame' ? '下絵 FRAME' : (o.name || (row.type === 'img' ? 'IMAGE' : 'REF'));
-    lbl.innerHTML = '<span class="rl-dot"></span>';
+    lbl.innerHTML = '<span class="rl-dot"></span><span class="rl-tag"></span>';
     lbl.firstChild.style.background = color;
+    lbl.children[1].textContent = tag;
     lbl.appendChild(document.createTextNode(name));
-    lbl.title = name + '（クリックで選択）';
-    lbl.addEventListener('click', () => selectRefFromLane(row.type, o.id));
+    lbl.title = tag + ' ' + name + (row.type === 'frame' ? '（クリックで選択）' : '（クリックで選択／上下にドラッグで並べ替え／Wクリックで名前）');
+    wireRefLabel(lbl, row, i, frameRows, rows.length);
     head.appendChild(lbl);
     // 帯
     const bar = document.createElement('div');
     const timed = row.type === 'anim' && o.ticks && o.ticks.length > 1;
-    bar.className = 'rl-bar' + (timed ? '' : ' static') + (sel ? ' sel' : '') +
+    bar.className = 'rl-bar' + (timed ? '' : ' static') + (row.type === 'img' ? ' img' : '') + (sel ? ' sel' : '') +
                     (o.visible === false ? ' hidden-ref' : '') + (o.locked ? ' locked' : '');
-    bar.style.top = (top + (timed ? 0 : 0)) + 'px';
-    bar.style.background = color;
+    bar.style.top = top + 'px';
     if(timed){
+      bar.style.background = color;
       const x0 = tickToPx(o.offset | 0), x1 = tickToPx(refEndTick(o));
       bar.style.left = x0 + 'px';
       bar.style.width = Math.max(6, x1 - x0) + 'px';
@@ -3852,10 +3889,24 @@ function updateRefLane(){
       bar.title = name + '：横ドラッグで出るタイミングをずらす（Wクリックで先頭に戻す）' +
                   ((o.offset | 0) ? '／いま ' + ((o.offset | 0) > 0 ? '+' : '') + (o.offset | 0) + 'コマ' : '');
       wireRefBarDrag(bar, o);
+    } else if(row.type === 'img'){
+      // 画像：イン点〜アウト点（既定は全尺）。端＝トリム／中＝範囲ごと移動／Wクリック＝全尺に戻す
+      bar.style.color = color;
+      const x0 = tickToPx(o.tin | 0), e = refImgEnd(o);
+      const x1 = e == null ? Math.max(endPx, timelineTotalPx()) : tickToPx(e);
+      bar.style.left = x0 + 'px';
+      bar.style.width = Math.max(6, x1 - x0) + 'px';
+      const tl = document.createElement('div'); tl.className = 'rl-trim l'; tl.title = 'イン点（ドラッグ）';
+      const tr = document.createElement('div'); tr.className = 'rl-trim r'; tr.title = 'アウト点（ドラッグ）';
+      bar.appendChild(tl); bar.appendChild(tr);
+      const range = ((o.tin | 0) || e != null) ? '（いま ' + ((o.tin | 0) + 1) + '〜' + (e == null ? '最後' : e) + 'コマ）' : '（全尺）';
+      bar.title = name + '：端をドラッグで出るコマを切る／中を横ドラッグで範囲ごと移動／Wクリックで全尺に戻す' + range;
+      wireRefImgBar(bar, o);
     } else {
+      bar.style.color = color;
       bar.style.left = '0px';
       bar.style.width = Math.max(endPx, timelineTotalPx()) + 'px';
-      bar.title = name + '（時間を持たない参照・タップで選択）';
+      bar.title = name + '（全コマ共通の下絵・タップで選択）';
       bar.addEventListener('click', () => selectRefFromLane(row.type, o.id));
     }
     inner.appendChild(bar);
@@ -3863,12 +3914,158 @@ function updateRefLane(){
   setRefLaneHeight(rows.length * RL_ROW + 1);
   syncTimeTrackScroll();
 }
-// offset / step を変えたあとの後始末（表示・尺・保存）
+function startRefRename(anchorEl, obj, type){
+  if(!anchorEl || !obj) return;
+  const host = anchorEl.offsetParent || anchorEl.parentElement;
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.maxLength = 24;
+  inp.className = 'rl-rename';
+  inp.value = obj.name || '';
+  inp.placeholder = refTag(type, obj) + ' の名前';
+  // パネルの行でもレーンの見出しでも、元の名前の位置にかぶせる
+  inp.style.top = anchorEl.offsetTop + 'px';
+  if(!anchorEl.classList.contains('rl-lbl')){
+    inp.style.position = 'absolute';
+    inp.style.left = anchorEl.offsetLeft + 'px';
+    inp.style.width = Math.max(90, anchorEl.offsetWidth) + 'px';
+    inp.style.height = Math.max(16, anchorEl.offsetHeight) + 'px';
+  }
+  if(getComputedStyle(host).position === 'static') host.style.position = 'relative';
+  host.appendChild(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const finish = ok => {
+    if(done) return; done = true;
+    const v = inp.value.trim().slice(0, 24);
+    inp.remove();
+    if(ok && v && v !== obj.name){
+      obj.name = v;
+      buildRefList(); saveRefs(); markMetaDirty();
+      stageToast(refTag(type, obj) + ' ' + v);
+    }
+  };
+  inp.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if(e.key === 'Enter'){ e.preventDefault(); finish(true); }
+    else if(e.key === 'Escape'){ e.preventDefault(); finish(false); }
+  });
+  inp.addEventListener('blur', () => finish(true));
+  inp.addEventListener('pointerdown', e => e.stopPropagation());
+}
+// offset / step / 画像のイン・アウトを変えたあとの後始末（表示・尺・保存）
 function refTimingChanged(r){
   renderRefLayer();
   updateTimeTrack();   // 尺が伸び縮みする＋帯の置き直し
   buildRefList();
   saveRefs();
+  markMetaDirty();     // 画像は meta 側に保存される
+}
+// 見出し：タップ＝選択／Wタップ＝名前／上下ドラッグ＝並べ替え（下絵は参照より手前の別の層なので動かさない）
+//   Wタップの判定は参照そのもの（_lblTap）に持たせる。1回目のタップで選択→見出しが作り直されるため。
+function wireRefLabel(lbl, row, i, frameRows, nRows){
+  const o = row.obj;
+  let d = null;
+  lbl.addEventListener('pointerdown', e => {
+    if(e.button !== 0 && e.pointerType === 'mouse') return;
+    e.preventDefault(); e.stopPropagation();
+    try{ lbl.setPointerCapture(e.pointerId); }catch(err){}
+    d = { y0: e.clientY, moved: false, drop: null };
+  });
+  lbl.addEventListener('pointermove', e => {
+    if(!d || row.type === 'frame') return;
+    if(!d.moved && Math.abs(e.clientY - d.y0) < 6) return;
+    d.moved = true;
+    lbl.classList.add('drag');
+    const head = document.getElementById('ref-lane-head');
+    const y = e.clientY - head.getBoundingClientRect().top;
+    const target = Math.max(frameRows, Math.min(nRows - 1, Math.floor((y - 1) / RL_ROW)));
+    d.target = target;
+    if(!d.drop){ d.drop = document.createElement('div'); d.drop.className = 'rl-drop'; head.appendChild(d.drop); }
+    const lineRow = target > i ? target + 1 : target;
+    d.drop.style.top = (lineRow * RL_ROW) + 'px';
+  });
+  const end = () => {
+    if(!d) return;
+    const dd = d; d = null;
+    lbl.classList.remove('drag');
+    if(dd.drop) dd.drop.remove();
+    if(dd.moved){
+      if(dd.target != null && dd.target !== i) refMoveTo(row.type, o.id, dd.target - frameRows);
+      return;
+    }
+    const now = performance.now();
+    if(row.type !== 'frame' && o._lblTap && now - o._lblTap < 400){
+      o._lblTap = 0;
+      const fresh = [...document.querySelectorAll('#ref-lane-head .rl-lbl')][i] || lbl;
+      startRefRename(fresh, o, row.type);
+      return;
+    }
+    o._lblTap = now;
+    selectRefFromLane(row.type, o.id);
+  };
+  lbl.addEventListener('pointerup', end);
+  lbl.addEventListener('pointercancel', () => { if(d && d.drop) d.drop.remove(); d = null; lbl.classList.remove('drag'); });
+}
+// 画像の帯：端＝イン/アウト、中＝範囲ごと移動、Wクリック＝全尺。ロック中は動かさない
+function wireRefImgBar(bar, o){
+  bar.addEventListener('pointerdown', e => {
+    if(e.button !== 0 && e.pointerType === 'mouse') return;
+    e.preventDefault(); e.stopPropagation();
+    const mode = e.target.classList.contains('l') ? 'in' : (e.target.classList.contains('r') ? 'out' : 'move');
+    const inner = document.getElementById('ref-lane-inner');
+    const t0 = pxToTick(e.clientX - inner.getBoundingClientRect().left);
+    const endAll = Math.max(1, effectiveTotalTicks());
+    gRefLaneDrag = { bar, mode, t0, x0: e.clientX, moved: false,
+                     tin: o.tin | 0, tout: (o.tout == null ? endAll : (o.tout | 0)), hadOut: o.tout != null };
+    try{ bar.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  bar.addEventListener('pointermove', e => {
+    const d = gRefLaneDrag;
+    if(!d || d.bar !== bar) return;
+    if(!d.moved && Math.abs(e.clientX - d.x0) < 4) return;
+    if(o.locked){ if(!d.moved) stageToast('🔒 ロック中の参照は動かせません'); d.moved = true; return; }
+    d.moved = true;
+    const inner = document.getElementById('ref-lane-inner');
+    const t = pxToTick(e.clientX - inner.getBoundingClientRect().left);
+    const len = d.tout - d.tin;
+    if(d.mode === 'in'){
+      o.tin = Math.max(0, Math.min(d.tout - 1, t));
+      if(!d.hadOut) o.tout = null;
+    } else if(d.mode === 'out'){
+      o.tout = Math.max((o.tin | 0) + 1, t);
+    } else {
+      const nin = Math.max(0, d.tin + (t - d.t0));
+      o.tin = nin; o.tout = nin + len;
+    }
+    // ドラッグ中は帯の位置とキャンバスだけ
+    const e2 = refImgEnd(o);
+    const x0 = tickToPx(o.tin | 0);
+    const x1 = e2 == null ? Math.max(tickToPx(effectiveTotalTicks()), timelineTotalPx()) : tickToPx(e2);
+    bar.style.left = x0 + 'px';
+    bar.style.width = Math.max(6, x1 - x0) + 'px';
+    renderRefLayer();
+    stageToast((o.name || 'IMAGE') + '　' + ((o.tin | 0) + 1) + '〜' + (e2 == null ? '最後' : e2) + 'コマ');
+  });
+  const end = () => {
+    const d = gRefLaneDrag;
+    if(!d || d.bar !== bar) return;
+    gRefLaneDrag = null;
+    if(d.moved){ if(!o.locked) refTimingChanged(o); return; }
+    const now = performance.now();
+    if(o._laneTap && now - o._laneTap < 400){
+      o._laneTap = 0;
+      if(o.locked){ stageToast('🔒 ロック中の参照は動かせません'); return; }
+      if(!(o.tin | 0) && o.tout == null){ stageToast((o.name || 'IMAGE') + ' はもう全尺です'); return; }
+      o.tin = 0; o.tout = null;
+      refTimingChanged(o);
+      stageToast((o.name || 'IMAGE') + ' を全尺に戻しました');
+      return;
+    }
+    o._laneTap = now;
+    selectRefFromLane('img', o.id);
+  };
+  bar.addEventListener('pointerup', end);
+  bar.addEventListener('pointercancel', () => { gRefLaneDrag = null; });
 }
 function wireRefBarDrag(bar, r){
   bar.addEventListener('pointerdown', e => {
@@ -3948,13 +4145,23 @@ function renderRefLayer(tickOverride){
   if(!refLayerCtx) return;
   refLayerCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
   refLayerCanvas.style.display = state.refMasterShow ? 'block' : 'none';
+  // 2026-09-23 調整: 画像も ref-layer に一緒に描く（種類をまたいで並べ替えるため）。refimg-layer は使わない
+  if(refImgCtx){ refImgCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H); refImgLayerCanvas.style.display = 'none'; }
   if(!state.refMasterShow) return;
-  const refs = state.refAnimators;
-  if(!refs.length) return;
   const t = (typeof tickOverride === 'number') ? tickOverride : currentSyncTick();
-  // リスト先頭(index 0)を最前面にするため、末尾から描画（下→上）
-  for(let ri = refs.length - 1; ri >= 0; ri--){
-    const r = refs[ri];
+  refLayerCtx.imageSmoothingEnabled = true;
+  // 奥 → 手前
+  for(const it of refStack()){
+    if(it.type === 'img'){
+      const o = it.obj;
+      if(!o.img || !o.visible || o.opacity <= 0 || !refImgVisibleAt(o, t)) continue;
+      const w = o.img.naturalWidth * o.scale, h = o.img.naturalHeight * o.scale;
+      refLayerCtx.globalAlpha = o.opacity;
+      try{ refLayerCtx.drawImage(o.img, o.x, o.y, w, h); }catch(e){}
+      if(isSelected('img', o.id)){ refLayerCtx.globalAlpha = 1; strokeRefSel(refLayerCtx, o.x, o.y, w, h); }
+      continue;
+    }
+    const r = it.obj;
     if(!r.visible || !r.ticks) continue;
     // 1コマだけの参照＝静止画は全ティックで出しっぱなし。複数コマは offset / step で読み、尽きたら非表示。
     const k = refTickIndex(r, t);
@@ -3968,7 +4175,7 @@ function renderRefLayer(tickOverride){
     const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
     refLayerCtx.globalAlpha = r.opacity;
     try{ refLayerCtx.drawImage(img, ox, oy, w, h); }catch(e){}
-    if(isSelected('anim', r.id)) strokeRefSel(refLayerCtx, ox, oy, w, h);
+    if(isSelected('anim', r.id)){ refLayerCtx.globalAlpha = 1; strokeRefSel(refLayerCtx, ox, oy, w, h); }
   }
   refLayerCtx.globalAlpha = 1;
 }
@@ -3980,9 +4187,8 @@ function buildRefList(){
   const list = document.getElementById('ref-list');
   if(!list) return;
   list.innerHTML = '';
-  const rows = [];
-  for(let i = state.refImages.length - 1; i >= 0; i--) rows.push({ kind:'img', obj: state.refImages[i] });
-  for(const r of state.refAnimators) rows.push({ kind:'anim', obj: r });
+  // 2026-09-23 調整: 種類をまたいで「手前 → 奥」の1本（REF レーン・キャンバスの重なりと同じ順）
+  const rows = refStackFront().map(it => ({ kind: it.type, obj: it.obj }));
   if(!rows.length){
     const e = document.createElement('div');
     e.className = 'ref-empty';
@@ -4011,8 +4217,10 @@ function buildRefList(){
     dot.style.background = isImg ? '#5AE9FF' : obj.color;   // 画像＝アイス色 / ANIMATOR＝各色
     const name = document.createElement('span');
     name.className = 'ref-name';
-    name.textContent = obj.name || (isImg ? 'IMAGE' : 'REF');
-    name.title = name.textContent;
+    name.innerHTML = '<span class="ref-tag"></span>';
+    name.firstChild.textContent = refTag(kind, obj);
+    name.appendChild(document.createTextNode(obj.name || (isImg ? 'IMAGE' : 'REF')));
+    name.title = refTag(kind, obj) + ' ' + (obj.name || '') + '（✎ で名前を変える）';
     const meta = document.createElement('span');
     meta.className = 'ref-meta';
     meta.textContent = isImg
@@ -4039,8 +4247,21 @@ function buildRefList(){
     delBtn.textContent = '✕';
     delBtn.title = '参照を削除';
     delBtn.addEventListener('click', () => isImg ? removeRefImage(obj.id) : removeRefAnimator(obj.id));
+    // 並び替え（上＝手前）と名前
+    const upBtn = document.createElement('button');
+    upBtn.className = 'ref-btn'; upBtn.textContent = '▲'; upBtn.title = 'ひとつ手前へ（上）';
+    upBtn.addEventListener('click', () => refMove(kind, obj.id, -1));
+    const dnBtn = document.createElement('button');
+    dnBtn.className = 'ref-btn'; dnBtn.textContent = '▼'; dnBtn.title = 'ひとつ奥へ（下）';
+    dnBtn.addEventListener('click', () => refMove(kind, obj.id, +1));
+    const renBtn = document.createElement('button');
+    renBtn.className = 'ref-btn'; renBtn.textContent = '✎'; renBtn.title = '名前を変える（種類の札 ' + refTag(kind, obj) + ' はそのまま付きます）';
+    renBtn.addEventListener('click', () => startRefRename(name, obj, kind));
     btns.appendChild(visBtn);
     btns.appendChild(lockBtn);
+    btns.appendChild(upBtn);
+    btns.appendChild(dnBtn);
+    btns.appendChild(renBtn);
     btns.appendChild(document.createElement('span')).style.flex = '1';
     btns.appendChild(delBtn);
 
@@ -4109,6 +4330,7 @@ function saveRefs(){
           fps:r.fps, source:r.source,
           x:r.x, y:r.y, scale:r.scale, locked:!!r.locked,
           offset: r.offset | 0, step: refStep(r),
+          kind: r.kind || 'ani', z: r.z,
         })),
         savedAt: Date.now(),
       }, 'refs');
@@ -4143,6 +4365,8 @@ async function loadRefs(){
         locked: !!it.locked,
         offset: (typeof it.offset === 'number') ? (it.offset | 0) : 0,
         step: Math.max(1, (it.step | 0) || 1),
+        kind: it.kind === 'seq' ? 'seq' : 'ani',
+        z: (typeof it.z === 'number') ? it.z : undefined,
       });
       const justAdded = state.refAnimators[state.refAnimators.length - 1];
       if(typeof it.x !== 'number') centerRefAnimator(justAdded); // 旧データは原寸・中央
@@ -4207,7 +4431,7 @@ async function addRefAnimatorFromSeq(imgFiles){
   }
   // 連番部分を除いたベース名を参照名にする
   const base = imgFiles[0].name.replace(/\.[^.]+$/,'').replace(/[_\-. ]*\d+$/,'') || 'SEQ';
-  await addRefAnimator({ name: base, fps: 24, cells }, base);
+  await addRefAnimator({ name: base, fps: 24, cells, refKind: 'seq' }, base);
 }
 document.getElementById('ref-json-input').addEventListener('change', async e => {
   const files = Array.from(e.target.files || []);
@@ -4623,9 +4847,11 @@ function refObjSize(type, obj){
 }
 // キャンバスのドラッグで掴めるのは「画像のみ」（アニメ/フレームはリスト等で選択してから移動）
 function hitTestImage(wx, wy){
-  for(let i = state.refImages.length - 1; i >= 0; i--){
-    const o = state.refImages[i];
-    if(!o.img || !o.visible || o.locked) continue;   // ロック中は掴めない
+  const t = currentSyncTick();
+  for(const it of refStackFront()){
+    if(it.type !== 'img') continue;
+    const o = it.obj;
+    if(!o.img || !o.visible || o.locked || !refImgVisibleAt(o, t)) continue;   // ロック中・出ていない画像は掴めない
     const w = o.img.naturalWidth * o.scale, h = o.img.naturalHeight * o.scale;
     if(wx >= o.x && wy >= o.y && wx <= o.x + w && wy <= o.y + h) return o;
   }
@@ -4633,8 +4859,12 @@ function hitTestImage(wx, wy){
 }
 // 画像を最前面へ（配列末尾＝最後に描画）
 function bringImageFront(id){
-  const i = state.refImages.findIndex(o => o.id === id);
-  if(i >= 0 && i !== state.refImages.length - 1){ const [o] = state.refImages.splice(i, 1); state.refImages.push(o); }
+  const o = state.refImages.find(x => x.id === id);
+  if(!o) return;
+  const top = refTopZ() - 1;
+  if((o.z || 0) >= top && refStackFront()[0].obj === o) return;
+  o.z = top + 1;   // 並びの一番上（＝手前）へ。パネルと REF レーンも同じ順に並び替わる
+  buildRefList(); saveRefs(); markMetaDirty();
 }
 function refFindSel(){
   if(!state.refSel) return null;
@@ -4658,21 +4888,8 @@ function strokeRefSel(ctx, x, y, w, h){
 }
 
 // 参照画像（複数・原寸・移動可）を描画。書き出しには含めない
-function renderRefImg(){
-  if(!refImgCtx) return;
-  refImgCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
-  refImgLayerCanvas.style.display = state.refMasterShow ? 'block' : 'none';
-  if(!state.refMasterShow) return;
-  refImgCtx.imageSmoothingEnabled = true;
-  for(const o of state.refImages){
-    if(!o.img || !o.visible || o.opacity <= 0) continue;
-    const w = o.img.naturalWidth * o.scale, h = o.img.naturalHeight * o.scale;
-    refImgCtx.globalAlpha = o.opacity;
-    try{ refImgCtx.drawImage(o.img, o.x, o.y, w, h); }catch(e){}
-    if(isSelected('img', o.id)) strokeRefSel(refImgCtx, o.x, o.y, w, h);
-  }
-  refImgCtx.globalAlpha = 1;
-}
+// 画像も ref-layer に一緒に描くようになったので、中身は renderRefLayer と同じ（呼び出し側のために名前を残す）
+function renderRefImg(){ renderRefLayer(); }
 // dataURL から参照画像を1枚追加（原寸・中央、わずかにカスケード）
 function loadRefImageFromSrc(src, opts){
   opts = opts || {};
@@ -4690,6 +4907,10 @@ function loadRefImageFromSrc(src, opts){
         opacity: (typeof opts.opacity === 'number') ? opts.opacity : 0.6,
         visible: opts.visible !== false,
         locked: !!opts.locked,
+        // 2026-09-23 調整: 出る範囲（既定＝全尺。端をドラッグでトリム）と並び
+        tin: (typeof opts.tin === 'number') ? Math.max(0, opts.tin | 0) : 0,
+        tout: (typeof opts.tout === 'number') ? Math.max(1, opts.tout | 0) : null,
+        z: (typeof opts.z === 'number') ? opts.z : refTopZ(),
       };
       state.refImages.push(o);
       if(!opts.noSelect){ state.refSel = {type:'img', id:o.id}; }
@@ -5236,7 +5457,8 @@ function lassoFillPolygon(pts){
   const erase = !!state.fillErase;
   // トーンインク選択中は網点で塗る（ドットの位置だけ着色）
   const tone = (!erase && isToneInk(state.inkColor)) ? TONE[state.inkColor] : null;
-  const fc = erase ? {r:0,g:0,b:0} : hexToRgb(tone ? tone.color : currentFillHex());
+  // 主線を選んでいるときの投げ縄塗りは黒で固定（パレット色は下書へ移る作りなので、主線＝黒で迷わない）
+  const fc = erase ? {r:0,g:0,b:0} : hexToRgb(tone ? tone.color : (state.inkColor === 'black' ? '#000000' : currentFillHex()));
   const fA = erase ? 0 : 255;
   const bw = maxX - minX + 1, bh = maxY - minY + 1;
   const img = ctx.getImageData(minX, minY, bw, bh);
@@ -5288,9 +5510,8 @@ function sampleCompositeColor(cx, cy){
   const layers = [];
   layers.push(lineCtx);
   layers.push(fillCtx);
-  if(state.refMasterShow && state.refImages.some(o => o.img && o.visible && o.opacity > 0)) layers.push(refImgCtx);
   if(state.frameLayer && state.frameLayer.visible) layers.push(frameLayerCtx);
-  if(state.refAnimators && state.refAnimators.length) layers.push(refLayerCtx);
+  if(state.refMasterShow && (state.refAnimators.length || state.refImages.length)) layers.push(refLayerCtx);
   for(const c of layers){
     try{
       const d = c.getImageData(cx, cy, 1, 1).data;
@@ -5336,18 +5557,27 @@ function applyPickedColor(hex){
       stageToast((slot === 'blue' ? '下書' : '指示') + ' に色を入れました（トーン解除）');
       return;
     }
-    setActiveInkColor(hex); return;
+    setActiveInkColor(hex);
+    pickToPalette(hex);   // 2026-09-23: 下書/指示を選んでいるときもパレットの選択チップへ入れる（主線のときと揃える）
+    return;
   }
   // FILL PALETTE の選択スロットへ取り込み（＝カスタムパレット化）。
   // 先頭の明度チップは固定なので上書きしない（色は下の主線→下書の流れでちゃんと使える）。
-  state.fillColor = hex;
-  if(typeof gPalette !== 'undefined' && gPalSlot >= 0 && gPalSlot < gPalette.length && !isPalLocked(gPalSlot)){
-    gPalette[gPalSlot] = hex;
-    savePalette();
-    renderPalette();
-  }
+  pickToPalette(hex);
   // 主線(黒)のときだけ、続けて下書スロットへフォーカス＋色入れ
   if(state.inkColor === 'black' && state.tool !== 'erase') focusRoughInk(state.fillColor);
+}
+// 拾った色をパレットの選択チップへ。先頭の明度チップ（固定）を選んでいるときは入れずに理由を出す
+function pickToPalette(hex){
+  state.fillColor = hex;
+  if(typeof gPalette === 'undefined' || gPalSlot < 0 || gPalSlot >= gPalette.length) return;
+  if(isPalLocked(gPalSlot)){
+    stageToast('明度チップは固定なのでパレットには入れていません（色のチップを選ぶか ＋ で枠を足す）');
+    return;
+  }
+  gPalette[gPalSlot] = hex;
+  savePalette();
+  renderPalette();
 }
 // Altクリック / スポイトツールの行き先を一元決定する
 function eyedropDispatch(clientX, clientY){
@@ -5448,10 +5678,7 @@ function resetGlobalHistory(){
   updateUndoButtons();
 }
 function updateUndoButtons(){
-  const u = document.getElementById('tb-undo');
-  const r = document.getElementById('tb-redo');
-  if(u) u.disabled = gUndo.length === 0;
-  if(r) r.disabled = gRedo.length === 0;
+  // ツールバーの ↩ ↪ は 2026-09-23 に撤去（Ctrl+Z / Y と指2本・3本タップが入口）。呼び出し側のために名前だけ残す
 }
 
 // 現在のタイムライン状態をスナップショット（drawDataはref、historyはshallow copy）
@@ -5845,12 +6072,18 @@ function totalTicks(){
   return state.frames.reduce((s, f) => s + f.duration, 0);
 }
 // 表示中REFの最長ティック数（REFが手元プロジェクトより長い場合の延長用）
+function refHasTiming(){
+  return state.refAnimators.length > 0 || state.refImages.some(o => (o.tin | 0) > 0 || o.tout != null);
+}
 function maxRefTicks(){
   let m = 0;
   for(const r of state.refAnimators){
     if(!r.visible || !r.ticks) continue;
     const n = refEndTick(r);
     if(n > m) m = n;
+  }
+  for(const o of state.refImages){
+    if(o.visible && o.tout != null && (o.tout | 0) > m) m = o.tout | 0;
   }
   return m;
 }
@@ -6592,7 +6825,7 @@ function play(){
       lastTick = tick;
       if(playCursor) playCursor.style.left = tickToPx(tick) + 'px';
       // 参照ANIMATORを再生ティックに同期
-      if(state.refAnimators.length){
+      if(refHasTiming()){
         _refSyncTick = tick;
         renderRefLayer(tick);
       }
@@ -7007,7 +7240,7 @@ function startStroke(clientX, clientY, pressure){
   drawing = true;
   const ctx = activeDrawCtx();
   const mp = (mx, my) => { const m = mirrorPt(mx, my); return em ? toFrameLocal(m.x, m.y) : m; };
-  const usePressure = state.pressurePen && (state.tool === 'pen' || state.tool === 'erase');
+  const usePressure = toolPressureOn();
   if(state.tool === 'pen'){
     if(usePressure){
       lastR = pressureRadius(smoothPressure(pressure));
@@ -7037,7 +7270,7 @@ function continueStroke(clientX, clientY, pressure, noSmooth){
   const dc = em ? toFrameLocal(sm.x, sm.y) : { x: sm.x, y: sm.y };
   const x = dc.x, y = dc.y;
   const ctx = activeDrawCtx();
-  const usePressure = state.pressurePen && (state.tool === 'pen' || state.tool === 'erase');
+  const usePressure = toolPressureOn();
   // ミラーは「作業座標」で反転 → 必要ならフレームバッファ座標へ変換
   const curWX = sm.x, curWY = sm.y;
   const mLine = () => {
@@ -7225,6 +7458,8 @@ drawCanvas.addEventListener('pointerdown', e => {
   if(state.tool !== 'eyedrop' && !e.altKey && laneBlocked()) return;
   if(state.tool === 'eyedrop' || e.altKey){
     eyedropDispatch(e.clientX, e.clientY);
+  } else if(state.tool === 'fill' && !state.frameLayer.editMode && curLane() === 'line' && !fillIsLassoErase()){
+    stageToast('線レーンで使えるのは投げ縄消しだけです（塗りは塗レーンで）');
   } else if(state.tool === 'fill'){
     if(state.fillMode === 'lasso'){
       if(lassoPoly) lassoPolyClick(e.clientX, e.clientY);  // 多角形モード＝クリックで頂点
@@ -7319,9 +7554,18 @@ document.querySelectorAll('.tool').forEach(btn => {
     if(t === 'redo'){ redo(); return; }
     if(lassoing && t !== 'fill') lassoCancel();   // 囲い途中でツールを変えたら捨てる
     if(t !== 'sel') floatSettle();                 // SPEC_20 P4: 別の道具を持ったら浮いている形は確定
+    const prevTool = state.tool;
     state.tool = t;
-    // SPEC_20: FILL は塗レーンの道具。線レーンで押されたら黙って効かないのではなく移る。
-    if(t === 'fill' && !state.frameLayer.editMode) setLane('fill');
+    // 2026-09-23 調整: ペン・消しゴムは基本 線レーン。FILL は塗レーン（ただし投げ縄消しだけは線レーンでも使える）
+    if(!state.frameLayer.editMode){
+      if(t === 'pen' || t === 'erase') setLane('line', { quiet: true });
+      else if(t === 'fill' && !fillIsLassoErase()) setLane('fill');
+    }
+    // FILL / SEL から PEN に戻ったら主線に戻す（FILL でパレット色を使うとインクが下書へ移るため）
+    if(t === 'pen' && (prevTool === 'fill' || prevTool === 'sel') && state.inkColor !== 'black'){
+      state.inkColor = 'black';
+      stageToast('主線に戻しました');
+    }
     document.querySelectorAll('.tool').forEach(b => {
       const tb = b.dataset.tool;
       if(tb === 'undo' || tb === 'redo') return;
@@ -7473,21 +7717,33 @@ function onDoubleActivate(el, handler){
 
 // PEN ボタン ダブルクリック/ダブルタップ → 筆圧ペン ON/OFF
 const penToolBtn = document.querySelector('.tool[data-tool="pen"]');
+// いまの道具で筆圧を使うか（ペンと消しゴムは別々に持つ）
+function toolPressureOn(){
+  if(state.tool === 'pen') return !!state.pressurePen;
+  if(state.tool === 'erase') return !!state.pressureErase;
+  return false;
+}
 function togglePressurePen(){
   state.pressurePen = !state.pressurePen;
   applyPressurePenUI();
-  stageToast('筆圧 ' + (state.pressurePen ? 'ON' : 'OFF') + '（ペン・消しゴム共通）');
+  stageToast('ペンの筆圧 ' + (state.pressurePen ? 'ON' : 'OFF'));
 }
-// 筆圧バッジ/ツールチップを PEN と ERASE の両方に同期（設定は1つ＝state.pressurePen）
+function togglePressureErase(){
+  state.pressureErase = !state.pressureErase;
+  applyPressurePenUI();
+  stageToast('消しゴムの筆圧 ' + (state.pressureErase ? 'ON' : 'OFF'));
+}
+// 筆圧バッジ/ツールチップ。PEN と ERASE はそれぞれ自分の設定を出す
 function applyPressurePenUI(){
   const on = !!state.pressurePen;
   penToolBtn.classList.toggle('pp-on', on);
   penToolBtn.title = '筆圧: ' + (on ? 'ON' : 'OFF') + '（Wクリック / P2連打で切替）/ Shift+クリック=直線・Shift+ドラッグ=水平垂直';
   const eb = document.querySelector('.tool[data-tool="erase"]');
   if(eb){
-    eb.classList.toggle('pp-on', on);
-    eb.title = '消しゴム (E)　筆圧: ' + (on ? 'ON' : 'OFF') +
-               '（Wクリック / E2連打で切替）／長押しでこのコマを全消去';
+    const eon = !!state.pressureErase;
+    eb.classList.toggle('pp-on', eon);
+    eb.title = '消しゴム (E)　筆圧: ' + (eon ? 'ON' : 'OFF') +
+               '（Wクリック / E2連打で切替・ペンとは別）／長押しでこのコマを全消去';
   }
 }
 onDoubleActivate(penToolBtn, togglePressurePen);
@@ -7521,6 +7777,7 @@ function fillToggleLasso(){
   if(state.tool !== 'fill') fillToolBtn.click();
   applyFillModeUI();
   syncFillInkFocus();
+  fillLaneFollowMode();
   stageToast(fillModeName());
 }
 // 長押しは「透明消しかどうか」だけを受け持つ。**戻しても投げ縄のまま**（塗りへ戻る）。
@@ -7536,7 +7793,14 @@ function fillToggleLassoErase(){
   if(state.tool !== 'fill') fillToolBtn.click(); // 切替時はFILLを選択状態に
   applyFillModeUI();
   syncFillInkFocus();
-  stageToast(fillModeName());
+  fillLaneFollowMode();
+  stageToast(fillModeName() + (fillIsLassoErase() ? '（' + LANE_JP[curLane()] + 'レーン）' : ''));
+}
+function fillIsLassoErase(){ return state.fillMode === 'lasso' && !!state.fillErase; }
+// モードを変えたら行き先のレーンも合わせる（塗り系＝塗レーン。投げ縄消しは今のレーンのまま）
+function fillLaneFollowMode(){
+  if(state.tool !== 'fill' || state.frameLayer.editMode) return;
+  if(!fillIsLassoErase() && curLane() === 'line') setLane('fill');
 }
 function fillModeName(){
   if(state.fillMode !== 'lasso') return 'バケツ塗り';
@@ -7872,6 +8136,8 @@ bgTrack.addEventListener('pointerdown', e => {
   bgTrack.setPointerCapture(e.pointerId);
   bgTrackHandler(e);
 });
+// iOS Safari は touch-action だけだと親（ツールバー）のスクロールが先に始まることがあるので、touchstart も止める
+bgTrack.addEventListener('touchstart', e => { e.preventDefault(); }, { passive: false });
 bgTrack.addEventListener('pointermove', e => {
   if(bgTrack.hasPointerCapture(e.pointerId)){
     bgTrackHandler(e);
@@ -7900,7 +8166,7 @@ function clearCanvas(){
     if(now < holdUntil){ lastEraseTap = 0; return; }   // 長押し成立直後の click は食う
     if(now - lastEraseTap < 380){
       lastEraseTap = 0;
-      togglePressurePen();
+      togglePressureErase();
     } else {
       lastEraseTap = now;
     }
@@ -8853,6 +9119,7 @@ async function flushSave(){
       refImages: state.refImages.map(o => ({
         src:o.src, name:o.name, x:o.x, y:o.y, scale:o.scale,
         opacity:o.opacity, visible:o.visible, locked:!!o.locked,
+        tin: o.tin | 0, tout: (o.tout == null) ? null : (o.tout | 0), z: o.z,
       })),
       mirrorAxis: state.mirrorAxis,
       mirrorAxisX: state.mirrorAxisX,
@@ -9039,7 +9306,7 @@ async function loadProject(){
         if(!src) continue;
         if(typeof src.visible === 'boolean') state.lanes[L].visible = src.visible;
         if(typeof src.locked  === 'boolean') state.lanes[L].locked  = src.locked;
-        if(typeof src.opacity === 'number')  state.lanes[L].opacity = src.opacity;
+        state.lanes[L].opacity = 1;   // 2026-09-23: レーンの濃度は撤去（常に100%）
       }
     }
     if(typeof meta.onionIncludeFill === 'boolean') state.onionIncludeFill = meta.onionIncludeFill;
@@ -9053,6 +9320,9 @@ async function loadProject(){
           scale:(typeof o.scale==='number')?o.scale:1,
           opacity:(typeof o.opacity==='number')?o.opacity:0.6,
           visible:o.visible !== false, locked:!!o.locked, noSelect:true,
+          tin: (typeof o.tin === 'number') ? o.tin : 0,
+          tout: (typeof o.tout === 'number') ? o.tout : undefined,
+          z: (typeof o.z === 'number') ? o.z : 1000 + state.refImages.length,   // 旧保存＝画像は ANIMATOR より手前だった
         });
       }
     }
@@ -9986,7 +10256,7 @@ function setupCursorScrub(){
       }
     }
     // REFはスクラブ位置のティックでライブプレビュー（手元尺を超えても追従）
-    if(state.refAnimators.length) renderRefLayer(tick);
+    if(refHasTiming()) renderRefLayer(tick);
     // カーソル位置を即時更新
     cursor.style.left = tickToPx(tick) + 'px';
   }
@@ -10207,8 +10477,6 @@ document.getElementById('oni-opa').addEventListener('input', e => {
 document.getElementById('oni-opa').addEventListener('change', () => saveOnionCfg());
 
 // LOOPボタンは廃止（常時LOOP）
-document.getElementById('tb-undo').addEventListener('click', () => undo());
-document.getElementById('tb-redo').addEventListener('click', () => redo());
 
 // ===== ブラシ補正ウィジェット =====
 const STAB_ORDER = ['off', 'avg', 'pull'];
@@ -10424,8 +10692,7 @@ function applyRefImgUI(){
 //    FRAME LAYER → REF IMAGE(手前から) → REF ANIMATORS(リスト順)
 function refSelCandidates(){
   const out = [{ type:'frame' }];
-  for(let i = state.refImages.length - 1; i >= 0; i--) out.push({ type:'img', id: state.refImages[i].id });
-  for(const r of state.refAnimators) out.push({ type:'anim', id: r.id });
+  for(const it of refStackFront()) out.push({ type: it.type, id: it.obj.id });
   return out;
 }
 function refSelStep(dir){
@@ -11457,7 +11724,7 @@ async function hBuildFixture(){
 
   // 描画状態を既定に固定（localStorage 復元値の影響を消す）
   state.tool = 'pen'; state.inkColor = 'black'; state.fillColor = '#2f6ad0';
-  state.fillErase = false; state.pressurePen = false; state.mirrorOn = false;
+  state.fillErase = false; state.pressurePen = false; state.pressureErase = false; state.mirrorOn = false;
   state.flipped = false; state.frameLayer.editMode = false;
   state.lane = 'line';
   state.lanes.line = { visible: true, locked: false, opacity: 1 };
