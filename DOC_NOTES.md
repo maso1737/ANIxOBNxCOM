@@ -89,12 +89,18 @@
   左レール `PRS` の下に **`SM` トグル（RAW → EMA → EMA+）** を追加。**既定 RAW ＝従来と完全に同じ**なので、
   描き比べて好きなほうを選べる（`localStorage['animator_pensmooth_v1']`）。
   §6 に「probe を作って実際に踏んだ落とし穴7件」（getCoalescedEvents が空配列を返す・setPointerCapture が投げる 等）
-- `SPEC_20_ANIMATOR_LINE_FILL.md` — **ANIMATOR「線と塗りの2レーン」＋ REF レーン ＋ 変形。未着手（2026-09-18 起草・発注者合意済み）**。
+- `SPEC_20_ANIMATOR_LINE_FILL.md` — **ANIMATOR「線と塗りの2レーン」＋ REF レーン ＋ 変形。P0〜P4 すべて実装済（2026-09-23）**。残りは §7-9 だけ。
+  ★ **参照の表示コマは `refTickIndex(r, t)` の1本**。`renderRefLayer` と `animTickImg` に別の式を書かない（§7-6）。
+  ★ **SEL で浮いている間は `syncFrameFromCanvas` がそのコマを吸い上げない**。この前提で取り消しと autosave が成り立っている（§7-8）。
+    新しく「現在コマを保存する」経路を足すときは、先に `floatSettle()` を呼ぶこと。
+  ★ **AA OFF の確定は `flBakeNearest()`**。canvas の drawImage に置き換えると縁に半透明と色ずれが出て、バケツの色一致が崩れる。
+  ★ トップバーはもう幅の余裕が無い（1096px。iPad mini 横 1133px）。ボタンを足すならタイムラインか ⚙ へ。
+  ★ **履歴の底 `lane:'base'` は HISTORY_MAX でも捨てない**。捨てるとレーンの「1つ前」が見つからず Undo が効かなくなる（§7-2）。
   コマ＝`line`＋`fill`（`fill` は最初の塗りまで null）。**タイムラインは1本・レーン2つ**（線と塗りは同じコマ打ちなので独立させない）。
   塗りは線 α を壁にして **1px 潜る**（AE で線と塗りを別に重ねても隙間が出ない＝分離の最大の実利）。REF は `time-track` の下に**帯**（サムネ無し・`offset`/`step`）。
   ★ **`renderRefLayer` と `animTickImg` の添字の式を必ず同じにする**（HANDOVER で踏んだ「中央ボタンが黙る」の再発防止）。
   ★ **共有DB／LIVE に流す JSON は合体1枚のまま（`layers` を載せない）**＝COMPOSER / OBAN / MANGA PLATE は改修ゼロ。`layers` はファイルの EXPORT JSON と PROJ 保存箱だけ。
-  ★ **新設 UI は新 OBAN 規約**（`--acc` 系変数・3テーマ・44px ヘッダ・`.qd-*`・CVC 橋）。`--acid` は `var(--acc)` のエイリアスにして既定 ROUGE＝現行の見え方を保つ。
+  ★ **UI は animator の現行デザインのまま**（2026-09-19 に「新 OBAN 規約で」から変更）。`--acc` / `THEMES` / `.qd-*` / `CVC` 橋を**足さない**。色は既存 `--acid`、新設 UI は `.fc-vis-btn` / `#zoom-ctl` / `showModal` / `.fc-dur` を真似る。
   ★ 変形は REF パネルに入れない（道具側の `SEL`）。`flPaint` の `imageSmoothingEnabled` を `state.selAA`（既定 false）にする以外、econte の数式は変えない。
 - `SPEC_21_LIVE_PLATE.md` — **一本化アプリ LIVE PLATE（仮）の設計・仕様書。起草のみ（2026-09-18）。着手前に §13 の発注者判断7件**。
   作るのは「5本の機能を足したアプリ」ではなく **1つの BOOK（sheets[] / plates{} / take / fx）に4つの見方（01 SHEET / 02 DRAW / 03 TAKE / 04 SHOW）**。
@@ -104,7 +110,12 @@
   ★ 連携（`tdr_live` / `tdr_exchange` / `?open=` / `BOOK.links` / COPY FOR COMPOSER …）は**全部消える**。旧5形式の読み込み（§5-2）だけ残す。
   ★ ファイル構成は **`live-plate/` 複数ファイル・古典 `<script src>`・ビルド無し**（単一 HTML 2MB は Claude が読めない）。`tools/check.js` に複数ファイル対応を足すのが P0 の仕事。
   §10 の「良いとこどり表」が移植元の関数名一覧。新しく書く前にここを見る。
-- `SPEC_16_ECONTE_V4.md` — **ECONTE V4「枠ごとの画」。§1〜§3＋§5-B＋E1＋§5-C(C1〜C10) 実装済み（2026-08-18〜19）。残りは §5-D（iPad）だけ**。
+- `SPEC_19_ECONTE_V5.md` — **ECONTE V5「プレート」＋ GRID 一本化。P0〜P2 実装済み（2026-09-23）。残りは P3（ブラシ）と iPad 実機確認**。
+  画は **プレート（同じ倍率で写す枠の集まり）ごとに1枚**（`cut.pl[j]`）＝PAN は1枚の長い紙・T.U./T.B. だけ別の紙。設計図は `planPlates`（純関数）、枠が変わったら `syncPlates` 1本。
+  ★ **下書き §1〜§2 と実装が違う所は §6 が正**（紙の矩形＝外接矩形＋のりしろ／隠す規則は時刻で＝`homePlate`／並べ方は段詰め＝`packCells`／C.SCRIPT に設計図）。
+  ★ ボタンは STUDIO / GRID の2つ。SINGLE は **FOCUS**（セルのWタップ・✎・見出しのダブルクリック → Esc で戻る）。キー `3`/`4` は撤去。
+  ★ **ブラシを足すときはプレート API**（`strokePatchSeg(cut, j, …)` / `plK`）。V4 の `frLayer` / `camBakeRect` / `drawPatchStack` / `patchK` は無い。
+- `SPEC_16_ECONTE_V4.md` — **ECONTE V4「枠ごとの画」。⚠ V5（SPEC_19）で `cut.fr[k]` → `cut.pl[j]` に置き換わった＝以下は経緯**。§1〜§3＋§5-B＋E1＋§5-C(C1〜C10) 実装済み（2026-08-18〜19）。残りは §5-D（iPad）だけ**。
   画は **枠（`cam[k]`）ごとに1枚**（`cut.fr[k] = {line 1280×720, plate 512×288, rect}`。`cam[]` と1対1・`ensureFr()` を必ず通す）。
   写真（`baseC`）だけ全枠で共有。パッチは **紙（ベイク空間）の上に `camBakeRect(cut,k)` の位置で置く**ので
   T.U./PAN に追従する（V3-P1 の土台のまま＝旧V2のフェードには戻らない）。描画の入口は **`drawPatchStack()` 1本**。

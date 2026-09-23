@@ -28,11 +28,12 @@
 5. **4本目の道具 DEPTH PLATE が試作に入った**（2026-09-04）。LAB A ＝ `depth-brush-lab.html`（DEPTH BRUSH）。
    **このリポジトリで唯一の `type="module"`**（three.js r170 / importmap）＝ローカルサーバで開く（port 8146）。
    次は LAB B（トーンが何度で崩れるか）/ C（生成線）/ D（部屋の中）/ E（嘘パース）のどれか。
-   設計と実測は `DEPTH_PLATE_HANDOVER.md`。**SPEC_19 は「これだ」が出るまで書かない。**
-6. **ANIMATOR の「線＋塗の2レーン」が仕様化された**（2026-09-18・`SPEC_20_ANIMATOR_LINE_FILL.md`・発注者合意済み）。
+   設計と実測は `DEPTH_PLATE_HANDOVER.md`。**DEPTH PLATE の SPEC は「これだ」が出るまで書かない**（番号 SPEC_19 は 2026-09-13 に ECONTE V5 が使った。書くときは空いている番号で）。
+6. **ANIMATOR の SPEC_20 が P0〜P4 まで入った**（2026-09-23）。線＋塗の2レーン・レーン見出し列・REF レーン・SEQ PNG 4択・SEL 変形。
+   発注者判断は「**一本化の新アプリ（SPEC_21）の前に、旧 animator をこのまま極める**」。
    コマを `line`/`fill` に分け（塗りは遅延確保）、タイムラインは1本のままセルを上下2レーンに割る。REF は時間軸上の帯。
    HANDOVER で見送っていた「線のコピペ＆選択変形」は econte の `箱+rot+warp` を移植して P4 で引き取る。
-   **新設 UI は新 OBAN の規約**（`OBAN_BUILDER_UI_HANDOVER.md`）で作る。着手順は P0（データ＋2枚 canvas）→ 見せる → P1（レーン UI）。
+   **UI は animator の現行デザインのまま**（2026-09-19 判断。新 OBAN のテーマ機構・`.qd-*` は持ち込まない）。着手順は P0（データ＋2枚 canvas）→ 見せる → P1（レーン UI）。
 
 ---
 
@@ -144,6 +145,10 @@
 
 > ★ **2026-09-13: 先に `SPEC_19_ECONTE_V5.md` P0（画の単位をプレートに）をやる。** PAN の途中コマに出る縁（切れ目）と
 > SINGLE で余白に描いた線が消える件の根が「画＝枠」にあり、ブラシを枠 API に乗せてからだと付け替えが二度手間になる。
+> ✅ **2026-09-23: SPEC_19 P0〜P2 実装済み。** ブラシは **プレート API** に乗せる（`strokePatchSeg(cut, j, kind, a, b)`・太さは `plK(cut, j, kind)`・
+> Undo 矩形は `txTouch(cut, j, …)`）。下の注意点1（区間が2枚に二重に描かれる）は **PAN では消えた**（紙が1枚）。
+> 画面で描くストロークは頭で行き先の紙を1枚に決める（`gStrokePl`）ので、T.U. でも二重描画は起きない。
+> 残るのは検証フックの「紙に引く」（`gStrokePl<0`）経路だけ。下の行番号（`econte.html:5563` など）は V4 のもの
 
 ### いまの実測 — animator との差
 
