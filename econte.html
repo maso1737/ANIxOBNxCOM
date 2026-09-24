@@ -5068,8 +5068,12 @@ function renderGrid(){
     bindTouchEyedrop(cv);                     // 指の長押し＝スポイト
     // 指のWタップ＝その紙を FOCUS で開く。
     // 複数選択のタップ中（別の指がセルに乗っている）は開かない（いま組み立てた選択が捨てられるため）
+    // ★ gGPtr.size をそのまま見ていたのが iPad で開かなかった原因（2026-09-24）。
+    //   セルの pointerup は #edit-grid の gridTouchUp より**先に**来るので、この時点では
+    //   いま離した指自身がまだ gGPtr に残っている＝size が必ず 1 以上で毎回 return していた。
+    //   「自分以外の指が乗っているか」で判定する
     bindDoubleTap(cv, e => {
-      if(e.pointerType !== 'touch' || gGridAdding || gGPtr.size) return;
+      if(e.pointerType !== 'touch' || gGridAdding || otherFingerDown(e.pointerId)) return;
       openEdit(ce.i, ce.j);
     });
     let pal = null;
@@ -5346,6 +5350,37 @@ function hasHeldFinger(){
   }
   return false;
 }
+function otherFingerDown(id){
+  for(const k of gGPtr.keys()) if(k !== id) return true;
+  return false;
+}
+/* --- 「タップ」だけを選択に使う（ドラッグ＝スクロール/塗りでは選択を動かさない。2026-09-24） ---
+   指1本のセル選択と、隙間タップ/クリックの選択解除はどちらも **離したときに・ほぼ動いていなければ** 決める。
+   押した瞬間に決めると、スクロールしようと触っただけで選択が変わってしまう */
+const TAP_SLOP_PX = 10, TAP_MAX_MS = 500;
+let gTapPick = null;       // { id, x, y, t, key?(セル) | gap:true }
+function isGridGap(t){
+  return t && (t.id === 'edit-grid' || t.id === 'grid-wrap' || t.id === 'grid-empty' || t.classList.contains('gc'));
+}
+function gridGapDown(e){
+  if(e.pointerType === 'mouse' && e.button !== 0) return;
+  if(!isGridGap(e.target)) return;
+  gTapPick = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), gap: true };
+}
+function gridTapUp(e){
+  const p = gTapPick;
+  if(!p || p.id !== e.pointerId) return;
+  gTapPick = null;
+  if(!inGrid()) return;                      // Wタップで FOCUS へ行った直後は触らない
+  if(Math.hypot(e.clientX - p.x, e.clientY - p.y) > TAP_SLOP_PX || performance.now() - p.t > TAP_MAX_MS) return;
+  if(p.gap){
+    if(e.ctrlKey || e.metaKey || e.shiftKey || gGridAdding || otherFingerDown(e.pointerId)) return;
+    if(gSelCells.length) setSelCells([]);
+    return;
+  }
+  setSelCells([p.key]);
+  syncEditPanels();
+}
 function gridTouchDown(e){
   if(e.pointerType !== 'touch') return;
   gGPtr.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t: performance.now() });
@@ -5394,13 +5429,22 @@ function gridPaintDown(e, cv){
       gGest = null;
       const all = colorCells().map(c => c.i + ':' + c.j);
       const set = new Set(gSelCells);
+      // 置いたままの指のセルは「離したら選択」の保留中なので、ここで先に選択へ入れる
+      // （以前の「押した瞬間に1枚選択」と同じ結果＝それまでの選択は置き換える）
+      if(gTapPick && gTapPick.key && gTapPick.id !== e.pointerId){
+        set.clear();
+        set.add(gTapPick.key);
+        gTapPick = null;
+      }
       set.add(i + ':' + j);
       setSelCells(all.filter(x => set.has(x)));
       toast(gSelCells.length + ' コマ選択中（濃・描画モード・REFはまとめて効きます）');
+      syncEditPanels();
     }else{
-      setSelCells([i + ':' + j]);
+      // 1本だけのタップ選択は **離したときに** 決める（gridTapUp）。ここで決めると
+      // スクロールのために触っただけで選択が変わる
+      gTapPick = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), key: i + ':' + j };
     }
-    syncEditPanels();
     return;
   }
   // **Ctrl / Shift を押している間は選択の操作**（画の上でも効く。2026-08-18）。
@@ -5411,17 +5455,13 @@ function gridPaintDown(e, cv){
     cellCaptionClick(e, i, j);
     return;
   }
-  const key = i + ':' + j;
   state.curCut = i;
   state.curPlate = j;                      // 画はプレートごとなのでどの紙かも覚える（SPEC_19）
-  // 選択は**押すたびに合わせ直す**。以前は「別のセルに移ったとき」しか触っていなかったので、
-  // いま居るセルをもう一度押しても選択が入らなかった（選択を外した直後に効いてくる）。
-  // すでに複数選んでいてその中を押したときは**選択を保つ**（一括操作の途中で消えると使えない）
-  // ★ ペンだけは例外＝**描くだけで選択は動かさない**（2026-09-03・発注者要望「選択は指のみ」）。
-  //   指でまとめて選んだ数枚に対して、ペンで1枚描き足した瞬間に選択が1枚へ畳まれていた。
-  //   マウス（デスクトップ）は指が無いので従来どおり選択も兼ねる。
-  //   ※ state.curCut / curPlate は「どこに描くか」なので、ペンでも必ず更新する（上の2行）
-  if(e.pointerType !== 'pen' && gSelCells.indexOf(key) < 0) setSelCells([key]);
+  // ★ 画の上を押す/なぞる＝**塗るだけ。選択は動かさない**（2026-09-24・発注者要望「ドラッグはペイント専用」）。
+  //   以前はマウスで押すと選択が1枚に畳まれ、またぎ塗りでは触れたコマが全部選択になっていた。
+  //   選択は: 見出しクリック ／ Ctrl・Shift+クリック（画の上でも可）／ 指タップ・指を置いたまま次々タップ。
+  //   解除は GRID の隙間クリック/タップ。
+  //   ※ state.curCut / curPlate は「どこに描くか」なので必ず更新する（上の2行）
   syncEditPanels();
   const cut = cuts[i];
   if(paintKind() === 'line' && !isResident(cut)){
@@ -5541,15 +5581,7 @@ function gridStrokeUp(e){
   const touched = [...g.touched.values()];
   touched.forEach(t => { drawCell(t.cell); refreshRow(t.i); });
   gGridRows.forEach(drawRowPalette);
-  // **またいだコマを全部「選択中」にする**（2026-08-14）。
-  // 濃・描画モードは全体設定になった（SPEC_15 P3-1）が、REF濃度と並べ替えは今も選択単位
-  const hit = new Set(touched.map(t => t.i + ':' + t.j));
-  const sel = colorCells().map(c => c.i + ':' + c.j).filter(k => hit.has(k));
-  if(sel.length > 1){
-    setSelCells(sel);
-    syncEditPanels();
-    toast(sel.length + ' コマを選択中（REF・並べ替えはまとめて効きます）');
-  }
+  // （以前はここで「またいだコマを全部選択」にしていた。ドラッグ＝塗り専用に揃えたので廃止・2026-09-24）
   scheduleSave();
 }
 /* EDIT の中の2つの見方: GRID（一覧）／ FOCUS（1枚の紙を画面いっぱい）。SPEC_19 §1-3。
@@ -10572,6 +10604,9 @@ function wire(){
   $('#chk-grid-col').addEventListener('change', renderGrid);
   // 指: 1本=スクロール / 2本=ピンチ拡縮（セルは touch-action:none なので自前で処理する）
   $('#edit-grid').addEventListener('pointerdown', gridTouchDown);
+  // タップ判定（指のセル選択・隙間での選択解除）。gridTouchUp が gGPtr を消す**前**に見る
+  $('#edit-grid').addEventListener('pointerdown', gridGapDown);
+  $('#edit-grid').addEventListener('pointerup', gridTapUp);
   $('#edit-grid').addEventListener('pointermove', gridTouchMove);
   $('#edit-grid').addEventListener('pointerup', gridTouchUp);
   $('#edit-grid').addEventListener('pointercancel', gridTouchUp);
