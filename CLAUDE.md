@@ -27,9 +27,16 @@
   寄り＋振りで見る → 連番PNG＋`*.depth.png`。**視差px（フルHD換算）を実測して Z幅 を逆算する**のが本体。
   **このリポジトリで唯一の `type="module"`（three.js r170 / importmap）。** 既存の非module群とはスコープが混ざらない。
   設計の根拠と決定事項は `DEPTH_PLATE_HANDOVER.md`。検証フック `window.__LAB__`（`api.step()` で1フレーム進める）
+- **`live-plate/` — LIVE PLATE（SPEC_21）。一本化アプリ＝1つの BOOK に4つの見方（01 SHEET / 02 DRAW / 03 TAKE / 04 SHOW）。**
+  **このリポジトリで唯一の複数ファイル構成**（`index.html`＋`css/`＋`js/` の古典 script src 18本・ビルド無し・file:// で動く・グローバルは `LP` 1つ）。
+  **P0 骨格＋ P1 SHEET＋ BOOK zip 実装済み（2026-09-24）**：α PNG／連番の取り込み（紙・タイムライン・棚・Ctrl+V）・紙の尺と並べ替え・層の移動/拡縮・
+  コマ割り（DIV／EDIT・断ち切り・分割を戻す）・仕上げ素材（網・集中線・流線・文字・ホワイト）・層のコマ所属と Z・BOOK zip（保存／開く）・旧 MANGA_BOOK_v2 の読み込み・
+  描画は `renderFrame(ctx, book, t, view)` 1本（ステージ・サムネ・PLAY・HTML ビューア・VRT 共通）・HTML 書き出し（画像埋め込み）・IndexedDB `live_plate_db_v1`。
+  テーマは SPOTLIGHT のみ。ファイルごとの役割は [live-plate/CLAUDE.md](live-plate/CLAUDE.md)、決めたこと・チェック表は SPEC_21 §15。
+  ローカルサーバは `Projects/.claude/launch.json` の `live-plate`（port 8148）
 - `index.html` — ランディングページ。**2段構成**（2026-09-04）。
-  上＝**本編アプリ5枚**（01 ANIMATOR / 02 OBAN / 03 COMPOSER / 04 ECONTE / 05 MANGA PLATE。rouge系・大）／
-  下＝`LAB & UTILITIES` の**サブ5枚**（06 WARP LAB / 07 LINK MAP / 08 BRUSH LAB / 09 iPad PROBE / 10 REF BOARD。ice系・小 `.card.mini`）。
+  上＝**本編アプリ6枚**（01 ANIMATOR / 02 OBAN / 03 COMPOSER / 04 ECONTE / 05 MANGA PLATE / **06 LIVE PLATE**（2026-09-24・SPEC_21 §13-7）。rouge系・大）／
+  下＝`LAB & UTILITIES` の**サブ5枚**（07 WARP LAB / 08 LINK MAP / 09 BRUSH LAB / 10 iPad PROBE / 11 REF BOARD。ice系・小 `.card.mini`）。
   **道具が増えたら基本はサブ側に足す**（本編＝パイプラインの本線だけ）。
   `body` は `overflow:hidden` をやめ、`justify-content:flex-start` ＋ `.lockup{margin-top:auto}` / `footer{margin-bottom:auto}` の
   auto マージンで「入るときは中央・入らないときは上から普通にスクロール」にしてある。
@@ -45,9 +52,12 @@
 - `tools/check.js` — 依存ゼロのスモークチェック（構文/配線/ID重複/デッドコード）。**対象は `FILES` 配列。HTMLを足したらここにも足す**（brush-lab.html / depth-brush-lab.html 追加済み）。
   **`type="module"` も JS として検査する**（2026-09-04）。以前は type属性のある `<script>` を全部データブロック扱いで飛ばしていたため、
   module のラボは「構文 OK」だけ出して配線・id重複・未参照関数を1つも見ないまま通っていた（偽のグリーン）。
-  構文チェックの直前だけ `import`/`export` を落として `new Function` に渡している
+  構文チェックの直前だけ `import`/`export` を落として `new Function` に渡している。
+  **複数ファイル構成（`live-plate/index.html`）は「HTML＋その script src 列」を1単位で検査する**（2026-09-24）：
+  src を1本ずつ構文チェック → 全部つないで構文（別ファイル同士の top-level const 衝突）→ 配線・重複・未参照関数はファイル横断。
+  ★ HTML のコメントに山かっこ付きの script を書くとタグとして拾われて構文エラーになる
 - `verify/` — VERIFY HARNESS（決定論VRT＋パフォーマンス予算。SPEC_08）。
-  **ANIMATOR / COMPOSER / OBAN BUILDER / ECONTE 実装済み**（manga-plate は未＝SPEC_09 v2 が出力を変えている最中なので保留）。
+  **ANIMATOR / COMPOSER / OBAN BUILDER / ECONTE / LIVE PLATE 実装済み**（manga-plate は未＝SPEC_09 v2 が出力を変えている最中なので保留）。
   詳細は [verify/CLAUDE.md](verify/CLAUDE.md)
 
 ドキュメント（ハンドオーバー／仕様）:
@@ -90,7 +100,7 @@
 | `SPEC_18_IPAD_GRAMMAR` | iPad 操作文法（実機測定値） | P0・P1(composer) 済／**P2 スキル化・P3 横展開 未** |
 | `SPEC_19_ECONTE_V5` | 画の単位を枠→**プレート**（同倍率の枠群）・GRID 統一解像度配置・SINGLE→FOCUS 統合 | **P0〜P2 実装済**（2026-09-23）。下書きから変えた点は §6（紙の差し替えは時刻で・段詰め・C.SCRIPT に設計図）。P3 ブラシ暫定5種も実装済（2026-09-24・§7。PEN / MARKER / FLAT / AIR / GLOW、画像は端末のブラウザにだけ保存）。iPad 実機 OK |
 | `SPEC_20_ANIMATOR_LINE_FILL` | ANIMATOR：コマを**線＋塗の2レーン**（1本のタイムライン）・塗りは線を壁にして1px潜る・**REF レーン**（帯・`offset`/`×N`）・SEQ PNG 4択・econte の変形（`箱+rot+warp`）移植・UI は**現行デザインのまま** | **P0〜P4 実装済**（2026-09-23）。レーン見出し列・REF レーン（offset/×N）・SEQ PNG 4択・EXPORT JSON `layers`・SEL（A キー・AA OFF はニアレスト焼き込み）。残りは §7-9 の任意項目と実機確認だけ |
-| `SPEC_21_LIVE_PLATE` | **一本化アプリ LIVE PLATE（仮）の設計・仕様**。5本を足すのではなく「1つの BOOK に4つの見方（SHEET/DRAW/TAKE/SHOW）」。プレート（SPEC_19）・線＋塗（SPEC_20）・composer の透視式・OBAN の手つき・新 OBAN 規約を土台に、連携（10ルート・3チャンネル）を構造ごと消す。複数ファイル・ビルド無し | **起草のみ**（2026-09-18）。§13-1 は 2026-09-23 に答えが出た＝**旧 animator を先に極める**（SPEC_20 は旧アプリで実装済み）。残り6件は未判断 |
+| `SPEC_21_LIVE_PLATE` | **一本化アプリ LIVE PLATE の設計・仕様**。5本を足すのではなく「1つの BOOK に4つの見方（SHEET/DRAW/TAKE/SHOW）」。プレート（SPEC_19）・線＋塗（SPEC_20）・composer の透視式・OBAN の手つき・新 OBAN 規約を土台に、連携（10ルート・3チャンネル）を構造ごと消す。複数ファイル・ビルド無し | **P0 骨格・P1 SHEET・BOOK zip 実装済**（2026-09-24・`live-plate/`。§15＝P0・§16＝P1 に決めたことと動作チェック表。次は P2 DRAW か P3 TAKE）。起草 2026-09-18。§13 の発注者判断は2026-09-24に**全7件確定**（旧5本は凍結せず並行して極め続ける／名前LIVE PLATE／用紙SCREEN 3840×2160／テーマSPOTLIGHTのみ・他テーマ当面無し／複数ファイル・ビルド無し／P0はPC専念・iPadは旧アプリの知見が固まってから統一／置き場所`live-plate/`。詳細はSPEC_21 §13） |
 | `MOTION_COMIC_SPEC` | composer モーションコミック | Phase 1〜3 済／**Phase 4〜5 要判定** |
 | `EXPORT_WEB_SPEC` | スクロールビューアHTML書き出し | 実装済 |
 | `申し送り_MANGA_PLATE_to_OBAN_TEXT.md` | 読み文字の往復 | P0〜P2 済。残っている選択肢だけ書いてある |
@@ -161,7 +171,7 @@ REF BOARD には `<meta name="robots" content="noindex,nofollow">` も入れて�
 ```
 node tools/check.js
 ```
-12ファイル（animator / oban-builder / composer / index / manga-plate / econte / link-map / brush-lab / depth-brush-lab / ref-board / inbetween_warp_lab / ipad-probe）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※JS扱いは type無し・`type="module"`・`text|application/javascript` のみ（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。**depth-brush-lab だけはローカルサーバで開く**
+13本（animator / oban-builder / composer / index / manga-plate / econte / link-map / brush-lab / depth-brush-lab / ref-board / inbetween_warp_lab / ipad-probe / **live-plate/index.html＋src 24本**）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※JS扱いは type無し・`type="module"`・`text|application/javascript` のみ（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。**depth-brush-lab だけはローカルサーバで開く**
 （`Projects/.claude/launch.json` の `depth-brush-lab` / port 8146 → `http://localhost:8146/depth-brush-lab.html`。
 module ＋ CDN import なので `file://` での可否は未確認。書き出しの `showDirectoryPicker` も http:// のほうが確実）。
 
@@ -171,6 +181,7 @@ cd verify && npm run verify:animator
 cd verify && npm run verify:composer
 cd verify && npm run verify:oban
 cd verify && npm run verify:econte
+cd verify && npm run verify:liveplate
 ```
 コマ送り6〜9点を作業解像度そのままで撮って前回の承認済み画像と比較する（PASS=0%）。
 意図した変更で差分が出たら `UPDATE_BASELINE=1 node harness/runner.mjs verify.<tool>.config.json` で承認。

@@ -24,3 +24,5 @@ composer-*.json
 manga-plate-*.json
 *_export.json
 *.refclip.json
+# LIVE PLATE の BOOK zip（作品データ。公開リポジトリに置かない）
+liveplate-*.zip

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<!-- iPad: ホーム画面に追加すると Safari のバーごと消えた「アプリ」として起動する（SPEC_18。manifest は張らない） -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LIVE PLATE">
+<title>LIVE PLATE — one book, four views</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500&family=Shippori+Antique&family=Shippori+Antique+B1&display=swap">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<!-- LIVE PLATE（SPEC_21）— 1つの BOOK に 4つの見方（01 SHEET / 02 DRAW / 03 TAKE / 04 SHOW）。
+     ★ DOM と script タグ（src）の列だけ。ロジックは js/ 以下（古典スクリプト・グローバルは LP 1つ）。
+     ★ このコメントに山かっこ付きの script を書かないこと（tools/check.js がタグとして拾う）。
+     ★ file:// 直開きで動く。フォルダごと動かす限り壊れない（相対パスだけ）。 -->
+<body class="step-sheet" data-theme="SPOTLIGHT">
+<div id="app">
+
+  <header id="bar">
+    <div class="brand">
+      <svg viewBox="0 0 120 120" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g transform="rotate(-9 60 60)"><rect x="18" y="26" width="84" height="68" rx="3" stroke="var(--acc)" stroke-width="11"></rect><path d="M 40 26 V 94" stroke="var(--acc)" stroke-width="9"></path><circle cx="72" cy="60" r="11" fill="var(--acc2)"></circle></g></svg>
+      <div class="bwrap"><span class="bname">LIVE PLATE</span><span class="bsub">ONE BOOK · FOUR VIEWS</span></div>
+    </div>
+    <div class="steps">
+      <button class="step on" data-step="sheet" title="01 SHEET：紙に素材を置く・動かす（1）"><span class="n">01</span><span class="en">SHEET</span><span class="jp">割る・置く</span><span class="nb">NOW</span></button>
+      <span class="sep">›</span>
+      <button class="step" data-step="draw" title="02 DRAW：選んだ層のプレートを原寸で（2）"><span class="n">02</span><span class="en">DRAW</span><span class="jp">描く</span><span class="nb">NOW</span></button>
+      <span class="sep">›</span>
+      <button class="step" data-step="take" title="03 TAKE：カメラの窓（3）"><span class="n">03</span><span class="en">TAKE</span><span class="jp">撮る</span><span class="nb">NOW</span></button>
+      <span class="sep">›</span>
+      <button class="step" data-step="show" title="04 SHOW：全画面再生・書き出し（4）"><span class="n">04</span><span class="en">SHOW</span><span class="jp">見せる</span><span class="nb">NOW</span></button>
+    </div>
+    <span id="crumb"></span>
+    <span class="flex"></span>
+    <span id="bar-right">
+      <span id="save-st" class="pn-note" title="保存の状態">—</span>
+      <button class="btn" id="b-detail" title="詳細（選んだ層／いまの紙の数値）を開閉（U）">詳細 ···</button>
+      <button class="btn ico" id="b-set" title="設定：BOOK・キー操作の一覧と再割当">⚙</button>
+      <button class="btn ico" id="b-fs" title="全画面表示 ON/OFF">⛶</button>
+      <a class="btn" id="b-home" href="../index.html" title="ランディングページに戻る">HOME</a>
+    </span>
+  </header>
+
+  <aside id="side-l" class="pane">
+    <div class="pn-head"><span class="en">SHELF</span><span class="jp">素材棚</span><span class="cnt" id="shelf-cnt"></span><span class="sp"></span>
+      <button class="btn ico" id="shelf-add" title="画像を選んで棚にしまう（複数・連番OK）">＋</button>
+      <button class="btn ico" id="side-l-toggle" title="棚を畳む">≡</button></div>
+    <div class="pn-body">
+      <div id="shelf-list"></div>
+      <div class="pn-note" id="shelf-empty">取り込んだ画像・連番がここに並びます。<br>
+        タイルを<b>紙へドラッグ</b>＝層にする<br>
+        <b>タイムラインへ</b>＝新しい紙にする<br>
+        連番は「名前＋番号（3〜5桁）」が同じ4枚以上で1本になります。</div>
+    </div>
+    <div class="pn-strip" title="素材棚を開く"><span>SHELF</span></div>
+  </aside>
+
+  <main id="stage">
+    <canvas id="cv"></canvas>
+    <div id="stage-msg"></div>
+    <div id="stage-hud"></div>
+  </main>
+
+  <aside id="side-r" class="pane">
+    <div class="pn-head"><span class="en">SHEETS</span><span class="jp">紙</span><span class="cnt" id="sheet-cnt"></span><span class="sp"></span>
+      <button class="btn ico" id="sheet-add" title="空の紙を最後に足す">＋</button>
+      <button class="btn ico" id="side-r-toggle" title="一覧を畳む">≡</button></div>
+    <div class="pn-body"><div id="sheet-list"></div></div>
+    <div class="pn-sub"><span class="en">◆ ITEMS</span><span class="jp">層（上＝手前）</span><span class="sp" style="flex:1"></span><span class="pn-note" id="item-sheet"></span></div>
+    <div class="pn-body items"><div id="item-list"></div></div>
+    <div class="pn-strip" title="SHEETS を開く"><span>SHEETS</span></div>
+  </aside>
+
+  <section id="timeline">
+    <div id="tl-head">
+      <button class="btn ico" id="tl-play" title="再生／停止（Space）">▶</button>
+      <span id="tl-time"></span>
+      <span class="sp"></span>
+      <span class="inf">Ctrl+ホイール＝拡縮 ／ 右端ドラッグ＝尺 ／ ファイルを落とす＝新しい紙</span>
+      <button class="btn ico" id="tl-zout" title="時間を縮める">－</button>
+      <button class="btn" id="tl-fit" title="全体が入る幅に">FIT</button>
+      <button class="btn ico" id="tl-zin" title="時間を伸ばす">＋</button>
+    </div>
+    <div id="tl-main">
+      <div id="tl-labels"><div class="lr">TIME</div><div class="ls">SHEET</div><div class="lc" title="選んだ層のセル（P2 で 線／塗 の2レーンに分かれる）">線</div></div>
+      <div id="tl-scroll">
+        <div id="tl-inner">
+          <div id="tl-ruler"></div>
+          <div id="tl-sheets"></div>
+          <div id="tl-add" title="空の紙を最後に足す">＋</div>
+          <div id="tl-cells"></div>
+          <div id="tl-drop"></div>
+          <div id="tl-ph"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="dock"></footer>
+</div>
+
+<input type="file" id="file-in" accept="image/png,image/webp,image/jpeg,.png,.webp,.jpg,.jpeg" multiple hidden>
+<input type="file" id="book-in" accept=".zip,application/zip,.json,application/json" hidden>
+
+<!-- 詳細（選んだ層／いまの紙） -->
+<div id="qe" class="fpanel">
+  <div id="qe-head" class="fp-head"><span class="ttl">詳細</span><span class="ttl2">DETAIL</span><span class="sp"></span><span id="qe-tag" class="tag"></span>
+    <button class="hb" id="qe-mini" title="最小化／展開">▾</button><button class="hb x" id="qe-close" title="閉じる（U で開き直せます）">✕</button></div>
+  <div id="qe-body" class="fp-body"></div>
+  <div id="qe-resize" class="fp-resize" title="ドラッグで高さ調整"></div>
+</div>
+
+<!-- 設定 -->
+<div id="set-ovl">
+  <div id="set-box">
+    <div class="fp-head"><span class="ttl">SETTINGS</span><span class="ttl2">BOOK とキー操作</span><span class="sp"></span>
+      <button class="hb x" id="set-close" title="閉じる（Esc）">✕</button></div>
+    <div id="set-acts"><span class="h">BOOK</span>
+      <input class="qd-txt" id="book-name" maxlength="40" style="max-width:220px" title="BOOK の名前（保存するファイル名・書き出す HTML の名前になる）">
+      <button class="btn" id="b-booksave" title="作品を丸ごと zip に保存（紙・層・素材・コマ割り。別の端末やバックアップに）">⇩ BOOK 保存</button>
+      <button class="btn" id="b-bookopen" title="保存した BOOK zip を開く（いまの BOOK と置き換え）／旧 MANGA_BOOK_v2 の JSON は紙として足す">⇧ BOOK 開く</button>
+      <span class="sp"></span>
+      <button class="btn" id="b-newbook" title="BOOK を空にする（元に戻せません）">NEW BOOK</button>
+      <span class="pn-note" style="flex-basis:100%">作品はこの端末のブラウザ（IndexedDB）に自動保存されます。持ち出し・バックアップは <b>⇩ BOOK 保存</b>（zip）。見せるのは 04 SHOW の HTML。</span>
+    </div>
+    <div id="set-body"></div>
+    <div id="set-note">キーは行のボタンを押してから新しいキーを打つと替わります（同じキーを使っていた操作は空になります）。
+      まだ無い道具（PEN / CAPTURE …）のキーはそのフェーズで足します。仕様は <b>SPEC_21_LIVE_PLATE.md</b>。</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="clean-hint">SPACE 再生/停止 ・ ←→ コマ ・ J/K 紙 ・ ESC 戻る</div>
+
+<div id="cf-modal">
+  <div id="cf-box">
+    <div id="cf-msg"></div>
+    <div id="cf-btns"><button class="btn" id="cf-cancel">CANCEL</button><button class="btn" id="cf-ok">OK</button></div>
+  </div>
+</div>
+
+<!-- 順番に意味がある：core（time → geom → items → render＝ビューアに同梱する純関数）→ ui → mode → input → io → viewer → app（起動）→ harness -->
+<script src="js/core/model.js"></script>
+<script src="js/core/time.js"></script>
+<script src="js/core/geom.js"></script>
+<script src="js/core/items.js"></script>
+<script src="js/core/render.js"></script>
+<script src="js/core/panels.js"></script>
+<script src="js/core/history.js"></script>
+<script src="js/core/store.js"></script>
+<script src="js/ui/widgets.js"></script>
+<script src="js/ui/stage.js"></script>
+<script src="js/ui/timeline.js"></script>
+<script src="js/ui/sides.js"></script>
+<script src="js/ui/detail.js"></script>
+<script src="js/ui/dock.js"></script>
+<script src="js/ui/settings.js"></script>
+<script src="js/mode/sheet.js"></script>
+<script src="js/input/keymap.js"></script>
+<script src="js/io/import.js"></script>
+<script src="js/io/book-zip.js"></script>
+<script src="js/io/import-legacy.js"></script>
+<script src="js/io/export-html.js"></script>
+<script src="viewer/template.js"></script>
+<script src="js/app.js"></script>
+<script src="js/harness.js"></script>
+</body>
+</html>

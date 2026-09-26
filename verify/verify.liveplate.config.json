@@ -1,0 +1,28 @@
+{
+  "tool": "liveplate",
+  "root": "..",
+  "html": "live-plate/index.html?harness=1",
+
+  "seeks": [
+    { "label": "l01_c1_bg_sprite",   "timeMs": 0 },
+    { "label": "l02_c1_mid",         "timeMs": 500 },
+    { "label": "l03_c2_seq_f0",      "timeMs": 1000 },
+    { "label": "l04_c2_seq_step2",   "timeMs": 1375 },
+    { "label": "l05_c2_seq_loop",    "timeMs": 2334 },
+    { "label": "l06_c3_mul_rot",     "timeMs": 2584 },
+    { "label": "l07_c4_panels",      "timeMs": 3585 },
+    { "label": "l08_c4_panels_mid",  "timeMs": 4002 }
+  ],
+
+  "vrt": { "colorThreshold": 0.1, "allowedPixelRatio": 0.0002 },
+
+  "perfPass": { "enabled": true, "sampleMs": 2000, "samples": 8 },
+
+  "budget": {
+    "maxTTFFms": 800,
+    "maxLongestFrameMs": 400,
+    "maxVramBytes": 117440512
+  },
+
+  "timeoutMs": 30000
+}

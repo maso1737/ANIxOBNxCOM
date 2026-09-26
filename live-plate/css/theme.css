@@ -1,0 +1,183 @@
+/* ============================================================
+   LIVE PLATE — theme.css（器と色）
+   正準は oban-builder.html §1〜§2（OBAN_BUILDER_UI_HANDOVER.md）。
+   ★ テーマは SPOTLIGHT のみ（SPEC_21 §13-4・2026-09-24 確定）。
+     切替機構は入れない。要るとなったら :root の --acc* を
+     body[data-theme="…"] で上書きするブロックを足すだけで全 UI に効く。
+   ★ 色は必ず変数経由。hex を直接足さない（canvas は js/ui/theme.js の CVC 橋で読む）。
+   ============================================================ */
+:root{
+  /* SPEC_18 P0 — iPad standalone の安全域（PC では 0px） */
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+
+  /* 面と線（テーマ不変の器） */
+  --bg:#08090C;--ink:#E8ECF2;
+  --panel:rgba(10,12,16,.95);--panel2:#0D0F14;--cell:rgba(232,236,242,.03);
+  --grey:rgba(232,236,242,.55);--dim:rgba(232,236,242,.3);
+  --line:rgba(232,236,242,.14);--line-2:rgba(232,236,242,.08);
+  --danger:#FF5A5A;--dangerRGB:255,90,90;
+  /* canvas HUD の「注目マーカー」（OBAN §7-1。テーマから独立した役割色） */
+  --mark:#FFC94F;
+  /* 書体 */
+  --saira:'Saira Condensed','Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
+  --mono:'JetBrains Mono','IBM Plex Mono','Menlo','Consolas',monospace;
+  --jp:'Noto Sans JP',-apple-system,'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;
+
+  /* THEME: SPOTLIGHT（ICE→紫→ROUGE の斜め掃引） */
+  --acc:#C46BFF;--accRGB:196,107,255;--acc2:#9BF3FF;--acc2RGB:155,243,255;
+  --acc-fill:linear-gradient(118deg,#5AE9FF,#8F7BFF 40%,#FF4FA8 72%,#B850FF 100%);--acc-ink:#FFFFFF;
+  --acc-border:linear-gradient(118deg,#5AE9FF,#8F7BFF 40%,#FF4FA8 72%,#B850FF 100%);
+  --acc-pt:#5AE9FF;--acc-ptRGB:90,233,255;
+  --acc-inset:inset 0 1px 0 rgba(255,255,255,.35);
+  --acc-glow:0 0 18px rgba(196,107,255,.45);
+  --acc-hover-fill:linear-gradient(180deg,rgba(90,233,255,.22),rgba(184,80,255,.12));
+  --acc-hover-line:#9BF3FF;
+}
+@keyframes nowGlow{
+  0%,100%{box-shadow:0 0 0 1px rgba(var(--accRGB),.55),0 0 18px rgba(var(--accRGB),.18)}
+  50%{box-shadow:0 0 0 1px rgba(var(--accRGB),.9),0 0 26px rgba(var(--accRGB),.34)}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:rgba(232,236,242,.04)}
+*::-webkit-scrollbar-thumb{background:rgba(var(--accRGB),.45);border:3px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:rgba(var(--accRGB),.85);border:3px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-corner{background:transparent}
+@supports not selector(::-webkit-scrollbar){*{scrollbar-width:thin;scrollbar-color:rgba(var(--accRGB),.5) rgba(232,236,242,.04)}}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;touch-action:manipulation;overscroll-behavior:none}
+body{
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 46%,transparent 40%,rgba(4,5,7,.72) 100%),
+    linear-gradient(180deg,#0A0C11,#07080B 62%,#0A0B0F);
+  color:var(--ink);font-family:var(--mono);font-size:11px;
+  -webkit-font-smoothing:antialiased;-webkit-user-select:none;user-select:none;
+}
+button{font:inherit;color:inherit}
+input,select{font:inherit}
+
+/* ---------- 汎用ボタン ---------- */
+.btn{
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;flex:none;
+  border:1px solid var(--line);background:var(--cell);color:rgba(232,236,242,.7);
+  font-family:var(--saira);font-weight:600;font-size:11px;letter-spacing:.16em;transition:all .12s;
+}
+.btn:hover{background:var(--acc-hover-fill);border-color:var(--acc-hover-line);color:var(--ink);box-shadow:var(--acc-glow)}
+.btn:active{filter:brightness(1.18);box-shadow:var(--acc-glow),var(--acc-inset)}
+.btn.on{background:var(--acc-fill);border-color:transparent;color:var(--acc-ink);box-shadow:var(--acc-inset),var(--acc-glow)}
+.btn.ico{width:34px;padding:0;justify-content:center;font-family:var(--mono);font-size:13px;letter-spacing:0}
+.btn:disabled,.btn.off{opacity:.32;pointer-events:none}
+
+/* ---------- 手順チップ 01 SHEET › 02 DRAW › 03 TAKE › 04 SHOW ---------- */
+.step{
+  cursor:pointer;position:relative;display:flex;align-items:center;gap:9px;height:36px;padding:0 15px;flex:none;
+  border:1px solid var(--line);background:var(--cell);transition:all .12s;
+}
+.step .n{font-size:10px;color:rgba(232,236,242,.32)}
+.step .en{font-family:var(--saira);font-weight:600;font-size:14px;letter-spacing:.24em;color:rgba(232,236,242,.6)}
+.step .jp{font-family:var(--jp);font-size:9px;letter-spacing:.1em;color:rgba(232,236,242,.3)}
+.step .nb{display:none;font-size:8px;letter-spacing:.22em;color:#08090C;background:var(--acc-pt);padding:2px 5px}
+.step:hover{background:var(--acc-hover-fill);border-color:var(--acc-hover-line);box-shadow:var(--acc-glow)}
+.step:hover .en{color:var(--ink)}
+.step.on{
+  border:1px solid rgba(var(--accRGB),.85);border-image:var(--acc-border) 1;
+  background:rgba(var(--accRGB),.14);animation:nowGlow 3.2s ease-in-out infinite;
+}
+.step.on .en{color:var(--acc2);font-weight:700}
+.step.on .n{color:rgba(var(--acc2RGB),.7)}
+.step.on .jp{color:rgba(var(--acc2RGB),.72)}
+.step.on .nb{display:block}
+
+/* ---------- フローティングパネル（44px ヘッダ・▾・✕。OBAN §2 の骨格） ---------- */
+.fpanel{
+  position:fixed;z-index:46;display:none;flex-direction:column;max-width:94vw;
+  border:1px solid rgba(232,236,242,.18);background:rgba(9,10,14,.93);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 30px 70px rgba(0,0,0,.6);
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;overflow:hidden;
+}
+.fpanel.show{display:flex}
+.fp-head{
+  display:flex;align-items:center;gap:9px;height:44px;flex:none;padding:0 13px;cursor:move;user-select:none;
+  border-bottom:1px solid rgba(232,236,242,.12);background:rgba(var(--accRGB),.05);
+}
+.fp-head .ttl{flex:none;font-family:var(--saira);font-weight:700;font-size:14px;letter-spacing:.24em;color:var(--acc)}
+.fp-head .ttl2{flex:none;font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.34)}
+.fp-head .sp{flex:1;min-width:0}
+.fp-head .tag{flex:none;max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:9px;letter-spacing:.16em;color:var(--acc-ink);background:var(--acc);padding:3px 6px}
+.fp-head .tag:empty{display:none}
+.hb{
+  cursor:pointer;flex:none;width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid transparent;background:none;color:rgba(255,255,255,.6);font-family:var(--mono);font-size:11px;
+}
+.hb:hover{background:rgba(232,236,242,.08);border-color:rgba(232,236,242,.22);color:#fff}
+.hb.x{margin-left:4px}
+@media (max-width:900px),(pointer:coarse){.hb{width:34px;height:34px}.hb.x{margin-left:6px}}
+.fp-body{flex:0 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;max-height:62vh;padding:0 0 6px}
+.fp-resize{height:11px;flex:none;cursor:ns-resize;display:flex;align-items:center;justify-content:center;
+  border-top:1px solid var(--line);background:rgba(255,255,255,.02)}
+.fp-resize::after{content:'';width:28px;height:2px;background:rgba(255,255,255,.25)}
+.fpanel.mini .fp-body,.fpanel.mini .fp-resize{display:none}
+
+/* ---------- 中身の語彙 .qd-*（OBAN と同じ名前・同じ見た目） ---------- */
+.qd-sect{display:flex;align-items:baseline;gap:9px;padding:14px 13px 6px;border-top:1px solid rgba(232,236,242,.06)}
+.qd-sect:first-child{border-top:0;padding-top:12px}
+.qd-sect .en{font-family:var(--saira);font-weight:600;font-size:12px;letter-spacing:.26em;color:var(--acc)}
+.qd-sect .jp{font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.4)}
+.qd-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding:7px 13px;min-height:34px;border-top:1px solid rgba(232,236,242,.05)}
+.qd-sect+.qd-row{border-top:0}
+.qd-row>.k{width:52px;flex:none;font-family:var(--jp);font-size:11px;letter-spacing:.08em;color:rgba(232,236,242,.6)}
+.qd-seg{display:flex;gap:2px;flex-wrap:wrap;min-width:0}
+.qd-sb{height:30px;padding:0 10px;flex:none;display:flex;align-items:center;justify-content:center;gap:6px;
+  border:1px solid rgba(232,236,242,.18);background:transparent;cursor:pointer;transition:all .12s;
+  font-family:var(--saira);font-weight:600;font-size:12px;letter-spacing:.14em;color:rgba(232,236,242,.62)}
+.qd-sb:hover{background:var(--acc-hover-fill);border-color:var(--acc-hover-line);color:var(--ink);box-shadow:var(--acc-glow)}
+.qd-sb.on{background:var(--acc);border-color:transparent;color:var(--acc-ink);font-weight:700}
+.qd-sb.jp{font-family:var(--jp);font-weight:400;font-size:11px;letter-spacing:.06em}
+.qd-sb.del{border-color:rgba(var(--dangerRGB),.4);color:rgba(255,138,138,.9)}
+.qd-sb.del:hover{background:rgba(var(--dangerRGB),.14);border-color:rgba(var(--dangerRGB),.75);color:#fff;box-shadow:0 0 10px rgba(var(--dangerRGB),.3)}
+/* 数値は左右ドラッグ（Wクリックで直接入力）。素の input[type=number] は置かない（SPEC_18） */
+.qd-num{display:inline-flex;align-items:baseline;gap:4px;flex:none;cursor:ew-resize;touch-action:none}
+.qd-num .k{font-size:8px;letter-spacing:.2em;color:rgba(232,236,242,.34)}
+.qd-num .v{font-family:var(--saira);font-weight:600;font-size:16px;color:var(--ink);line-height:1;min-width:1.2em;
+  border-bottom:1px dashed rgba(232,236,242,.36);font-variant-numeric:tabular-nums}
+.qd-num .u{font-size:8px;letter-spacing:.1em;color:rgba(232,236,242,.3)}
+.qd-num:hover .v{border-bottom-color:var(--acc)}
+.qd-num input{width:5.5em;height:22px;padding:0 4px;border:1px solid var(--acc);background:rgba(var(--accRGB),.12);
+  color:var(--ink);font-family:var(--saira);font-weight:600;font-size:15px}
+.qd-num input:focus{outline:none}
+.qd-txt{flex:1;min-width:0;height:30px;padding:0 9px;border:1px solid rgba(232,236,242,.18);background:rgba(232,236,242,.04);
+  color:var(--ink);font-family:var(--jp);font-size:12px;letter-spacing:.04em}
+.qd-txt:focus{outline:none;border-color:var(--acc);box-shadow:var(--acc-glow)}
+.qd-note{font-family:var(--jp);font-size:9px;letter-spacing:.08em;color:rgba(232,236,242,.38);line-height:1.6}
+.qd-note b{color:var(--acc2);font-weight:400}
+
+/* ---------- toast ---------- */
+#toast{
+  position:fixed;left:50%;top:calc(80px + var(--safe-t));transform:translateX(-50%);z-index:110;display:none;
+  border:1px solid rgba(var(--accRGB),.55);background:rgba(10,12,16,.97);color:var(--ink);
+  box-shadow:var(--acc-glow);max-width:80vw;
+  padding:9px 16px 9px 18px;font-size:10px;letter-spacing:.12em;font-family:var(--mono);
+}
+#toast::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--acc-pt)}
+#toast.show{display:block}
+
+/* ---------- confirm（native confirm の置き換え。Enter=OK・capture でキーを飲む・z 120） ---------- */
+#cf-modal{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.7)}
+#cf-modal.show{display:flex}
+#cf-box{border:1px solid rgba(var(--accRGB),.7);background:rgba(10,12,16,.98);box-shadow:var(--acc-glow);
+  min-width:280px;max-width:440px;padding:20px}
+#cf-msg{font-family:var(--jp);font-size:12px;color:var(--ink);line-height:1.8;white-space:pre-line;margin-bottom:18px}
+#cf-btns{display:flex;gap:8px;justify-content:flex-end}
+#cf-ok{border-color:var(--acc);color:var(--acc2)}
+.qd-row.top{align-items:flex-start}
+.qd-row.top>.k{padding-top:7px}
+.qd-ta{height:auto;min-height:64px;padding:6px 9px;resize:vertical;font-family:'Shippori Antique',var(--jp);font-size:14px;line-height:1.5}
+.qd-pal{display:flex;gap:3px;flex-wrap:wrap}
+.qd-sw{width:22px;height:22px;cursor:pointer;border:1px solid rgba(232,236,242,.28);padding:0}
+.qd-sw.on{outline:2px solid var(--acc);outline-offset:1px}
+.qd-sb:disabled{opacity:.3;pointer-events:none}

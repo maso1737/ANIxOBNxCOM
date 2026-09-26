@@ -4,11 +4,14 @@
 // 2) 配線チェック: JSが参照する #id が HTML に実在するか
 // 3) id 重複チェック
 // 4) 未参照関数（デッドコード候補）
+// 複数ファイル構成（live-plate/ のような「HTML＋<script src> 列」）は、HTML 1本＋その src 列を
+// 1単位として検査する（SPEC_21 §11-1）。src は1本ずつ構文を見てから、全部をつないで
+// 配線・未参照関数をファイル横断で見る（別ファイルの関数から呼ばれていれば「参照あり」）。
 // 終了コード: 問題があれば 1
 const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
-const FILES = ['animator.html', 'oban-builder.html', 'composer.html', 'index.html', 'manga-plate.html', 'econte.html', 'link-map.html', 'brush-lab.html', 'depth-brush-lab.html', 'ref-board.html', 'inbetween_warp_lab.html', 'ipad-probe.html'];
+const FILES = ['animator.html', 'oban-builder.html', 'composer.html', 'index.html', 'manga-plate.html', 'econte.html', 'link-map.html', 'brush-lab.html', 'depth-brush-lab.html', 'ref-board.html', 'inbetween_warp_lab.html', 'ipad-probe.html', 'live-plate/index.html'];
 
 // JSとして扱う <script>: type無し / type="module" / text|application/javascript。
 // type="application/json" 等のデータブロック＝EXPORT WEBのビューアテンプレ等は除外する。
@@ -28,6 +31,23 @@ const stripModuleSyntax = js => js
   .replace(/^[ \t]*import\s[^\n;]*;[ \t]*$/gm, '')
   .replace(/^[ \t]*export\s+(?=default|function|class|const|let|var|\{)/gm, '');
 
+// <script src="相対パス"> の列（http(s):// と // で始まる外部 CDN は対象外）。
+// 古典スクリプトは同じグローバル字句スコープを共有するので、つないだ全体でも構文を見る
+//（別ファイル同士で top-level の const/let が重なると、ブラウザでは後のファイルが SyntaxError で丸ごと死ぬ）。
+const srcRe = () => /<script\b([^>]*?)\bsrc\s*=\s*["']([^"']+)["']([^>]*)>\s*<\/script>/g;
+function collectSrc(file, html){
+  const dir = path.dirname(path.join(root, file));
+  const out = [];
+  for(const m of html.matchAll(srcRe())){
+    if(!isJsTag(m[1] + ' ' + m[3])) continue;
+    const src = m[2];
+    if(/^(https?:)?\/\//i.test(src)) continue;
+    const abs = path.join(dir, src.split(/[?#]/)[0]);
+    out.push({ src, code: fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : null });
+  }
+  return out;
+}
+
 // JS内で動的に生成される等、実在チェックから除外するidプレフィックス
 const ID_IGNORE = [
   /^kf-/, /^fx-/, /^dot-/, /^tl-wa-/, /^i-/, // composerのプロパティ別・動的id
@@ -43,10 +63,20 @@ for(const file of FILES){
   const html = fs.readFileSync(path.join(root, file), 'utf8');
   const jsBlocks = [...html.matchAll(scriptRe())]
     .filter(m => isJsTag(m[1])).map(m => m[2]).filter(s => s.length > 200);
-  const js = jsBlocks.join('\n;\n');
+  const ext = collectSrc(file, html);
+  let extBad = 0;
+  for(const e of ext){
+    if(e.code == null){ fail(`<script src="${e.src}"> のファイルがありません`); extBad++; continue; }
+    try{ new Function(stripModuleSyntax(e.code)); }
+    catch(err){ fail(`構文エラー（${e.src}）: ${err.message}`); extBad++; }
+  }
+  if(ext.length && !extBad) ok(`外部スクリプト ${ext.length}本（読み込み・1本ずつの構文 OK）`);
+  const extCode = ext.filter(e => e.code != null).map(e => e.code);
+  const js = [...jsBlocks, ...extCode].join('\n;\n');
+  const all = [html, ...extCode].join('\n');   // 未参照関数はファイル横断で数える
 
   // 1) 構文
-  try{ new Function(stripModuleSyntax(js)); ok('構文 OK'); }
+  try{ new Function(stripModuleSyntax(js)); ok(ext.length ? '構文 OK（全ファイルをつないでも衝突なし）' : '構文 OK'); }
   catch(e){ fail('構文エラー: ' + e.message); continue; }
 
   if(!js) { console.log(); continue; }
@@ -93,7 +123,7 @@ for(const file of FILES){
     // 常に「未参照関数」と誤検出されていた（ref-board.html を追加して発覚）。
     // 前後の識別子文字を否定先読み/後読みで自前に見る（$ を含む名前も正しく数える）
     const re = new RegExp('(?<![\w$])' + d.name.replace(/\$/g, '\\$') + '(?![\w$])', 'g');
-    if((html.match(re) || []).length <= 1) dead.push(d.name);
+    if((all.match(re) || []).length <= 1) dead.push(d.name);
   }
   if(dead.length) dead.forEach(n => fail(`未参照関数（デッドコード候補）: ${n}`));
   else ok('未参照関数なし');

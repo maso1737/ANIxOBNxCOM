@@ -103,7 +103,11 @@
   ★ **共有DB／LIVE に流す JSON は合体1枚のまま（`layers` を載せない）**＝COMPOSER / OBAN / MANGA PLATE は改修ゼロ。`layers` はファイルの EXPORT JSON と PROJ 保存箱だけ。
   ★ **UI は animator の現行デザインのまま**（2026-09-19 に「新 OBAN 規約で」から変更）。`--acc` / `THEMES` / `.qd-*` / `CVC` 橋を**足さない**。色は既存 `--acid`、新設 UI は `.fc-vis-btn` / `#zoom-ctl` / `showModal` / `.fc-dur` を真似る。
   ★ 変形は REF パネルに入れない（道具側の `SEL`）。`flPaint` の `imageSmoothingEnabled` を `state.selAA`（既定 false）にする以外、econte の数式は変えない。
-- `SPEC_21_LIVE_PLATE.md` — **一本化アプリ LIVE PLATE（仮）の設計・仕様書。起草のみ（2026-09-18）。着手前に §13 の発注者判断7件**。
+- `SPEC_21_LIVE_PLATE.md` — **一本化アプリ LIVE PLATE の設計・仕様書。§13 の発注者判断は 2026-09-24 に全7件確定。P0 骨格・P1 SHEET・BOOK zip は 2026-09-24 に `live-plate/` へ実装済み＝決めたことと動作チェック表は §15（P0）・§16（P1）、ファイルの地図は `live-plate/CLAUDE.md`**。
+  ★ **重なり順は ◆ITEMS の並び（配列）だけ。Z は視差だけで、止まったカメラの画は Z で変わらない**（§6-2 の「z 昇順」から変更・§16-2 #3 #5）。
+  ★ **割っても見えている絵は消さない**：コマを覆う層・素材は両方の子へコピー、分割を戻すと1枚に（`panels.divide` / `merge`・§16-2 #1）。
+  ★ **LAYER.z は「正＝手前」**（§5）。§6-3 の式（composer は正＝奥）とは符号が逆なので `render.js perspOf` で depth = F − z − cam.z にしてある。P1 の Z 定規・P3 の AE JSX もこの向きで（§15-1 #2）。
+  ★ **`time.js` / `render.js` は HTML ビューアに文字列で同梱される**＝外（LP・DOM・Blob）を参照しない。セル番号の式 `cellIndexAt` はここ1か所。
   作るのは「5本の機能を足したアプリ」ではなく **1つの BOOK（sheets[] / plates{} / take / fx）に4つの見方（01 SHEET / 02 DRAW / 03 TAKE / 04 SHOW）**。
   ★ **変えない軸3つ**＝同期を作らない（econte）／フレームは `t` の純関数 `renderFrame()` 1本（OBAN の P）／紙が世界・カメラが出口。
   ★ **SPEC_19（プレート・FOCUS・統一解像度セル）と SPEC_20（線＋塗・REF 帯・変形・SEQ 4択）はそのまま DRAW の仕様**＝旧アプリで実装せず新アプリに直接載せる推奨（§13-1）。

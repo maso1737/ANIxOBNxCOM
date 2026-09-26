@@ -12,7 +12,9 @@
     "verify:oban": "node harness/runner.mjs verify.oban.config.json",
     "approve:oban": "UPDATE_BASELINE=1 node harness/runner.mjs verify.oban.config.json",
     "verify:econte": "node harness/runner.mjs verify.econte.config.json",
-    "approve:econte": "UPDATE_BASELINE=1 node harness/runner.mjs verify.econte.config.json"
+    "approve:econte": "UPDATE_BASELINE=1 node harness/runner.mjs verify.econte.config.json",
+    "verify:liveplate": "node harness/runner.mjs verify.liveplate.config.json",
+    "approve:liveplate": "UPDATE_BASELINE=1 node harness/runner.mjs verify.liveplate.config.json"
   },
   "devDependencies": {
     "pixelmatch": "^6.0.0",

@@ -8,7 +8,7 @@ Animation Paint の単一HTMLツールを**決定論的に**検証するハー�
 （スキル `single-html-verify` の配布物と同一）。**ここでは改造しない。**
 挙動を変えたくなったら、まず正準側を直して SPEC_08 の version を上げ、その後コピーし直す。
 
-現在の対象は **ANIMATOR / COMPOSER / OBAN BUILDER / ECONTE**（manga-plate は未。SPEC_09 v2 が
+現在の対象は **ANIMATOR / COMPOSER / OBAN BUILDER / ECONTE / LIVE PLATE**（manga-plate は未。SPEC_09 v2 が
 まだ出力そのものを変えている最中なので、承認しなおしが常態化する＝いま張っても得にならない）。
 
 | ツール | config | 起動URL（鍵） | 撮るもの |
@@ -17,6 +17,7 @@ Animation Paint の単一HTMLツールを**決定論的に**検証するハー�
 | COMPOSER | `verify.composer.config.json` | `composer.html?harness=1` | コンポ合成（960×540） |
 | OBAN BUILDER | `verify.oban.config.json` | `oban-builder.html?harness=1` | TAKE走行中のステージ（960×540） |
 | ECONTE | `verify.econte.config.json` | `econte.html?harness=1` | TIMELINE出力 と GRIDセル（**1280×720**） |
+| LIVE PLATE | `verify.liveplate.config.json` | `live-plate/index.html?harness=1` | `renderFrame` の mode:'export'＝HTML 書き出しと同じ画（960×540） |
 
 > ⚠ **撮影キャンバスは 1280×720 を超えないこと。** runner はビューポート既定（1280×720）のまま
 > `locator.screenshot()` する。`position:fixed` の要素はスクロールできないので、**大きくすると下が切れる**。
@@ -35,6 +36,7 @@ npm run verify:animator
 npm run verify:composer
 npm run verify:oban
 npm run verify:econte
+npm run verify:liveplate
 ```
 
 - 初回は `baselines/` に正解画像を作るだけで必ず通る。**2回目以降が本番**（比較してPASS/FAIL）。
@@ -329,6 +331,46 @@ econte 固有の事情が4つある。
 2〜4ms 大きい値を選ぶ）。カットの割り当ては通しフレームで
 `C1=0〜11 / C2=12〜31 / C3=32〜41 / C4=42〜49 / C5=50〜55 / C6=56〜65 / C7=66〜91`。
 GRIDセルを撮りたいときは **その値に 10000 を足す**。
+
+## LIVE PLATE 側の契約（live-plate/js/harness.js）
+
+```js
+window.__HARNESS__ = { version:1, kind:'canvas2d', canvas:'#harness-shot', ready, seek, render, info }
+```
+
+1. **`?harness=1`（`LP.HARNESS_ON`）の窓でしか動かない。** 同じ鍵で `store.js` の読み書き・キーマップ／書き出し設定／ペインの
+   localStorage 書き込みを止めている（検証窓は `live_plate_db_v1` を開かない）。
+2. **撮るのは `renderFrame(ctx, book, t, {mode:'export'})` そのもの**＝ステージのカメラ窓・PLAY・HTML ビューアと同じ関数。
+   ビューアは同じ関数を `Function#toString` で同梱しているので、ここが通れば**書き出しの画も同じ**（書き写しの回帰が起きない）。
+3. **素材は canvas に直接描き、`LP.cache.put` で置く**（アプリの取り込み関数を通さない＝econte で踏んだ「同じ関数で組んで同じ関数で描くと
+   対称性で打ち消し合う」を避ける。デコード待ちも挟まない）。
+4. フィクスチャ（24fps・全84コマ）：
+
+   | 紙 | 通しフレーム | 何を踏むか |
+   |---|---|---|
+   | C1（24） | 0〜23 | 全面の背景（1920 の絵を紙いっぱい）＋ α の三角（不透明度 0.8） |
+   | C2（36） | 24〜59 | 連番6セル・**2コマ打ち・ループ**を2枚（2枚目は `tOffset=3`）＝`cellIndexAt` の式 |
+   | C3（24） | 60〜83 | 乗算の網点（`blend:'multiply'`）＋ **12° 回した層** |
+   | C4（24） | 84〜107 | **コマ割り**（`panels.divide` で斜めの縦線＋右を横線・右下は断ち切り）。背景は割ると全コマにコピー・フチ付きの層（Z 付き）・網（乗算）・集中線・流線（枠の上）・ホワイト。**文字は入れない**（書体の読み込みが検証窓で揺れる） |
+
+`timeMs → frame` は `floor(t/(1000/24))`。seek は `0 / 500 / 1000 / 1375 / 2334 / 2584 / 3585 / 4002`（C1 頭・中／C2 頭・2コマ打ち＋ずらし・ループ2周目／C3／C4 ×2）。
+
+### 予算（LIVE PLATE・2026-09-24 実測）
+
+| 項目 | 実測 | 上限 | 何を捕まえるか |
+|---|---|---|---|
+| `maxTTFFms` | 525〜573ms | 800 | 起動（18本の script）＋フィクスチャの PNG 化 |
+| `maxLongestFrameMs` | 238〜290ms（1回 368ms） | 400 | 最長フレーム（P1 で起動のスクリプトが 24 本・フィクスチャにコマ割りが増えた。P0 は 191〜224ms で 300 だった） |
+| `maxVramBytes` | 17.1MB（10枚） | 112MB | 常駐ビットマップ（`LP.cache.stats().bytes`）。フィクスチャの素材 5本・10セル |
+| `allowedPixelRatio` | 0.000% | 0.02% | 他ツールと同じ |
+
+### 負のコントロール（2026-09-24）
+
+| 壊し方 | 結果 | 通ったコマの説明 |
+|---|---|---|
+| `cellIndexAt` の k を +1 コマ（`time.js`） | **3/6 FAIL**（C2 の3コマ・0.83%） | C1・C3 は1セルの素材だけ＝セル番号が変わらないので 0% が正しい |
+| カメラ窓での置き場所を紙 +2px（`render.js drawCamera`） | **6/6 FAIL**（0.024〜0.234%） | — |
+| コマの切り抜き（`render.js compose` の `clip()`）を外す（P1） | **C4 の 2/8 だけ FAIL**（10.5%） | C1〜C3 はコマが無い紙＝ 0% が正しい |
 
 ## 他のツールへ広げるとき
 
