@@ -41,6 +41,7 @@ LP.lib.time = function(){
     return a;
   }
   /* 層の紙内フレーム local → プレートのセル番号（-1＝何も出さない）。
+     layer は { tIn, tOut, tOffset, step, clip } を持つもの（LAYER そのもの／REF の参照）。
      ★ SPEC_20 の k = floor((t - offset) / step) を**ここ1か所だけ**に置く
        （animator で renderRefLayer と animTickImg の式がずれて「中央ボタンが黙った」再発防止） */
   function cellIndexAt(plate, layer, local){
@@ -50,6 +51,7 @@ LP.lib.time = function(){
     const step = Math.max(1, layer.step | 0 || 1);
     const n = plateLen(plate);
     let k = Math.floor((local - (layer.tOffset || 0)) / step);
+    if(layer.clip && (k < 0 || k >= n)) return -1;   // 参照（REF）：尽きたら出さない（SPEC_20 §1-5。ループしない）
     if(plate.loop) k = ((k % n) + n) % n;
     else k = Math.max(0, Math.min(n - 1, k));
     for(let i = 0; i < plate.cells.length; i++){

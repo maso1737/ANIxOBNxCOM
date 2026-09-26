@@ -12,23 +12,28 @@ var LP = window.LP || (window.LP = {});
 (function(){
   'use strict';
   const $ = s => document.querySelector(s);
-  let cv, ctx, stageEl, W = 0, H = 0, dpr = 1;
+  let cv, ctx, ov, octx, stageEl, W = 0, H = 0, dpr = 1;
   // 視点：paper＝紙座標（SHEET / TAKE / SHOW）、plate＝プレート座標（DRAW）
   const views = {
     paper: { s: 0.2, ox: 0, oy: 0, fit: true },
     plate: { s: 0.2, ox: 0, oy: 0, fit: true, key: '' },
   };
-  let rq = 0, drag = null;
+  let rq = 0, rqo = 0, drag = null;
 
   function init(){
     stageEl = $('#stage'); cv = $('#cv'); ctx = cv.getContext('2d');
+    ov = $('#cv-ov'); octx = ov.getContext('2d');
     new ResizeObserver(resize).observe(stageEl);
     resize();
     stageEl.addEventListener('pointerdown', onDown);
     stageEl.addEventListener('pointermove', onMove);
     stageEl.addEventListener('pointerup', onUp);
     stageEl.addEventListener('pointercancel', onUp);
-    stageEl.addEventListener('pointerleave', () => { if(!drag && LP.sheetTools.hover(null)) renderQ(); });
+    stageEl.addEventListener('pointerleave', () => {
+      if(drag) return;
+      if(LP.state.step === 'draw') LP.drawTools.leave();
+      else if(LP.sheetTools.hover(null)) renderQ();
+    });
     stageEl.addEventListener('dblclick', onDbl);
     stageEl.addEventListener('wheel', onWheel, { passive: false });
     stageEl.addEventListener('contextmenu', e => e.preventDefault());
@@ -38,6 +43,7 @@ var LP = window.LP || (window.LP = {});
     dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
     W = Math.max(1, r.width); H = Math.max(1, r.height);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ov.width = cv.width; ov.height = cv.height;
     if(!LP.book) return;   // 起動中（BOOK を読み込む前）
     if(views.paper.fit) fitView('paper');
     if(views.plate.fit) fitView('plate');
@@ -83,6 +89,14 @@ var LP = window.LP || (window.LP = {});
 
   /* ---------- 描画 ---------- */
   function renderQ(){ if(!rq) rq = requestAnimationFrame(() => { rq = 0; render(); }); }
+  /* 02 DRAW の手すり（筆の輪・投げ縄・浮いた形）は #cv-ov に別に描く＝なぞるたびに紙を描き直さない */
+  function renderOv(){ if(!rqo) rqo = requestAnimationFrame(() => { rqo = 0; drawOv(); }); }
+  function drawOv(){
+    if(!octx) return;
+    octx.setTransform(1, 0, 0, 1, 0, 0);
+    octx.clearRect(0, 0, ov.width, ov.height);
+    if(LP.state.step === 'draw' && !LP.state.clean && LP.app.selLayer()) LP.drawTools.overlay(octx, helpers);
+  }
   function render(){
     if(!ctx || !LP.book) return;
     const st = LP.state, C = LP.ui.CVC;
@@ -112,7 +126,8 @@ var LP = window.LP || (window.LP = {});
       const L = LP.app.selLayer();
       if(L){
         res = LP.render.renderFrame(ctx, LP.book, T, { mode: 'focus', img, layerId: L.id, baseAlpha: 0.28,
-          scale: v.s * dpr, ox: v.ox * dpr, oy: v.oy * dpr, guides: true, guideColor: C.pt, px: dpr });
+          scale: v.s * dpr, ox: v.ox * dpr, oy: v.oy * dpr, guides: true, guideColor: C.pt, px: dpr,
+          under: LP.drawTools.under, mid: LP.drawTools.mid });
       }else{
         ctx.globalAlpha = 0.3;
         res = LP.render.renderFrame(ctx, LP.book, T, sheetView());
@@ -137,6 +152,7 @@ var LP = window.LP || (window.LP = {});
       const sh = LP.app.curSheet();
       if(sh && !sh.layers.length && !(sh.items || []).length && !(sh.panels || []).length) showMsg = 'empty';
     }
+    drawOv();
     if(msg){
       msg.classList.toggle('show', !!showMsg);
       msg.classList.toggle('dark', showMsg === 'draw');
@@ -158,8 +174,10 @@ var LP = window.LP || (window.LP = {});
   /* 道具（mode/sheet.js）に渡す手すり */
   const helpers = {
     toWorld, toScreen,
+    evWorld(ev){ const p = evPt(ev); return toWorld(p.x, p.y); },
+    view(){ return views[viewKey()]; },
     get dpr(){ return dpr; },
-    get scale(){ return views.paper.s; },
+    get scale(){ return views[viewKey()].s; },
     get el(){ return stageEl; },
   };
 
@@ -175,6 +193,12 @@ var LP = window.LP || (window.LP = {});
     try{ stageEl.setPointerCapture(e.pointerId); }catch(err){}
     if(e.button === 1 || e.button === 2){ e.preventDefault(); startPan(e, sp); return; }
     if(e.button !== 0) return;
+    if(LP.state.step === 'draw'){
+      // 指はナビ（SPEC_18）。ペンとマウスで描く
+      const d = e.pointerType === 'touch' ? null : LP.drawTools.down(e, sp, toWorld(sp.x, sp.y), helpers);
+      if(d) drag = d; else startPan(e, sp, true);
+      return;
+    }
     if(LP.state.step !== 'sheet'){ startPan(e, sp, true); return; }
     if(LP.state.playing) LP.app.stop();
     const d = LP.sheetTools.down(e, sp, toWorld(sp.x, sp.y), helpers);
@@ -184,6 +208,7 @@ var LP = window.LP || (window.LP = {});
   function onMove(e){
     const sp = evPt(e);
     if(!drag){
+      if(LP.state.step === 'draw' && e.pointerType !== 'touch'){ stageEl.style.cursor = LP.drawTools.hover(sp, toWorld(sp.x, sp.y), helpers, e) || ''; return; }
       if(LP.state.step === 'sheet'){
         const cur = LP.sheetTools.hover(sp, toWorld(sp.x, sp.y), helpers, e);
         stageEl.style.cursor = cur || '';
@@ -199,6 +224,7 @@ var LP = window.LP || (window.LP = {});
       renderQ();
       return;
     }
+    if(LP.state.step === 'draw'){ LP.drawTools.move(e, sp, toWorld(sp.x, sp.y), drag, helpers); return; }
     LP.sheetTools.move(e, sp, toWorld(sp.x, sp.y), drag, helpers);
   }
   function onUp(e){
@@ -212,11 +238,14 @@ var LP = window.LP || (window.LP = {});
       LP.app.hud();
       return;
     }
+    if(LP.state.step === 'draw'){ LP.drawTools.up(e, sp, wp, d, helpers); return; }
     LP.sheetTools.up(e, sp, wp, d, helpers);
   }
   function onDbl(e){
-    if(LP.state.step !== 'sheet' || LP.state.clean) return;
+    if(LP.state.clean) return;
     const sp = evPt(e);
+    if(LP.state.step === 'draw'){ LP.drawTools.dbl(e, sp, toWorld(sp.x, sp.y)); return; }
+    if(LP.state.step !== 'sheet') return;
     LP.sheetTools.dbl(e, sp, toWorld(sp.x, sp.y), helpers);
   }
   function onWheel(e){
@@ -227,5 +256,5 @@ var LP = window.LP || (window.LP = {});
     zoomAt(viewKey(), f, sp.x, sp.y);
   }
 
-  LP.stage = { init, render, renderQ, fit, zoomBy, zoomPct, clientToPaper };
+  LP.stage = { init, render, renderQ, renderOv, fit, zoomBy, zoomPct, clientToPaper };
 })();

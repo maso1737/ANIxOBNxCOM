@@ -7,7 +7,12 @@
      断ち切りは「ページの端」まで伸びる（SCREEN の紙の端ではない）。
      img 素材 → PLATE（1セル。srcs があれば n セル）＋ LAYER。奥行きタグ（奥/中/前）→ Z（中＝紙の面）
      ぱかぱか（pk）は持ち込まない（§7-1）。網点化（tone.on）は印刷用なので持ち込まない（§13-3）
-   それ以外の旧形式（ANIMATOR_v1 / PROJECT_v2 / ECONTE zip / OBAN JSON）は P2・P3 で足す。
+   P2 で足したもの：ANIMATOR の EXPORT JSON（format:'PROJECT_v1'＝ANIMATOR_v1・tdr_exchange の PROJECT_v1 も同形）
+     cells → PLATE 1本（作業解像度そのまま・dur＝duration・空ブロック＝絵の無いセル）。
+     cells[].layers { line, fill } があれば**線と塗りに分けたまま**、無ければ合体1枚（image）を線レーンへ（SPEC_20 §5-1）。
+     新しい紙1枚（尺＝合計コマ数）に紙いっぱいで置く。画像は dataURL をそのまま Blob に＝再エンコードしない（1px も変わらない）。
+     持ち込まないもの：FRAME 下絵（frameLayer）・ワークエリア・非表示（hidden）の印（絵はそのまま入る）
+   それ以外の旧形式（PROJECT_v2 / ECONTE zip / OBAN JSON）は P3 で足す。
    ============================================================ */
 var LP = window.LP || (window.LP = {});
 LP.io = LP.io || {};
@@ -133,6 +138,55 @@ LP.io = LP.io || {};
     return true;
   }
 
+  /* ANIMATOR_v1（PROJECT_v1）→ PLATE 1本＋新しい紙 */
+  async function importAnimator(o, fname){
+    const book = LP.book;
+    const W = Math.round(o.width || 0), H = Math.round(o.height || 0);
+    if(!W || !H || !Array.isArray(o.cells) || !o.cells.length){ LP.ui.toast('ANIMATOR の JSON にコマがありません'); return false; }
+    const name = String(fname || 'animator').replace(/\.json$/i, '').slice(0, 32);
+    const plate = LP.model.newPlate(name, W, H, 'draw');
+    const blobOf = async url => (typeof url === 'string' && url.startsWith('data:')) ? (await fetch(url)).blob() : null;
+    let hidden = 0, i = 0;
+    for(const c of o.cells){
+      const dur = Math.max(1, Math.round(c.duration || 1));
+      const cell = LP.model.newCell(null, dur);
+      if(c.kind !== 'empty'){
+        if(c.layers && c.layers.line){ cell.line = await blobOf(c.layers.line); cell.fill = await blobOf(c.layers.fill); }
+        else cell.line = await blobOf(c.image);
+        if(c.hidden) hidden++;
+      }
+      plate.cells.push(cell);
+      if(++i % 24 === 0) LP.ui.toast('ANIMATOR を読み込み中… ' + i + ' / ' + o.cells.length);
+    }
+    // 棚のサムネ（最初に絵のあるセル）
+    const first = plate.cells.find(c => c.line || c.fill);
+    if(first){
+      const k = Math.min(1, 240 / Math.max(W, H)), cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(W * k)); cv.height = Math.max(1, Math.round(H * k));
+      const g = cv.getContext('2d');
+      for(const lane of ['fill', 'line']){
+        if(!first[lane]) continue;
+        const bmp = await createImageBitmap(first[lane]);
+        g.drawImage(bmp, 0, 0, cv.width, cv.height);
+        bmp.close && bmp.close();
+      }
+      plate.thumb = await new Promise(r => cv.toBlob(r, 'image/png'));
+    }
+    book.plates[plate.id] = plate;
+    const sh = LP.model.newSheet(book, LP.time.plateLen(plate));
+    sh.name = sh.name + ' ' + name.slice(0, 16);
+    const L = LP.model.newLayer(plate, LP.model.fitRect(book, W, H));
+    sh.layers.push(L);
+    book.sheets.push(sh);
+    LP.app.select('layer', L.id, true);
+    LP.app.commit('ANIMATOR を読む');
+    LP.app.seek(LP.time.sheetStart(book, book.sheets.length - 1));
+    const nf = plate.cells.filter(c => c.fill).length;
+    LP.ui.toast('ANIMATOR から新しい紙 ' + sh.name + '（' + W + '×' + H + '・セル ' + plate.cells.length + '・' + LP.time.fmtDur(sh.dur, book.fps) + (nf ? '・塗り ' + nf + '枚' : '') + '）'
+      + (hidden ? '　※非表示の印 ' + hidden + '件は持ち込みません（絵は入っています）' : '') + ' — 層を Wクリックで 02 DRAW', 6000);
+    return true;
+  }
+
   /* 何かのファイルを「開く」：BOOK zip（置き換え）／ JSON（旧形式を見分けて足す） */
   async function openAny(file){
     const name = (file.name || '').toLowerCase();
@@ -142,10 +196,13 @@ LP.io = LP.io || {};
     if(o && o.format === 'MANGA_BOOK_v2' && o.book){
       try{ return await importMangaBook(o); }catch(e){ console.error(e); LP.ui.toast('MANGA_BOOK_v2 を読めませんでした：' + (e && e.message || e)); return false; }
     }
-    const kind = o && (o.format || o.type || o.kind || (Array.isArray(o.cells) ? 'ANIMATOR_v1' : '') || (o.take && o.panels ? 'OBAN' : ''));
-    LP.ui.toast('この形式はまだ読めません' + (kind ? '（' + kind + '）' : '') + '。P1 は MANGA_BOOK_v2 だけ（ANIMATOR / COMPOSER / ECONTE / OBAN は P2・P3）', 5000);
+    if(o && (o.format === 'PROJECT_v1' || o.format === 'ANIMATOR_v1') && Array.isArray(o.cells) && o.width){
+      try{ return await importAnimator(o, file.name); }catch(e){ console.error(e); LP.ui.toast('ANIMATOR の JSON を読めませんでした：' + (e && e.message || e)); return false; }
+    }
+    const kind = o && (o.format || o.type || o.kind || (Array.isArray(o.cells) ? 'ANIMATOR?' : '') || (o.take && o.panels ? 'OBAN' : ''));
+    LP.ui.toast('この形式はまだ読めません' + (kind ? '（' + kind + '）' : '') + '。読めるのは MANGA_BOOK_v2 と ANIMATOR（PROJECT_v1）。COMPOSER / ECONTE / OBAN は P3', 5000);
     return false;
   }
 
-  Object.assign(LP.io, { openAny, importMangaBook });
+  Object.assign(LP.io, { openAny, importMangaBook, importAnimator });
 })();

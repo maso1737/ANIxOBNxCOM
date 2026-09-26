@@ -69,17 +69,18 @@ LP.lib.render = function(T, G, IT){
   }
 
   /* 層の絵（いまの ctx 原点＝層の中心・単位＝紙 px）。戻り値＝読めていない画像の数 */
-  function drawLayerCell(ctx, book, L, local, view, w, h){
+  function drawLayerCell(ctx, book, L, local, view, w, h, mid){
     const plate = book.plates[L.plateId];
     if(!plate) return 0;
     const ci = T.cellIndexAt(plate, L, local);
-    if(ci < 0) return 0;
+    if(ci < 0){ if(mid) mid(ctx); return 0; }
     const cell = plate.cells[ci];
     const ga = ctx.globalAlpha;
     let miss = 0;
     const ims = [];
     for(let i = 0; i < LANES.length; i++){
       const lane = LANES[i], ln = plate.lanes && plate.lanes[lane];
+      if(view.pass && view.pass !== lane) continue;                          // SEQ PNG の 線／塗 だけの書き出し
       if(view.mode !== 'export' && ln && ln.visible === false) continue;   // レーンの表示は表示だけ（§6-2）
       const im = view.img(cell, lane);
       if(im === false){ miss++; continue; }
@@ -92,11 +93,14 @@ LP.lib.render = function(T, G, IT){
         ctx.drawImage(e.canvas, -w / 2 - e.pad * sx, -h / 2 - e.pad * sy, e.canvas.width * sx, e.canvas.height * sy);
       }
     }
-    for(const [, im, ln] of ims){
+    let midDone = !mid;
+    for(const [lane, im, ln] of ims){
+      if(!midDone && lane === 'line'){ midDone = true; mid(ctx); }   // 02 DRAW：オニオンは塗の上・線の下（SPEC_20 §1-2）
       if(view.mode !== 'export' && ln && ln.opacity != null) ctx.globalAlpha = ga * ln.opacity;
       ctx.drawImage(im, -w / 2, -h / 2, w, h);
       ctx.globalAlpha = ga;
     }
+    if(!midDone) mid(ctx);
     return miss;
   }
 
@@ -112,7 +116,8 @@ LP.lib.render = function(T, G, IT){
     panels.forEach(k => { pmap[k.id] = k; });
     const bg = gray(sheet.bg);
     const env = { bg: bg, alpha: alpha };
-    ctx.save(); ctx.globalAlpha = alpha; P.bg(bg); ctx.restore();
+    const pass = !!view.pass;   // 線／塗だけ（SEQ PNG）：地・枠線・仕上げ素材は出さない（透明の上にそのレーンだけ）
+    if(!pass){ ctx.save(); ctx.globalAlpha = alpha; P.bg(bg); ctx.restore(); }
     const clipTo = id => {
       const k = pmap[id];
       if(!k) return;
@@ -131,7 +136,7 @@ LP.lib.render = function(T, G, IT){
       }
       ctx.restore();
     };
-    const items = IT.drawOrder(sheet.items || []).filter(it => itemOn(it, local));
+    const items = pass ? [] : IT.drawOrder(sheet.items || []).filter(it => itemOn(it, local));
     const item = it => {
       ctx.save();
       if(it.panelId) clipTo(it.panelId);
@@ -143,7 +148,7 @@ LP.lib.render = function(T, G, IT){
     sheet.layers.forEach(L => { if(L.panelId) layer(L); });
     items.forEach(it => { if(it.panelId) item(it); });
     // 2) コマ枠線
-    if(panels.length){
+    if(panels.length && !pass){
       ctx.save(); P.paper();
       ctx.globalAlpha = alpha;
       ctx.strokeStyle = fr.color; ctx.lineWidth = fr.lw; ctx.lineJoin = 'miter';
@@ -186,8 +191,7 @@ LP.lib.render = function(T, G, IT){
     const pcx = book.paper.w / 2, pcy = book.paper.h / 2;
     ctx.save();
     ctx.beginPath(); ctx.rect(R.x, R.y, R.w, R.h); ctx.clip();
-    ctx.fillStyle = gray(sheet.bg);
-    ctx.fillRect(R.x, R.y, R.w, R.h);
+    if(!view.pass){ ctx.fillStyle = gray(sheet.bg); ctx.fillRect(R.x, R.y, R.w, R.h); }
     ctx.translate(R.x + R.w / 2, R.y + R.h / 2);
     if(cam.rot) ctx.rotate(-cam.rot * Math.PI / 180);
     ctx.scale(cam.s || 1, cam.s || 1);
@@ -217,7 +221,8 @@ LP.lib.render = function(T, G, IT){
     return miss;
   }
 
-  /* view: { mode:'sheet'|'focus'|'camera'|'export', img,
+  /* view: { mode:'sheet'|'focus'|'camera'|'export', img, pass（'line'|'fill'＝そのレーンだけ・地なし）,
+            under / mid（focus：参照・オニオンを描く手すり。原点＝プレート左上）,
             scale, ox, oy（sheet/focus：世界→ctx）, rect（camera/export：出口の矩形）,
             guides, guideColor, layerId（focus）, baseAlpha（focus の紙の透かし）, px（ガイド線の太さ＝ctx px） } */
   function renderFrame(ctx, book, t, view){
@@ -260,9 +265,12 @@ LP.lib.render = function(T, G, IT){
       // 本体：プレート原寸
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.translate(view.ox || 0, view.oy || 0); ctx.scale(s, s);
+      // 02 DRAW の手すり（参照・オニオン）。出力には出ない UI なので view で受け取る（原点＝プレートの左上・単位＝プレート px）
+      if(view.under){ ctx.save(); view.under(ctx); ctx.restore(); }
       ctx.save();
       ctx.translate(plate.w / 2, plate.h / 2);
-      miss += drawLayerCell(ctx, book, L, at.local, view, plate.w, plate.h);
+      const mid = view.mid ? c => { c.save(); c.translate(-plate.w / 2, -plate.h / 2); view.mid(c); c.restore(); } : null;
+      miss += drawLayerCell(ctx, book, L, at.local, view, plate.w, plate.h, mid);
       ctx.restore();
       if(view.guides){
         ctx.lineWidth = px / s;

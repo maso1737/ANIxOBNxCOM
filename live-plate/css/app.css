@@ -5,12 +5,14 @@
    ============================================================ */
 #app{
   position:fixed;inset:0;display:grid;
-  grid-template-columns:var(--lw,224px) minmax(0,1fr) var(--rw,252px);
+  grid-template-columns:var(--lw,224px) minmax(0,1fr) calc(var(--sw) + var(--iw));
   grid-template-rows:calc(64px + var(--safe-t)) minmax(0,1fr) auto auto;
   grid-template-areas:"bar bar bar" "sl stage sr" "tl tl tl" "dock dock dock";
 }
+body{--sw:176px;--iw:236px}
 body.l-off{--lw:30px}
-body.r-off{--rw:30px}
+body.s-off{--sw:30px}
+body.i-off{--iw:30px}
 
 /* ---------- top bar ---------- */
 #bar{
@@ -42,7 +44,12 @@ body.r-off{--rw:30px}
 .pane{position:relative;z-index:20;display:flex;flex-direction:column;min-height:0;overflow:hidden;
   background:rgba(8,9,12,.82);border-color:var(--line);border-style:solid;border-width:0}
 #side-l{grid-area:sl;border-right-width:1px}
-#side-r{grid-area:sr;border-left-width:1px}
+#side-r{grid-area:sr;border-left-width:1px;display:grid;grid-template-columns:var(--sw) var(--iw)}
+/* 右の2列（SHEETS｜◆ITEMS）。列ごとに畳める＝畳んだ列は細い帯 */
+.rcol{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+#col-items{border-left:1px solid var(--line-2)}
+.rcol .pn-head{padding:0 6px 0 10px;gap:6px}
+.rcol .pn-head .en{font-size:12px;letter-spacing:.2em}
 .pn-head{display:flex;align-items:center;gap:8px;height:40px;flex:none;padding:0 8px 0 12px;
   border-bottom:1px solid var(--line-2);background:rgba(var(--accRGB),.04)}
 .pn-head .en{font-family:var(--saira);font-weight:700;font-size:13px;letter-spacing:.24em;color:var(--acc)}
@@ -61,8 +68,8 @@ body.r-off{--rw:30px}
 .pn-strip{display:none;flex:1;flex-direction:column;align-items:center;gap:10px;padding-top:10px;cursor:pointer}
 .pn-strip span{writing-mode:vertical-rl;font-family:var(--saira);font-weight:600;font-size:11px;letter-spacing:.3em;color:rgba(232,236,242,.5)}
 .pn-strip:hover span{color:var(--acc2)}
-body.l-off #side-l>*:not(.pn-strip),body.r-off #side-r>*:not(.pn-strip){display:none}
-body.l-off #side-l .pn-strip,body.r-off #side-r .pn-strip{display:flex}
+body.l-off #side-l>*:not(.pn-strip),body.s-off #col-sheets>*:not(.pn-strip),body.i-off #col-items>*:not(.pn-strip){display:none}
+body.l-off #side-l .pn-strip,body.s-off #col-sheets .pn-strip,body.i-off #col-items .pn-strip{display:flex}
 
 /* 素材棚のタイル */
 #shelf-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;align-content:start}
@@ -86,7 +93,13 @@ body.l-off #side-l .pn-strip,body.r-off #side-r .pn-strip{display:flex}
 
 /* SHEETS と ◆ITEMS の行 */
 #sheet-list,#item-list{display:flex;flex-direction:column;gap:4px}
-#side-r .pn-body.items{flex:0 1 auto;max-height:42%}
+#sheet-list .row{gap:6px;padding:3px 4px 3px 3px}
+#sheet-list .row .th{width:60px}
+#sheet-list .row .no{width:16px;font-size:11px}
+#sheet-list .row .nm{font-size:12px}
+#item-list .row{gap:6px;padding:3px 4px 3px 3px}
+#item-list .row .th{width:44px}
+#item-list .row .ic{width:22px;height:22px}
 .row{position:relative;display:flex;align-items:center;gap:8px;padding:4px 6px 4px 4px;cursor:pointer;touch-action:none;
   border:1px solid var(--line-2);background:var(--cell);transition:border-color .1s}
 .row:hover{border-color:rgba(232,236,242,.28)}
@@ -115,11 +128,15 @@ body.l-off #side-l .pn-strip,body.r-off #side-r .pn-strip{display:flex}
   background:
     linear-gradient(rgba(232,236,242,.025) 1px,transparent 1px) center/80px 80px,
     linear-gradient(90deg,rgba(232,236,242,.025) 1px,transparent 1px) center/80px 80px}
-#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#cv,#cv-ov{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#cv-ov{pointer-events:none}
 #stage.pan,#stage.pan #cv{cursor:grabbing}
 #stage-hud{position:absolute;right:10px;top:8px;display:flex;gap:8px;align-items:center;pointer-events:none;
   font-size:9px;letter-spacing:.16em;color:rgba(232,236,242,.45)}
 #stage-hud b{font-family:var(--saira);font-weight:600;font-size:12px;color:var(--acc2);letter-spacing:.1em}
+#stage-hud .ln{font-family:var(--saira);font-weight:700;font-size:13px;letter-spacing:.14em;padding:1px 7px;border:1px solid}
+#stage-hud .ln.line{color:var(--acc-pt);border-color:rgba(var(--acc-ptRGB),.6);background:rgba(var(--acc-ptRGB),.1)}
+#stage-hud .ln.fill{color:var(--mark);border-color:rgba(255,201,79,.6);background:rgba(255,201,79,.1)}
 #stage-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;align-items:center;gap:12px;
   pointer-events:none;text-align:center}
 #stage-msg.show{display:flex}
@@ -148,9 +165,21 @@ body.dragover #stage{outline:1px dashed rgba(var(--accRGB),.8);outline-offset:-1
 #tl-labels div{display:flex;align-items:center;padding-left:10px;font-family:var(--saira);font-weight:600;font-size:11px;letter-spacing:.2em;color:rgba(232,236,242,.5)}
 #tl-labels .lr{height:20px;font-size:8px;color:rgba(232,236,242,.25)}
 #tl-labels .ls{height:44px}
+#tl-labels .lref{height:0;overflow:hidden;font-size:9px}
+body.has-refs #tl-labels .lref{height:var(--ref-h,18px)}
 #tl-labels .lc{height:30px}
+#tl-labels .lf{height:16px}
+#tl-labels .lane{gap:4px;padding-left:6px;cursor:pointer;font-family:var(--jp);font-size:10px;letter-spacing:.06em}
+#tl-labels .lane .nm{width:16px;text-align:center;color:rgba(232,236,242,.6)}
+#tl-labels .lane .t{width:18px;height:14px;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(232,236,242,.55);border:1px solid transparent}
+#tl-labels .lane .t:hover{border-color:rgba(232,236,242,.25)}
+#tl-labels .lane .t.off{color:rgba(232,236,242,.2)}
+#tl-labels .lane .t.lk{color:var(--mark)}
+body.step-draw #tl-labels .lane.on{background:rgba(var(--accRGB),.18);box-shadow:inset 2px 0 0 var(--acc)}
+body.step-draw #tl-labels .lane.on .nm{color:var(--acc2)}
 #tl-scroll{position:relative;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden}
-#tl-inner{position:relative;height:94px}
+#tl-inner{position:relative;height:calc(110px + var(--ref-row,0px))}
+body.has-refs{--ref-row:18px}
 #tl-ruler{position:absolute;left:0;top:0;height:20px;right:0;cursor:ew-resize;touch-action:none;border-bottom:1px solid var(--line-2)}
 #tl-ruler i{position:absolute;bottom:0;width:1px;height:5px;background:rgba(232,236,242,.18)}
 #tl-ruler i.s{height:10px;background:rgba(232,236,242,.35)}
@@ -169,7 +198,23 @@ body.dragover #stage{outline:1px dashed rgba(var(--accRGB),.8);outline-offset:-1
 #tl-add{position:absolute;top:8px;height:28px;width:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;
   border:1px dashed rgba(232,236,242,.3);color:rgba(232,236,242,.6);font-size:14px}
 #tl-add:hover{border-color:var(--acc-hover-line);color:var(--ink)}
-#tl-cells{position:absolute;left:0;top:64px;height:30px;right:0}
+#tl-refs{position:absolute;left:0;top:64px;height:var(--ref-row,0px);right:0;overflow:hidden}
+.refb{position:absolute;top:3px;height:12px;display:flex;align-items:center;gap:4px;padding:0 3px 0 6px;cursor:ew-resize;touch-action:none;
+  font-size:8px;letter-spacing:.06em;color:#0B0D11;white-space:nowrap;overflow:hidden;opacity:.85}
+.refb.off{opacity:.3}
+.refb .x{cursor:pointer;padding:0 3px;font-weight:700;background:rgba(0,0,0,.25);color:#fff}
+.refb .sn{cursor:pointer;padding:0 3px;background:rgba(0,0,0,.25);color:#fff}
+#tl-cells{position:absolute;left:0;top:calc(64px + var(--ref-row,0px));height:30px;right:0}
+#tl-fills{position:absolute;left:0;top:calc(94px + var(--ref-row,0px));height:16px;right:0}
+.fb{position:absolute;top:2px;height:11px;border:1px solid rgba(255,201,79,.35);cursor:pointer}
+.fb.has{background:rgba(255,201,79,.55);border-color:rgba(255,201,79,.8)}
+.fb.rep{opacity:.35;border-style:dashed}
+.cel{cursor:pointer}
+.cel.cur,.fb.cur{box-shadow:inset 0 0 0 1px #fff}
+body.step-draw.lane-line .cel.cur{outline:2px solid var(--acc);outline-offset:-1px;z-index:2}
+body.step-draw.lane-fill .fb.cur{outline:2px solid var(--acc);outline-offset:-1px;z-index:2}
+.cel .rh,.fb .rh{position:absolute;right:0;top:0;bottom:0;width:6px;cursor:ew-resize;background:rgba(232,236,242,.12)}
+.cel .rh:hover,.fb .rh:hover{background:var(--acc-pt)}
 .cel{position:absolute;top:3px;height:24px;display:flex;align-items:center;justify-content:center;overflow:hidden;
   border:1px solid rgba(var(--acc-ptRGB),.45);background:rgba(var(--acc-ptRGB),.1);
   font-size:8px;letter-spacing:.04em;color:rgba(232,236,242,.7)}
@@ -231,7 +276,7 @@ body.dragover #stage{outline:1px dashed rgba(var(--accRGB),.8);outline-offset:-1
 .dk-prog .m{font-family:var(--jp);font-size:10px;letter-spacing:.06em;color:rgba(232,236,242,.55)}
 
 /* ---------- 詳細パネル・設定 ---------- */
-#qe{right:268px;top:calc(76px + var(--safe-t));width:clamp(290px,24vw,360px)}
+#qe{right:calc(var(--sw) + var(--iw) + 16px);top:calc(76px + var(--safe-t));width:clamp(290px,24vw,360px)}
 #set-ovl{position:fixed;inset:0;z-index:100;display:none;background:rgba(3,4,6,.6);
   align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 #set-ovl.show{display:flex}
@@ -289,3 +334,22 @@ body.harness #harness-shot{display:block}
 .row .th.mk{display:flex;align-items:center;justify-content:center;background:rgba(232,236,242,.06);
   font-family:var(--jp);font-size:16px;color:rgba(232,236,242,.7)}
 .row.it .nm{font-family:var(--jp);font-weight:500;font-size:11px;letter-spacing:.04em}
+
+/* ---------- 02 DRAW のドック ---------- */
+.dk-sw{display:flex;flex-wrap:wrap;gap:3px;width:152px}
+.dk-sw button{width:16px;height:16px;border:1px solid rgba(232,236,242,.25);cursor:pointer;padding:0}
+.dk-sw button.on{outline:2px solid var(--acc2);outline-offset:1px}
+.dk-cur{display:flex;flex-direction:column;align-items:center;gap:3px}
+.dk-cur .chip{width:30px;height:30px;border:1px solid rgba(232,236,242,.4);position:relative;cursor:pointer}
+.dk-cur .chip input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dk-cur .lb{font-size:8px;letter-spacing:.12em;color:rgba(232,236,242,.45)}
+.rail.fe .t{color:var(--mark)}
+.dk-refs{display:flex;flex-direction:column;gap:3px;min-width:220px;max-height:62px;overflow-y:auto}
+.dk-refs .rr{display:flex;align-items:center;gap:5px;font-size:9px;color:rgba(232,236,242,.7)}
+.dk-refs .rr i{width:10px;height:10px;flex:none}
+.dk-plates{display:flex;gap:4px;flex-wrap:nowrap;max-width:360px;overflow-x:auto}
+.dk-plates button{flex:none;width:54px;height:40px;padding:0;border:1px solid var(--line);background:#1C1F24 center/contain no-repeat;cursor:pointer;position:relative}
+.dk-plates button span{position:absolute;left:0;right:0;bottom:0;font-size:7px;background:rgba(0,0,0,.6);color:#fff;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dk-plates button:hover{border-color:var(--acc-hover-line)}
+.qd-sb.off{opacity:.32;pointer-events:none}
+.cel,.fb,.refb{touch-action:none}

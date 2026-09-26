@@ -13,11 +13,13 @@ LP.io = LP.io || {};
 (function(){
   'use strict';
   const PREF_LS = 'liveplate_export_v1';
-  const ex = { res: 1920, q: 'webp80', ppf: 20, busy: false, abort: false, msg: '', p: 0 };
-  try{ const o = JSON.parse(localStorage.getItem(PREF_LS) || '{}'); ['res', 'q', 'ppf'].forEach(k => { if(o[k] != null) ex[k] = o[k]; }); }catch(e){}
+  // kind＝ドックで選んでいる出口（html／seq）。seq＝SEQ PNG（io/export-seq.js）。seqMode＝合体／線／塗／線+塗、seqTo＝zip／フォルダ
+  const ex = { kind: 'html', res: 1920, q: 'webp80', ppf: 20, seqMode: 'comp', seqTo: 'zip', busy: false, abort: false, msg: '', p: 0 };
+  const PREF_KEYS = ['kind', 'res', 'q', 'ppf', 'seqMode', 'seqTo'];
+  try{ const o = JSON.parse(localStorage.getItem(PREF_LS) || '{}'); PREF_KEYS.forEach(k => { if(o[k] != null) ex[k] = o[k]; }); }catch(e){}
 
   function exportState(){ return ex; }
-  function saveExportPrefs(){ try{ if(!LP.HARNESS_ON) localStorage.setItem(PREF_LS, JSON.stringify({ res: ex.res, q: ex.q, ppf: ex.ppf })); }catch(e){} }
+  function saveExportPrefs(){ try{ if(!LP.HARNESS_ON){ const o = {}; PREF_KEYS.forEach(k => { o[k] = ex[k]; }); localStorage.setItem(PREF_LS, JSON.stringify(o)); } }catch(e){} }
 
   /* 書き出しに乗るプレート（層から参照されているものだけ） */
   function usedPlates(book){
@@ -57,6 +59,7 @@ LP.io = LP.io || {};
 
   async function exportHtml(){
     if(ex.busy){ ex.abort = true; return; }
+    await LP.cells.flush();                    // 02 DRAW で描いた絵を Blob へ
     const book = LP.book;
     const plates = usedPlates(book);
     if(!plates.length && !book.sheets.some(s => (s.items || []).length || (s.panels || []).length)){ LP.ui.toast('書き出す絵がありません（紙に層・コマ・仕上げ素材を置いてください）'); return; }
@@ -140,5 +143,5 @@ LP.io = LP.io || {};
     }
   }
 
-  Object.assign(LP.io, { exportState, saveExportPrefs, estimateHtml, exportHtml });
+  Object.assign(LP.io, { exportState, saveExportPrefs, estimateHtml, exportHtml, fmtMB });
 })();
