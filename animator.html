@@ -780,7 +780,29 @@ html,body{
 }
 .pal-cell.add-slot:hover{border-color:var(--acid);color:var(--acid);transform:none;}
 .pal-cell:hover{transform:scale(1.15);z-index:2;}
-.pal-cell.fixed-slot:nth-child(11){box-shadow:inset 0 0 0 1px rgba(255,255,255,0.35);}
+.pal-cell.fixed-slot[data-i="10"]{box-shadow:inset 0 0 0 1px rgba(255,255,255,0.35);}
+.pal-now{
+  grid-column:span 2;grid-row:span 2;min-height:55px;   /* 26px×2＋隙間3px（行の高さは中身で決まるので明示） */
+  border:1px solid rgba(255,255,255,0.35);border-radius:2px;cursor:pointer;position:relative;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,0.35);
+}
+.pal-now span{position:absolute;left:3px;bottom:2px;font-family:var(--mono);font-size:8px;letter-spacing:0.02em;pointer-events:none;}
+.pal-now::after{content:'HSB';position:absolute;right:3px;top:2px;font-family:var(--mono);font-size:7px;color:rgba(255,255,255,0.7);
+  background:rgba(0,0,0,0.45);padding:0 2px;border-radius:1px;pointer-events:none;}
+.pal-div{grid-column:1/-1;height:1px;background:rgba(255,255,255,0.18);margin:2px 0;}
+/* HSB ピッカー（パレットの大きいチップから開く） */
+#hsb-pop{position:fixed;z-index:400;display:none;width:184px;padding:8px;
+  background:rgba(16,7,34,0.98);border:1px solid var(--border-bright);box-shadow:0 8px 40px rgba(0,0,0,0.7);
+  font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.7);touch-action:none;}
+#hsb-pop.show{display:block;}
+#hsb-sv,#hsb-hue{display:block;width:168px;border:1px solid rgba(255,255,255,0.2);cursor:crosshair;touch-action:none;}
+#hsb-sv{height:120px;}
+#hsb-hue{height:16px;margin-top:6px;}
+.hsb-row{display:flex;align-items:center;gap:5px;margin-top:6px;}
+.hsb-sw{width:22px;height:18px;border:1px solid rgba(255,255,255,0.3);}
+#hsb-hex{flex:1;min-width:0;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.2);color:#fff;font-family:var(--mono);font-size:10px;padding:2px 4px;}
+.hsb-row button{background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.7);font-family:var(--mono);font-size:9px;padding:3px 6px;cursor:pointer;}
+.hsb-row button:hover{color:var(--acid);border-color:var(--acid);}
 .pal-cell.on{
   border-color:var(--acid);
   box-shadow:0 0 0 1px var(--acid);
@@ -946,14 +968,24 @@ input[type=range]::-moz-range-thumb{
 .lh-row.cur{border-color:rgba(255,79,168,0.55);background:rgba(255,79,168,0.08);}
 .lh-row.cur .lh-name{color:var(--acid);}
 .lh-spacer{height:18px;flex-shrink:0;}
-.lh-name{width:14px;text-align:center;font-size:11px;cursor:pointer;color:rgba(255,255,255,0.75);}
+.lh-name{width:36px;text-align:left;cursor:pointer;color:rgba(255,255,255,0.8);
+  /* 2026-10-05: 線/塗 → LINE / CELL。Bank Gothic(細) では小さくて読みにくいので太いゴシックで */
+  font-family:-apple-system,'Helvetica Neue','Arial Black',Arial,sans-serif;font-weight:800;font-size:10px;letter-spacing:0.04em;}
 .lh-name:hover{color:var(--acid);}
 .lh-vis,.lh-lock{
   width:16px;height:13px;padding:0;
   background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.18);border-radius:2px;
   color:rgba(255,255,255,0.65);font-size:8px;line-height:11px;text-align:center;cursor:pointer;
 }
-.lh-vis.off{color:rgba(90,233,255,0.9);border-color:rgba(90,233,255,0.5);background:rgba(60,0,0,0.65);}
+.lh-vis.off{border-color:rgba(255,120,120,0.5);background:rgba(60,0,0,0.65);}
+/* 表示 ON/OFF は目のアイコン（econte の CUT 枠と同じ作法）。OFF は薄く＋斜線 */
+.lh-vis,.ref-btn.eye{position:relative;font-size:10px;line-height:1;}
+.ref-btn.eye{min-width:28px;}
+.lh-vis.off,.ref-btn.eye.off{opacity:0.55;}
+.lh-vis.off::after,.ref-btn.eye.off::after{
+  content:'';position:absolute;left:12%;top:48%;width:76%;height:1.5px;
+  background:rgba(255,120,120,.95);transform:rotate(-20deg);pointer-events:none;
+}
 .lh-lock{opacity:0.35;}
 .lh-lock.on{opacity:1;border-color:var(--neon);background:rgba(255,210,122,0.15);}
 @media (pointer:coarse){
@@ -1234,6 +1266,9 @@ input[type=range]::-moz-range-thumb{
   opacity:0.4;
   border-color:var(--neon);
 }
+/* 指の長押しでつまんだコマ（並べ替え中） */
+.fc.lifted,.fc-empty.lifted{opacity:0.75;transform:translateY(-3px);box-shadow:0 0 0 2px var(--neon),0 6px 14px rgba(0,0,0,0.6);}
+.fc,.fc-empty{-webkit-touch-callout:none;}
 .fc.selected, .fc-empty.selected{
   outline:2px solid #FF6FB5;
   outline-offset:-2px;
@@ -1745,7 +1780,7 @@ input[type=range]::-moz-range-thumb{
   <!-- STAGE -->
   <div id="stage" class="">
     <div id="stage-info">
-      <b id="info-res">2048×1152</b> · ZOOM <b id="info-zoom">41%</b> · <b id="info-lane">線</b>
+      <b id="info-res">2048×1152</b> · ZOOM <b id="info-zoom">41%</b> · <b id="info-lane">LINE</b>
     </div>
     <div id="canvas-wrap" style="width: 842.457px; height: 473.882px; transform: translate(85.2755px, 5.00258px) scaleX(1); transform-origin: 50% 50%;">
       <canvas class="layer" id="bg-layer" width="2048" height="1152" style="width: 842.457px; height: 473.882px;"></canvas>
@@ -1860,13 +1895,13 @@ input[type=range]::-moz-range-thumb{
 
     <div id="lane-head">
       <div class="lh-row" data-lane="line">
-        <span class="lh-name" title="線レーンに描く（L で切替）">線</span>
-        <button class="lh-vis" title="線レーンの表示 ON/OFF">●</button>
+        <span class="lh-name" title="線レーン LINE に描く（L で切替）">LINE</span>
+        <button class="lh-vis" title="線レーンの表示 ON/OFF">👁</button>
         <button class="lh-lock" title="線レーンをロック（描けなくする）">🔒</button>
       </div>
       <div class="lh-row" data-lane="fill">
-        <span class="lh-name" title="塗レーンに描く（L で切替）">塗</span>
-        <button class="lh-vis" title="塗レーンの表示 ON/OFF">●</button>
+        <span class="lh-name" title="塗レーン CELL に描く（L で切替）">CELL</span>
+        <button class="lh-vis" title="塗レーンの表示 ON/OFF">👁</button>
         <button class="lh-lock" title="塗レーンをロック（描けなくする）">🔒</button>
       </div>
       <div class="lh-spacer"></div>
@@ -1915,6 +1950,10 @@ input[type=range]::-moz-range-thumb{
       <div class="ref-frame-row">
         <button id="btn-frame-edit" class="ref-btn" title="このレイヤーに直接描画するモード（ON中は下絵に描ける）">EDIT</button>
         <button id="btn-frame-clear" class="ref-btn del" title="FRAMEレイヤーをクリア">CLR</button>
+      </div>
+      <div class="ref-frame-row" style="margin-top:5px;">
+        <button id="btn-frame-seq" class="ref-btn" title="FRAME（下絵）だけを連番PNGでZIP書き出し（万一消えたとき用）。&#10;線・塗りは入りません。出ていないコマは透明1枚。&#10;戻すときは REFERENCES の + JSON / SEQ で PNG を全部選ぶ">⇩ SEQ PNG</button>
+        <button id="btn-frame-json" class="ref-btn" title="FRAME（下絵）だけを JSON で書き出し（絵1枚＋出る範囲）。&#10;+ JSON / SEQ で読むと、同じ位置・同じ範囲の IMG 参照として戻ります">⇩ JSON</button>
       </div>
       <div class="ref-op-row" style="margin-top:6px;">
         <span class="ref-op-tag">表示</span>
@@ -2146,6 +2185,20 @@ input[type=range]::-moz-range-thumb{
   <div id="tl-resize" title="ドラッグで高さ調整（下のセクションを隠せます）"></div>
 </div>
 
+<!-- HSB ピッカー（パレット先頭の大きいチップから開く・2026-10-05） -->
+<div id="hsb-pop">
+  <canvas id="hsb-sv" width="168" height="120"></canvas>
+  <canvas id="hsb-hue" width="168" height="16"></canvas>
+  <div class="hsb-row">
+    <span class="hsb-sw" id="hsb-old" title="開く前の色（タップで戻す）"></span>
+    <span class="hsb-sw" id="hsb-new" title="いまの色"></span>
+    <input type="text" id="hsb-hex" maxlength="7" spellcheck="false" title="#RRGGBB（Enter で反映）">
+  </div>
+  <div class="hsb-row">
+    <span id="hsb-val" style="flex:1;">H0 S0 B0</span>
+    <button id="hsb-close" title="閉じる（色はもう入っています）">OK</button>
+  </div>
+</div>
 <!-- EXPORT OVERLAY（進捗＋キャンセル。SEQ PNG / VIDEO 共通） -->
 <div id="export-ov">
   <div class="eov-msg" id="eov-msg">EXPORTING…</div>
@@ -2695,6 +2748,7 @@ const state = {
     opacity: 0.4,    // 0..1
     editMode: false, // true = 描画ターゲットがframeLayerになる
     x: 0, y: 0, scale: 1, // 表示transform（EDIT画も移動/拡縮可能。既定は等倍0,0）
+    tin: 0, tout: null,   // 2026-10-05: 出る範囲（tick）。null＝最後まで。画像の帯と同じくトリムできる
   },
   // 参照ANIMATOR（複数のANIMATORをコマ同期で重ね表示。書き出し/COMPOSERには行かない）
   // [{id,name,projectId,visible,opacity,color, ticks:[Image|null], totalTicks, fps,
@@ -2713,7 +2767,7 @@ const state = {
 //   コンポジタに任せるので、ストローク中の JS の仕事は今までと同じ「1枚に描く」だけ。
 // ============================================================
 const LANES = ['line', 'fill'];
-const LANE_JP = { line: '線', fill: '塗' };
+const LANE_JP = { line: 'LINE', fill: 'CELL' };   // 2026-10-05: 表示名（線/塗 → LINE/CELL）
 const FILL_WALL_A = 128;   // 塗レーンの FILL が「壁」とみなす線レーンのα
 function laneCtx(L){ return L === 'fill' ? fillCtx : lineCtx; }
 function laneCanvas(L){ return L === 'fill' ? fillCanvas : lineCanvas; }
@@ -2736,7 +2790,7 @@ function applyLaneStyle(){
     const L = row.dataset.lane, cfg = state.lanes[L];
     row.classList.toggle('cur', L === curLane());
     const v = row.querySelector('.lh-vis');
-    v.classList.toggle('off', !cfg.visible); v.textContent = cfg.visible ? '●' : '✕';
+    v.classList.toggle('off', !cfg.visible);
     row.querySelector('.lh-lock').classList.toggle('on', !!cfg.locked);
   });
   const strip = document.getElementById('frame-strip');
@@ -2821,12 +2875,12 @@ function laneBlocked(){
 function paintLanesFrom(frame){
   const W = CFG.WORK_W, H = CFG.WORK_H;
   if(frame && frame.kind === 'draw' && frame.line){
-    lineCtx.putImageData(new ImageData(new Uint8ClampedArray(frame.line), W, H), 0, 0);
+    lineCtx.putImageData(new ImageData(frame.line instanceof Uint8ClampedArray ? frame.line : new Uint8ClampedArray(frame.line), W, H), 0, 0);   // putImageData は読むだけ＝コピー不要
   } else {
     lineCtx.clearRect(0, 0, W, H);
   }
   if(frame && frame.kind === 'draw' && frame.fill){
-    fillCtx.putImageData(new ImageData(new Uint8ClampedArray(frame.fill), W, H), 0, 0);
+    fillCtx.putImageData(new ImageData(frame.fill instanceof Uint8ClampedArray ? frame.fill : new Uint8ClampedArray(frame.fill), W, H), 0, 0);   // putImageData は読むだけ＝コピー不要
   } else {
     fillCtx.clearRect(0, 0, W, H);
   }
@@ -3487,13 +3541,10 @@ function selPointerUp(){
 // ============================================================
 function applyFrameLayerStyle(){
   const fl = state.frameLayer;
-  // 可視性は「不透明度>0」で判定（専用の表示ON/OFFボタンは廃止）。
-  // 編集モード中は強制的に見えるよう下限0.6を確保。REFマスターOFFで一括非表示。
-  const shown = state.refMasterShow && (fl.editMode || fl.opacity > 0);
-  frameLayerCanvas.style.display = shown ? 'block' : 'none';
+  // 可視性は「不透明度>0」かつ「出る範囲（tin〜tout）に今のコマが入っている」で判定（applyFrameLayerTick）。
+  // 編集モード中は範囲の外でも見える（描いているものが見えないと困る）。REFマスターOFFで一括非表示。
+  applyFrameLayerTick();
   frameLayerCanvas.style.opacity = fl.editMode ? Math.max(0.6, fl.opacity) : fl.opacity;
-  // 内部フラグも整合（保存/スポイト合成判定で参照される）
-  fl.visible = shown;
   // 編集モードを示すボタン状態
   const btn = document.getElementById('btn-frame-edit');
   if(btn) btn.classList.toggle('on', fl.editMode);
@@ -3506,7 +3557,44 @@ function applyFrameLayerStyle(){
   const stageEl = document.getElementById('stage');
   if(stageEl) stageEl.classList.toggle('frame-edit', fl.editMode);
 }
+// 保存から出る範囲を読む（旧保存＝範囲なし＝全尺）
+function readFrameLayerRange(o){
+  state.frameLayer.tin  = (o && typeof o.tin === 'number') ? Math.max(0, o.tin | 0) : 0;
+  state.frameLayer.tout = (o && typeof o.tout === 'number') ? Math.max(1, o.tout | 0) : null;
+}
+// 今のティックで下絵を出すか（再生・スクラブ・コマ切替のたびに renderRefLayer から呼ばれる）
+function applyFrameLayerTick(t){
+  const fl = state.frameLayer;
+  if(typeof t !== 'number') t = currentSyncTick();
+  const shown = state.refMasterShow && (fl.editMode || (fl.opacity > 0 && refImgVisibleAt(fl, t)));
+  const disp = shown ? 'block' : 'none';
+  if(frameLayerCanvas.style.display !== disp) frameLayerCanvas.style.display = disp;
+  fl.visible = shown;   // 内部フラグも整合（保存/スポイト合成/タイムラプスが参照）
+}
+// 今のコマ（セル）の範囲。新しく置いた静止画・初めて描いた下絵はここにだけ出す
+function curCelRange(){
+  const i = Math.max(0, Math.min(state.currentFrame, state.frames.length - 1));
+  const f = state.frames[i];
+  const tin = frameStartTick(i);
+  return { tin, tout: tin + Math.max(1, f ? f.duration : 1) };
+}
+function frameLayerRangeToCurrentCel(){
+  const r = curCelRange();
+  state.frameLayer.tin = r.tin; state.frameLayer.tout = r.tout;
+  stageToast('FRAME は ' + (r.tin + 1) + '〜' + r.tout + 'コマに出します（REF レーンの帯で伸ばせます／Wタップで全尺）');
+}
+// 編集中に範囲の外のコマで描いたら、そのコマまで範囲を広げる（描いたのに出ない、を作らない）
+function frameLayerExtendToCurrentCel(){
+  const fl = state.frameLayer;
+  if(refImgVisibleAt(fl, currentSyncTick())) return;
+  const r = curCelRange();
+  fl.tin = Math.min(fl.tin | 0, r.tin);
+  if(fl.tout != null) fl.tout = Math.max(fl.tout | 0, r.tout);
+  stageToast('FRAME の範囲を ' + ((fl.tin | 0) + 1) + '〜' + (fl.tout == null ? '最後' : fl.tout) + 'コマに広げました');
+}
+let gFlHadInk = false;  // 直前まで下絵に何か描いてあったか（空→初めて描いた、を見分ける）
 let gFlHasInk = null;   // null = 未計測（編集のたびに落とす）
+let gFlPNG = undefined;  // 書き出し用 PNG の控え（undefined = 未作成／null = 空）。meta 保存のたびに 4K を PNG 化しない
 function frameLayerHasInk(){
   if(gFlHasInk !== null) return gFlHasInk;
   const d = frameLayerCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H).data;
@@ -3514,32 +3602,36 @@ function frameLayerHasInk(){
   for(let i = 3; i < d.length; i += 4){ if(d[i]){ gFlHasInk = true; break; } }
   return gFlHasInk;
 }
-function scheduleFrameLayerSave(){
-  gFlHasInk = null;
+// hasInk … 呼び出し側で分かっているとき（パッチ履歴の差分計算で全画素を見た直後）は渡す＝読み直さない
+function scheduleFrameLayerSave(hasInk){
+  gFlHasInk = (typeof hasInk === 'boolean') ? hasInk : null;
+  gFlPNG = undefined;
+  // 2026-10-05: 何も無かった下絵に初めて描いたら「いま選んでいるコマ」にだけ出す（Wタップで全尺）
+  if(frameLayerHasInk() && !gFlHadInk) frameLayerRangeToCurrentCel();
+  gFlHadInk = frameLayerHasInk();
   if(typeof updateRefLane === 'function') updateRefLane();
+  if(typeof applyFrameLayerTick === 'function') applyFrameLayerTick();
   // FRAMEレイヤー画像はメタに乗っているのでmetaを汚す
   if(typeof markMetaDirty === 'function') markMetaDirty();
   else if(typeof scheduleSave === 'function') scheduleSave();
 }
 function clearFrameLayer(){
   frameLayerCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
-  scheduleFrameLayerSave();
+  scheduleFrameLayerSave(false);
 }
 function frameLayerToPNGDataURL(){
-  // 空(全透明)ならnull
-  const img = frameLayerCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H);
-  let hasContent = false;
-  const d = img.data;
-  for(let i = 3; i < d.length; i += 4){
-    if(d[i] !== 0){ hasContent = true; break; }
-  }
-  if(!hasContent) return null;
-  return frameLayerCanvas.toDataURL('image/png');
+  // 空(全透明)ならnull。中身が変わっていなければ前回の PNG をそのまま返す
+  if(gFlPNG !== undefined) return gFlPNG;
+  gFlPNG = frameLayerHasInk() ? frameLayerCanvas.toDataURL('image/png') : null;
+  return gFlPNG;
 }
 function loadFrameLayerFromDataURL(dataURL){
+  resetFlHistory();   // 中身が丸ごと入れ替わる＝差分の基準も捨てる
   return new Promise((resolve) => {
     if(!dataURL){
       frameLayerCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
+      gFlHasInk = false; gFlPNG = null; gFlHadInk = false;
+      updateRefLane();
       resolve();
       return;
     }
@@ -3547,7 +3639,9 @@ function loadFrameLayerFromDataURL(dataURL){
     im.onload = () => {
       frameLayerCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
       frameLayerCtx.drawImage(im, 0, 0, CFG.WORK_W, CFG.WORK_H);
-      gFlHasInk = null; updateRefLane();
+      gFlHasInk = null; gFlPNG = undefined;
+      gFlHadInk = frameLayerHasInk();
+      updateRefLane(); applyFrameLayerTick();
       resolve();
     };
     im.onerror = () => resolve();
@@ -3557,29 +3651,77 @@ function loadFrameLayerFromDataURL(dataURL){
 
 // ============================================================
 // FRAME LAYER HISTORY (FRAMEレイヤー独立 Undo/Redo)
+//   2026-10-05: 全面スナップ → **変わった矩形だけのパッチ**に変更。
+//   4096×2304 だと全面1枚が 37.7MB で、旧方式（20枚）は 750MB に届いて iPad のタブが落ちていた。
+//   基準（flMirror）を1枚だけ持ち、編集後の画面と比べて差分の矩形を {before, after} で積む。
+//   ストローク・FILL・投げ縄・クリアのどの経路でも同じ（描いた道具を知らなくてよい）。
 // ============================================================
-const flHistory = [];
-let flHistIdx = -1;
-const FL_HIST_MAX = 20;
+const flHistory = [];   // [{x,y,w,h,before:ImageData,after:ImageData}]
+let flHistIdx = -1;     // 適用済みの最後のパッチ（-1 = 何も無い）
+const FL_HIST_MAX = 40;
+const FL_HIST_BYTES = (window.matchMedia && matchMedia('(pointer:coarse)').matches ? 96 : 320) * 1048576;
+let flMirror = null;    // 直前の確定状態（ImageData）。編集モードを抜けたら捨てる
+function resetFlHistory(){ flHistory.length = 0; flHistIdx = -1; flMirror = null; }
 
-// 編集前の状態を基準スナップとして1枚積んでおく（最初の1編集もUndoできるように）
-// ※必ず「編集を加える前」に呼ぶこと
+// ※必ず「編集を加える前」に呼ぶこと（ここで取った姿との差分がパッチになる）
 function ensureFlBaseline(){
-  if(flHistory.length === 0){
-    flHistory.push(frameLayerCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H));
-    flHistIdx = 0;
+  if(!flMirror || flMirror.width !== CFG.WORK_W || flMirror.height !== CFG.WORK_H){
+    flMirror = frameLayerCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H);
   }
 }
+function flPatchBytes(p){ return p.w * p.h * 8; }
 function pushFrameLayerHistory(){
-  ensureFlBaseline(); // 念のため（通常は編集前に呼ばれ済み）
-  // 現在のframeLayerCtxピクセルをスナップ
-  const snap = frameLayerCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H);
+  if(!flMirror){ scheduleFrameLayerSave(); return; }
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  const cur = frameLayerCtx.getImageData(0, 0, W, H);
+  const a = new Uint32Array(cur.data.buffer), b = new Uint32Array(flMirror.data.buffer);
+  let x0 = W, y0 = H, x1 = -1, y1 = -1, ink = false;
+  for(let y = 0; y < H; y++){
+    const row = y * W;
+    let rowHit = false;
+    for(let x = 0; x < W; x++){
+      const v = a[row + x];
+      if(v) ink = true;
+      if(v !== b[row + x]){
+        if(x < x0) x0 = x;
+        if(x > x1) x1 = x;
+        rowHit = true;
+      }
+    }
+    if(rowHit){ if(y < y0) y0 = y; y1 = y; }
+  }
+  if(x1 < 0){ scheduleFrameLayerSave(ink); return; }   // 何も変わっていない
+  const w = x1 - x0 + 1, h = y1 - y0 + 1;
+  const cut = (src) => {
+    const out = new ImageData(w, h);
+    const s = src.data, o = out.data;
+    for(let y = 0; y < h; y++){
+      const st = ((y0 + y) * W + x0) * 4;
+      o.set(s.subarray(st, st + w * 4), y * w * 4);
+    }
+    return out;
+  };
+  const patch = { x: x0, y: y0, w, h, before: cut(flMirror), after: cut(cur) };
+  flMirror = cur;
   if(flHistIdx < flHistory.length - 1) flHistory.splice(flHistIdx + 1);
-  flHistory.push(snap);
-  if(flHistory.length > FL_HIST_MAX) flHistory.shift();
+  flHistory.push(patch);
+  // 枚数と合計バイトの両方で古いものから捨てる（最後の1枚は残す）
+  let bytes = 0;
+  for(const p of flHistory) bytes += flPatchBytes(p);
+  while(flHistory.length > 1 && (flHistory.length > FL_HIST_MAX || bytes > FL_HIST_BYTES)){
+    bytes -= flPatchBytes(flHistory.shift());
+  }
   flHistIdx = flHistory.length - 1;
-  scheduleFrameLayerSave();
+  if(ink && gFlHadInk) frameLayerExtendToCurrentCel();
+  scheduleFrameLayerSave(ink);
   gLog({ type: 'framelayer' });
+}
+function flApplyPatch(p, img){
+  frameLayerCtx.putImageData(img, p.x, p.y);
+  if(flMirror && flMirror.width === CFG.WORK_W && flMirror.height === CFG.WORK_H){
+    const W = CFG.WORK_W, d = flMirror.data, s = img.data;
+    for(let y = 0; y < p.h; y++) d.set(s.subarray(y * p.w * 4, (y + 1) * p.w * 4), ((p.y + y) * W + p.x) * 4);
+  }
 }
 // （単発の undoFrameLayer/redoFrameLayer は global undo log に統合済み）
 
@@ -3615,6 +3757,8 @@ function parseRefSource(json, fallbackName){
     projectId: json.projectId || null,
     fps: typeof json.fps === 'number' ? json.fps : 24,
     cells,
+    // FRAME の ⇩JSON が付ける「出る範囲」。IMG として戻すときにそのまま使う
+    refRange: (json.refRange && typeof json.refRange.tin === 'number') ? json.refRange : null,
   };
 }
 
@@ -3642,9 +3786,33 @@ function expandRefTicks(source){
   });
 }
 
+// 絵が1枚だけの JSON / PNG は「静止画」＝ IMG として置く（2026-10-05）。
+//   ANI/SEQ の帯は時間を持つ前提なので、1枚だと帯を短くできず全尺に出っぱなしになっていた。
+//   前後に空コマがある（＝出る時間が決まっている。FRAME の ⇩JSON など）ならその範囲、
+//   無ければ「いま選んでいるコマ」に出す。
+async function addRefStillAsImage(src){
+  let t = 0, hit = null, padded = false;
+  for(const c of src.cells){
+    const d = Math.max(1, c.duration | 0);
+    if(c.kind !== 'empty' && !c.hidden && c.image){ hit = { image: c.image, tin: t, tout: t + d }; }
+    else padded = true;
+    t += d;
+  }
+  if(!hit) return null;
+  const range = src.refRange ? { tin: Math.max(0, src.refRange.tin | 0), tout: (typeof src.refRange.tout === 'number') ? src.refRange.tout : undefined }
+              : padded ? { tin: hit.tin, tout: hit.tout } : curCelRange();
+  const o = await loadRefImageFromSrc(hit.image, Object.assign({ name: src.name }, range));
+  if(!o) return null;
+  if(!state.refMasterShow){ state.refMasterShow = true; applyRefMaster(); }
+  buildRefList(); applyRefImgUI(); renderRefLayer(); updateTimeTrack(); markMetaDirty(); scheduleSave();
+  stageToast(src.name + ' は1枚なので IMG で置きました（' + (range.tin + 1) + '〜' + (range.tout == null ? '最後' : range.tout) + 'コマ）');
+  return o;
+}
 async function addRefAnimator(json, fallbackName){
   const src = parseRefSource(json, fallbackName);
   if(!src){ modalAlert('フレームが含まれていません'); return; }
+  const stills = src.cells.filter(c => c.kind !== 'empty' && !c.hidden && c.image).length;
+  if(stills === 1 && await addRefStillAsImage(src)) return;
   const { ticks, totalTicks } = await expandRefTicks(src);
   const idx = state.refAnimators.length;
   // 新規はリスト先頭（=最前面）に挿入。「1番上から重なる」挙動
@@ -3665,6 +3833,9 @@ async function addRefAnimator(json, fallbackName){
     z: refTopZ(),         // 追加したものは一番手前
   });
   centerRefAnimator(state.refAnimators[0]); // 原寸・中央に初期配置
+  // 2026-10-05: 読み込んだらすぐ MOVE することが多いので、置いたものを選んだ状態にする
+  state.refSel = { type: 'anim', id: state.refAnimators[0].id };
+  applyRefImgUI();
   buildRefList();
   updateTimeTrack();
   renderRefLayer();
@@ -3889,9 +4060,11 @@ function updateRefLane(){
       bar.title = name + '：横ドラッグで出るタイミングをずらす（Wクリックで先頭に戻す）' +
                   ((o.offset | 0) ? '／いま ' + ((o.offset | 0) > 0 ? '+' : '') + (o.offset | 0) + 'コマ' : '');
       wireRefBarDrag(bar, o);
-    } else if(row.type === 'img'){
-      // 画像：イン点〜アウト点（既定は全尺）。端＝トリム／中＝範囲ごと移動／Wクリック＝全尺に戻す
+    } else {
+      // 画像・下絵（FRAME）：イン点〜アウト点。端＝トリム／中＝範囲ごと移動／Wクリック＝全尺に戻す
+      //   2026-10-05: 下絵も同じ帯に（以前は全尺の固定線で、描いたコマだけに出す手段が無かった）
       bar.style.color = color;
+      if(row.type === 'frame') bar.classList.add('img');
       const x0 = tickToPx(o.tin | 0), e = refImgEnd(o);
       const x1 = e == null ? Math.max(endPx, timelineTotalPx()) : tickToPx(e);
       bar.style.left = x0 + 'px';
@@ -3901,13 +4074,7 @@ function updateRefLane(){
       bar.appendChild(tl); bar.appendChild(tr);
       const range = ((o.tin | 0) || e != null) ? '（いま ' + ((o.tin | 0) + 1) + '〜' + (e == null ? '最後' : e) + 'コマ）' : '（全尺）';
       bar.title = name + '：端をドラッグで出るコマを切る／中を横ドラッグで範囲ごと移動／Wクリックで全尺に戻す' + range;
-      wireRefImgBar(bar, o);
-    } else {
-      bar.style.color = color;
-      bar.style.left = '0px';
-      bar.style.width = Math.max(endPx, timelineTotalPx()) + 'px';
-      bar.title = name + '（全コマ共通の下絵・タップで選択）';
-      bar.addEventListener('click', () => selectRefFromLane(row.type, o.id));
+      wireRefImgBar(bar, o, row.type);
     }
     inner.appendChild(bar);
   });
@@ -4007,7 +4174,8 @@ function wireRefLabel(lbl, row, i, frameRows, nRows){
   lbl.addEventListener('pointercancel', () => { if(d && d.drop) d.drop.remove(); d = null; lbl.classList.remove('drag'); });
 }
 // 画像の帯：端＝イン/アウト、中＝範囲ごと移動、Wクリック＝全尺。ロック中は動かさない
-function wireRefImgBar(bar, o){
+function wireRefImgBar(bar, o, type){
+  type = type || 'img';
   bar.addEventListener('pointerdown', e => {
     if(e.button !== 0 && e.pointerType === 'mouse') return;
     e.preventDefault(); e.stopPropagation();
@@ -4044,7 +4212,7 @@ function wireRefImgBar(bar, o){
     bar.style.left = x0 + 'px';
     bar.style.width = Math.max(6, x1 - x0) + 'px';
     renderRefLayer();
-    stageToast((o.name || 'IMAGE') + '　' + ((o.tin | 0) + 1) + '〜' + (e2 == null ? '最後' : e2) + 'コマ');
+    stageToast((type === 'frame' ? 'FRAME' : (o.name || 'IMAGE')) + '　' + ((o.tin | 0) + 1) + '〜' + (e2 == null ? '最後' : e2) + 'コマ');
   });
   const end = () => {
     const d = gRefLaneDrag;
@@ -4055,14 +4223,14 @@ function wireRefImgBar(bar, o){
     if(o._laneTap && now - o._laneTap < 400){
       o._laneTap = 0;
       if(o.locked){ stageToast('🔒 ロック中の参照は動かせません'); return; }
-      if(!(o.tin | 0) && o.tout == null){ stageToast((o.name || 'IMAGE') + ' はもう全尺です'); return; }
+      if(!(o.tin | 0) && o.tout == null){ stageToast((type === 'frame' ? 'FRAME' : (o.name || 'IMAGE')) + ' はもう全尺です'); return; }
       o.tin = 0; o.tout = null;
       refTimingChanged(o);
-      stageToast((o.name || 'IMAGE') + ' を全尺に戻しました');
+      stageToast((type === 'frame' ? 'FRAME' : (o.name || 'IMAGE')) + ' を全尺に戻しました');
       return;
     }
     o._laneTap = now;
-    selectRefFromLane('img', o.id);
+    selectRefFromLane(type, o.id);
   };
   bar.addEventListener('pointerup', end);
   bar.addEventListener('pointercancel', () => { gRefLaneDrag = null; });
@@ -4147,8 +4315,9 @@ function renderRefLayer(tickOverride){
   refLayerCanvas.style.display = state.refMasterShow ? 'block' : 'none';
   // 2026-09-23 調整: 画像も ref-layer に一緒に描く（種類をまたいで並べ替えるため）。refimg-layer は使わない
   if(refImgCtx){ refImgCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H); refImgLayerCanvas.style.display = 'none'; }
-  if(!state.refMasterShow) return;
   const t = (typeof tickOverride === 'number') ? tickOverride : currentSyncTick();
+  applyFrameLayerTick(t);   // 下絵（FRAME）の出る範囲も同じティックで
+  if(!state.refMasterShow) return;
   refLayerCtx.imageSmoothingEnabled = true;
   // 奥 → 手前
   for(const it of refStack()){
@@ -4233,8 +4402,9 @@ function buildRefList(){
     btns.className = 'ref-item-btns';
     btns.style.marginTop = '5px';
     const visBtn = document.createElement('button');
-    visBtn.className = 'ref-btn' + (obj.visible ? ' on' : '');
-    visBtn.textContent = obj.visible ? '● VIS' : '✕ VIS';
+    visBtn.className = 'ref-btn eye' + (obj.visible ? ' on' : ' off');
+    visBtn.textContent = '👁';
+    visBtn.title = obj.visible ? '表示中（タップで隠す）' : '非表示（タップで表示）';
     visBtn.addEventListener('click', () => isImg ? toggleRefImgVis(obj.id) : toggleRefVis(obj.id));
     const lockBtn = document.createElement('button');
     lockBtn.className = 'ref-btn' + (obj.locked ? ' on' : '');
@@ -5161,6 +5331,7 @@ function setCanvasSize(newW, newH){
     const rs = recanvasDrawData(new Uint8ClampedArray(flData), oldW, oldH, newW, newH);
     frameLayerCtx.putImageData(new ImageData(rs, newW, newH), 0, 0);
   }
+  resetFlHistory(); gFlPNG = undefined;
   // 履歴・サムネ・表示を更新
   resetGlobalHistory();
   state.frames.forEach(regenThumb);
@@ -5572,7 +5743,8 @@ function pickToPalette(hex){
   state.fillColor = hex;
   if(typeof gPalette === 'undefined' || gPalSlot < 0 || gPalSlot >= gPalette.length) return;
   if(isPalLocked(gPalSlot)){
-    stageToast('明度チップは固定なのでパレットには入れていません（色のチップを選ぶか ＋ で枠を足す）');
+    updatePalNow();   // 枠には入れないが、いまの色（大きいチップ）には出す
+    stageToast('明度チップは固定なので枠には入れていません（左上の大きいチップがいまの色）');
     return;
   }
   gPalette[gPalSlot] = hex;
@@ -5604,8 +5776,19 @@ function screenEyedrop(){
 //   'base' … コマを開いた時点の姿（両レーン）。undo の底なので HISTORY_MAX で捨てない。
 //   'empty' … そのレーンはまだ無かった＝戻すときは clear する、という印。
 function laneSnap(L){ return laneCtx(L).getImageData(0, 0, CFG.WORK_W, CFG.WORK_H); }
+// 2026-10-05: base はコマの配列（f.line / f.fill）をそのまま包む＝コピーしない。
+//   f.line は「書き換えずに差し替える」約束（syncFrameFromCanvas が毎回新しい配列を入れる）なので共有して安全。
+//   4K だと1コマ開くたびに 37.7MB 増えていたのが 0 になる。
+function wrapLane(arr, L){
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  if(arr instanceof Uint8ClampedArray && arr.length === W * H * 4){
+    try{ return new ImageData(arr, W, H); }catch(e){}
+  }
+  return laneSnap(L);
+}
 function baseSnapshot(frame){
-  return { lane: 'base', line: laneSnap('line'), fill: (frame && frame.fill) ? laneSnap('fill') : 'empty' };
+  return { lane: 'base', line: wrapLane(frame && frame.line, 'line'),
+           fill: (frame && frame.fill) ? wrapLane(frame.fill, 'fill') : 'empty' };
 }
 function entryLanes(e){ return (e.lane === 'both' || e.lane === 'base') ? ['line', 'fill'] : [e.lane]; }
 // idx から手前に遡って、そのレーンが最後に記録された姿を返す（見つからなければ undefined）
@@ -5644,11 +5827,47 @@ function pushHistory(lanes){
   while(f.history.length > CFG.HISTORY_MAX + 1) f.history.splice(1, 1);
   f.histIdx = f.history.length - 1;
   f.strokeCount++;
-  syncFrameFromCanvas(f, want);
+  // 履歴の1枚とコマの配列は同じ中身なので共有する（getImageData＋コピーをもう1回しない）
+  syncFrameFromCanvas(f, want, e);
+  trimHistoryBudget(f);
   updateStats();
   markFrameDirty(f);
   state.lastEditWas = 'canvas'; // キャンバス操作を記録
   gLog({ type: 'canvas', frameId: f.id });
+}
+
+// 取り消し履歴の合計に上限を設ける（2026-10-05）。コマごとの HISTORY_MAX(50) だけだと
+//   4K（1枚 37.7MB）で1コマ 1.9GB まで積めてしまい、iPad はその前に落ちる。
+//   超えたら「いま描いていないコマ」の古い段から捨て、それでも超えるなら今のコマの古い段を捨てる。
+//   base（コマを開いた姿）と、いま表示している段より後ろ（redo 先）は捨てない。
+const HIST_BUDGET = (window.matchMedia && matchMedia('(pointer:coarse)').matches ? 640 : 2048) * 1048576;
+function histEntryBytes(e){
+  let b = 0;
+  if(e && e.lane !== 'base'){
+    if(e.line && e.line.data) b += e.line.data.byteLength;
+    if(e.fill && e.fill.data) b += e.fill.data.byteLength;
+  }
+  return b;
+}
+function trimHistoryBudget(cur){
+  let total = 0;
+  for(const f of state.frames) if(f.kind === 'draw' && f.history) for(const e of f.history) total += histEntryBytes(e);
+  if(total <= HIST_BUDGET) return;
+  // 捨てられるのは index 1（base の次）で、かつ histIdx が 2 以上のとき（今の姿は残す）
+  const canDrop = f => f.kind === 'draw' && f.history && f.history.length > 2 && f.histIdx >= 2;
+  let guard = 10000;
+  while(total > HIST_BUDGET && guard-- > 0){
+    let victim = null;
+    for(const f of state.frames){
+      if(f === cur || !canDrop(f)) continue;
+      if(!victim || f.history.length > victim.history.length) victim = f;
+    }
+    if(!victim && cur && canDrop(cur) && cur.history.length > 4) victim = cur;   // 今のコマは最低3段残す
+    if(!victim) break;
+    total -= histEntryBytes(victim.history[1]);
+    victim.history.splice(1, 1);
+    victim.histIdx--;
+  }
 }
 
 // ============================================================
@@ -5691,8 +5910,11 @@ function snapshotTL(){
       s.line        = f.line;              // syncFrameFromCanvas が新Array割当するので参照で安全
       s.fill        = f.fill;
       s.thumbCanvas = f.thumbCanvas;
-      s.history     = (f.history || []).slice(); // shallow copy（各snap自体は不変）
-      s.histIdx     = f.histIdx;
+      // 2026-10-05: 描画履歴は持たない。持つと捨てたはずの全面スナップ（4K で1枚 37.7MB）を
+      //   タイムライン履歴が握り続けて、上の上限が効かなくなる。消したコマを Undo で戻したときは
+      //   絵だけ戻り、そのコマの描画 Undo は戻した時点から始まる。
+      s.history     = [];
+      s.histIdx     = -1;
       s.strokeCount = f.strokeCount || 0;
     }
     return s;
@@ -5798,16 +6020,18 @@ function stepCanvasRedo(frameId){
   return true;
 }
 function stepFrameLayerUndo(){
-  if(flHistIdx <= 0) return false;
+  if(flHistIdx < 0) return false;
+  const p = flHistory[flHistIdx];
   flHistIdx--;
-  frameLayerCtx.putImageData(flHistory[flHistIdx], 0, 0);
+  flApplyPatch(p, p.before);
   scheduleFrameLayerSave();
   return true;
 }
 function stepFrameLayerRedo(){
   if(flHistIdx >= flHistory.length - 1) return false;
   flHistIdx++;
-  frameLayerCtx.putImageData(flHistory[flHistIdx], 0, 0);
+  const p = flHistory[flHistIdx];
+  flApplyPatch(p, p.after);
   scheduleFrameLayerSave();
   return true;
 }
@@ -5890,7 +6114,7 @@ function createBlankFrame(){
 // キャンバスの内容をフレームに同期（drawフレームのみ）。
 // lanes: 'line' | 'fill' | ['line','fill'] | 省略（＝既に持っている方だけ吸い上げる）
 //   ★省略時に fill を作らないのが肝。線だけのコマは今までと同じメモリ量のまま。
-function syncFrameFromCanvas(frame, lanes){
+function syncFrameFromCanvas(frame, lanes, snaps){
   if(!frame || frame.kind !== 'draw') return;
   // SPEC_20 P4: SEL で持ち上げている間は画面に「抜き跡」があるだけなので吸い上げない。
   //   こうしておくと autosave も取り消し（paintLanesFrom）も「持ち上げる前」の絵で済む。
@@ -5898,9 +6122,12 @@ function syncFrameFromCanvas(frame, lanes){
   const want   = lanes ? (Array.isArray(lanes) ? lanes : [lanes]) : null;
   const doLine = want ? want.indexOf('line') >= 0 : true;
   const doFill = want ? want.indexOf('fill') >= 0 : !!frame.fill;
-  if(doLine) frame.line = new Uint8ClampedArray(lineCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H).data);
+  // snaps … pushHistory が今取った ImageData。中身が同じなので配列を共有する（どちらも書き換えない約束）
+  const grab = (L, cx) => (snaps && snaps[L] && snaps[L].data) ? snaps[L].data
+                        : cx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H).data;
+  if(doLine) frame.line = grab('line', lineCtx);
   if(doFill){
-    frame.fill = new Uint8ClampedArray(fillCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H).data);
+    frame.fill = grab('fill', fillCtx);
     refreshFillBand(frame);
   }
   // サムネはいつも合成（塗→線）。現在コマなので画面の2枚をそのまま縮める
@@ -6073,7 +6300,9 @@ function totalTicks(){
 }
 // 表示中REFの最長ティック数（REFが手元プロジェクトより長い場合の延長用）
 function refHasTiming(){
-  return state.refAnimators.length > 0 || state.refImages.some(o => (o.tin | 0) > 0 || o.tout != null);
+  const fl = state.frameLayer;
+  return state.refAnimators.length > 0 || state.refImages.some(o => (o.tin | 0) > 0 || o.tout != null) ||
+         ((fl.tin | 0) > 0 || fl.tout != null);
 }
 function maxRefTicks(){
   let m = 0;
@@ -6320,10 +6549,21 @@ function setupCellInteraction(cell, frame, idx){
     isTouch = (e.pointerType === 'touch');
     const lane = (e.shiftKey || e.altKey) ? null : laneOfTarget(e.target);
     // 指の場合: ネイティブスクロールに任せる（preventDefaultしない、capture もしない）
+    //   2026-10-05: 長押し（動かさずに 0.35 秒）で「つまむ」→ そのまま横に動かして並べ替え。
+    //   つまむ前に指が動けば今までどおり横スクロール（touchmove を止めないので邪魔しない）。
     if(isTouch){
       // タップ判定だけ（短時間+小移動で switchToFrame）
       dragStart = { x: e.clientX, y: e.clientY, t: performance.now(), tap: true, lane };
       dragging = false;
+      clearTimeout(cell._lpTimer);
+      cell._lpTimer = setTimeout(() => {
+        if(!dragStart || !dragStart.tap) return;
+        dragStart.tap = false;
+        gTouchCellDrag = { cell, frame, idx, x: dragStart.x };
+        cell.classList.add('dragging', 'lifted');
+        if(navigator.vibrate) try{ navigator.vibrate(12); }catch(err){}
+        stageToast('コマをつまみました — 横に動かして離すと並べ替え');
+      }, 350);
       return;
     }
     // ペン/マウス: 即フレーム切替 + ドラッグ並び替え準備
@@ -6338,8 +6578,8 @@ function setupCellInteraction(cell, frame, idx){
     if(!dragStart) return;
     const dx = Math.abs(e.clientX - dragStart.x);
     if(isTouch){
-      // 指: 動いたらタップキャンセル
-      if(dx > 6) dragStart.tap = false;
+      // 指: 動いたらタップキャンセル（長押しも取り消し＝スクロールに任せる）
+      if(dx > 6 || Math.abs(e.clientY - dragStart.y) > 6){ dragStart.tap = false; clearTimeout(cell._lpTimer); }
       return;
     }
     // ペン/マウス: ドラッグ判定
@@ -6364,6 +6604,7 @@ function setupCellInteraction(cell, frame, idx){
     }
   });
   cell.addEventListener('pointerup', e => {
+    clearTimeout(cell._lpTimer);
     if(!dragStart) return;
     if(isTouch){
       // 指: タップなら切替
@@ -6378,38 +6619,13 @@ function setupCellInteraction(cell, frame, idx){
       return;
     }
     // ペン/マウス: ドラッグなら並び替え
-    if(dragging){
-      const target = findDropTarget(e.clientX);
-      document.querySelectorAll('#frame-strip .fc, #frame-strip .fc-empty').forEach(el => {
-        el.classList.remove('drop-target-left', 'drop-target-right', 'dragging');
-      });
-      if(target && target.cell !== cell){
-        let toIdx = parseInt(target.cell.dataset.idx);
-        if(!target.before) toIdx++;
-        // 複数選択中で、ドラッグ元セルが選択に含まれる場合 → 一括移動（元位置にempty）
-        if(state.selectedFrameIds.has(frame.id) && state.selectedFrameIds.size > 0){
-          moveSelectedFrames(toIdx);
-        } else {
-          const fromIdx = idx;
-          if(toIdx > fromIdx) toIdx--;
-          if(toIdx !== fromIdx){
-            const [moved] = state.frames.splice(fromIdx, 1);
-            state.frames.splice(toIdx, 0, moved);
-            state.currentFrame = toIdx;
-            buildStrip();
-            updateStripUI();
-            updateFramePos();
-            updateDurInfo();
-            markMetaDirty();
-            pushTimelineHistory();
-          }
-        }
-      }
-    }
+    if(dragging) dropCellAt(e.clientX, cell, frame, idx);
     dragStart = null;
     dragging = false;
   });
   cell.addEventListener('pointercancel', () => {
+    clearTimeout(cell._lpTimer);
+    if(gTouchCellDrag && gTouchCellDrag.cell === cell) return;   // つまんでいる最中の cancel は touch 側で片付ける
     dragStart = null;
     dragging = false;
     cell.classList.remove('dragging');
@@ -6418,6 +6634,77 @@ function setupCellInteraction(cell, frame, idx){
     });
   });
 }
+
+// ドロップ位置へ並べ替え（ペン/マウスのドラッグと、指の長押しドラッグの共通）
+function clearDropMarks(){
+  document.querySelectorAll('#frame-strip .fc, #frame-strip .fc-empty').forEach(el => {
+    el.classList.remove('drop-target-left', 'drop-target-right', 'dragging', 'lifted');
+  });
+}
+function markDropAt(clientX, cell){
+  const target = findDropTarget(clientX);
+  document.querySelectorAll('#frame-strip .fc, #frame-strip .fc-empty').forEach(el => {
+    el.classList.remove('drop-target-left', 'drop-target-right');
+  });
+  if(target && target.cell !== cell) target.cell.classList.add(target.before ? 'drop-target-left' : 'drop-target-right');
+}
+function dropCellAt(clientX, cell, frame, idx){
+  const target = findDropTarget(clientX);
+  clearDropMarks();
+  if(!target || target.cell === cell) return;
+  let toIdx = parseInt(target.cell.dataset.idx);
+  if(!target.before) toIdx++;
+  // 複数選択中で、ドラッグ元セルが選択に含まれる場合 → 一括移動（元位置にempty）
+  if(state.selectedFrameIds.has(frame.id) && state.selectedFrameIds.size > 0){
+    moveSelectedFrames(toIdx);
+    return;
+  }
+  const fromIdx = idx;
+  if(toIdx > fromIdx) toIdx--;
+  if(toIdx === fromIdx) return;
+  const [moved] = state.frames.splice(fromIdx, 1);
+  state.frames.splice(toIdx, 0, moved);
+  state.currentFrame = toIdx;
+  buildStrip();
+  updateStripUI();
+  updateFramePos();
+  updateDurInfo();
+  markMetaDirty();
+  pushTimelineHistory();
+}
+// 指の長押しドラッグ（つまんでいる間だけ touchmove を止めてスクロールさせない）
+let gTouchCellDrag = null;
+let gTouchEdgeRAF = 0;
+(function wireTouchCellDrag(){
+  const strip = document.getElementById('frame-strip');
+  if(!strip) return;
+  const edgeScroll = () => {
+    gTouchEdgeRAF = 0;
+    const d = gTouchCellDrag;
+    if(!d) return;
+    const r = strip.getBoundingClientRect();
+    const v = d.x < r.left + 40 ? -10 : (d.x > r.right - 40 ? 10 : 0);
+    if(v){ strip.scrollLeft += v; markDropAt(d.x, d.cell); gTouchEdgeRAF = requestAnimationFrame(edgeScroll); }
+  };
+  strip.addEventListener('touchmove', e => {
+    const d = gTouchCellDrag;
+    if(!d) return;
+    if(e.cancelable) e.preventDefault();
+    const t = e.touches[0]; if(!t) return;
+    d.x = t.clientX;
+    markDropAt(d.x, d.cell);
+    if(!gTouchEdgeRAF) gTouchEdgeRAF = requestAnimationFrame(edgeScroll);
+  }, { passive: false });
+  const finish = (drop) => {
+    const d = gTouchCellDrag;
+    if(!d) return;
+    gTouchCellDrag = null;
+    cancelAnimationFrame(gTouchEdgeRAF); gTouchEdgeRAF = 0;
+    if(drop) dropCellAt(d.x, d.cell, d.frame, d.idx); else clearDropMarks();
+  };
+  strip.addEventListener('touchend', () => finish(true));
+  strip.addEventListener('touchcancel', () => finish(false));
+})();
 
 // セルがタップされたときの処理（描画フレーム=切替、空=昇格）
 function handleCellTap(idx){
@@ -7984,7 +8271,10 @@ document.querySelectorAll('.tb-ink').forEach(btn => {
 // ── FILL PALETTE（カスタム可・データ駆動）──
 const PAL_LS = 'animator_palette_v1';
 let gPalette = normalizePalette(PALETTE_48);
-let gPalSlot = gPalette.length - 1; // 選択中スロット（スポイトの上書き先）
+// 選択中スロット（スポイトの上書き先）。2026-10-05: 起動時は「前回選んでいた枠」、無ければ最初のカスタム枠。
+//   以前は毎回「一番最後の枠」で始まっていて、FILL を持つと見覚えのない色が選ばれていた。
+const PAL_SLOT_LS = 'animator_palslot_v1';
+let gPalSlot = PAL_FIXED.length;
 const palEl = document.getElementById('palette');
 
 function loadPalette(){
@@ -7997,11 +8287,18 @@ function loadPalette(){
     }
   }catch(e){}
   if(gPalette.length <= PAL_FIXED.length) gPalette = normalizePalette(PALETTE_48);
+  try{ const v = parseInt(localStorage.getItem(PAL_SLOT_LS), 10); if(!isNaN(v)) gPalSlot = v; }catch(e){}
   gPalSlot = Math.min(Math.max(0, gPalSlot), gPalette.length-1);
 }
-function savePalette(){ try{ localStorage.setItem(PAL_LS, JSON.stringify({format:'PALETTE_v1', colors:gPalette})); }catch(e){} }
+function savePalette(){
+  try{
+    localStorage.setItem(PAL_LS, JSON.stringify({format:'PALETTE_v1', colors:gPalette}));
+    localStorage.setItem(PAL_SLOT_LS, String(gPalSlot));
+  }catch(e){}
+}
 function selectPalSlot(i){
   gPalSlot = i;
+  try{ localStorage.setItem(PAL_SLOT_LS, String(i)); }catch(e){}
   state.fillColor = gPalette[i];
   // ONIONカラーチップが選択中なら、パレット色はそちらへ入れて終わり（インクは触らない）
   if(gOniSlot){ setOnionColor(gOniSlot, gPalette[i]); renderPalette(); return; }
@@ -8017,10 +8314,39 @@ function selectPalSlot(i){
     const fb = document.querySelector('.tool[data-tool="fill"]'); if(fb) fb.click();
   }
 }
+// 先頭の大きいチップ（4チップ分）＝ **いまの色**。スポイトで拾った色もここに必ず出る
+//   （明度チップ選択中は枠が動かないので、拾えたかどうかが見えなかった）。タップで HSB ピッカー。
+function updatePalNow(){
+  const el = document.getElementById('pal-now');
+  if(!el) return;
+  const c = (state.fillColor || '#000000').toUpperCase();
+  el.style.background = c;
+  const lab = el.firstChild;
+  if(lab){
+    lab.textContent = c.slice(1);
+    const v = parseInt(c.slice(1), 16);
+    const lum = ((v >> 16) & 255) * 0.299 + ((v >> 8) & 255) * 0.587 + (v & 255) * 0.114;
+    lab.style.color = lum > 140 ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.85)';
+  }
+}
 function renderPalette(){
   palEl.innerHTML = '';
+  const now = document.createElement('div');
+  now.id = 'pal-now';
+  now.className = 'pal-now';
+  now.title = 'いまの色（スポイトで拾った色もここに出ます）。タップで HSB ピッカー';
+  now.appendChild(document.createElement('span'));
+  now.addEventListener('click', e => { e.stopPropagation(); openHsbPicker(now); });
+  palEl.appendChild(now);
   gPalette.forEach((c, i) => {
+    if(i === PAL_FIXED.length){
+      const div = document.createElement('div');
+      div.className = 'pal-div';
+      div.title = '上＝明度チップ（固定 0〜100%）／下＝カスタム（スポイトで上書き）';
+      palEl.appendChild(div);
+    }
     const cell = document.createElement('div');
+    cell.dataset.i = i;
     cell.className = 'pal-cell' + (i===gPalSlot ? ' on' : '');
     cell.style.background = c;
     cell.dataset.c = c;
@@ -8031,6 +8357,7 @@ function renderPalette(){
     cell.addEventListener('click', () => { gPalFocus = true; selectPalSlot(i); });
     palEl.appendChild(cell);
   });
+  updatePalNow();
 }
 // パレットをクリックした直後だけ ↑↓ を「色送り」に使う（それ以外は前/次のコマ送り）。
 // パレット外をクリックしたら解除＝キーの意味が勝手に変わり続けないようにする。
@@ -8040,12 +8367,129 @@ function palStep(d){
   const i = (gPalSlot + d + gPalette.length) % gPalette.length;
   selectPalSlot(i);
   gPalFocus = true;   // selectPalSlot 経由でも色送りモードは維持
-  const cell = palEl.children[i];
+  const cell = palEl.querySelector('.pal-cell[data-i="' + i + '"]');
   if(cell && cell.scrollIntoView) cell.scrollIntoView({block:'nearest'});
 }
 document.addEventListener('pointerdown', e => {
   if(gPalFocus && !(e.target.closest && e.target.closest('#palette-pnl'))) gPalFocus = false;
 }, true);
+// ── HSB ピッカー ──
+//   色の行き先はスポイトと同じ（applyPickedColor）＝下書/指示インク選択中ならそのインクへ、
+//   それ以外はパレットの選択枠へ。明度チップ（固定）を選んでいたら、最初の1回だけ枠を1つ足してそこへ入れる。
+const gHsb = { h: 0, s: 0, v: 0, orig: '#000000', raf: 0, open: false, added: false };
+function hsvToHex(h, s, v){
+  const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  const to = x => Math.round(x * 255).toString(16).padStart(2, '0');
+  return ('#' + to(f(5)) + to(f(3)) + to(f(1))).toUpperCase();
+}
+function hexToHsv(hex){
+  const n = parseInt((hex || '#000000').slice(1), 16);
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if(d){
+    if(mx === r) h = 60 * (((g - b) / d) % 6);
+    else if(mx === g) h = 60 * ((b - r) / d + 2);
+    else h = 60 * ((r - g) / d + 4);
+  }
+  if(h < 0) h += 360;
+  return { h, s: mx ? d / mx : 0, v: mx };
+}
+function drawHsb(){
+  const sv = document.getElementById('hsb-sv'), hue = document.getElementById('hsb-hue');
+  const c = sv.getContext('2d'), W = sv.width, H = sv.height;
+  c.fillStyle = hsvToHex(gHsb.h, 1, 1); c.fillRect(0, 0, W, H);
+  let g = c.createLinearGradient(0, 0, W, 0); g.addColorStop(0, '#fff'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, '#000');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  const x = gHsb.s * W, y = (1 - gHsb.v) * H;
+  c.lineWidth = 2; c.strokeStyle = gHsb.v > 0.5 ? '#000' : '#fff';
+  c.beginPath(); c.arc(x, y, 5, 0, Math.PI * 2); c.stroke();
+  const hc = hue.getContext('2d'), hw = hue.width, hh = hue.height;
+  const hg = hc.createLinearGradient(0, 0, hw, 0);
+  for(let i = 0; i <= 6; i++) hg.addColorStop(i / 6, hsvToHex(i * 60, 1, 1));
+  hc.fillStyle = hg; hc.fillRect(0, 0, hw, hh);
+  const hx = gHsb.h / 360 * hw;
+  hc.fillStyle = '#fff'; hc.fillRect(hx - 1.5, 0, 3, hh);
+  hc.strokeStyle = '#000'; hc.lineWidth = 1; hc.strokeRect(hx - 2, 0.5, 4, hh - 1);
+  const hex = hsvToHex(gHsb.h, gHsb.s, gHsb.v);
+  document.getElementById('hsb-new').style.background = hex;
+  const inp = document.getElementById('hsb-hex');
+  if(document.activeElement !== inp) inp.value = hex;
+  document.getElementById('hsb-val').textContent =
+    'H' + Math.round(gHsb.h) + ' S' + Math.round(gHsb.s * 100) + ' B' + Math.round(gHsb.v * 100);
+}
+function hsbCommit(hex){
+  if(!hex) return;
+  // 明度チップ（固定）選択中は、初回だけカスタム枠を1つ足してそこへ入れる
+  if(!gOniSlot && isPalLocked(gPalSlot) && !gHsb.added){
+    gPalette.push(hex);
+    gPalSlot = gPalette.length - 1;
+    gHsb.added = true;
+    stageToast('明度チップは固定なので、新しい枠を足してそこへ入れます');
+  }
+  applyPickedColor(hex);
+  updatePalNow();
+}
+function hsbChanged(){
+  drawHsb();
+  if(gHsb.raf) return;
+  gHsb.raf = requestAnimationFrame(() => { gHsb.raf = 0; hsbCommit(hsvToHex(gHsb.h, gHsb.s, gHsb.v)); });
+}
+function openHsbPicker(anchor){
+  const pop = document.getElementById('hsb-pop');
+  if(gHsb.open){ closeHsbPicker(); return; }
+  gHsb.orig = (state.fillColor || '#000000').toUpperCase();
+  Object.assign(gHsb, hexToHsv(gHsb.orig), { open: true, added: false });
+  document.getElementById('hsb-old').style.background = gHsb.orig;
+  pop.classList.add('show');
+  // 大きいチップの左（入らなければ右）に出す
+  const r = anchor.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let x = r.left - pw - 8;
+  if(x < 8) x = r.right + 8;
+  x = Math.max(8, Math.min(window.innerWidth - pw - 8, x));
+  const y = Math.max(8, Math.min(window.innerHeight - ph - 8, r.top));
+  pop.style.left = x + 'px'; pop.style.top = y + 'px';
+  drawHsb();
+}
+function closeHsbPicker(){
+  gHsb.open = false;
+  document.getElementById('hsb-pop').classList.remove('show');
+}
+(function wireHsb(){
+  const pop = document.getElementById('hsb-pop');
+  const drag = (el, fn) => {
+    let on = false;
+    const at = e => { const r = el.getBoundingClientRect(); fn(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))); hsbChanged(); };
+    el.addEventListener('pointerdown', e => { on = true; try{ el.setPointerCapture(e.pointerId); }catch(err){} e.preventDefault(); at(e); });
+    el.addEventListener('pointermove', e => { if(on) at(e); });
+    el.addEventListener('pointerup', () => { on = false; });
+    el.addEventListener('pointercancel', () => { on = false; });
+  };
+  drag(document.getElementById('hsb-sv'), (x, y) => { gHsb.s = x; gHsb.v = 1 - y; });
+  drag(document.getElementById('hsb-hue'), x => { gHsb.h = Math.min(359.9, x * 360); });
+  const inp = document.getElementById('hsb-hex');
+  inp.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if(e.key === 'Enter'){
+      let v = inp.value.trim().toUpperCase(); if(v[0] !== '#') v = '#' + v;
+      if(/^#[0-9A-F]{6}$/.test(v)){ Object.assign(gHsb, hexToHsv(v)); drawHsb(); hsbCommit(v); }
+      else stageToast('#RRGGBB で入れてください');
+    } else if(e.key === 'Escape') closeHsbPicker();
+  });
+  document.getElementById('hsb-old').addEventListener('click', () => {
+    Object.assign(gHsb, hexToHsv(gHsb.orig)); drawHsb(); hsbCommit(gHsb.orig);
+  });
+  document.getElementById('hsb-close').addEventListener('click', closeHsbPicker);
+  // 外を触ったら閉じる（パレットの大きいチップは開閉トグルなので除く）
+  document.addEventListener('pointerdown', e => {
+    if(!gHsb.open) return;
+    if(pop.contains(e.target) || (e.target.closest && e.target.closest('#pal-now'))) return;
+    closeHsbPicker();
+  }, true);
+})();
+
 loadPalette();
 state.fillColor = gPalette[gPalSlot] || '#000000';
 renderPalette();
@@ -8405,6 +8849,7 @@ function buildProjectJSON(){
     frameLayer: {
       visible: state.frameLayer.visible,
       opacity: state.frameLayer.opacity,
+      tin: state.frameLayer.tin | 0, tout: state.frameLayer.tout,
       image: frameLayerToPNGDataURL(),
     },
     cellCount: state.frames.length,
@@ -8473,7 +8918,7 @@ async function applyProjectJSON(json){
   }
   // プロジェクト読み込みで全履歴をリセット（古いframeId参照を残さない）
   tlHistory.length = 0; tlHistIdx = -1;
-  flHistory.length = 0; flHistIdx = -1;
+  resetFlHistory();
   resetGlobalHistory();
   // 新しいフレーム配列を構築
   const newFrames = [];
@@ -8538,11 +8983,13 @@ async function applyProjectJSON(json){
   if(json.frameLayer && typeof json.frameLayer === 'object'){
     if(typeof json.frameLayer.visible === 'boolean') state.frameLayer.visible = json.frameLayer.visible;
     if(typeof json.frameLayer.opacity === 'number') state.frameLayer.opacity = json.frameLayer.opacity;
+    readFrameLayerRange(json.frameLayer);
     state.frameLayer.editMode = false;
     const slider = document.getElementById('frame-opacity');
     if(slider) slider.value = Math.round(state.frameLayer.opacity * 100);
     await loadFrameLayerFromDataURL(json.frameLayer.image || null);
   } else {
+    readFrameLayerRange(null);
     await loadFrameLayerFromDataURL(null);
   }
   applyFrameLayerStyle();
@@ -8643,6 +9090,7 @@ function buildProjectPayload(){
     frameLayer: {
       visible: state.frameLayer.visible,
       opacity: state.frameLayer.opacity,
+      tin: state.frameLayer.tin | 0, tout: state.frameLayer.tout,
       image: frameLayerToPNGDataURL(),
     },
     cellCount: state.frames.length,
@@ -9129,6 +9577,7 @@ async function flushSave(){
         opacity: state.frameLayer.opacity,
         editMode: state.frameLayer.editMode,
         x: state.frameLayer.x, y: state.frameLayer.y, scale: state.frameLayer.scale,
+        tin: state.frameLayer.tin | 0, tout: state.frameLayer.tout,
         image: frameLayerToPNGDataURL(),
       },
       savedAt: Date.now(),
@@ -9342,6 +9791,7 @@ async function loadProject(){
       state.frameLayer.x = (typeof fl.x === 'number') ? fl.x : 0;
       state.frameLayer.y = (typeof fl.y === 'number') ? fl.y : 0;
       state.frameLayer.scale = (typeof fl.scale === 'number') ? fl.scale : 1;
+      readFrameLayerRange(fl);
       // 編集モードはアプリ起動時はOFFに戻す（不慮の上書き防止）
       state.frameLayer.editMode = false;
       const slider = document.getElementById('frame-opacity');
@@ -10646,6 +11096,8 @@ onLongPress(document.getElementById('btn-mirror'), () => {
 // FRAMEレイヤー UI
 document.getElementById('btn-frame-edit').addEventListener('click', () => {
   state.frameLayer.editMode = !state.frameLayer.editMode;
+  // 差分の基準（全面1枚）は編集中だけ持つ。抜けたら手放す＝4K で 37.7MB 浮く（パッチは残るので Undo は効く）
+  if(!state.frameLayer.editMode) flMirror = null;
   // EDIT ON時はMOVE(参照移動)を自動でOFF（描画と移動の競合回避）
   if(state.frameLayer.editMode && state.refMoveMode){
     state.refMoveMode = false;
@@ -10666,6 +11118,75 @@ document.getElementById('frame-opacity').addEventListener('input', e => {
   applyFrameLayerStyle(); // 0で自動的に非表示、>0で表示
   scheduleSave();
 });
+// ── FRAME（下絵）だけの書き出し（2026-10-05）──
+//   バックアップ用。線・塗りと一緒には出さない。位置・拡縮（MOVE）は焼き込んだ作業解像度の1枚にする。
+function frameLayerBakedCanvas(){
+  const W = CFG.WORK_W, H = CFG.WORK_H, fl = state.frameLayer;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const cx = cv.getContext('2d');
+  cx.imageSmoothingEnabled = (fl.scale || 1) !== 1;
+  cx.translate(fl.x || 0, fl.y || 0);   // 表示と同じ transform（applyFrameLayerTransform）
+  cx.scale(fl.scale || 1, fl.scale || 1);
+  cx.drawImage(frameLayerCanvas, 0, 0);
+  return cv;
+}
+function frameLayerExportName(ext){
+  const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  return `ref_frame_${ts}_${CFG.WORK_W}x${CFG.WORK_H}.${ext}`;
+}
+function downloadBlobAs(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+async function exportFrameLayerSeq(){
+  if(!frameLayerHasInk()){ await modalAlert('FRAME に何も描かれていません'); return; }
+  if(typeof JSZip === 'undefined'){ await modalAlert('ZIPライブラリの読込に失敗しました'); return; }
+  const fl = state.frameLayer;
+  const total = Math.max(totalTicks(), fl.tout == null ? 0 : (fl.tout | 0));
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  showExportOv('EXPORTING FRAME (REF) PNG');
+  try{
+    // 中身は「下絵1枚」か「透明1枚」の2種類だけ。PNG 化は2回で済ませて番号ぶん並べる
+    const img = frameLayerBakedCanvas().toDataURL('image/png').split(',')[1];
+    const blankCv = document.createElement('canvas'); blankCv.width = W; blankCv.height = H;
+    const blank = blankCv.toDataURL('image/png').split(',')[1];
+    const zip = new JSZip();
+    const dir = zip.folder('ref_frame');
+    for(let t = 0; t < total; t++){
+      dir.file(`ref_frame_${String(t + 1).padStart(5,'0')}.png`, refImgVisibleAt(fl, t) ? img : blank, { base64: true });
+    }
+    setExportOv(60, 'ZIPPING…');
+    const blob = await zip.generateAsync({ type: 'blob' });
+    if(!gExportCancel) downloadBlobAs(blob, frameLayerExportName('zip'));
+  }catch(err){
+    await modalAlert('書き出しに失敗しました: ' + (err.message || err));
+  }finally{ hideExportOv(); }
+}
+async function exportFrameLayerJSON(){
+  if(!frameLayerHasInk()){ await modalAlert('FRAME に何も描かれていません'); return; }
+  const fl = state.frameLayer;
+  const tin = fl.tin | 0, tout = (fl.tout == null) ? null : (fl.tout | 0);
+  const total = Math.max(totalTicks(), tout || 0, tin + 1);
+  const end = tout == null ? total : tout;
+  const cells = [];
+  if(tin > 0) cells.push({ kind: 'empty', duration: tin });
+  cells.push({ kind: 'draw', duration: Math.max(1, end - tin), image: frameLayerBakedCanvas().toDataURL('image/png') });
+  if(end < total) cells.push({ kind: 'empty', duration: total - end });
+  const json = {
+    format: 'ANIMATOR_REF_FRAME_v1',
+    name: 'FRAME',
+    fps: state.fps, width: CFG.WORK_W, height: CFG.WORK_H,
+    refRange: { tin, tout },
+    exportedAt: new Date().toISOString(),
+    cells,
+  };
+  downloadBlobAs(new Blob([JSON.stringify(json)], { type: 'application/json' }), frameLayerExportName('json'));
+  stageToast('FRAME を JSON で書き出しました（+ JSON / SEQ で IMG 参照として戻せます）');
+}
+document.getElementById('btn-frame-seq').addEventListener('click', exportFrameLayerSeq);
+document.getElementById('btn-frame-json').addEventListener('click', exportFrameLayerJSON);
 document.getElementById('btn-frame-clear').addEventListener('click', async () => {
   if(!await modalConfirm('FRAMEレイヤーをクリアしますか？')) return;
   ensureFlBaseline(); // クリア前の状態をUndo用に確保
@@ -10748,7 +11269,8 @@ async function pasteRefImageFromBlob(blob){
     fr.readAsDataURL(blob);
   });
   if(!url) return false;
-  const o = await loadRefImageFromSrc(url, { name: 'PASTE ' + (++gPasteSeq) });
+  // 2026-10-05: 置いた静止画は「いま選んでいるコマ」にだけ出す（帯の端で伸ばす／Wタップで全尺）
+  const o = await loadRefImageFromSrc(url, Object.assign({ name: 'PASTE ' + (++gPasteSeq) }, curCelRange()));
   if(!o) return false;
   if(!state.refMasterShow){ state.refMasterShow = true; applyRefMaster(); }   // 参照が非表示なら見せる
   buildRefList(); applyRefImgUI(); markMetaDirty(); scheduleSave();
@@ -11731,6 +12253,7 @@ async function hBuildFixture(){
   state.lanes.fill = { visible: true, locked: false, opacity: 1 };
   state.onionIncludeFill = false;
   state.frameLayer.x = 0; state.frameLayer.y = 0; state.frameLayer.scale = 1;
+  state.frameLayer.tin = 0; state.frameLayer.tout = null;
   state.refImages = []; state.refAnimators = []; state.bgBright = 100;
   state.fps = H_FIX.fps;
 
