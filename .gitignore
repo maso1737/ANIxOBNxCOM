@@ -24,5 +24,8 @@ composer-*.json
 manga-plate-*.json
 *_export.json
 *.refclip.json
+# ANIMATOR の FRAME（下絵）書き出し
+ref_frame_*.json
+ref_frame_*.zip
 # LIVE PLATE の BOOK zip（作品データ。公開リポジトリに置かない）
 liveplate-*.zip

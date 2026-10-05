@@ -602,6 +602,48 @@ option 1（projectIdキー分離）を検討するにあたって実測した数
 
 ---
 
+## iPad / REF 強化（2026-10-05）
+
+**メモリ（4096×2304 で FRAME EDIT 中にタブが落ちる件）**
+全面1枚 = W×H×4 バイト。4096×2304 = **37.7MB** / 2048×1152 = **9.4MB**（1/4）。
+- FRAME の Undo を **全面スナップ20枚（≒750MB）→ 変わった矩形だけのパッチ**に（`flHistory` = `{x,y,w,h,before,after}`）。
+  基準 `flMirror`（全面1枚）は EDIT 中だけ持ち、抜けたら捨てる。上限は 40段 かつ 合計 96MB（iPad）/ 320MB（PC）。
+  差分は `pushFrameLayerHistory` が「基準と今」を比べて取るので、ペン/FILL/投げ縄/CLR のどの経路でも同じ。
+- `frameLayerHasInk` / `frameLayerToPNGDataURL` は控え（`gFlHasInk` / `gFlPNG`）を使う。以前は meta 保存のたびに 4K を PNG 化していた。
+- コマの描画 Undo：履歴の1枚と `f.line` を**同じ配列で共有**（`syncFrameFromCanvas(f, lanes, snaps)`）、
+  base は `f.line` を包むだけ（`wrapLane`）。**`f.line` / `f.fill` は書き換えずに差し替える**約束が前提。
+  合計の上限 `HIST_BUDGET`（iPad 640MB / PC 2GB）を超えたら、今のコマ以外の古い段から捨てる（`trimHistoryBudget`）。
+- `snapshotTL` は描画履歴を持たない（持つと捨てた全面スナップを握り続けるため）。消したコマを Undo で戻すと絵だけ戻る。
+- 目安：iPad は **2048×1152 が安全圏**。4K は FRAME/REF を使う作業では避ける。
+
+**FRAME（下絵）の出る範囲**
+- `state.frameLayer.tin / tout`（tick、`tout=null`＝最後まで）。画像（IMG）と同じ帯で端トリム・横移動・Wタップで全尺。
+- 空の下絵に初めて描くと「いま選んでいるコマ」の範囲になる。範囲外のコマで描いたらそのコマまで広げる。
+- 表示判定は `applyFrameLayerTick(t)`（`renderRefLayer` が毎回呼ぶ）。EDIT 中は範囲外でも見える。
+- 旧保存（tin/tout 無し）は全尺のまま。
+
+**読み込み**
+- 新しく置いた静止画（PASTE）は今のコマだけに出る。`+ JSON / SEQ` で**絵が1枚だけ**のものは ANI/SEQ ではなく **IMG** にする
+  （`addRefStillAsImage`。前後に空コマがあればその範囲、`refRange` があればそれ、無ければ今のコマ）。
+- 読み込んだ参照は選択状態になる（すぐ MOVE できる）。
+
+**FRAME の書き出し（REF パネル FRAME LAYER の ⇩ SEQ PNG / ⇩ JSON）**
+- 下絵だけ。線・塗りとは混ぜない。位置・拡縮（MOVE）は作業解像度へ焼き込む。
+- SEQ PNG：`ref_frame/ref_frame_00001.png…`（1tick=1枚・範囲外は透明）。
+- JSON：`ANIMATOR_REF_FRAME_v1`（`cells` ＋ `refRange`）。`+ JSON / SEQ` で読むと同じ範囲の IMG 参照に戻る。
+- `.gitignore` に `ref_frame_*.json / .zip`。
+
+**UI**
+- 表示 ON/OFF は目のアイコン（👁・OFF は薄く＋赤い斜線。econte の CUT 枠と同じ作法）。REF の各行・レーン見出し。
+- レーン名 線/塗 → **LINE / CELL**（太いゴシック）。`LANE_JP` も同じ（トーストも LINE/CELL）。
+- サムネ下の帯（`.fc-fill`）＝ CELL レーンの帯。塗りがあるコマだけピンク。タップでそのコマの塗りへ。
+- タイムラインのコマを**指で並べ替え**：長押し 0.35 秒でつまむ → 横に動かして離す（端に寄せると自動スクロール）。
+  つまむ前に指が動いたら今までどおり横スクロール。つまんでいる間だけ `touchmove` を止める（`gTouchCellDrag`）。
+- パレット：起動時の選択枠は前回の枠（`animator_palslot_v1`）、無ければ最初のカスタム枠（以前は毎回一番最後の枠）。
+  先頭に **いまの色**の大きいチップ（4チップ分・`#pal-now`）。明度チップ選択中にスポイトしても色がここに出る。
+  明度チップとカスタムの間に区切り線。大きいチップをタップで **HSB ピッカー**（`#hsb-pop`。行き先はスポイトと同じ
+  `applyPickedColor`。明度チップ選択中なら最初の1回だけ枠を足してそこへ）。
+
 ## 既知の制限・注意点
 - ライブ連携は同一ブラウザ・同一オリジンのタブ間のみ（異なるPCは対象外）
 - キャンバス拡大はメモリ×コマ数で増加（8Kは多コマ不可。上限は4K面積）
