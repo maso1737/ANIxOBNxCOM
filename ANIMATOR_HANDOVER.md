@@ -616,11 +616,23 @@ option 1（projectIdキー分離）を検討するにあたって実測した数
 - `snapshotTL` は描画履歴を持たない（持つと捨てた全面スナップを握り続けるため）。消したコマを Undo で戻すと絵だけ戻る。
 - 目安：iPad は **2048×1152 が安全圏**。4K は FRAME/REF を使う作業では避ける。
 
-**FRAME（下絵）の出る範囲**
-- `state.frameLayer.tin / tout`（tick、`tout=null`＝最後まで）。画像（IMG）と同じ帯で端トリム・横移動・Wタップで全尺。
-- 空の下絵に初めて描くと「いま選んでいるコマ」の範囲になる。範囲外のコマで描いたらそのコマまで広げる。
-- 表示判定は `applyFrameLayerTick(t)`（`renderRefLayer` が毎回呼ぶ）。EDIT 中は範囲外でも見える。
-- 旧保存（tin/tout 無し）は全尺のまま。
+**FRAME（下絵）＝コマごとのページ（FRAME PAGES）**
+- `state.frameLayer.pages = [{id, tin, tout, cv, x, y, ink, dead, src, bx}]`。ページ＝出る範囲（tick・`tout=null`＝最後まで）＋
+  **描いた範囲だけ切り抜いた canvas**（全面は持たない）。位置/拡縮（MOVE）は全ページ共通。
+- `frameLayerCanvas` には**今のティックのページ（`gFlLive`）だけ**が載る。ペン/FILL/投げ縄/スポイト/タイムラプスは今までどおりこの1枚。
+  ティックが変わると `flSyncLiveToTick` が入れ替える（描き変えていたら `flCommitLive` で切り抜き直してから）。描画中は入れ替えない。
+- ページの無いコマで描く → そのコマ（セル）の範囲で新ページ。範囲が重なったら後から作ったページが勝つ
+  （全尺のページがあると新ページはできない＝そのページに描く）。
+- REF レーンの FRAME 行にページごとの帯。端トリム・横移動・Wタップで全尺は IMG と同じ。
+- Undo パッチは `pageId` を持つ。見えていないコマのページなら、そのコマへ移動してから当てる（`flBringPage`）。
+  空になったページは `dead`（表示・保存しない）。Undo で絵が戻れば生き返る。
+- CLR ＝「このコマのページ」（Undo 可）／「全部」（Undo 不可）。
+- 保存：`frameLayer.pages = [{tin,tout,x,y,src}]`（PNG は変わったページだけ作り直す）。旧保存の `image`（全面1枚＋tin/tout）は1ページとして読む。
+- 解像度変更はページの位置をずらすだけ（`flShiftPagesForResize`。中央アンカー）。
+
+**MEM 表示（下のバー）**
+- 絵の配列・取り消し履歴・キャンバス・FRAME・参照のバイト数を足した見積もり（`memEstimate`。共有している配列は1回だけ数える）。
+  iPad は 1100MB を目安に、50% で黄、80% で赤＋1回だけ警告トースト。タップで内訳。ブラウザ自身のぶんは入っていない。
 
 **読み込み**
 - 新しく置いた静止画（PASTE）は今のコマだけに出る。`+ JSON / SEQ` で**絵が1枚だけ**のものは ANI/SEQ ではなく **IMG** にする
@@ -629,8 +641,9 @@ option 1（projectIdキー分離）を検討するにあたって実測した数
 
 **FRAME の書き出し（REF パネル FRAME LAYER の ⇩ SEQ PNG / ⇩ JSON）**
 - 下絵だけ。線・塗りとは混ぜない。位置・拡縮（MOVE）は作業解像度へ焼き込む。
-- SEQ PNG：`ref_frame/ref_frame_00001.png…`（1tick=1枚・範囲外は透明）。
-- JSON：`ANIMATOR_REF_FRAME_v1`（`cells` ＋ `refRange`）。`+ JSON / SEQ` で読むと同じ範囲の IMG 参照に戻る。
+- SEQ PNG：`ref_frame/ref_frame_00001.png…`（1tick=1枚・ページの無いコマは透明。PNG 化はページごとに1回）。
+- JSON：`ANIMATOR_REF_FRAME_v1`（同じページが続く区間を1セル）。ページ1枚なら `refRange` 付き＝`+ JSON / SEQ` で同じ範囲の IMG に、
+  複数ページなら ANI 参照として戻る。
 - `.gitignore` に `ref_frame_*.json / .zip`。
 
 **UI**

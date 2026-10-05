@@ -1526,6 +1526,10 @@ input[type=range]::-moz-range-thumb{
 }
 #bottombar .stat{display:flex;gap:14px;}
 #bottombar .stat b{color:var(--acid);font-weight:400;}
+/* 使用メモリの見積もり（2026-10-05）。黄＝そろそろ／赤＝落ちる手前 */
+#mem-meter{cursor:pointer;}
+#mem-meter.warn b{color:#FFD27A;}
+#mem-meter.danger b{color:#ff5555;text-shadow:0 0 6px rgba(255,85,85,0.6);}
 #bottombar .save-state{
   font-size:9px;letter-spacing:0.2em;
 }
@@ -1919,6 +1923,7 @@ input[type=range]::-moz-range-thumb{
     <div class="stat">
       <span>HISTORY <b id="hist-count">1</b></span>
       <span>STROKES <b id="stroke-count">0</b></span>
+      <span id="mem-meter" title="使用メモリの見積もり（タップで内訳）">MEM <b id="mem-val">—</b></span>
     </div>
     <div class="save-state saved" id="save-state">SAVED</div>
   </div>
@@ -2748,7 +2753,7 @@ const state = {
     opacity: 0.4,    // 0..1
     editMode: false, // true = 描画ターゲットがframeLayerになる
     x: 0, y: 0, scale: 1, // 表示transform（EDIT画も移動/拡縮可能。既定は等倍0,0）
-    tin: 0, tout: null,   // 2026-10-05: 出る範囲（tick）。null＝最後まで。画像の帯と同じくトリムできる
+    pages: [],            // 2026-10-05: コマごとの下絵ページ [{id,tin,tout,cv,x,y,ink,...}]（FRAME PAGES 参照）
   },
   // 参照ANIMATOR（複数のANIMATORをコマ同期で重ね表示。書き出し/COMPOSERには行かない）
   // [{id,name,projectId,visible,opacity,color, ticks:[Image|null], totalTicks, fps,
@@ -3557,44 +3562,139 @@ function applyFrameLayerStyle(){
   const stageEl = document.getElementById('stage');
   if(stageEl) stageEl.classList.toggle('frame-edit', fl.editMode);
 }
-// 保存から出る範囲を読む（旧保存＝範囲なし＝全尺）
-function readFrameLayerRange(o){
-  state.frameLayer.tin  = (o && typeof o.tin === 'number') ? Math.max(0, o.tin | 0) : 0;
-  state.frameLayer.tout = (o && typeof o.tout === 'number') ? Math.max(1, o.tout | 0) : null;
+// ============================================================
+// FRAME PAGES（コマごとの下絵・2026-10-05）
+//   下絵は「ページ」の束。ページ＝出る範囲（tin〜tout, tick）＋絵（描いた範囲だけ切り抜いた canvas）。
+//   frameLayerCanvas には **今のティックのページ（live）だけ**が載っていて、ペン/FILL/投げ縄/スポイト/
+//   タイムラプスは今までどおりこの1枚を相手にする。ティックが変わると live を入れ替える（flSyncLiveToTick）。
+//   ・ページの無いコマで描く → そのコマ（セル）の範囲で新しいページができる
+//   ・範囲が重なったら後から作ったページが勝つ
+//   ・位置/拡縮（MOVE）は全ページ共通（state.frameLayer.x/y/scale）
+//   ・空になったページは dead（表示も保存もしない）。Undo で絵が戻れば生き返る
+// ============================================================
+let gFlLive = null;          // いま frameLayerCanvas に載っているページ（null＝空き。描けば新ページ）
+let gFlLiveDirty = false;    // live が読み込んでから描き変えられたか（入れ替え時に切り抜き直す）
+let gFlPageSeq = 0;
+function flPages(){ return state.frameLayer.pages || (state.frameLayer.pages = []); }
+function flNewPage(tin, tout){
+  const p = { id: 'fp' + Date.now().toString(36) + (++gFlPageSeq), tin, tout, cv: null, x: 0, y: 0,
+              ink: false, dead: false, src: undefined, bx: null };
+  flPages().push(p);
+  return p;
+}
+// t に出るページ（後から作ったものが勝つ）
+function flPageAt(t){
+  const ps = flPages();
+  for(let i = ps.length - 1; i >= 0; i--){
+    const p = ps[i];
+    if(!p.dead && refImgVisibleAt(p, t)) return p;
+  }
+  return null;
+}
+function flLivePages(){ return flPages().filter(p => !p.dead && p.ink); }
+function flAnyInk(){
+  if(gFlLive && gFlLiveDirty) gFlLive.ink = frameLayerHasInk();
+  return flPages().some(p => !p.dead && p.ink);
+}
+// live の絵をページへ書き戻す（描いた範囲＝bx だけ切り抜く。全面は持たない）
+function flCommitLive(){
+  const p = gFlLive;
+  if(!p || !gFlLiveDirty) return;
+  gFlLiveDirty = false;
+  p.ink = frameLayerHasInk();
+  p.src = undefined;
+  if(!p.ink || !p.bx){ p.cv = null; p.ink = false; p.dead = true; return; }
+  const W = CFG.WORK_W, H = CFG.WORK_H;
+  const x0 = Math.max(0, p.bx.x0), y0 = Math.max(0, p.bx.y0);
+  const x1 = Math.min(W - 1, p.bx.x1), y1 = Math.min(H - 1, p.bx.y1);
+  const w = x1 - x0 + 1, h = y1 - y0 + 1;
+  if(w <= 0 || h <= 0){ p.cv = null; p.ink = false; p.dead = true; return; }
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  cv.getContext('2d').drawImage(frameLayerCanvas, x0, y0, w, h, 0, 0, w, h);
+  p.cv = cv; p.x = x0; p.y = y0;
+}
+function flLoadPage(p){
+  frameLayerCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
+  if(p && p.cv) frameLayerCtx.drawImage(p.cv, p.x, p.y);
+  gFlLive = p || null;
+  gFlLiveDirty = false;
+  flMirror = null;   // 差分の基準はページごと
+  gFlHasInk = p ? !!(p.cv && p.ink) : false;
+}
+// ティックに合わせて live を入れ替える（描いている最中は入れ替えない）
+function flSyncLiveToTick(t){
+  if((typeof drawing !== 'undefined' && drawing) || (typeof lassoing !== 'undefined' && lassoing)) return;
+  const want = flPageAt(t);
+  if(want === gFlLive) return;
+  flCommitLive();
+  flLoadPage(want);
+}
+function flUnionBox(p, x0, y0, x1, y1){
+  if(!p.bx) p.bx = { x0, y0, x1, y1 };
+  else { p.bx.x0 = Math.min(p.bx.x0, x0); p.bx.y0 = Math.min(p.bx.y0, y0); p.bx.x1 = Math.max(p.bx.x1, x1); p.bx.y1 = Math.max(p.bx.y1, y1); }
+}
+// ── 保存（meta / EXPORT JSON）──
+function flSerializePages(){
+  flCommitLive();
+  return flLivePages().filter(p => p.cv).map(p => {
+    if(p.src === undefined) p.src = p.cv.toDataURL('image/png');   // 変わっていなければ前回の PNG
+    return { tin: p.tin | 0, tout: p.tout, x: p.x, y: p.y, src: p.src };
+  });
+}
+// 保存から読む。新形式 pages[] ／ 旧形式 image（全面1枚）＋ tin/tout（無ければ全尺）
+async function loadFrameLayerFromSaved(o){
+  resetFlHistory();
+  state.frameLayer.pages = [];
+  flLoadPage(null);
+  const list = (o && Array.isArray(o.pages)) ? o.pages
+             : (o && o.image) ? [{ src: o.image, x: 0, y: 0, full: true,
+                                   tin: (typeof o.tin === 'number') ? o.tin : 0,
+                                   tout: (typeof o.tout === 'number') ? o.tout : null }]
+             : [];
+  for(const q of list){
+    if(!q || !q.src) continue;
+    const im = await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = q.src; });
+    if(!im) continue;
+    const w = q.full ? CFG.WORK_W : im.naturalWidth, h = q.full ? CFG.WORK_H : im.naturalHeight;
+    const p = flNewPage(Math.max(0, q.tin | 0), (typeof q.tout === 'number') ? Math.max(1, q.tout | 0) : null);
+    p.cv = document.createElement('canvas'); p.cv.width = w; p.cv.height = h;
+    p.cv.getContext('2d').drawImage(im, 0, 0, w, h);
+    p.x = q.x | 0; p.y = q.y | 0; p.ink = true; p.src = q.full ? undefined : q.src;
+    p.bx = { x0: p.x, y0: p.y, x1: p.x + w - 1, y1: p.y + h - 1 };
+  }
+  flSyncLiveToTick(currentSyncTick());
+  updateRefLane(); applyFrameLayerTick();
+}
+// 解像度変更（中央アンカー）。ページの位置だけずらす＝絵は等倍のまま
+function flShiftPagesForResize(oldW, oldH, newW, newH){
+  flCommitLive();
+  const dx = Math.round((newW - oldW) / 2), dy = Math.round((newH - oldH) / 2);
+  for(const p of flPages()){
+    p.x += dx; p.y += dy;
+    if(p.bx){ p.bx.x0 += dx; p.bx.x1 += dx; p.bx.y0 += dy; p.bx.y1 += dy; }
+  }
+  const live = gFlLive;
+  gFlLive = null;
+  flLoadPage(live);
 }
 // 今のティックで下絵を出すか（再生・スクラブ・コマ切替のたびに renderRefLayer から呼ばれる）
 function applyFrameLayerTick(t){
   const fl = state.frameLayer;
   if(typeof t !== 'number') t = currentSyncTick();
-  const shown = state.refMasterShow && (fl.editMode || (fl.opacity > 0 && refImgVisibleAt(fl, t)));
+  flSyncLiveToTick(t);
+  const shown = state.refMasterShow && (fl.editMode || (fl.opacity > 0 && !!gFlLive));
   const disp = shown ? 'block' : 'none';
   if(frameLayerCanvas.style.display !== disp) frameLayerCanvas.style.display = disp;
-  fl.visible = shown;   // 内部フラグも整合（保存/スポイト合成/タイムラプスが参照）
+  fl.visible = shown && !!gFlLive;   // 内部フラグも整合（スポイト合成/タイムラプスが参照）
 }
-// 今のコマ（セル）の範囲。新しく置いた静止画・初めて描いた下絵はここにだけ出す
+// 今のコマ（セル）の範囲。新しく置いた静止画・新しい下絵ページはここにだけ出す
 function curCelRange(){
   const i = Math.max(0, Math.min(state.currentFrame, state.frames.length - 1));
   const f = state.frames[i];
   const tin = frameStartTick(i);
   return { tin, tout: tin + Math.max(1, f ? f.duration : 1) };
 }
-function frameLayerRangeToCurrentCel(){
-  const r = curCelRange();
-  state.frameLayer.tin = r.tin; state.frameLayer.tout = r.tout;
-  stageToast('FRAME は ' + (r.tin + 1) + '〜' + r.tout + 'コマに出します（REF レーンの帯で伸ばせます／Wタップで全尺）');
-}
-// 編集中に範囲の外のコマで描いたら、そのコマまで範囲を広げる（描いたのに出ない、を作らない）
-function frameLayerExtendToCurrentCel(){
-  const fl = state.frameLayer;
-  if(refImgVisibleAt(fl, currentSyncTick())) return;
-  const r = curCelRange();
-  fl.tin = Math.min(fl.tin | 0, r.tin);
-  if(fl.tout != null) fl.tout = Math.max(fl.tout | 0, r.tout);
-  stageToast('FRAME の範囲を ' + ((fl.tin | 0) + 1) + '〜' + (fl.tout == null ? '最後' : fl.tout) + 'コマに広げました');
-}
-let gFlHadInk = false;  // 直前まで下絵に何か描いてあったか（空→初めて描いた、を見分ける）
-let gFlHasInk = null;   // null = 未計測（編集のたびに落とす）
-let gFlPNG = undefined;  // 書き出し用 PNG の控え（undefined = 未作成／null = 空）。meta 保存のたびに 4K を PNG 化しない
+let gFlHasInk = null;   // live（frameLayerCanvas）に何か描いてあるか。null = 未計測
 function frameLayerHasInk(){
   if(gFlHasInk !== null) return gFlHasInk;
   const d = frameLayerCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H).data;
@@ -3605,48 +3705,13 @@ function frameLayerHasInk(){
 // hasInk … 呼び出し側で分かっているとき（パッチ履歴の差分計算で全画素を見た直後）は渡す＝読み直さない
 function scheduleFrameLayerSave(hasInk){
   gFlHasInk = (typeof hasInk === 'boolean') ? hasInk : null;
-  gFlPNG = undefined;
-  // 2026-10-05: 何も無かった下絵に初めて描いたら「いま選んでいるコマ」にだけ出す（Wタップで全尺）
-  if(frameLayerHasInk() && !gFlHadInk) frameLayerRangeToCurrentCel();
-  gFlHadInk = frameLayerHasInk();
+  if(gFlLive){ gFlLiveDirty = true; gFlLive.ink = frameLayerHasInk(); gFlLive.src = undefined; if(gFlLive.ink) gFlLive.dead = false; }
   if(typeof updateRefLane === 'function') updateRefLane();
   if(typeof applyFrameLayerTick === 'function') applyFrameLayerTick();
+  if(typeof updateMemMeter === 'function') updateMemMeter();
   // FRAMEレイヤー画像はメタに乗っているのでmetaを汚す
   if(typeof markMetaDirty === 'function') markMetaDirty();
   else if(typeof scheduleSave === 'function') scheduleSave();
-}
-function clearFrameLayer(){
-  frameLayerCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
-  scheduleFrameLayerSave(false);
-}
-function frameLayerToPNGDataURL(){
-  // 空(全透明)ならnull。中身が変わっていなければ前回の PNG をそのまま返す
-  if(gFlPNG !== undefined) return gFlPNG;
-  gFlPNG = frameLayerHasInk() ? frameLayerCanvas.toDataURL('image/png') : null;
-  return gFlPNG;
-}
-function loadFrameLayerFromDataURL(dataURL){
-  resetFlHistory();   // 中身が丸ごと入れ替わる＝差分の基準も捨てる
-  return new Promise((resolve) => {
-    if(!dataURL){
-      frameLayerCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
-      gFlHasInk = false; gFlPNG = null; gFlHadInk = false;
-      updateRefLane();
-      resolve();
-      return;
-    }
-    const im = new Image();
-    im.onload = () => {
-      frameLayerCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
-      frameLayerCtx.drawImage(im, 0, 0, CFG.WORK_W, CFG.WORK_H);
-      gFlHasInk = null; gFlPNG = undefined;
-      gFlHadInk = frameLayerHasInk();
-      updateRefLane(); applyFrameLayerTick();
-      resolve();
-    };
-    im.onerror = () => resolve();
-    im.src = dataURL;
-  });
 }
 
 // ============================================================
@@ -3655,16 +3720,18 @@ function loadFrameLayerFromDataURL(dataURL){
 //   4096×2304 だと全面1枚が 37.7MB で、旧方式（20枚）は 750MB に届いて iPad のタブが落ちていた。
 //   基準（flMirror）を1枚だけ持ち、編集後の画面と比べて差分の矩形を {before, after} で積む。
 //   ストローク・FILL・投げ縄・クリアのどの経路でも同じ（描いた道具を知らなくてよい）。
+//   パッチはページに属する（pageId）。Undo するときはそのページを live に戻してから当てる。
 // ============================================================
-const flHistory = [];   // [{x,y,w,h,before:ImageData,after:ImageData}]
+const flHistory = [];   // [{pageId,x,y,w,h,before:ImageData,after:ImageData}]
 let flHistIdx = -1;     // 適用済みの最後のパッチ（-1 = 何も無い）
 const FL_HIST_MAX = 40;
 const FL_HIST_BYTES = (window.matchMedia && matchMedia('(pointer:coarse)').matches ? 96 : 320) * 1048576;
-let flMirror = null;    // 直前の確定状態（ImageData）。編集モードを抜けたら捨てる
+let flMirror = null;    // 直前の確定状態（ImageData）。編集モードを抜けたら・ページが替わったら捨てる
 function resetFlHistory(){ flHistory.length = 0; flHistIdx = -1; flMirror = null; }
 
 // ※必ず「編集を加える前」に呼ぶこと（ここで取った姿との差分がパッチになる）
 function ensureFlBaseline(){
+  flSyncLiveToTick(currentSyncTick());   // 今のコマのページを live にしてから
   if(!flMirror || flMirror.width !== CFG.WORK_W || flMirror.height !== CFG.WORK_H){
     flMirror = frameLayerCtx.getImageData(0, 0, CFG.WORK_W, CFG.WORK_H);
   }
@@ -3691,6 +3758,14 @@ function pushFrameLayerHistory(){
     if(rowHit){ if(y < y0) y0 = y; y1 = y; }
   }
   if(x1 < 0){ scheduleFrameLayerSave(ink); return; }   // 何も変わっていない
+  // ページの無いコマで描いた → このコマの範囲で新しいページ
+  if(!gFlLive){
+    if(!ink){ scheduleFrameLayerSave(false); return; }
+    const r = curCelRange();
+    gFlLive = flNewPage(r.tin, r.tout);
+    stageToast('FRAME：' + (r.tin + 1) + '〜' + r.tout + 'コマの下絵ページを作りました（帯で伸ばす／Wタップで全尺）');
+  }
+  flUnionBox(gFlLive, x0, y0, x1, y1);
   const w = x1 - x0 + 1, h = y1 - y0 + 1;
   const cut = (src) => {
     const out = new ImageData(w, h);
@@ -3701,7 +3776,7 @@ function pushFrameLayerHistory(){
     }
     return out;
   };
-  const patch = { x: x0, y: y0, w, h, before: cut(flMirror), after: cut(cur) };
+  const patch = { pageId: gFlLive.id, x: x0, y: y0, w, h, before: cut(flMirror), after: cut(cur) };
   flMirror = cur;
   if(flHistIdx < flHistory.length - 1) flHistory.splice(flHistIdx + 1);
   flHistory.push(patch);
@@ -3712,16 +3787,34 @@ function pushFrameLayerHistory(){
     bytes -= flPatchBytes(flHistory.shift());
   }
   flHistIdx = flHistory.length - 1;
-  if(ink && gFlHadInk) frameLayerExtendToCurrentCel();
   scheduleFrameLayerSave(ink);
   gLog({ type: 'framelayer' });
 }
+// パッチのページを live にする（見えていないコマのページなら、そのコマへ移動する）
+function flBringPage(pageId){
+  const pg = flPages().find(p => p.id === pageId);
+  if(!pg) return null;
+  pg.dead = false;
+  if(!refImgVisibleAt(pg, currentSyncTick())){
+    let acc = 0;
+    for(let i = 0; i < state.frames.length; i++){
+      if((pg.tin | 0) < acc + state.frames[i].duration){ if(i !== state.currentFrame) switchToFrame(i); break; }
+      acc += state.frames[i].duration;
+    }
+  }
+  if(gFlLive !== pg){ flCommitLive(); flLoadPage(pg); }
+  return pg;
+}
 function flApplyPatch(p, img){
+  const pg = flBringPage(p.pageId);
+  if(!pg) return false;
   frameLayerCtx.putImageData(img, p.x, p.y);
+  flUnionBox(pg, p.x, p.y, p.x + p.w - 1, p.y + p.h - 1);
   if(flMirror && flMirror.width === CFG.WORK_W && flMirror.height === CFG.WORK_H){
     const W = CFG.WORK_W, d = flMirror.data, s = img.data;
     for(let y = 0; y < p.h; y++) d.set(s.subarray(y * p.w * 4, (y + 1) * p.w * 4), ((p.y + y) * W + p.x) * 4);
   }
+  return true;
 }
 // （単発の undoFrameLayer/redoFrameLayer は global undo log に統合済み）
 
@@ -3976,7 +4069,7 @@ function refTag(type, o){
 }
 function refLaneRows(){
   const rows = [];
-  if(frameLayerHasInk()) rows.push({ type: 'frame', obj: state.frameLayer });   // 下絵は参照より手前の別の層
+  if(flAnyInk()) rows.push({ type: 'frame', obj: state.frameLayer });   // 下絵は参照より手前の別の層（ページは1行に並ぶ）
   for(const it of refStackFront()) rows.push(it);
   return rows;
 }
@@ -4030,7 +4123,8 @@ function updateRefLane(){
     lbl.title = tag + ' ' + name + (row.type === 'frame' ? '（クリックで選択）' : '（クリックで選択／上下にドラッグで並べ替え／Wクリックで名前）');
     wireRefLabel(lbl, row, i, frameRows, rows.length);
     head.appendChild(lbl);
-    // 帯
+    // 帯（下絵はページごとに1本ずつ同じ行に並ぶ）
+    const mkBar = (o) => {
     const bar = document.createElement('div');
     const timed = row.type === 'anim' && o.ticks && o.ticks.length > 1;
     bar.className = 'rl-bar' + (timed ? '' : ' static') + (row.type === 'img' ? ' img' : '') + (sel ? ' sel' : '') +
@@ -4076,7 +4170,10 @@ function updateRefLane(){
       bar.title = name + '：端をドラッグで出るコマを切る／中を横ドラッグで範囲ごと移動／Wクリックで全尺に戻す' + range;
       wireRefImgBar(bar, o, row.type);
     }
-    inner.appendChild(bar);
+    return bar;
+    };
+    if(row.type === 'frame') flLivePages().forEach(pg => inner.appendChild(mkBar(pg)));
+    else inner.appendChild(mkBar(o));
   });
   setRefLaneHeight(rows.length * RL_ROW + 1);
   syncTimeTrackScroll();
@@ -4355,6 +4452,7 @@ function renderRefLayer(tickOverride){
 function buildRefList(){
   const list = document.getElementById('ref-list');
   if(!list) return;
+  if(typeof updateMemMeter === 'function') updateMemMeter();
   list.innerHTML = '';
   // 2026-09-23 調整: 種類をまたいで「手前 → 奥」の1本（REF レーン・キャンバスの重なりと同じ順）
   const rows = refStackFront().map(it => ({ kind: it.type, obj: it.obj }));
@@ -5321,17 +5419,13 @@ function setCanvasSize(newW, newH){
     f.history = []; f.histIdx = -1; // サイズ非互換の履歴は破棄
     f.dirty = true; state.pendingSaveFrames.add(f.id);
   }
-  // FRAMEレイヤーも等倍のまま再配置
-  let flData = null;
-  try{ flData = frameLayerCtx.getImageData(0, 0, oldW, oldH).data; }catch(e){}
+  // FRAMEレイヤー（ページ）も等倍のまま再配置。いまの絵を先にページへ書き戻す
+  flCommitLive();
   // サイズ適用 → レイヤーcanvas再構築
   CFG.WORK_W = newW; CFG.WORK_H = newH;
   setupCanvas();
-  if(flData){
-    const rs = recanvasDrawData(new Uint8ClampedArray(flData), oldW, oldH, newW, newH);
-    frameLayerCtx.putImageData(new ImageData(rs, newW, newH), 0, 0);
-  }
-  resetFlHistory(); gFlPNG = undefined;
+  resetFlHistory();
+  flShiftPagesForResize(oldW, oldH, newW, newH);
   // 履歴・サムネ・表示を更新
   resetGlobalHistory();
   state.frames.forEach(regenThumb);
@@ -6022,16 +6116,16 @@ function stepCanvasRedo(frameId){
 function stepFrameLayerUndo(){
   if(flHistIdx < 0) return false;
   const p = flHistory[flHistIdx];
+  if(!flApplyPatch(p, p.before)) return false;
   flHistIdx--;
-  flApplyPatch(p, p.before);
   scheduleFrameLayerSave();
   return true;
 }
 function stepFrameLayerRedo(){
   if(flHistIdx >= flHistory.length - 1) return false;
+  const p = flHistory[flHistIdx + 1];
+  if(!flApplyPatch(p, p.after)) return false;
   flHistIdx++;
-  const p = flHistory[flHistIdx];
-  flApplyPatch(p, p.after);
   scheduleFrameLayerSave();
   return true;
 }
@@ -6075,7 +6169,71 @@ function redo(){
   }
   updateUndoButtons();
 }
+// ── 使用メモリの見積もり（2026-10-05）──
+//   iPad Safari にはメモリを測る API が無いので、持っている絵の配列・履歴・キャンバスのバイト数を足して出す。
+//   同じ配列を複数から指している（履歴とコマの絵の共有）ぶんは1回だけ数える。
+const MEM_LIMIT = (window.matchMedia && matchMedia('(pointer:coarse)').matches ? 1100 : 3500) * 1048576;
+function memEstimate(){
+  const seen = new Set();
+  const add = (x) => {
+    if(!x) return 0;
+    const buf = x.buffer || (x.data && x.data.buffer);
+    if(!buf || seen.has(buf)) return 0;
+    seen.add(buf);
+    return buf.byteLength;
+  };
+  const W = CFG.WORK_W, H = CFG.WORK_H, one = W * H * 4;
+  const r = { canvas: one * 11, frames: 0, history: 0, frame: 0, ref: 0 };   // 表示用キャンバス11枚（レイヤー＋作業用）
+  for(const f of state.frames){
+    if(f.kind !== 'draw') continue;
+    r.frames += add(f.line) + add(f.fill);
+  }
+  for(const f of state.frames){
+    if(f.kind !== 'draw' || !f.history) continue;
+    for(const e of f.history){ r.history += add(e.line) + add(e.fill); }
+  }
+  for(const sn of tlHistory) for(const x of sn){ r.history += add(x.line) + add(x.fill); }
+  if(flMirror) r.frame += add(flMirror);
+  for(const p of flHistory) r.frame += p.w * p.h * 8;
+  for(const p of flPages()) if(p.cv) r.frame += p.cv.width * p.cv.height * 4;
+  for(const o of state.refImages) if(o.img) r.ref += o.img.naturalWidth * o.img.naturalHeight * 4;
+  for(const a of state.refAnimators){
+    const imgs = new Set((a.ticks || []).filter(Boolean));
+    for(const im of imgs) r.ref += im.naturalWidth * im.naturalHeight * 4;
+  }
+  r.total = r.canvas + r.frames + r.history + r.frame + r.ref;
+  return r;
+}
+var gMemTimer = 0;   // var: 初期化前に buildRefList から呼ばれても TDZ にならないように
+function updateMemMeter(){
+  if(gMemTimer) return;
+  gMemTimer = setTimeout(() => {
+    gMemTimer = 0;
+    const el = document.getElementById('mem-meter'), v = document.getElementById('mem-val');
+    if(!el || !v) return;
+    const r = memEstimate();
+    const mb = Math.round(r.total / 1048576);
+    v.textContent = mb + 'MB';
+    const ratio = r.total / MEM_LIMIT;
+    el.classList.toggle('warn', ratio >= 0.5 && ratio < 0.8);
+    el.classList.toggle('danger', ratio >= 0.8);
+    if(ratio >= 0.8 && !gMemWarned){ gMemWarned = true; stageToast('⚠ メモリが多めです（' + mb + 'MB）。保存して再読み込みすると Undo 履歴のぶんが空きます'); }
+    if(ratio < 0.7) gMemWarned = false;
+  }, 250);
+}
+var gMemWarned = false;
+document.getElementById('mem-meter').addEventListener('click', () => {
+  const r = memEstimate(), M = x => Math.round(x / 1048576) + 'MB';
+  modalAlert(
+    '使用メモリの見積もり（' + CFG.WORK_W + '×' + CFG.WORK_H + '・1枚 ' + M(CFG.WORK_W * CFG.WORK_H * 4) + '）\n\n' +
+    'キャンバス ' + M(r.canvas) + '\nコマの絵 ' + M(r.frames) + '\n取り消し履歴 ' + M(r.history) +
+    '\nFRAME 下絵 ' + M(r.frame) + '\n参照 ' + M(r.ref) + '\n──────\n合計 ' + M(r.total) +
+    '（目安の上限 ' + M(MEM_LIMIT) + '）\n\n' +
+    '多いときは：保存してから再読み込み（取り消し履歴が空く）／解像度を下げる（2048 幅で 1/4）／使わない参照を消す。\n' +
+    '※ブラウザ自身のぶんは入っていない概算です。');
+});
 function updateStats(){
+  updateMemMeter();
   const f = curDrawFrame();
   if(!f){
     document.getElementById('hist-count').textContent = '0';
@@ -6302,7 +6460,7 @@ function totalTicks(){
 function refHasTiming(){
   const fl = state.frameLayer;
   return state.refAnimators.length > 0 || state.refImages.some(o => (o.tin | 0) > 0 || o.tout != null) ||
-         ((fl.tin | 0) > 0 || fl.tout != null);
+         (fl.pages || []).length > 0;
 }
 function maxRefTicks(){
   let m = 0;
@@ -8849,8 +9007,7 @@ function buildProjectJSON(){
     frameLayer: {
       visible: state.frameLayer.visible,
       opacity: state.frameLayer.opacity,
-      tin: state.frameLayer.tin | 0, tout: state.frameLayer.tout,
-      image: frameLayerToPNGDataURL(),
+      pages: flSerializePages(),   // 2026-10-05: コマごとの下絵ページ（旧 image は読むだけ）
     },
     cellCount: state.frames.length,
     cells: state.frames.map(f => {
@@ -8983,14 +9140,12 @@ async function applyProjectJSON(json){
   if(json.frameLayer && typeof json.frameLayer === 'object'){
     if(typeof json.frameLayer.visible === 'boolean') state.frameLayer.visible = json.frameLayer.visible;
     if(typeof json.frameLayer.opacity === 'number') state.frameLayer.opacity = json.frameLayer.opacity;
-    readFrameLayerRange(json.frameLayer);
     state.frameLayer.editMode = false;
     const slider = document.getElementById('frame-opacity');
     if(slider) slider.value = Math.round(state.frameLayer.opacity * 100);
-    await loadFrameLayerFromDataURL(json.frameLayer.image || null);
+    await loadFrameLayerFromSaved(json.frameLayer);
   } else {
-    readFrameLayerRange(null);
-    await loadFrameLayerFromDataURL(null);
+    await loadFrameLayerFromSaved(null);
   }
   applyFrameLayerStyle();
   // 参照画像は新規プロジェクト読込でクリア（前プロジェクトの残留防止）
@@ -9090,8 +9245,7 @@ function buildProjectPayload(){
     frameLayer: {
       visible: state.frameLayer.visible,
       opacity: state.frameLayer.opacity,
-      tin: state.frameLayer.tin | 0, tout: state.frameLayer.tout,
-      image: frameLayerToPNGDataURL(),
+      pages: flSerializePages(),   // 2026-10-05: コマごとの下絵ページ（旧 image は読むだけ）
     },
     cellCount: state.frames.length,
     cells: state.frames.map(f => f.kind === 'empty'
@@ -9577,8 +9731,7 @@ async function flushSave(){
         opacity: state.frameLayer.opacity,
         editMode: state.frameLayer.editMode,
         x: state.frameLayer.x, y: state.frameLayer.y, scale: state.frameLayer.scale,
-        tin: state.frameLayer.tin | 0, tout: state.frameLayer.tout,
-        image: frameLayerToPNGDataURL(),
+        pages: flSerializePages(),
       },
       savedAt: Date.now(),
     }, 'project');
@@ -9791,12 +9944,11 @@ async function loadProject(){
       state.frameLayer.x = (typeof fl.x === 'number') ? fl.x : 0;
       state.frameLayer.y = (typeof fl.y === 'number') ? fl.y : 0;
       state.frameLayer.scale = (typeof fl.scale === 'number') ? fl.scale : 1;
-      readFrameLayerRange(fl);
       // 編集モードはアプリ起動時はOFFに戻す（不慮の上書き防止）
       state.frameLayer.editMode = false;
       const slider = document.getElementById('frame-opacity');
       if(slider) slider.value = Math.round(state.frameLayer.opacity * 100);
-      await loadFrameLayerFromDataURL(fl.image || null);
+      await loadFrameLayerFromSaved(fl);
       applyFrameLayerStyle();
       applyFrameLayerTransform();
     } else {
@@ -11120,14 +11272,14 @@ document.getElementById('frame-opacity').addEventListener('input', e => {
 });
 // ── FRAME（下絵）だけの書き出し（2026-10-05）──
 //   バックアップ用。線・塗りと一緒には出さない。位置・拡縮（MOVE）は焼き込んだ作業解像度の1枚にする。
-function frameLayerBakedCanvas(){
+function frameLayerBakedCanvas(page){
   const W = CFG.WORK_W, H = CFG.WORK_H, fl = state.frameLayer;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const cx = cv.getContext('2d');
   cx.imageSmoothingEnabled = (fl.scale || 1) !== 1;
   cx.translate(fl.x || 0, fl.y || 0);   // 表示と同じ transform（applyFrameLayerTransform）
   cx.scale(fl.scale || 1, fl.scale || 1);
-  cx.drawImage(frameLayerCanvas, 0, 0);
+  if(page && page.cv) cx.drawImage(page.cv, page.x, page.y);
   return cv;
 }
 function frameLayerExportName(ext){
@@ -11140,22 +11292,36 @@ function downloadBlobAs(blob, name){
   a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
+// 書き出す長さ：手元の尺とページの終わりの大きい方
+function flExportTotal(){
+  let m = totalTicks();
+  for(const p of flLivePages()) m = Math.max(m, p.tout == null ? 0 : (p.tout | 0), (p.tin | 0) + 1);
+  return m;
+}
 async function exportFrameLayerSeq(){
-  if(!frameLayerHasInk()){ await modalAlert('FRAME に何も描かれていません'); return; }
+  flCommitLive();
+  if(!flLivePages().length){ await modalAlert('FRAME に何も描かれていません'); return; }
   if(typeof JSZip === 'undefined'){ await modalAlert('ZIPライブラリの読込に失敗しました'); return; }
-  const fl = state.frameLayer;
-  const total = Math.max(totalTicks(), fl.tout == null ? 0 : (fl.tout | 0));
+  const total = flExportTotal();
   const W = CFG.WORK_W, H = CFG.WORK_H;
   showExportOv('EXPORTING FRAME (REF) PNG');
   try{
-    // 中身は「下絵1枚」か「透明1枚」の2種類だけ。PNG 化は2回で済ませて番号ぶん並べる
-    const img = frameLayerBakedCanvas().toDataURL('image/png').split(',')[1];
+    // 中身は「ページの数＋透明」の種類だけ。PNG 化はページごとに1回で済ませて番号ぶん並べる
+    const enc = new Map();
     const blankCv = document.createElement('canvas'); blankCv.width = W; blankCv.height = H;
     const blank = blankCv.toDataURL('image/png').split(',')[1];
     const zip = new JSZip();
     const dir = zip.folder('ref_frame');
     for(let t = 0; t < total; t++){
-      dir.file(`ref_frame_${String(t + 1).padStart(5,'0')}.png`, refImgVisibleAt(fl, t) ? img : blank, { base64: true });
+      const pg = flPageAt(t);
+      let data = blank;
+      if(pg && pg.ink){
+        if(!enc.has(pg)) enc.set(pg, frameLayerBakedCanvas(pg).toDataURL('image/png').split(',')[1]);
+        data = enc.get(pg);
+      }
+      dir.file(`ref_frame_${String(t + 1).padStart(5,'0')}.png`, data, { base64: true });
+      if(t % 24 === 0){ setExportOv(t / total * 60, `${t} / ${total}`); await new Promise(r => setTimeout(r, 0)); }
+      if(gExportCancel) return;
     }
     setExportOv(60, 'ZIPPING…');
     const blob = await zip.generateAsync({ type: 'blob' });
@@ -11165,33 +11331,69 @@ async function exportFrameLayerSeq(){
   }finally{ hideExportOv(); }
 }
 async function exportFrameLayerJSON(){
-  if(!frameLayerHasInk()){ await modalAlert('FRAME に何も描かれていません'); return; }
-  const fl = state.frameLayer;
-  const tin = fl.tin | 0, tout = (fl.tout == null) ? null : (fl.tout | 0);
-  const total = Math.max(totalTicks(), tout || 0, tin + 1);
-  const end = tout == null ? total : tout;
+  flCommitLive();
+  const pages = flLivePages();
+  if(!pages.length){ await modalAlert('FRAME に何も描かれていません'); return; }
+  const total = flExportTotal();
+  // ティックを「同じページが続く区間」でまとめてセルにする（空き＝empty）
+  const enc = new Map();
   const cells = [];
-  if(tin > 0) cells.push({ kind: 'empty', duration: tin });
-  cells.push({ kind: 'draw', duration: Math.max(1, end - tin), image: frameLayerBakedCanvas().toDataURL('image/png') });
-  if(end < total) cells.push({ kind: 'empty', duration: total - end });
+  let cur = undefined, run = 0;
+  const flush = () => {
+    if(!run) return;
+    if(cur){
+      if(!enc.has(cur)) enc.set(cur, frameLayerBakedCanvas(cur).toDataURL('image/png'));
+      cells.push({ kind: 'draw', duration: run, image: enc.get(cur) });
+    } else cells.push({ kind: 'empty', duration: run });
+  };
+  for(let t = 0; t < total; t++){
+    const pg = flPageAt(t);
+    const k = (pg && pg.ink) ? pg : null;
+    if(k !== cur){ flush(); cur = k; run = 0; }
+    run++;
+  }
+  flush();
   const json = {
     format: 'ANIMATOR_REF_FRAME_v1',
     name: 'FRAME',
     fps: state.fps, width: CFG.WORK_W, height: CFG.WORK_H,
-    refRange: { tin, tout },
+    // ページが1枚なら範囲も付ける（読み戻すと同じ範囲の IMG。全尺は全尺のまま）
+    refRange: pages.length === 1 ? { tin: pages[0].tin | 0, tout: pages[0].tout } : undefined,
     exportedAt: new Date().toISOString(),
     cells,
   };
   downloadBlobAs(new Blob([JSON.stringify(json)], { type: 'application/json' }), frameLayerExportName('json'));
-  stageToast('FRAME を JSON で書き出しました（+ JSON / SEQ で IMG 参照として戻せます）');
+  stageToast(pages.length === 1 ? 'FRAME を JSON で書き出しました（+ JSON / SEQ で IMG 参照として戻せます）'
+                                 : 'FRAME（' + pages.length + 'ページ）を JSON で書き出しました（+ JSON / SEQ で ANI 参照として戻せます）');
 }
 document.getElementById('btn-frame-seq').addEventListener('click', exportFrameLayerSeq);
 document.getElementById('btn-frame-json').addEventListener('click', exportFrameLayerJSON);
+// CLR：このコマのページだけ（Undo できる）／全部（Undo できない）
 document.getElementById('btn-frame-clear').addEventListener('click', async () => {
-  if(!await modalConfirm('FRAMEレイヤーをクリアしますか？')) return;
-  ensureFlBaseline(); // クリア前の状態をUndo用に確保
-  clearFrameLayer();
-  pushFrameLayerHistory();
+  const n = flLivePages().length;
+  if(!n){ stageToast('FRAME は空です'); return; }
+  ensureFlBaseline();   // 今のコマのページを live に
+  const here = !!gFlLive;
+  const buttons = [{ label: 'キャンセル', value: null }];
+  if(here) buttons.unshift({ label: 'このコマのページ', value: 'page' });
+  if(n > 1 || !here) buttons.unshift({ label: '全部（' + n + 'ページ）', value: 'all', variant: 'danger' });
+  const v = await showModal({
+    msg: here ? 'FRAME の下絵を消します（このコマのページは Ctrl+Z で戻せます／全部は戻せません）'
+              : 'このコマには下絵がありません。全ページを消しますか？（戻せません）',
+    buttons,
+  });
+  if(!v) return;
+  if(v === 'page'){
+    ensureFlBaseline();
+    frameLayerCtx.clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
+    pushFrameLayerHistory();
+    return;
+  }
+  state.frameLayer.pages = [];
+  resetFlHistory();
+  flLoadPage(null);
+  scheduleFrameLayerSave(false);
+  stageToast('FRAME を全部消しました');
 });
 
 // ── 共通MOVE/中央のUI同期 ──
@@ -12253,7 +12455,7 @@ async function hBuildFixture(){
   state.lanes.fill = { visible: true, locked: false, opacity: 1 };
   state.onionIncludeFill = false;
   state.frameLayer.x = 0; state.frameLayer.y = 0; state.frameLayer.scale = 1;
-  state.frameLayer.tin = 0; state.frameLayer.tout = null;
+  state.frameLayer.pages = []; resetFlHistory(); flLoadPage(null);
   state.refImages = []; state.refAnimators = []; state.bgBright = 100;
   state.fps = H_FIX.fps;
 
