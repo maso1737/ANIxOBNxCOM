@@ -1286,7 +1286,7 @@ input[type=range]::-moz-range-thumb{
 /* 指の長押しでつまんだコマ（並べ替え中） */
 .fc.lifted,.fc-empty.lifted{opacity:0.75;transform:translateY(-3px);box-shadow:0 0 0 2px var(--neon),0 6px 14px rgba(0,0,0,0.6);}
 .fc,.fc-empty{-webkit-touch-callout:none;}
-#stage.hand-key, #stage.hand-key canvas{cursor:grab !important;}
+#stage.hand-key, #stage.hand-key canvas{cursor:zoom-in !important;}
 .fc.selected, .fc-empty.selected{
   outline:2px solid #FF6FB5;
   outline-offset:-2px;
@@ -8940,19 +8940,21 @@ stage.addEventListener('pointermove', e => {
 function endMidPan(e){
   if(!midPanning) return;
   midPanning = false;
-  stage.style.cursor = gHandKey ? 'grab' : '';
+  stage.style.cursor = '';
 }
 stage.addEventListener('pointerup', endMidPan);
 stage.addEventListener('pointercancel', endMidPan);
-// ── Ctrl+Space 押している間は手のひら（2026-10-11・Photoshop 癖用）──
-//   Space 単独は再生のまま。Ctrl を押しながら Space を押すと、どちらかを離すまで左ドラッグでパン。
-//   描画のハンドラより先に拾うため window の capture で取る（中ボタンパンと同じ変数を使う）。
+// ── Ctrl+Space 押している間はズーム（2026-10-11・Photoshop のスクラブズーム）──
+//   Space 単独は再生のまま。Ctrl(⌘)+Space を押している間、左ドラッグ＝押した点を中心に 右で拡大／左で縮小
+//   （ホイールと同じ zoomAt）。動かさずにクリック＝1段拡大、Alt+クリック＝1段縮小。
+//   描画のハンドラより先に拾うため window の capture で取る。
 let gHandKey = false;
 function setHandKey(on){
   if(gHandKey === on) return;
   gHandKey = on;
   stage.classList.toggle('hand-key', on);
   if(!on && !midPanning) stage.style.cursor = '';
+  if(!on) gKeyZoom = null;
 }
 window.addEventListener('keydown', e => {
   if((e.key === ' ' || e.code === 'Space') && (e.ctrlKey || e.metaKey)){
@@ -8967,16 +8969,29 @@ window.addEventListener('keyup', e => {
   if(e.key === ' ' || e.code === 'Space' || e.key === 'Control' || e.key === 'Meta'){ e.preventDefault(); setHandKey(false); }
 }, true);
 window.addEventListener('blur', () => setHandKey(false));
+let gKeyZoom = null;   // { x, y, z0, x0, moved }
 window.addEventListener('pointerdown', e => {
   if(!gHandKey || e.pointerType === 'touch' || e.button !== 0) return;
   if(!stage.contains(e.target)) return;
   e.preventDefault(); e.stopImmediatePropagation();
   try{ stage.setPointerCapture(e.pointerId); }catch(err){}
-  midPanning = true;
-  midPanStart = { x: e.clientX, y: e.clientY };
-  midPanStartPan = { x: state.panX, y: state.panY };
-  stage.style.cursor = 'grabbing';
+  gKeyZoom = { x: e.clientX, y: e.clientY, z0: state.zoom, x0: e.clientX, moved: false, alt: e.altKey };
 }, true);
+window.addEventListener('pointermove', e => {
+  if(!gKeyZoom) return;
+  e.stopImmediatePropagation();
+  const dx = e.clientX - gKeyZoom.x0;
+  if(!gKeyZoom.moved && Math.abs(dx) < 3) return;
+  gKeyZoom.moved = true;
+  zoomAt(gKeyZoom.x, gKeyZoom.y, gKeyZoom.z0 * Math.pow(2, dx / 200));   // 200px で2倍
+}, true);
+window.addEventListener('pointerup', e => {
+  if(!gKeyZoom) return;
+  const k = gKeyZoom; gKeyZoom = null;
+  e.stopImmediatePropagation();
+  if(!k.moved) zoomAt(k.x, k.y, state.zoom * (k.alt ? 1 / 1.25 : 1.25));
+}, true);
+window.addEventListener('pointercancel', () => { gKeyZoom = null; }, true);
 
 // 中ボタンのオートスクロール抑止
 stage.addEventListener('auxclick', e => { if(e.button === 1) e.preventDefault(); });
