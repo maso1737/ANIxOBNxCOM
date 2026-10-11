@@ -8935,16 +8935,17 @@ bgTrack.addEventListener('pointermove', e => {
 // 初期表示
 setBgBright(100);
 
-// クリア関数（ロックされていないレーンだけ消す。両方ロックなら理由を出して何もしない）
+// クリア関数（2026-10-11: **今のレーンだけ**消す。CELL で長押ししても LINE は巻き添えにしない）
 function clearCanvas(){
   floatSettle();
-  const ls = LANES.filter(L => !laneLocked(L));
-  if(!ls.length){ stageToast('🔒 どちらのレーンもロック中'); return; }
+  const cur = curLane();
+  if(laneLocked(cur)){ stageToast('🔒 ' + LANE_JP[cur] + 'レーンはロック中'); return; }
+  const ls = [cur];
   for(const L of ls) laneCtx(L).clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
   pushHistory(ls);
-  if(ls.length === 1) stageToast(LANE_JP[ls[0]] + 'レーンを消去');
+  stageToast(LANE_JP[cur] + 'レーンを消去（Undoで戻せます）');
 }
-// ERASEボタン: **Wクリック/Wタップ＝筆圧のON/OFF ／ 長押し＝このコマを全消去**。
+// ERASEボタン: **Wクリック/Wタップ＝筆圧のON/OFF ／ 長押し＝このコマの今のレーンだけ全消去**。
 //   全消去は「2連打」だと巻き添えで消しやすいので長押しへ移した（Undoで戻せる）。
 //   Wクリックは click の時刻差で測っているので、Eキー2連打（＝2回click）でも筆圧が切り替わる。
 (function(){
@@ -8964,7 +8965,6 @@ function clearCanvas(){
     holdUntil = performance.now() + 700;
     lastEraseTap = 0;
     clearCanvas();
-    stageToast('このコマを全消去（Undoで戻せます）');
   }, 600);
 })();
 applyPressurePenUI();   // 起動時にバッジ/ツールチップを両ボタンへ
