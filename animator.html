@@ -415,6 +415,16 @@ html,body{
 .ref-sect:last-of-type{border-bottom:none;margin-bottom:0;padding-bottom:0;}
 .ref-sect-h{font-size:8px;letter-spacing:0.22em;color:rgba(255,79,168,0.55);margin-bottom:7px;}
 .ref-frame-row{display:flex;gap:5px;}
+/* REF パネルの行：≡ つまみで並べ替え（2026-10-11） */
+#ref-list{position:relative;}
+.ref-grip{display:inline-block;width:18px;margin-right:4px;text-align:center;font-size:13px;line-height:1;
+  color:rgba(255,255,255,0.45);cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;}
+.ref-grip:hover{color:var(--acid);}
+@media (pointer:coarse){ .ref-grip{width:26px;font-size:17px;} }
+.ref-item.dragging{position:relative;z-index:5;opacity:0.85;box-shadow:0 6px 16px rgba(0,0,0,0.6);}
+.ref-drop{position:absolute;left:0;right:0;height:2px;background:var(--acid);pointer-events:none;z-index:6;}
+.ref-btn.tl{font-size:8px;letter-spacing:0.05em;min-width:24px;}
+.ref-btn.tl:not(.on){opacity:0.5;}
 .ref-frame-row .ref-btn{flex:1;text-align:center;padding:4px 0;}
 .ref-op-tag{font-size:8px;letter-spacing:0.12em;color:rgba(255,255,255,0.4);min-width:54px;}
 .ref-op-row input[type=range]{flex:1;height:3px;accent-color:var(--acid);cursor:pointer;}
@@ -687,8 +697,11 @@ html,body{
 #palette-pnl.floating #palette-resize{display:flex;}
 /* ── フローティングパネル本文は文字を選択・コピーできる（SETTINGS/REF/TIMELAPSE/PROJECTS共通）──
    body 全体の user-select:none を打ち消す。見出しバー（ドラッグ用）は none のまま。 */
+/* 2026-10-11: 文字の選択は PC（マウス）だけ。iPad では長押しで選択が始まって操作の邪魔になるので付けない */
+@media (hover:hover) and (pointer:fine){
 #settings-panel-body,#ref-panel-body,#tl-panel-body,#proj-panel-body{
   -webkit-user-select:text;user-select:text;cursor:text;
+}
 }
 /* ボタン/スライダーは従来どおり（ドラッグで文字が選ばれて誤操作にならないように）。
    数値・テキスト入力は編集できないと困るので選択可のままにする */
@@ -1181,6 +1194,10 @@ input[type=range]::-moz-range-thumb{
   padding:0;
 }
 #strip-toolbar .play-btn svg{width:10px;height:10px;}
+/* 2026-10-11: 上下スピナは出さない（24 しか使わない・誤タップ防止）。数字の打ち替えはできる */
+#strip-toolbar .fps-input{-moz-appearance:textfield;appearance:textfield;}
+#strip-toolbar .fps-input::-webkit-inner-spin-button,
+#strip-toolbar .fps-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
 #strip-toolbar .fps-input{
   width:42px;background:#0d0620;border:1px solid var(--border);
   color:var(--acid);text-align:center;font-family:var(--mono);
@@ -1269,6 +1286,7 @@ input[type=range]::-moz-range-thumb{
 /* 指の長押しでつまんだコマ（並べ替え中） */
 .fc.lifted,.fc-empty.lifted{opacity:0.75;transform:translateY(-3px);box-shadow:0 0 0 2px var(--neon),0 6px 14px rgba(0,0,0,0.6);}
 .fc,.fc-empty{-webkit-touch-callout:none;}
+#stage.hand-key, #stage.hand-key canvas{cursor:grab !important;}
 .fc.selected, .fc-empty.selected{
   outline:2px solid #FF6FB5;
   outline-offset:-2px;
@@ -1954,6 +1972,7 @@ input[type=range]::-moz-range-thumb{
       <div class="ref-sect-h" id="frame-sect-h" style="cursor:pointer;" title="クリックでFRAMEレイヤーを選択（MOVE/中央の対象に）">FRAME LAYER（描ける下絵・移動可）</div>
       <div class="ref-frame-row">
         <button id="btn-frame-edit" class="ref-btn" title="このレイヤーに直接描画するモード（ON中は下絵に描ける）">EDIT</button>
+        <button id="btn-frame-tl" class="ref-btn tl on" title="FRAME をタイムライン（REF レーン）に出す／隠す">TL</button>
         <button id="btn-frame-clear" class="ref-btn del" title="FRAMEレイヤーをクリア">CLR</button>
       </div>
       <div class="ref-frame-row" style="margin-top:5px;">
@@ -3550,6 +3569,7 @@ function applyFrameLayerStyle(){
   // 編集モード中は範囲の外でも見える（描いているものが見えないと困る）。REFマスターOFFで一括非表示。
   applyFrameLayerTick();
   frameLayerCanvas.style.opacity = fl.editMode ? Math.max(0.6, fl.opacity) : fl.opacity;
+  if(typeof syncFrameTlBtn === 'function') syncFrameTlBtn();
   // 編集モードを示すボタン状態
   const btn = document.getElementById('btn-frame-edit');
   if(btn) btn.classList.toggle('on', fl.editMode);
@@ -4069,8 +4089,9 @@ function refTag(type, o){
 }
 function refLaneRows(){
   const rows = [];
-  if(flAnyInk()) rows.push({ type: 'frame', obj: state.frameLayer });   // 下絵は参照より手前の別の層（ページは1行に並ぶ）
-  for(const it of refStackFront()) rows.push(it);
+  // 2026-10-11: REF パネルの「TL」を OFF にしたものはタイムラインに出さない（画面には出る）
+  if(flAnyInk() && state.frameLayer.lane !== false) rows.push({ type: 'frame', obj: state.frameLayer });   // 下絵は参照より手前の別の層（ページは1行に並ぶ）
+  for(const it of refStackFront()) if(it.obj.lane !== false) rows.push(it);
   return rows;
 }
 function selectRefFromLane(type, id){
@@ -4254,7 +4275,14 @@ function wireRefLabel(lbl, row, i, frameRows, nRows){
     lbl.classList.remove('drag');
     if(dd.drop) dd.drop.remove();
     if(dd.moved){
-      if(dd.target != null && dd.target !== i) refMoveTo(row.type, o.id, dd.target - frameRows);
+      if(dd.target != null && dd.target !== i){
+        // レーンには TL OFF のものが出ていないので、行の番号ではなく「落とした先の行の参照」の位置へ動かす
+        const rows2 = refLaneRows();
+        const dest = rows2[dd.target];
+        const full = refStackFront();
+        const k = dest ? full.findIndex(x => x.obj === dest.obj) : -1;
+        if(k >= 0) refMoveTo(row.type, o.id, k);
+      }
       return;
     }
     const now = performance.now();
@@ -4494,6 +4522,13 @@ function buildRefList(){
       ? (obj.img ? (obj.img.naturalWidth + '×' + obj.img.naturalHeight) : 'IMG')
       : (obj.totalTicks + 'f' + (refStep(obj) > 1 ? ' ×' + refStep(obj) : '') +
          ((obj.offset | 0) ? ' @' + ((obj.offset | 0) > 0 ? '+' : '') + (obj.offset | 0) : ''));
+    // ≡ つまみ：上下にドラッグで並べ替え（iPad 用。▲▼ も残す）
+    const grip = document.createElement('span');
+    grip.className = 'ref-grip';
+    grip.textContent = '≡';
+    grip.title = '上下にドラッグで並べ替え（上＝手前）';
+    wireRefPanelDrag(grip, item, kind, obj);
+    top.appendChild(grip);
     top.appendChild(dot); top.appendChild(name); top.appendChild(meta);
 
     const btns = document.createElement('div');
@@ -4504,6 +4539,17 @@ function buildRefList(){
     visBtn.textContent = '👁';
     visBtn.title = obj.visible ? '表示中（タップで隠す）' : '非表示（タップで表示）';
     visBtn.addEventListener('click', () => isImg ? toggleRefImgVis(obj.id) : toggleRefVis(obj.id));
+    // TL＝REF レーン（タイムライン）に出すか。必要なものだけ出して行数を減らす
+    const tlBtn = document.createElement('button');
+    tlBtn.className = 'ref-btn tl' + (obj.lane !== false ? ' on' : '');
+    tlBtn.textContent = 'TL';
+    tlBtn.title = obj.lane !== false ? 'タイムライン（REF レーン）に出しています — タップで隠す（画面の表示はそのまま）'
+                                     : 'タイムラインには出していません — タップで出す';
+    tlBtn.addEventListener('click', () => {
+      obj.lane = (obj.lane === false);
+      buildRefList(); saveRefs(); markMetaDirty();
+      if(obj.lane && !gRefLaneOpen){ gRefLaneOpen = true; try{ localStorage.setItem(REF_LANE_LS, '1'); }catch(e){} updateRefLane(); }
+    });
     const lockBtn = document.createElement('button');
     lockBtn.className = 'ref-btn' + (obj.locked ? ' on' : '');
     lockBtn.textContent = obj.locked ? '🔒' : '🔓';
@@ -4526,6 +4572,7 @@ function buildRefList(){
     renBtn.className = 'ref-btn'; renBtn.textContent = '✎'; renBtn.title = '名前を変える（種類の札 ' + refTag(kind, obj) + ' はそのまま付きます）';
     renBtn.addEventListener('click', () => startRefRename(name, obj, kind));
     btns.appendChild(visBtn);
+    btns.appendChild(tlBtn);
     btns.appendChild(lockBtn);
     btns.appendChild(upBtn);
     btns.appendChild(dnBtn);
@@ -4558,6 +4605,48 @@ function buildRefList(){
   updateRefLane();
 }
 
+// REF パネルの行を ≡ で上下に並べ替える（指でもペンでも）。落とす位置は行の中心で判定
+function wireRefPanelDrag(grip, item, kind, obj){
+  let d = null;
+  grip.addEventListener('click', e => e.stopPropagation());
+  grip.addEventListener('pointerdown', e => {
+    if(e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    try{ grip.setPointerCapture(e.pointerId); }catch(err){}
+    const list = document.getElementById('ref-list');
+    const items = [...list.querySelectorAll('.ref-item')];
+    if(items.length < 2) return;
+    d = { list, items, from: items.indexOf(item), to: items.indexOf(item), y0: e.clientY, line: null };
+    item.classList.add('dragging');
+  });
+  grip.addEventListener('pointermove', e => {
+    if(!d) return;
+    item.style.transform = 'translateY(' + (e.clientY - d.y0) + 'px)';
+    // 落とした後の位置＝自分以外で「中心が指より上」にある行の数
+    let to = 0;
+    d.items.forEach((it, k) => {
+      if(k === d.from) return;
+      const r = it.getBoundingClientRect();
+      if(r.top + r.height / 2 < e.clientY) to++;
+    });
+    d.to = to;
+    if(!d.line){ d.line = document.createElement('div'); d.line.className = 'ref-drop'; d.list.appendChild(d.line); }
+    const others = d.items.filter((it, k) => k !== d.from);
+    const lr = d.list.getBoundingClientRect();
+    const y = (d.to < others.length ? others[d.to].getBoundingClientRect().top
+                                    : others[others.length - 1].getBoundingClientRect().bottom) - lr.top + d.list.scrollTop;
+    d.line.style.top = (y - 1) + 'px';
+  });
+  const end = () => {
+    if(!d) return;
+    const dd = d; d = null;
+    item.classList.remove('dragging'); item.style.transform = '';
+    if(dd.line) dd.line.remove();
+    if(dd.to !== dd.from) refMoveTo(kind, obj.id, dd.to);
+  };
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('pointercancel', end);
+}
 function toggleRefPanel(force){
   const p = document.getElementById('ref-panel');
   const show = (typeof force === 'boolean') ? force : !p.classList.contains('show');
@@ -4596,7 +4685,7 @@ function saveRefs(){
           id:r.id, name:r.name, projectId:r.projectId,
           visible:r.visible, opacity:r.opacity, color:r.color,
           fps:r.fps, source:r.source,
-          x:r.x, y:r.y, scale:r.scale, locked:!!r.locked,
+          x:r.x, y:r.y, scale:r.scale, locked:!!r.locked, lane: r.lane !== false,
           offset: r.offset | 0, step: refStep(r),
           kind: r.kind || 'ani', z: r.z,
         })),
@@ -4631,6 +4720,7 @@ async function loadRefs(){
         y: (typeof it.y === 'number') ? it.y : 0,
         scale: (typeof it.scale === 'number') ? it.scale : 1,
         locked: !!it.locked,
+        lane: it.lane !== false,
         offset: (typeof it.offset === 'number') ? (it.offset | 0) : 0,
         step: Math.max(1, (it.step | 0) || 1),
         kind: it.kind === 'seq' ? 'seq' : 'ani',
@@ -5175,6 +5265,7 @@ function loadRefImageFromSrc(src, opts){
         opacity: (typeof opts.opacity === 'number') ? opts.opacity : 0.6,
         visible: opts.visible !== false,
         locked: !!opts.locked,
+        lane: opts.lane !== false,   // REF レーン（タイムライン）に出すか
         // 2026-09-23 調整: 出る範囲（既定＝全尺。端をドラッグでトリム）と並び
         tin: (typeof opts.tin === 'number') ? Math.max(0, opts.tin | 0) : 0,
         tout: (typeof opts.tout === 'number') ? Math.max(1, opts.tout | 0) : null,
@@ -7620,7 +7711,9 @@ function taperK(){
 // 筆圧 → 半径（いま使っている道具のサイズを最大半径とする。消しゴムは eraseSize）
 function pressureRadius(pressure){
   const sz = currentToolSize();
-  const maxR = sz === 1 ? 3 : sz === 2 ? 6 : sz * 0.8;
+  // 2026-10-11: 1px/2px ボタンは筆圧ONで最大半径 3 / 6 の別換算、3px 以上は sz×0.8 だったため
+  //   **3px（最大半径 2.4）が 2px（6）より細い**逆転が起きていた。3px 以上は 2px の続きから伸ばす（単調に太くなる）。
+  const maxR = sz === 1 ? 3 : sz === 2 ? 6 : 6 + (sz - 2) * 0.8;
   const plus = (state.penSmooth === 'ema+');
   /* ★あの「線上に点々と残る太い粒」の正体はここだった。
      `pressure || 0.5` は「筆圧が来ていない環境なら 0.5 とみなす」つもりの式だが、
@@ -8847,10 +8940,44 @@ stage.addEventListener('pointermove', e => {
 function endMidPan(e){
   if(!midPanning) return;
   midPanning = false;
-  stage.style.cursor = '';
+  stage.style.cursor = gHandKey ? 'grab' : '';
 }
 stage.addEventListener('pointerup', endMidPan);
 stage.addEventListener('pointercancel', endMidPan);
+// ── Ctrl+Space 押している間は手のひら（2026-10-11・Photoshop 癖用）──
+//   Space 単独は再生のまま。Ctrl を押しながら Space を押すと、どちらかを離すまで左ドラッグでパン。
+//   描画のハンドラより先に拾うため window の capture で取る（中ボタンパンと同じ変数を使う）。
+let gHandKey = false;
+function setHandKey(on){
+  if(gHandKey === on) return;
+  gHandKey = on;
+  stage.classList.toggle('hand-key', on);
+  if(!on && !midPanning) stage.style.cursor = '';
+}
+window.addEventListener('keydown', e => {
+  if((e.key === ' ' || e.code === 'Space') && (e.ctrlKey || e.metaKey)){
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+    e.preventDefault(); e.stopImmediatePropagation();   // 再生（Space）に渡さない
+    setHandKey(true);
+  }
+}, true);
+window.addEventListener('keyup', e => {
+  if(!gHandKey) return;
+  if(e.key === ' ' || e.code === 'Space' || e.key === 'Control' || e.key === 'Meta'){ e.preventDefault(); setHandKey(false); }
+}, true);
+window.addEventListener('blur', () => setHandKey(false));
+window.addEventListener('pointerdown', e => {
+  if(!gHandKey || e.pointerType === 'touch' || e.button !== 0) return;
+  if(!stage.contains(e.target)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  try{ stage.setPointerCapture(e.pointerId); }catch(err){}
+  midPanning = true;
+  midPanStart = { x: e.clientX, y: e.clientY };
+  midPanStartPan = { x: state.panX, y: state.panY };
+  stage.style.cursor = 'grabbing';
+}, true);
+
 // 中ボタンのオートスクロール抑止
 stage.addEventListener('auxclick', e => { if(e.button === 1) e.preventDefault(); });
 stage.addEventListener('mousedown', e => { if(e.button === 1) e.preventDefault(); });
@@ -9424,8 +9551,13 @@ async function exportSequencePNG(){
   floatSettle();
   const cur = curFrame();
   if(cur) syncFrameFromCanvas(cur);
-  const total = totalTicks();
-  if(total <= 0){ await modalAlert('書き出すコマがありません'); return; }
+  const all = totalTicks();
+  if(all <= 0){ await modalAlert('書き出すコマがありません'); return; }
+  // 2026-10-11: ワークエリアの範囲だけ（VIDEO と同じ）。番号はその範囲の頭から 00001
+  const wStart = Math.max(0, Math.min(all - 1, state.workStart | 0));
+  const wEnd = (state.workEnd > wStart) ? Math.min(all, state.workEnd) : all;
+  const total = wEnd - wStart;
+  if(total <= 0){ await modalAlert('書き出す範囲がありません'); return; }
   const W = CFG.WORK_W, H = CFG.WORK_H;
   // SPEC_20 P3: 何を書き出すかを選ぶ（前回の選択を覚える）。AE へは「別フォルダ」、COMPOSER 等へは合体
   let last = 'both';
@@ -9437,7 +9569,8 @@ async function exportSequencePNG(){
     { value: 'split', label: '線と塗りを別フォルダ（AE用）', sub: 'line/ ＋ fill/ を1つのZIPに・同じ番号で揃う' },
   ].map(o => o.value === last ? Object.assign({}, o, { sub: o.sub + ' ・前回' }) : o);
   const mode = await showModal({
-    msg: `全 ${total} コマを ${W}×${H} BG透過の連番PNGで書き出します（コマ数が多いと時間がかかります）。どれを書き出しますか？`,
+    msg: (total < all ? `ワークエリア ${wStart + 1}〜${wEnd}コマ（${total}コマ）` : `全 ${total} コマ`) +
+         `を ${W}×${H} BG透過の連番PNGで書き出します（番号は 00001 から）。どれを書き出しますか？`,
     list: opts,
     buttons: [{ label: 'キャンセル', value: null }],
   });
@@ -9466,17 +9599,21 @@ async function exportSequencePNG(){
       const dur = Math.max(1, f.duration | 0);
       const show = f.kind === 'draw' && !f.hidden && f.line;
       const startTick = tick;
+      // ワークエリアと重なる tick だけ
+      const a = Math.max(startTick, wStart), b = Math.min(startTick + dur, wEnd);
+      if(b <= a){ tick += dur; if(tick >= wEnd) break; continue; }
       for(const L of lanesOut){
         // このセルの1枚を生成（draw かつ非hidden のときのみ絵を描く）。無い番号を作らない＝空でも透明1枚
         exCtx.clearRect(0, 0, W, H);
         if(show) exCtx.drawImage(L === 'both' ? frameArtCanvas(f) : frameLaneCanvas(f, L), 0, 0);
         const dataURL = ex.toDataURL('image/png').split(',')[1];
-        for(let d = 0; d < dur; d++){
-          folders[L].file(`frame_${String(startTick + d + 1).padStart(5,'0')}.png`, dataURL, { base64: true });
+        for(let t = a; t < b; t++){
+          folders[L].file(`frame_${String(t - wStart + 1).padStart(5,'0')}.png`, dataURL, { base64: true });
         }
       }
       tick += dur;
-      setExportOv(tick / total * 100, `${tick} / ${total}`);
+      const done = Math.min(total, b - wStart);
+      setExportOv(done / total * 100, `${done} / ${total}`);
       await new Promise(r => setTimeout(r, 0));
     }
     if(!canceled){
@@ -9720,7 +9857,7 @@ async function flushSave(){
       fillUnderPx: state.fillUnderPx,
       refImages: state.refImages.map(o => ({
         src:o.src, name:o.name, x:o.x, y:o.y, scale:o.scale,
-        opacity:o.opacity, visible:o.visible, locked:!!o.locked,
+        opacity:o.opacity, visible:o.visible, locked:!!o.locked, lane: o.lane !== false,
         tin: o.tin | 0, tout: (o.tout == null) ? null : (o.tout | 0), z: o.z,
       })),
       mirrorAxis: state.mirrorAxis,
@@ -9732,6 +9869,7 @@ async function flushSave(){
         editMode: state.frameLayer.editMode,
         x: state.frameLayer.x, y: state.frameLayer.y, scale: state.frameLayer.scale,
         pages: flSerializePages(),
+        lane: state.frameLayer.lane !== false,
       },
       savedAt: Date.now(),
     }, 'project');
@@ -9921,7 +10059,7 @@ async function loadProject(){
           x:o.x|0, y:o.y|0, name:o.name,
           scale:(typeof o.scale==='number')?o.scale:1,
           opacity:(typeof o.opacity==='number')?o.opacity:0.6,
-          visible:o.visible !== false, locked:!!o.locked, noSelect:true,
+          visible:o.visible !== false, locked:!!o.locked, noSelect:true, lane: o.lane !== false,
           tin: (typeof o.tin === 'number') ? o.tin : 0,
           tout: (typeof o.tout === 'number') ? o.tout : undefined,
           z: (typeof o.z === 'number') ? o.z : 1000 + state.refImages.length,   // 旧保存＝画像は ANIMATOR より手前だった
@@ -9944,6 +10082,7 @@ async function loadProject(){
       state.frameLayer.x = (typeof fl.x === 'number') ? fl.x : 0;
       state.frameLayer.y = (typeof fl.y === 'number') ? fl.y : 0;
       state.frameLayer.scale = (typeof fl.scale === 'number') ? fl.scale : 1;
+      state.frameLayer.lane = fl.lane !== false;
       // 編集モードはアプリ起動時はOFFに戻す（不慮の上書き防止）
       state.frameLayer.editMode = false;
       const slider = document.getElementById('frame-opacity');
@@ -11366,6 +11505,14 @@ async function exportFrameLayerJSON(){
   stageToast(pages.length === 1 ? 'FRAME を JSON で書き出しました（+ JSON / SEQ で IMG 参照として戻せます）'
                                  : 'FRAME（' + pages.length + 'ページ）を JSON で書き出しました（+ JSON / SEQ で ANI 参照として戻せます）');
 }
+function syncFrameTlBtn(){
+  const b = document.getElementById('btn-frame-tl');
+  if(b) b.classList.toggle('on', state.frameLayer.lane !== false);
+}
+document.getElementById('btn-frame-tl').addEventListener('click', () => {
+  state.frameLayer.lane = (state.frameLayer.lane === false);
+  syncFrameTlBtn(); updateRefLane(); markMetaDirty();
+});
 document.getElementById('btn-frame-seq').addEventListener('click', exportFrameLayerSeq);
 document.getElementById('btn-frame-json').addEventListener('click', exportFrameLayerJSON);
 // CLR：このコマのページだけ（Undo できる）／全部（Undo できない）
