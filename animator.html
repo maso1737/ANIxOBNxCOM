@@ -1452,6 +1452,12 @@ body{-webkit-touch-callout:none;}
   border-color:rgba(90,233,255,0.5);
   background:rgba(60,0,0,0.65);
 }
+/* コマメニュー（上スワイプ）とコマロック */
+#cel-menu{position:fixed;z-index:9000;display:flex;gap:6px;padding:6px;background:rgba(10,10,14,0.96);border:1px solid var(--acid);border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,0.6);}
+#cel-menu button{min-width:72px;min-height:40px;padding:0 12px;font:inherit;font-size:13px;font-weight:700;color:#fff;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);border-radius:4px;cursor:pointer;}
+#cel-menu button.danger{color:#ff6b6b;border-color:rgba(255,107,107,0.6);}
+.fc-lock-ico{position:absolute;right:2px;bottom:1px;font-size:10px;line-height:1;pointer-events:none;z-index:4;}
+.fc.fc-locked .fc-thumb{outline:1px dashed rgba(255,200,80,0.8);outline-offset:-1px;}
 /* 非表示フレームのオーバーレイ */
 .fc.fc-frame-hidden::after{
   content:'';
@@ -2725,6 +2731,7 @@ const state = {
   onionOn: false,
   // SPEC_20: オニオンが拾うのは既定で線レーンだけ（前後のコマの線を読むための道具なので）
   onionIncludeFill: false,
+  refLayoutMemo: [],   // 2026-10-11: REF の置き場所の記憶（画像そのものは持たない。同じ参考を読み直したら同じ位置・サイズへ）
   // ストローク補正の強さ (0=なし, 推奨: 3) — 旧方式（互換用）
   smoothing: 3,
   // ブラシ補正: mode='off'|'avg'(プロクリエイト的 指数移動平均)|'pull'(ZBrushレイジー的)
@@ -2910,6 +2917,8 @@ function setLane(L, opts){
 function laneBlocked(){
   const L = curLane();
   if(state.frameLayer.editMode) return false;
+  const cf = curFrame();
+  if(cf && cf.locked){ stageToast('🔒 このコマはロック中（コマを上にスワイプ→ロック解除）'); return true; }
   if(!laneLocked(L)) return false;
   stageToast('🔒 ' + LANE_JP[L] + 'レーンはロック中');
   return true;
@@ -3937,6 +3946,12 @@ async function addRefStillAsImage(src){
               : padded ? { tin: hit.tin, tout: hit.tout } : curCelRange();
   const o = await loadRefImageFromSrc(hit.image, Object.assign({ name: src.name }, range));
   if(!o) return null;
+  if(refLayoutApply('img', o)){
+    stageToast(src.name + ' を前回の位置・サイズに置きました');
+    if(!state.refMasterShow){ state.refMasterShow = true; applyRefMaster(); }
+    buildRefList(); applyRefImgUI(); renderRefLayer(); updateTimeTrack(); markMetaDirty(); scheduleSave();
+    return o;
+  }
   if(!state.refMasterShow){ state.refMasterShow = true; applyRefMaster(); }
   buildRefList(); applyRefImgUI(); renderRefLayer(); updateTimeTrack(); markMetaDirty(); scheduleSave();
   stageToast(src.name + ' は1枚なので IMG で置きました（' + (range.tin + 1) + '〜' + (range.tout == null ? '最後' : range.tout) + 'コマ）');
@@ -3967,6 +3982,7 @@ async function addRefAnimator(json, fallbackName){
     z: refTopZ(),         // 追加したものは一番手前
   });
   centerRefAnimator(state.refAnimators[0]); // 原寸・中央に初期配置
+  if(refLayoutApply('anim', state.refAnimators[0])) stageToast(src.name + ' を前回の位置・サイズに置きました');
   // 2026-10-05: 読み込んだらすぐ MOVE することが多いので、置いたものを選んだ状態にする
   state.refSel = { type: 'anim', id: state.refAnimators[0].id };
   applyRefImgUI();
@@ -4939,7 +4955,7 @@ function copySelectedFrames(){
       return {
         kind: 'draw',
         duration: f.duration,
-        hidden: !!f.hidden, fillHidden: !!f.fillHidden,
+        hidden: !!f.hidden, fillHidden: !!f.fillHidden, locked: !!f.locked,
         line: f.line ? new Uint8ClampedArray(f.line) : null,
         fill: f.fill ? new Uint8ClampedArray(f.fill) : null,
       };
@@ -4963,7 +4979,7 @@ function pasteFramesAfterCurrent(){
     }
     const f = createBlankFrame();
     f.duration = cf.duration;
-    f.hidden = cf.hidden; f.fillHidden = !!cf.fillHidden;
+    f.hidden = cf.hidden; f.fillHidden = !!cf.fillHidden; f.locked = !!cf.locked;
     if(cf.line || cf.fill){
       if(cf.line) f.line = new Uint8ClampedArray(cf.line);
       if(cf.fill) f.fill = new Uint8ClampedArray(cf.fill);
@@ -5232,6 +5248,49 @@ function animTickImg(r){
 }
 function firstTickImg(r){ if(!r.ticks) return null; for(const im of r.ticks){ if(im) return im; } return null; }
 // アニメ参照を 原寸(1:1)＆中央 に配置
+// ── REF の置き場所の記憶（2026-10-11）──
+//   PROJECTS 保存／EXPORT JSON／自動保存に「どの参考を・どこに・どの大きさで」だけを残す（画像は入れない＝重くしない）。
+//   同じ参考を読み直したら（名前＋画像なら原寸サイズで照合）、記憶した位置・倍率・濃さ・出る範囲に置く。FRAME（EDIT）は対象外
+function refLayoutKey(type, o){
+  const n = String(o.name || '').trim().toLowerCase();
+  if(!n) return null;
+  if(type === 'img') return o.img ? 'img:' + n + ':' + o.img.naturalWidth + 'x' + o.img.naturalHeight : null;
+  return 'anim:' + n;
+}
+function refLayoutEntry(type, o){
+  const key = refLayoutKey(type, o); if(!key) return null;
+  const e = { key, x: o.x, y: o.y, scale: o.scale, opacity: o.opacity };
+  if(type === 'img'){ e.tin = o.tin | 0; e.tout = (typeof o.tout === 'number') ? o.tout : null; }
+  else { e.offset = o.offset | 0; e.step = refStep(o); }
+  return e;
+}
+// 記憶＋いま出ている REF（出ているほうが新しい）をまとめて返す。消した REF の記憶も残す
+function refLayoutSnapshot(){
+  const map = new Map();
+  for(const e of (state.refLayoutMemo || [])) if(e && e.key) map.set(e.key, e);
+  for(const o of state.refImages){ const e = refLayoutEntry('img', o); if(e) map.set(e.key, e); }
+  for(const r of state.refAnimators){ const e = refLayoutEntry('anim', r); if(e) map.set(e.key, e); }
+  state.refLayoutMemo = [...map.values()].slice(-200);
+  return state.refLayoutMemo;
+}
+// 記憶があればその位置へ置く。置いたら true
+function refLayoutApply(type, o){
+  const key = refLayoutKey(type, o); if(!key) return false;
+  const e = (state.refLayoutMemo || []).find(m => m && m.key === key);
+  if(!e) return false;
+  if(typeof e.x === 'number') o.x = e.x;
+  if(typeof e.y === 'number') o.y = e.y;
+  if(typeof e.scale === 'number') o.scale = e.scale;
+  if(typeof e.opacity === 'number') o.opacity = e.opacity;
+  if(type === 'img'){
+    if(typeof e.tin === 'number') o.tin = e.tin;
+    o.tout = (typeof e.tout === 'number') ? e.tout : null;
+  } else {
+    if(typeof e.offset === 'number') o.offset = e.offset | 0;
+    if(typeof e.step === 'number') o.step = Math.max(1, e.step | 0);
+  }
+  return true;
+}
 function centerRefAnimator(r){
   const im = firstTickImg(r); if(!im) return;
   r.scale = 1;
@@ -6133,7 +6192,7 @@ function updateUndoButtons(){
 function snapshotTL(){
   return state.frames.map(f => {
     const s = {
-      id: f.id, kind: f.kind, duration: f.duration, hidden: !!f.hidden, fillHidden: !!f.fillHidden,
+      id: f.id, kind: f.kind, duration: f.duration, hidden: !!f.hidden, fillHidden: !!f.fillHidden, locked: !!f.locked,
     };
     if(f.kind === 'draw'){
       s.line        = f.line;              // syncFrameFromCanvas が新Array割当するので参照で安全
@@ -6156,7 +6215,7 @@ function tlSnapEquals(a, b){
   if(!a || !b || a.length !== b.length) return false;
   for(let i = 0; i < a.length; i++){
     const x = a[i], y = b[i];
-    if(x.id !== y.id || x.kind !== y.kind || x.duration !== y.duration || !!x.hidden !== !!y.hidden || !!x.fillHidden !== !!y.fillHidden) return false;
+    if(x.id !== y.id || x.kind !== y.kind || x.duration !== y.duration || !!x.hidden !== !!y.hidden || !!x.fillHidden !== !!y.fillHidden || !!x.locked !== !!y.locked) return false;
     if(x.kind === 'draw' && (x.line !== y.line || x.fill !== y.fill)) return false;
   }
   return true;
@@ -6166,7 +6225,7 @@ function tlStructEquals(a, b){
   if(!a || !b || a.length !== b.length) return false;
   for(let i = 0; i < a.length; i++){
     const x = a[i], y = b[i];
-    if(x.id !== y.id || x.kind !== y.kind || x.duration !== y.duration || !!x.hidden !== !!y.hidden || !!x.fillHidden !== !!y.fillHidden) return false;
+    if(x.id !== y.id || x.kind !== y.kind || x.duration !== y.duration || !!x.hidden !== !!y.hidden || !!x.fillHidden !== !!y.fillHidden || !!x.locked !== !!y.locked) return false;
   }
   return true;
 }
@@ -6212,7 +6271,7 @@ function restoreTL(snap){
     if(live && live.kind === s.kind){
       // 種別が一致する既存コマ → 絵/履歴は温存し、構造だけ合わせる
       live.duration = s.duration;
-      live.hidden = !!s.hidden; live.fillHidden = !!s.fillHidden;
+      live.hidden = !!s.hidden; live.fillHidden = !!s.fillHidden; live.locked = !!s.locked;
       live.dirty = true;
       return live;
     }
@@ -6222,7 +6281,7 @@ function restoreTL(snap){
     }
     return {
       id: s.id, kind: 'draw',
-      duration: s.duration, hidden: s.hidden, fillHidden: s.fillHidden,
+      duration: s.duration, hidden: s.hidden, fillHidden: s.fillHidden, locked: !!s.locked,
       line: s.line, fill: s.fill, thumbCanvas: s.thumbCanvas,
       history: (s.history || []).slice(), histIdx: s.histIdx,
       strokeCount: s.strokeCount || 0, dirty: true,
@@ -6576,6 +6635,7 @@ function addFrame(copyFromCurrent = false){
 // 現在フレーム削除
 async function deleteCurrentFrame(){
   floatSettle();
+  if(curFrame() && curFrame().locked){ stageToast('🔒 ロック中のコマは消せません'); return; }
   // 確認ダイアログなし版
   if(state.frames.length <= 1){
     await modalAlert('最低1フレーム必要です。');
@@ -6761,6 +6821,7 @@ function buildStrip(){
       if(f.hidden) thumb.classList.add('vis-off');
       if(f.fillHidden) band.classList.add('vis-off');
       if(f.hidden && f.fillHidden) cell.classList.add('fc-frame-hidden');
+      if(f.locked){ cell.classList.add('fc-locked'); const lk = document.createElement('div'); lk.className = 'fc-lock-ico'; lk.textContent = '🔒'; thumb.appendChild(lk); }
 
       // 内側仕切り線（duration 2,3用）
       if(f.duration >= 2 && f.duration <= 3){
@@ -6929,6 +6990,14 @@ function setupCellInteraction(cell, frame, idx){
     if(!dragStart) return;
     const dx = Math.abs(e.clientX - dragStart.x);
     if(isTouch){
+      // 2026-10-11: 上へスワイプ（縦にはっきり・横はほぼ動かない）→ コマメニュー（ロック／複製／削除）
+      const dyUp = dragStart.y - e.clientY;
+      if(!dragStart.menu && dyUp > 28 && dx < dyUp * 0.6 && !gTouchCellDrag){
+        dragStart.menu = true; dragStart.tap = false; clearTimeout(cell._lpTimer);
+        if(navigator.vibrate) try{ navigator.vibrate(10); }catch(err){}
+        openCelMenu(idx, cell);
+        return;
+      }
       // 指: 動いたらタップキャンセル（長押しも取り消し＝スクロールに任せる）
       if(dx > 6 || Math.abs(e.clientY - dragStart.y) > 6){ dragStart.tap = false; clearTimeout(cell._lpTimer); }
       return;
@@ -6986,6 +7055,50 @@ function setupCellInteraction(cell, frame, idx){
   });
 }
 
+// ── コマメニュー（2026-10-11）: キーボードの無い iPad 用。コマを指で上へスワイプすると出る（Procreate のレイヤースワイプ風）
+//   🔒 ロック（このコマに描けない・全消去も効かない）／ 複製（すぐ後ろへ）／ 削除（Del と同じ＝空コマへ。Undo 可）
+function closeCelMenu(){
+  const m = document.getElementById('cel-menu'); if(m) m.remove();
+  document.removeEventListener('pointerdown', celMenuOutside, true);
+}
+function celMenuOutside(e){ if(!e.target.closest('#cel-menu')) closeCelMenu(); }
+function openCelMenu(idx, cell){
+  closeCelMenu();
+  if(state.currentFrame !== idx) switchToFrame(idx);
+  const f = state.frames[idx]; if(!f) return;
+  const isDraw = f.kind === 'draw';
+  const m = document.createElement('div');
+  m.id = 'cel-menu';
+  const items = [];
+  if(isDraw) items.push(['lock', f.locked ? '🔓 ロック解除' : '🔒 ロック']);
+  if(isDraw) items.push(['dup', '⧉ 複製']);
+  items.push(['del', isDraw ? '✕ 削除' : '✕ 空コマを詰める']);
+  for(const [act, label] of items){
+    const b = document.createElement('button');
+    b.dataset.act = act; b.textContent = label;
+    if(act === 'del') b.className = 'danger';
+    b.addEventListener('click', async ev => {
+      ev.stopPropagation();
+      closeCelMenu();
+      if(act === 'lock'){
+        tlCheckpoint();
+        f.locked = !f.locked; markFrameDirty(f); buildStrip(); pushTimelineHistory(); scheduleSave();
+        stageToast(f.locked ? '🔒 コマ ' + (idx + 1) + ' をロック' : '🔓 コマ ' + (idx + 1) + ' のロックを解除');
+      } else if(act === 'dup'){
+        addFrame(true);
+      } else if(act === 'del'){
+        await deleteCurrentFrame();
+      }
+    });
+    m.appendChild(b);
+  }
+  document.body.appendChild(m);
+  const r = cell.getBoundingClientRect(), mr = m.getBoundingClientRect();
+  const left = Math.max(8, Math.min(window.innerWidth - mr.width - 8, r.left + r.width / 2 - mr.width / 2));
+  m.style.left = left + 'px';
+  m.style.top = Math.max(8, r.top - mr.height - 8) + 'px';
+  setTimeout(() => document.addEventListener('pointerdown', celMenuOutside, true), 0);
+}
 // ドロップ位置へ並べ替え（ペン/マウスのドラッグと、指の長押しドラッグの共通）
 function clearDropMarks(){
   document.querySelectorAll('#frame-strip .fc, #frame-strip .fc-empty').forEach(el => {
@@ -8966,6 +9079,7 @@ function clearCanvas(){
   floatSettle();
   const cur = curLane();
   if(laneLocked(cur)){ stageToast('🔒 ' + LANE_JP[cur] + 'レーンはロック中'); return; }
+  if(curFrame() && curFrame().locked){ stageToast('🔒 このコマはロック中'); return; }
   const ls = [cur];
   for(const L of ls) laneCtx(L).clearRect(0, 0, CFG.WORK_W, CFG.WORK_H);
   pushHistory(ls);
@@ -9300,6 +9414,7 @@ function buildProjectJSON(){
       startFrame: state.workStart,
       endFrame: state.workEnd,
     },
+    refLayout: refLayoutSnapshot(),   // REF の置き場所だけ（画像は含まない）
     frameLayer: {
       visible: state.frameLayer.visible,
       opacity: state.frameLayer.opacity,
@@ -9314,7 +9429,7 @@ function buildProjectJSON(){
         id: f.id,
         kind: 'draw',
         duration: f.duration,
-        hidden: !!f.hidden, fillHidden: !!f.fillHidden,
+        hidden: !!f.hidden, fillHidden: !!f.fillHidden, locked: !!f.locked,
         image: frameToPNGDataURL(f),   // 合体1枚（COMPOSER / OBAN など下流が読むのはこれだけ）
       };
       // SPEC_20 P3: 線と塗りを分けたまま戻すための同梱。共有DB／LIVE（buildProjectPayload）には載せない
@@ -9386,7 +9501,7 @@ async function applyProjectJSON(json){
     } else {
       const f = createBlankFrame();
       f.duration = Math.max(1, fj.duration | 0);
-      f.hidden = !!fj.hidden; f.fillHidden = !!fj.fillHidden;
+      f.hidden = !!fj.hidden; f.fillHidden = !!fj.fillHidden; f.locked = !!fj.locked;
       if(fj.id) f.id = fj.id;
       if(fj.image){
         try{
@@ -9446,6 +9561,12 @@ async function applyProjectJSON(json){
   applyFrameLayerStyle();
   // 参照画像は新規プロジェクト読込でクリア（前プロジェクトの残留防止）
   state.refImages = []; state.refMoveMode = false; state.refSel = null;
+  // REF の置き場所の記憶を差し替え、いま読み込まれている参考（ANI/SEQ）にも当てる
+  state.refLayoutMemo = Array.isArray(json.refLayout) ? json.refLayout.filter(e => e && typeof e.key === 'string') : [];
+  let relaid = 0;
+  for(const r of state.refAnimators) if(refLayoutApply('anim', r)) relaid++;
+  if(relaid){ buildRefList(); updateTimeTrack(); saveRefs(); }
+  markMetaDirty();
   if(typeof renderRefImg === 'function'){ renderRefImg(); applyRefImgUI(); }
   renderRefLayer();
   updateResLabel();
@@ -10023,6 +10144,7 @@ async function flushSave(){
       lane: state.lane,
       lanes: state.lanes,
       onionIncludeFill: !!state.onionIncludeFill,
+      refLayout: refLayoutSnapshot(),
       fillUnderPx: state.fillUnderPx,
       refImages: state.refImages.map(o => ({
         src:o.src, name:o.name, x:o.x, y:o.y, scale:o.scale,
@@ -10219,6 +10341,7 @@ async function loadProject(){
       }
     }
     if(typeof meta.onionIncludeFill === 'boolean') state.onionIncludeFill = meta.onionIncludeFill;
+    if(Array.isArray(meta.refLayout)) state.refLayoutMemo = meta.refLayout.filter(e => e && typeof e.key === 'string');
     if(typeof meta.fillUnderPx === 'number') state.fillUnderPx = Math.max(0, Math.min(3, meta.fillUnderPx | 0));
     if(Array.isArray(meta.refImages)){
       state.refImages = [];

@@ -719,3 +719,7 @@ cd verify && npm run verify:animator
 - 2026-10-11: **コマの表示トグルを LINE / CELL 別に**。サムネ左上の ●＝LINE（`f.hidden`）、塗帯の左の ●＝CELL（新設 `f.fillHidden`・保存/JSON/履歴にも載る）。
   隠したレーンは編集キャンバス（`applyCelVis` → `applyLaneStyle` の opacity）・再生・書き出しから消える。**両方隠したコマだけ**従来どおり「無いコマ」扱い（`celShown`）＝直前のコマが出続ける。
   旧ボタンは hover でしか出ず（iPad で見えない）、右端の `.fc-handle` に覆われてタップが届いていなかった → 常時表示・左寄せに。
+- 2026-10-11: **REF の置き場所の記憶**（`state.refLayoutMemo` / `refLayoutSnapshot` / `refLayoutApply`）。PROJECTS 保存・EXPORT JSON（`refLayout`）・自動保存 meta に、REF ごとの x/y/scale/opacity（IMG は tin/tout、ANI/SEQ は offset/step）だけを残す。**画像は入れない**。
+  同じ参考を読み直すと（キー＝名前、IMG は名前＋原寸サイズ）記憶した位置・サイズに置く。プロジェクトを開くと記憶が差し替わり、読み込み済みの ANI/SEQ にもその場で当たる。FRAME（EDIT）は対象外。
+- 2026-10-11: **コマメニュー（iPad 用）**。タイムラインのコマを指で**上へスワイプ**（縦28px超・横は縦の0.6倍未満）→ `#cel-menu`：🔒 ロック／⧉ 複製／✕ 削除。
+  コマロック `f.locked`（保存・JSON・タイムライン履歴に載る）：`laneBlocked` で描けない・ERASE 長押しの全消去も `deleteCurrentFrame`（Del）も止まる。サムネに 🔒 と点線。
