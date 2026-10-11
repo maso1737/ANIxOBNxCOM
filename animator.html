@@ -1440,7 +1440,13 @@ body{-webkit-touch-callout:none;}
   display:none;
   touch-action:none;
 }
-.fc:hover .fc-vis-btn,.fc-vis-btn.off{display:block;}
+.fc-vis-btn{display:block;opacity:0.55;}
+.fc-vis-btn.off{opacity:1;}
+.fc-thumb,.fc-fill{position:relative;}
+.fc-thumb .fc-vis-btn{top:2px;left:2px;right:auto;}
+.fc-fill .fc-vis-btn{top:50%;transform:translateY(-50%);left:2px;right:auto;width:11px;height:11px;line-height:11px;font-size:6px;}
+.fc-thumb.vis-off canvas{opacity:0.2;}
+.fc-fill.vis-off{opacity:0.25 !important;}
 .fc-vis-btn.off{
   color:rgba(90,233,255,0.9);
   border-color:rgba(90,233,255,0.5);
@@ -2815,7 +2821,8 @@ function applyLaneStyle(){
     const cfg = state.lanes[L];
     const cv  = laneCanvas(L);
     cv.style.display = cfg.visible ? 'block' : 'none';
-    cv.style.opacity = fade * (typeof cfg.opacity === 'number' ? cfg.opacity : 1);
+    const cf = gCelVisFrame, celOff = !!(cf && cf.kind === 'draw' && (L === 'fill' ? cf.fillHidden : cf.hidden));
+    cv.style.opacity = celOff ? 0 : fade * (typeof cfg.opacity === 'number' ? cfg.opacity : 1);
   }
   const info = document.getElementById('info-lane');
   if(info){ info.textContent = LANE_JP[curLane()]; info.classList.toggle('fill', curLane() === 'fill'); }
@@ -2909,6 +2916,7 @@ function laneBlocked(){
 }
 // コマの2枚をキャンバスへ（履歴は触らない）
 function paintLanesFrom(frame){
+  applyCelVis(frame);
   const W = CFG.WORK_W, H = CFG.WORK_H;
   if(frame && frame.kind === 'draw' && frame.line){
     lineCtx.putImageData(new ImageData(frame.line instanceof Uint8ClampedArray ? frame.line : new Uint8ClampedArray(frame.line), W, H), 0, 0);   // putImageData は読むだけ＝コピー不要
@@ -2934,12 +2942,13 @@ function frameArtCanvas(frame){
   _artCx.clearRect(0, 0, W, H);
   if(!frame || frame.kind !== 'draw') return _artCv;
   // putImageData は下を上書きするので、重ねる側は必ず drawImage を通す
-  if(frame.fill){
+  const fillOn = frame.fill && !frame.fillHidden;
+  if(fillOn){
     _artTmpCx.putImageData(new ImageData(new Uint8ClampedArray(frame.fill), W, H), 0, 0);
     _artCx.drawImage(_artTmpCv, 0, 0);
   }
-  if(frame.line){
-    if(frame.fill){
+  if(frame.line && !frame.hidden){
+    if(fillOn){
       _artTmpCx.putImageData(new ImageData(new Uint8ClampedArray(frame.line), W, H), 0, 0);
       _artCx.drawImage(_artTmpCv, 0, 0);
     } else {
@@ -4930,7 +4939,7 @@ function copySelectedFrames(){
       return {
         kind: 'draw',
         duration: f.duration,
-        hidden: !!f.hidden,
+        hidden: !!f.hidden, fillHidden: !!f.fillHidden,
         line: f.line ? new Uint8ClampedArray(f.line) : null,
         fill: f.fill ? new Uint8ClampedArray(f.fill) : null,
       };
@@ -4954,7 +4963,7 @@ function pasteFramesAfterCurrent(){
     }
     const f = createBlankFrame();
     f.duration = cf.duration;
-    f.hidden = cf.hidden;
+    f.hidden = cf.hidden; f.fillHidden = !!cf.fillHidden;
     if(cf.line || cf.fill){
       if(cf.line) f.line = new Uint8ClampedArray(cf.line);
       if(cf.fill) f.fill = new Uint8ClampedArray(cf.fill);
@@ -6124,7 +6133,7 @@ function updateUndoButtons(){
 function snapshotTL(){
   return state.frames.map(f => {
     const s = {
-      id: f.id, kind: f.kind, duration: f.duration, hidden: !!f.hidden,
+      id: f.id, kind: f.kind, duration: f.duration, hidden: !!f.hidden, fillHidden: !!f.fillHidden,
     };
     if(f.kind === 'draw'){
       s.line        = f.line;              // syncFrameFromCanvas が新Array割当するので参照で安全
@@ -6147,7 +6156,7 @@ function tlSnapEquals(a, b){
   if(!a || !b || a.length !== b.length) return false;
   for(let i = 0; i < a.length; i++){
     const x = a[i], y = b[i];
-    if(x.id !== y.id || x.kind !== y.kind || x.duration !== y.duration || !!x.hidden !== !!y.hidden) return false;
+    if(x.id !== y.id || x.kind !== y.kind || x.duration !== y.duration || !!x.hidden !== !!y.hidden || !!x.fillHidden !== !!y.fillHidden) return false;
     if(x.kind === 'draw' && (x.line !== y.line || x.fill !== y.fill)) return false;
   }
   return true;
@@ -6157,7 +6166,7 @@ function tlStructEquals(a, b){
   if(!a || !b || a.length !== b.length) return false;
   for(let i = 0; i < a.length; i++){
     const x = a[i], y = b[i];
-    if(x.id !== y.id || x.kind !== y.kind || x.duration !== y.duration || !!x.hidden !== !!y.hidden) return false;
+    if(x.id !== y.id || x.kind !== y.kind || x.duration !== y.duration || !!x.hidden !== !!y.hidden || !!x.fillHidden !== !!y.fillHidden) return false;
   }
   return true;
 }
@@ -6203,7 +6212,7 @@ function restoreTL(snap){
     if(live && live.kind === s.kind){
       // 種別が一致する既存コマ → 絵/履歴は温存し、構造だけ合わせる
       live.duration = s.duration;
-      live.hidden = !!s.hidden;
+      live.hidden = !!s.hidden; live.fillHidden = !!s.fillHidden;
       live.dirty = true;
       return live;
     }
@@ -6213,7 +6222,7 @@ function restoreTL(snap){
     }
     return {
       id: s.id, kind: 'draw',
-      duration: s.duration, hidden: s.hidden,
+      duration: s.duration, hidden: s.hidden, fillHidden: s.fillHidden,
       line: s.line, fill: s.fill, thumbCanvas: s.thumbCanvas,
       history: (s.history || []).slice(), histIdx: s.histIdx,
       strokeCount: s.strokeCount || 0, dirty: true,
@@ -6463,6 +6472,12 @@ function syncFrameFromCanvas(frame, lanes, snaps){
   tc.drawImage(lineCanvas, 0, 0, CFG.THUMB_W, CFG.THUMB_H);
 }
 
+// レーン別の表示トグルを編集中のキャンバスにも効かせる（隠したレーンは見えない。描けば絵は入る）
+var gCelVisFrame = null;   // いまキャンバスに出ているコマ（レーン別の表示トグルを見る相手）
+function applyCelVis(f){
+  gCelVisFrame = f || null;
+  applyLaneStyle();
+}
 // フレーム→キャンバス。空ブロックの場合は白紙に
 function loadFrameToCanvas(frame){
   if(!frame) return;
@@ -6720,21 +6735,32 @@ function buildStrip(){
       band.title = '塗レーン（タップでこのコマの塗りを描く）';
       cell.appendChild(band);
 
-      // 表示/非表示トグルボタン
-      const visBtn = document.createElement('button');
-      visBtn.className = 'fc-vis-btn' + (f.hidden ? ' off' : '');
-      visBtn.title = f.hidden ? '非表示（タップで表示）' : '表示（タップで非表示）';
-      visBtn.textContent = f.hidden ? '✕' : '●';
-      visBtn.addEventListener('pointerdown', e => e.stopPropagation());
-      visBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        f.hidden = !f.hidden;
-        markFrameDirty(f);
-        buildStrip();
-        pushTimelineHistory(); // タイムライン操作記録（表示/非表示切替）
-      });
-      cell.appendChild(visBtn);
-      if(f.hidden) cell.classList.add('fc-frame-hidden');
+      // 表示/非表示トグル（2026-10-11: LINE と CELL で別々。iPad は hover が無いので常に出す）
+      const mkVis = (key, lane, host) => {
+        const btn = document.createElement('button');
+        btn.className = 'fc-vis-btn fc-vis-' + lane + (f[key] ? ' off' : '');
+        btn.title = LANE_JP[lane] + (f[key] ? ' 非表示（タップで表示）' : ' 表示（タップで非表示）');
+        btn.textContent = f[key] ? '✕' : '●';
+        const stop = e => e.stopPropagation();
+        btn.addEventListener('pointerdown', stop);
+        btn.addEventListener('pointerup', stop);
+        btn.addEventListener('touchstart', stop, { passive: true });
+        btn.addEventListener('click', e => {
+          e.stopPropagation(); e.preventDefault();
+          f[key] = !f[key];
+          markFrameDirty(f);
+          if(i === state.currentFrame) applyCelVis(f);
+          buildStrip();
+          pushTimelineHistory(); // タイムライン操作記録（表示/非表示切替）
+          scheduleSave();
+        });
+        host.appendChild(btn);
+      };
+      mkVis('hidden', 'line', thumb);
+      mkVis('fillHidden', 'fill', band);
+      if(f.hidden) thumb.classList.add('vis-off');
+      if(f.fillHidden) band.classList.add('vis-off');
+      if(f.hidden && f.fillHidden) cell.classList.add('fc-frame-hidden');
 
       // 内側仕切り線（duration 2,3用）
       if(f.duration >= 2 && f.duration <= 3){
@@ -7382,15 +7408,18 @@ let playRAF = 0;
 // 範囲内のtickから idx と「実描画フレームidx」を返す（tick→表示コマの純関数）
 // 空ブロック／非表示コマの場合は直前のdrawフレームを返す。
 // ※ 再生ループと VERIFY HARNESS の seek() が共有する唯一の定義（ズレ防止）
+// 2026-10-11: 表示トグルはレーン別（f.hidden＝LINE を隠す／f.fillHidden＝CELL を隠す）。
+//   両方隠したコマだけ「無いコマ」扱い（＝直前のコマが出続ける＝従来の非表示と同じ）
+function celShown(f){ return f.kind === 'draw' && !(f.hidden && f.fillHidden); }
 function frameAtTick(tick){
   let acc = 0;
   let lastDrawIdx = -1;
   for(let i = 0; i < state.frames.length; i++){
     const f = state.frames[i];
-    if(f.kind === 'draw' && !f.hidden) lastDrawIdx = i;
+    if(celShown(f)) lastDrawIdx = i;
     acc += f.duration;
     if(tick < acc){
-      return { idx: i, showIdx: (f.kind === 'draw' && !f.hidden) ? i : lastDrawIdx };
+      return { idx: i, showIdx: celShown(f) ? i : lastDrawIdx };
     }
   }
   return { idx: state.frames.length - 1, showIdx: lastDrawIdx };
@@ -9221,7 +9250,7 @@ function frameLaneCanvas(frame, lane){
   const W = CFG.WORK_W, H = CFG.WORK_H;
   if(!_laneCv){ _laneCv = document.createElement('canvas'); _laneCx = _laneCv.getContext('2d'); }
   if(_laneCv.width !== W || _laneCv.height !== H){ _laneCv.width = W; _laneCv.height = H; }
-  const a = frame && frame.kind === 'draw' ? (lane === 'fill' ? frame.fill : frame.line) : null;
+  const a = frame && frame.kind === 'draw' ? (lane === 'fill' ? (frame.fillHidden ? null : frame.fill) : (frame.hidden ? null : frame.line)) : null;
   if(a) _laneCx.putImageData(new ImageData(new Uint8ClampedArray(a), W, H), 0, 0);
   else _laneCx.clearRect(0, 0, W, H);
   return _laneCv;
@@ -9285,7 +9314,7 @@ function buildProjectJSON(){
         id: f.id,
         kind: 'draw',
         duration: f.duration,
-        hidden: !!f.hidden,
+        hidden: !!f.hidden, fillHidden: !!f.fillHidden,
         image: frameToPNGDataURL(f),   // 合体1枚（COMPOSER / OBAN など下流が読むのはこれだけ）
       };
       // SPEC_20 P3: 線と塗りを分けたまま戻すための同梱。共有DB／LIVE（buildProjectPayload）には載せない
@@ -9357,7 +9386,7 @@ async function applyProjectJSON(json){
     } else {
       const f = createBlankFrame();
       f.duration = Math.max(1, fj.duration | 0);
-      f.hidden = !!fj.hidden;
+      f.hidden = !!fj.hidden; f.fillHidden = !!fj.fillHidden;
       if(fj.id) f.id = fj.id;
       if(fj.image){
         try{
@@ -9737,7 +9766,7 @@ async function exportSequencePNG(){
       if(gExportCancel){ canceled = true; break; }
       const f = state.frames[i];
       const dur = Math.max(1, f.duration | 0);
-      const show = f.kind === 'draw' && !f.hidden && f.line;
+      const show = celShown(f);
       const startTick = tick;
       // ワークエリアと重なる tick だけ
       const a = Math.max(startTick, wStart), b = Math.min(startTick + dur, wEnd);
@@ -9820,7 +9849,7 @@ async function exportVideo(){
   let cellOf = null; // cellCv に描かれているフレーム
   const drawTick = (f) => {
     exCtx.drawImage(bgCanvas, 0, 0, W, H); // 背景（bgBright反映）
-    if(f && f.kind === 'draw' && !f.hidden && f.line){
+    if(f && celShown(f)){
       if(cellOf !== f){
         cellCtx.clearRect(0, 0, W, H);
         cellCtx.drawImage(frameArtCanvas(f), 0, 0);

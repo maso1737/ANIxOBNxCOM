@@ -716,3 +716,6 @@ cd verify && npm run verify:animator
 - 構文チェック（`new Function`）→ Pages か `file://` で実機確認。
 - push は明示依頼時のみ。大きい・不可逆な変更は先に方針を確認。
 - 2026-10-11: **MOVE は選択中の REF を動かす**（`refMoveTarget`）。上に重なった画像を触っても選択は切り替わらない（ドラッグ／ホイール拡縮／ピンチ共通）。何も選んでいないときだけ触った位置の一番上の画像を選ぶ。最前面化（旧 `bringImageFront`）は撤去＝並びはパネルのドラッグで変える。
+- 2026-10-11: **コマの表示トグルを LINE / CELL 別に**。サムネ左上の ●＝LINE（`f.hidden`）、塗帯の左の ●＝CELL（新設 `f.fillHidden`・保存/JSON/履歴にも載る）。
+  隠したレーンは編集キャンバス（`applyCelVis` → `applyLaneStyle` の opacity）・再生・書き出しから消える。**両方隠したコマだけ**従来どおり「無いコマ」扱い（`celShown`）＝直前のコマが出続ける。
+  旧ボタンは hover でしか出ず（iPad で見えない）、右端の `.fc-handle` に覆われてタップが届いていなかった → 常時表示・左寄せに。
