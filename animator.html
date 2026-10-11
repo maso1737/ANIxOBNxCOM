@@ -8189,7 +8189,8 @@ document.querySelectorAll('.tool').forEach(btn => {
     state.tool = t;
     // 2026-09-23 調整: ペン・消しゴムは基本 線レーン。FILL は塗レーン（ただし投げ縄消しだけは線レーンでも使える）
     if(!state.frameLayer.editMode){
-      if(t === 'pen' || t === 'erase') setLane('line', { quiet: true });
+      // 2026-10-11: 消しゴムはレーンを変えない（CELL で塗っていて消しゴムに持ち替えたら CELL のまま消す）
+      if(t === 'pen') setLane('line', { quiet: true });
       else if(t === 'fill' && !fillIsLassoErase()) setLane('fill');
     }
     // FILL / SEL から PEN に戻ったら主線に戻す（FILL でパレット色を使うとインクが下書へ移るため）
