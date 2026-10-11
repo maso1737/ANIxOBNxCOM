@@ -723,3 +723,4 @@ cd verify && npm run verify:animator
   同じ参考を読み直すと（キー＝名前、IMG は名前＋原寸サイズ）記憶した位置・サイズに置く。プロジェクトを開くと記憶が差し替わり、読み込み済みの ANI/SEQ にもその場で当たる。FRAME（EDIT）は対象外。
 - 2026-10-11: **コマメニュー（iPad 用）**。タイムラインのコマを指で**上へスワイプ**（縦28px超・横は縦の0.6倍未満）→ `#cel-menu`：🔒 ロック／⧉ 複製／✕ 削除。
   コマロック `f.locked`（保存・JSON・タイムライン履歴に載る）：`laneBlocked` で描けない・ERASE 長押しの全消去も `deleteCurrentFrame`（Del）も止まる。サムネに 🔒 と点線。
+- 2026-10-11: タイムライン見出し列の**レーンロック（🔒）ボタンを非表示**（`.lh-lock{display:none}`）。読み込み時に `state.lanes[L].locked=false` へ戻す。ロックはコマメニューのコマ単位だけ。

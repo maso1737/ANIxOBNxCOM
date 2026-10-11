@@ -999,7 +999,7 @@ input[type=range]::-moz-range-thumb{
   content:'';position:absolute;left:12%;top:48%;width:76%;height:1.5px;
   background:rgba(255,120,120,.95);transform:rotate(-20deg);pointer-events:none;
 }
-.lh-lock{opacity:0.35;}
+.lh-lock{display:none !important;}   /* 2026-10-11: 撤去（ロックはコマメニューのコマ単位だけ） */
 .lh-lock.on{opacity:1;border-color:var(--neon);background:rgba(255,210,122,0.15);}
 @media (pointer:coarse){
   .lh-vis,.lh-lock{width:20px;height:16px;line-height:14px;}
@@ -10336,7 +10336,7 @@ async function loadProject(){
         const src = meta.lanes[L];
         if(!src) continue;
         if(typeof src.visible === 'boolean') state.lanes[L].visible = src.visible;
-        if(typeof src.locked  === 'boolean') state.lanes[L].locked  = src.locked;
+        state.lanes[L].locked = false;   // 2026-10-11: レーンのロックボタンは撤去（コマ単位のロック＝上スワイプに一本化）。昔の保存で鍵が掛かったままにしない
         state.lanes[L].opacity = 1;   // 2026-09-23: レーンの濃度は撤去（常に100%）
       }
     }
