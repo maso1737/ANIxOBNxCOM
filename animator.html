@@ -5249,20 +5249,21 @@ function hitTestImage(wx, wy){
   }
   return null;
 }
-// 画像を最前面へ（配列末尾＝最後に描画）
-function bringImageFront(id){
-  const o = state.refImages.find(x => x.id === id);
-  if(!o) return;
-  const top = refTopZ() - 1;
-  if((o.z || 0) >= top && refStackFront()[0].obj === o) return;
-  o.z = top + 1;   // 並びの一番上（＝手前）へ。パネルと REF レーンも同じ順に並び替わる
-  buildRefList(); saveRefs(); markMetaDirty();
-}
 function refFindSel(){
   if(!state.refSel) return null;
   if(state.refSel.type === 'img'){ const o = state.refImages.find(i => i.id === state.refSel.id); return o ? {type:'img', obj:o} : null; }
   if(state.refSel.type === 'frame'){ return {type:'frame', obj: state.frameLayer}; }
   const r = state.refAnimators.find(a => a.id === state.refSel.id); return r ? {type:'anim', obj:r} : null;
+}
+// MOVE の対象（2026-10-11）: **いま選んでいる REF が最優先**。上に重なった画像に勝手に切り替えない。
+//   何も選んでいない（選択が消えた）ときだけ、触った位置の一番上の画像を選ぶ
+function refMoveTarget(wx, wy){
+  const sel = refFindSel();
+  if(sel) return sel;
+  const hit = hitTestImage(wx, wy);
+  if(!hit) return null;
+  state.refSel = {type:'img', id:hit.id};
+  return {type:'img', obj:hit};
 }
 // 選択中(frame含む)の描画反映
 function renderSelObj(kind){
@@ -5335,8 +5336,7 @@ function refCenterSel(){
 // 戻り値: 実際に拡縮したか（false ならキャンバス側のズームに渡す）
 function refImgScaleAt(clientX, clientY, factor){
   const { x:wx, y:wy } = toCanvasCoord(clientX, clientY);
-  const imgHit = hitTestImage(wx, wy);
-  const e = imgHit ? {type:'img', obj:imgHit} : refFindSel();
+  const e = refMoveTarget(wx, wy);
   if(!e || refIsLocked(e)) return false;
   const o = e.obj;
   const ns = Math.max(0.05, Math.min(12, o.scale * factor));
@@ -5351,10 +5351,7 @@ function refImgScaleAt(clientX, clientY, factor){
 let refDragging = false, refDragObj = null, refDragKind = null, refDragStart = null;
 function refDragBegin(clientX, clientY){
   const { x:wx, y:wy } = toCanvasCoord(clientX, clientY);
-  const imgHit = hitTestImage(wx, wy);
-  let e;
-  if(imgHit){ bringImageFront(imgHit.id); state.refSel = {type:'img', id:imgHit.id}; e = {type:'img', obj:imgHit}; }
-  else { e = refFindSel(); }
+  const e = refMoveTarget(wx, wy);
   if(!e || refIsLocked(e)){ refDragging = false; refDragObj = null; return false; }
   refDragObj = e.obj; refDragKind = e.type; refDragging = true;
   refDragStart = { cx:clientX, cy:clientY, x:e.obj.x, y:e.obj.y };
@@ -5382,7 +5379,7 @@ function refPinchBegin(cx, cy, dist){
   // 既にドラッグ中の対象があればそれを、無ければピンチ中心の画像→選択中
   let e;
   if(refDragObj){ e = {type:refDragKind, obj:refDragObj}; }
-  else { const hit = hitTestImage(wx, wy); e = hit ? {type:'img', obj:hit} : refFindSel(); }
+  else { e = refMoveTarget(wx, wy); }
   if(!e || refIsLocked(e)){ refPinching = false; refPinchObj = null; return false; }
   refDragging = false; // 単指ドラッグを終了してピンチへ
   refPinchObj = e.obj; refPinchKind = e.type; refPinching = true;
