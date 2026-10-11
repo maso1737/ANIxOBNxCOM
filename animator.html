@@ -1286,6 +1286,13 @@ input[type=range]::-moz-range-thumb{
 /* 指の長押しでつまんだコマ（並べ替え中） */
 .fc.lifted,.fc-empty.lifted{opacity:0.75;transform:translateY(-3px);box-shadow:0 0 0 2px var(--neon),0 6px 14px rgba(0,0,0,0.6);}
 .fc,.fc-empty{-webkit-touch-callout:none;}
+/* CELL レーン中：アクセント（--acid）を紫に。ステージの枠も紫で囲う */
+html.lane-cell{--acid:#B98CFF;}
+html.lane-cell #stage{box-shadow:inset 0 0 0 3px rgba(185,140,255,0.75);}
+html.lane-cell .lh-row.cur{border-color:rgba(185,140,255,0.8);background:rgba(185,140,255,0.14);}
+#hist-clear{margin-left:6px;background:transparent;border:1px solid var(--border);color:rgba(255,255,255,0.55);
+  font-family:var(--mono);font-size:8px;letter-spacing:0.08em;padding:1px 5px;cursor:pointer;}
+#hist-clear:hover{color:var(--acid);border-color:var(--acid);}
 body{-webkit-touch-callout:none;}
 #stage.hand-key, #stage.hand-key canvas{cursor:zoom-in !important;}
 .fc.selected, .fc-empty.selected{
@@ -1943,6 +1950,7 @@ body{-webkit-touch-callout:none;}
       <span>HISTORY <b id="hist-count">1</b></span>
       <span>STROKES <b id="stroke-count">0</b></span>
       <span id="mem-meter" title="使用メモリの見積もり（タップで内訳）">MEM <b id="mem-val">—</b></span>
+      <button id="hist-clear" title="取り消し履歴を全部捨ててメモリを空ける（絵はそのまま・Undo できなくなります）">履歴クリア</button>
     </div>
     <div class="save-state saved" id="save-state">SAVED</div>
   </div>
@@ -2819,6 +2827,8 @@ function applyLaneStyle(){
     v.classList.toggle('off', !cfg.visible);
     row.querySelector('.lh-lock').classList.toggle('on', !!cfg.locked);
   });
+  // 2026-10-11: CELL（塗レーン）のあいだは UI のアクセント色を紫にする（いまどちらに描くかが一目で分かる）
+  document.documentElement.classList.toggle('lane-cell', curLane() === 'fill' && !state.frameLayer.editMode);
   const strip = document.getElementById('frame-strip');
   if(strip){ strip.classList.toggle('lane-fill', curLane() === 'fill'); strip.classList.toggle('lane-line', curLane() === 'line'); }
   // 設定パネル
@@ -5005,6 +5015,8 @@ async function deleteSelectedFrames(){
   if(indices.length === 0){
     return deleteCurrentFrame();
   }
+  floatSettle();
+  tlCheckpoint();   // 消す前の姿を記録
   // 後ろから削除（drawは empty 化、empty は splice）
   // deleteCurrentFrame と同じ振る舞いを再現するため、各idxにフォーカスを移して個別削除
   // 末尾から削除すると state.currentFrame が安定
@@ -6143,6 +6155,29 @@ function tlSnapEquals(a, b){
   }
   return true;
 }
+// 構造（id/kind/尺/表示）だけの比較
+function tlStructEquals(a, b){
+  if(!a || !b || a.length !== b.length) return false;
+  for(let i = 0; i < a.length; i++){
+    const x = a[i], y = b[i];
+    if(x.id !== y.id || x.kind !== y.kind || x.duration !== y.duration || !!x.hidden !== !!y.hidden) return false;
+  }
+  return true;
+}
+// 壊す操作（コマ削除など）の**直前**に呼ぶ。タイムライン履歴は操作の後にしか取っていなかったので、
+//   ・起動後の最初の操作は「基準」に吸われて Undo できない
+//   ・基準が古いと、消したコマを戻しても「そのとき」の絵（描く前＝空）で戻る
+//   の2つが起きていた（2026-10-11）。今の姿（絵の参照込み）で記録を取り直してから操作する。
+function tlCheckpoint(){
+  const cur = curDrawFrame();
+  if(cur) syncFrameFromCanvas(cur);
+  const snap = snapshotTL();
+  if(tlHistIdx >= 0 && tlStructEquals(tlHistory[tlHistIdx], snap)){ tlHistory[tlHistIdx] = snap; return; }
+  if(tlHistIdx < tlHistory.length - 1) tlHistory.splice(tlHistIdx + 1);
+  tlHistory.push(snap);
+  if(tlHistory.length > TL_HIST_MAX) tlHistory.shift();
+  tlHistIdx = tlHistory.length - 1;
+}
 function pushTimelineHistory(){
   const snap = snapshotTL();
   const isBaseline = (tlHistory.length === 0); // 最初の1回は基準状態（Undo対象にしない）
@@ -6349,6 +6384,23 @@ document.getElementById('mem-meter').addEventListener('click', () => {
     '多いときは：保存してから再読み込み（取り消し履歴が空く）／解像度を下げる（2048 幅で 1/4）／使わない参照を消す。\n' +
     '※ブラウザ自身のぶんは入っていない概算です。');
 });
+// 取り消し履歴を全部捨てる（絵はそのまま）。再読み込みと同じだけメモリが空く
+document.getElementById('hist-clear').addEventListener('click', async () => {
+  const before = Math.round(memEstimate().total / 1048576);
+  if(!await modalConfirm('取り消し履歴を全部捨てます（絵はそのまま。これより前には Undo で戻れなくなります）。\nいま ' + before + 'MB')) return;
+  floatSettle();
+  if(drawing) endStroke();
+  const cur = curDrawFrame();
+  if(cur) syncFrameFromCanvas(cur);
+  for(const f of state.frames){ if(f.kind === 'draw'){ f.history = []; f.histIdx = -1; } }
+  tlHistory.length = 0; tlHistIdx = -1;
+  resetFlHistory();
+  resetGlobalHistory();
+  loadFrameToCanvas(curFrame());   // 今のコマの「底」を取り直す（絵の配列を包むだけ＝コピーしない）
+  pushTimelineHistory();           // 基準
+  updateStats();
+  setTimeout(() => stageToast('履歴をクリアしました（' + before + 'MB → ' + Math.round(memEstimate().total / 1048576) + 'MB）'), 300);
+});
 function updateStats(){
   updateMemMeter();
   const f = curDrawFrame();
@@ -6519,6 +6571,7 @@ async function deleteCurrentFrame(){
   }
   // 確認なし即削除：描画フレームを「空ブロック」に置き換え（タイムライン尺を維持）
   if(drawing) endStroke();
+  tlCheckpoint();   // 消す前の姿を記録（Undo で絵ごと戻す）
   const removed = state.frames[state.currentFrame];
   if(removed.kind === 'draw'){
     // 空ブロックに変換（line/fill は持たない）
@@ -8027,7 +8080,7 @@ drawCanvas.addEventListener('pointerdown', e => {
   if(e.pointerType === 'touch') return; // stage側で処理
   // 主ボタン以外（右ボタン＝ペンのバレルボタン含む）では描き始めない
   //  ＝右ドラッグはブラシサイズ変更に使う（CLIP STUDIO風）
-  if(e.button !== 0) return;
+  if(e.button !== 0 && !(e.pointerType === 'pen' && e.button === 5)) return;   // 5＝ペンの消しゴム側（一時的に ERASE）
   e.preventDefault();
   drawCanvas.setPointerCapture(e.pointerId);
   drawingPointerId = e.pointerId;
@@ -9010,6 +9063,28 @@ window.addEventListener('keyup', e => {
 }, true);
 window.addEventListener('blur', () => setHandKey(false));
 let gKeyZoom = null;   // { x, y, z0, x0, moved }
+// ペンの消しゴム側（テールスイッチ）で触ったら、そのストロークだけ消しゴム。離したら**直前の道具**に戻す
+//   （ペンへ固定で戻さない。FILL 中に裏返して消したら FILL に戻る）。2026-10-11
+let gTailPrevTool = null;
+function setToolQuiet(t){
+  state.tool = t;
+  document.querySelectorAll('.tool').forEach(b => { const tb = b.dataset.tool; if(tb !== 'undo' && tb !== 'redo') b.classList.toggle('on', tb === t); });
+  if(typeof refreshPenSizeUI === 'function') refreshPenSizeUI();
+  if(typeof applyInkUIForTool === 'function') applyInkUIForTool();
+}
+window.addEventListener('pointerdown', e => {
+  if(e.pointerType !== 'pen' || !(e.button === 5 || (e.buttons & 32))) return;
+  if(state.tool === 'erase' || gTailPrevTool) return;
+  gTailPrevTool = state.tool;
+  setToolQuiet('erase');
+}, true);
+const tailRestore = () => {
+  if(!gTailPrevTool) return;
+  const t = gTailPrevTool; gTailPrevTool = null;
+  setTimeout(() => setToolQuiet(t), 0);   // 描画側の pointerup（ストローク確定）が済んでから戻す
+};
+window.addEventListener('pointerup', tailRestore);
+window.addEventListener('pointercancel', tailRestore);
 // Ctrl(⌘)+ペン先（左ボタン）ドラッグ＝手のひらパン（2026-10-11・液タブ用）。
 //   Ctrl+Space（ズーム）を押しているときはそちら優先。SEL（Ctrl＝コピー投げ縄・自由変形）中は SEL に渡す。
 window.addEventListener('pointerdown', e => {
@@ -12425,7 +12500,8 @@ window.addEventListener('keydown', e => {
   // Enter: 多角形の投げ縄を確定
   if(e.key === 'Enter' && lassoing && lassoPoly){ e.preventDefault(); lassoEnd(); return; }
   if(e.key === 'Enter' && gFloat){ e.preventDefault(); floatCommit(); return; }
-  if(e.key === 'Backspace'){ e.preventDefault(); SC_BY_ID.delFrame.run(); return; }
+  // 2026-10-11: Backspace でのコマ削除は廃止（液タブで右手が当たって消える）。削除は Delete だけ
+  if(e.key === 'Backspace'){ e.preventDefault(); return; }
   // 可変ショートカット（keymap照合）
   const k = normKey(e);
   for(const a of SHORTCUT_ACTIONS){
