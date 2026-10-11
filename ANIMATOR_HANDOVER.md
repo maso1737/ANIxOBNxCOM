@@ -724,3 +724,4 @@ cd verify && npm run verify:animator
 - 2026-10-11: **コマメニュー（iPad 用）**。タイムラインのコマを指で**上へスワイプ**（縦28px超・横は縦の0.6倍未満）→ `#cel-menu`：🔒 ロック／⧉ 複製／✕ 削除。
   コマロック `f.locked`（保存・JSON・タイムライン履歴に載る）：`laneBlocked` で描けない・ERASE 長押しの全消去も `deleteCurrentFrame`（Del）も止まる。サムネに 🔒 と点線。
 - 2026-10-11: タイムライン見出し列の**レーンロック（🔒）ボタンを非表示**（`.lh-lock{display:none}`）。読み込み時に `state.lanes[L].locked=false` へ戻す。ロックはコマメニューのコマ単位だけ。
+- 2026-10-11: JSON の `hidden` は**下流向けに「LINE も CELL も隠した＝コマごと出さない」**だけを意味する（COMPOSER/OBAN/REF は hidden のコマを丸ごと飛ばすため）。レーン別は `lineHidden` / `fillHidden`（ANIMATOR の読み込みは `lineHidden` 優先）。`layers` は隠したレーンの絵も持ち出す（`frameLaneCanvas(f, L, raw=true)`）。

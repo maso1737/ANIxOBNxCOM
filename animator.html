@@ -9360,21 +9360,21 @@ document.getElementById('btn-export').title = '現在のコマを1枚PNGで書�
 // SPEC_20 P3: 1レーンだけの絵（line / fill）を作業解像度の canvas で返す。使い回しの1枚。
 //   塗りが無いコマの fill は透明1枚（AE で重ねたときに「その番号のファイルが無い」を作らない）
 let _laneCv = null, _laneCx = null;
-function frameLaneCanvas(frame, lane){
+function frameLaneCanvas(frame, lane, raw){
   const W = CFG.WORK_W, H = CFG.WORK_H;
   if(!_laneCv){ _laneCv = document.createElement('canvas'); _laneCx = _laneCv.getContext('2d'); }
   if(_laneCv.width !== W || _laneCv.height !== H){ _laneCv.width = W; _laneCv.height = H; }
-  const a = frame && frame.kind === 'draw' ? (lane === 'fill' ? (frame.fillHidden ? null : frame.fill) : (frame.hidden ? null : frame.line)) : null;
+  const a = frame && frame.kind === 'draw' ? (lane === 'fill' ? ((frame.fillHidden && !raw) ? null : frame.fill) : ((frame.hidden && !raw) ? null : frame.line)) : null;
   if(a) _laneCx.putImageData(new ImageData(new Uint8ClampedArray(a), W, H), 0, 0);
   else _laneCx.clearRect(0, 0, W, H);
   return _laneCv;
 }
 // EXPORT JSON / PROJ 保存箱に同梱するレーン別 PNG。塗りが無いコマは null（＝image と同じなので持たない）
 function frameLayersForJSON(frame){
-  if(!frame || frame.kind !== 'draw' || !fillHasInk(frame)) return null;
+  if(!frame || frame.kind !== 'draw' || (!fillHasInk(frame) && !frame.hidden)) return null;
   return {
-    line: frameLaneCanvas(frame, 'line').toDataURL('image/png'),
-    fill: frameLaneCanvas(frame, 'fill').toDataURL('image/png'),
+    line: frameLaneCanvas(frame, 'line', true).toDataURL('image/png'),   // 隠したレーンも絵は持ち出す（戻したとき消えないように）
+    fill: frameLaneCanvas(frame, 'fill', true).toDataURL('image/png'),
   };
 }
 function frameToPNGDataURL(frame){
@@ -9429,7 +9429,8 @@ function buildProjectJSON(){
         id: f.id,
         kind: 'draw',
         duration: f.duration,
-        hidden: !!f.hidden, fillHidden: !!f.fillHidden, locked: !!f.locked,
+        hidden: !!(f.hidden && f.fillHidden), lineHidden: !!f.hidden,   // hidden＝下流（COMPOSER/OBAN/REF）向けの「コマごと出さない」。LINE だけ隠したコマは image から線を抜いて出す
+        fillHidden: !!f.fillHidden, locked: !!f.locked,
         image: frameToPNGDataURL(f),   // 合体1枚（COMPOSER / OBAN など下流が読むのはこれだけ）
       };
       // SPEC_20 P3: 線と塗りを分けたまま戻すための同梱。共有DB／LIVE（buildProjectPayload）には載せない
@@ -9501,7 +9502,7 @@ async function applyProjectJSON(json){
     } else {
       const f = createBlankFrame();
       f.duration = Math.max(1, fj.duration | 0);
-      f.hidden = !!fj.hidden; f.fillHidden = !!fj.fillHidden; f.locked = !!fj.locked;
+      f.hidden = (typeof fj.lineHidden === 'boolean') ? fj.lineHidden : !!fj.hidden; f.fillHidden = !!fj.fillHidden; f.locked = !!fj.locked;
       if(fj.id) f.id = fj.id;
       if(fj.image){
         try{
@@ -9667,7 +9668,7 @@ function buildProjectPayload(){
     cellCount: state.frames.length,
     cells: state.frames.map(f => f.kind === 'empty'
       ? { id: f.id, kind: 'empty', duration: f.duration }
-      : { id: f.id, kind: 'draw', duration: f.duration, hidden: !!f.hidden, image: frameToPNGDataURL(f) }
+      : { id: f.id, kind: 'draw', duration: f.duration, hidden: !!(f.hidden && f.fillHidden), image: frameToPNGDataURL(f) }
     ),
     composer: state.composerData || null,
   };
