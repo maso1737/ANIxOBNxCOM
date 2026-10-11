@@ -1985,6 +1985,7 @@ body{-webkit-touch-callout:none;}
       <div class="ref-frame-row">
         <button id="btn-ref-move" class="ref-btn" title="ドラッグで移動／ホイールで拡縮。画像はクリックで掴む、ANIMATOR/FRAMEは選択してから移動">MOVE</button>
         <button id="btn-ref-center" class="ref-btn" title="選択中を原寸(1:1)＆中央に戻す">中央</button>
+        <button id="btn-ref-above" class="ref-btn" title="REF を描いた絵の上に重ねて見る（後ろ髪など、隠れる範囲を見ながら描く用）。書き出しには入りません">上に重ねる</button>
         <span class="sc-hint" id="ref-sel-info" style="flex:1;align-self:center;text-align:right;">—</span>
       </div>
     </div>
@@ -2707,6 +2708,7 @@ const state = {
   refImages: [],            // 貼り付けた参照画像 [{id, img, src, name, x, y, scale, opacity, visible, locked}]
   refMoveMode: false,       // ON中はドラッグで参照(画像/アニメ)を移動・ホイールで拡縮
   refSel: null,             // 選択中の可動参照 {type:'img'|'anim', id}
+  refAbove: false,          // 2026-10-11: REF を描いた絵の上に重ねて表示（表示だけ）
   refMasterShow: true,      // REFパネル連動: キャンバス上の参照表示マスター
   // ズームとパン
   zoom: 1,
@@ -4102,11 +4104,6 @@ function refMoveTo(type, id, newIdx){
   list.forEach((x, k) => { x.obj.z = list.length - k; });
   refOrderChanged();
 }
-function refMove(type, id, dir){
-  const list = refStackFront();
-  const i = list.findIndex(it => it.type === type && it.obj.id === id);
-  if(i >= 0) refMoveTo(type, id, i + dir);
-}
 function refOrderChanged(){
   renderRefLayer(); buildRefList(); saveRefs(); markMetaDirty();
 }
@@ -4598,21 +4595,13 @@ function buildRefList(){
     delBtn.textContent = '✕';
     delBtn.title = '参照を削除';
     delBtn.addEventListener('click', () => isImg ? removeRefImage(obj.id) : removeRefAnimator(obj.id));
-    // 並び替え（上＝手前）と名前
-    const upBtn = document.createElement('button');
-    upBtn.className = 'ref-btn'; upBtn.textContent = '▲'; upBtn.title = 'ひとつ手前へ（上）';
-    upBtn.addEventListener('click', () => refMove(kind, obj.id, -1));
-    const dnBtn = document.createElement('button');
-    dnBtn.className = 'ref-btn'; dnBtn.textContent = '▼'; dnBtn.title = 'ひとつ奥へ（下）';
-    dnBtn.addEventListener('click', () => refMove(kind, obj.id, +1));
+    // 並び替えはパネルのドラッグで（2026-10-11: ▲▼ は撤去）。名前
     const renBtn = document.createElement('button');
     renBtn.className = 'ref-btn'; renBtn.textContent = '✎'; renBtn.title = '名前を変える（種類の札 ' + refTag(kind, obj) + ' はそのまま付きます）';
     renBtn.addEventListener('click', () => startRefRename(name, obj, kind));
     btns.appendChild(visBtn);
     btns.appendChild(tlBtn);
     btns.appendChild(lockBtn);
-    btns.appendChild(upBtn);
-    btns.appendChild(dnBtn);
     btns.appendChild(renBtn);
     btns.appendChild(document.createElement('span')).style.flex = '1';
     btns.appendChild(delBtn);
@@ -7442,6 +7431,16 @@ function onionTmp(){
   }
   return onionTmpCv;
 }
+// ワークエリアに掛かっているコマの範囲（先頭 a〜最後 b）。範囲が全尺でも同じ（＝全体ループ）
+function onionLoopRange(){
+  if(!state.loop || state.frames.length < 2) return null;
+  let t = 0, a = -1, b = -1;
+  for(let k = 0; k < state.frames.length; k++){
+    const d = state.frames[k].duration, s0 = t, s1 = t + d; t = s1;
+    if(s1 > state.workStart && s0 < state.workEnd){ if(a < 0) a = k; b = k; }
+  }
+  return (a >= 0 && b > a) ? { a, b } : null;
+}
 // dir=-1（前）/ +1（後）の側を、近い順に最大 n 枚ぶん重ねて描く
 function drawOnionSide(ctx, dir){
   ctx.clearRect(0,0,CFG.WORK_W,CFG.WORK_H);
@@ -7449,9 +7448,17 @@ function drawOnionSide(ctx, dir){
   const color = (dir < 0) ? ONION.prevColor : ONION.nextColor;
   // drawフレームのみ拾う（空ブロック・非表示は飛ばす）
   const picks = [];
-  for(let i = state.currentFrame + dir; i >= 0 && i < state.frames.length && picks.length < n; i += dir){
+  // 2026-10-11: ループ回り込み。今のコマがワークエリアの中なら、端まで行ったら反対の端へ回る
+  //   （最後のコマ＝次に先頭が、先頭のコマ＝前に最後が透ける。ループ作画のつなぎ用）
+  const wr = onionLoopRange();
+  const inLoop = wr && state.currentFrame >= wr.a && state.currentFrame <= wr.b;
+  let i = state.currentFrame;
+  for(let step = 0; step < state.frames.length && picks.length < n; step++){
+    i += dir;
+    if(inLoop){ if(i > wr.b) i = wr.a; else if(i < wr.a) i = wr.b; }
+    if(i < 0 || i >= state.frames.length || i === state.currentFrame) break;
     const f = state.frames[i];
-    if(f.kind === 'draw' && !f.hidden) picks.push(f);
+    if(f.kind === 'draw' && !f.hidden && !picks.includes(f)) picks.push(f);
   }
   if(!picks.length) return;
   const tmp = onionTmp();
@@ -10146,6 +10153,7 @@ async function flushSave(){
       lanes: state.lanes,
       onionIncludeFill: !!state.onionIncludeFill,
       refLayout: refLayoutSnapshot(),
+      refAbove: !!state.refAbove,
       fillUnderPx: state.fillUnderPx,
       refImages: state.refImages.map(o => ({
         src:o.src, name:o.name, x:o.x, y:o.y, scale:o.scale,
@@ -10342,6 +10350,7 @@ async function loadProject(){
       }
     }
     if(typeof meta.onionIncludeFill === 'boolean') state.onionIncludeFill = meta.onionIncludeFill;
+    if(typeof meta.refAbove === 'boolean'){ state.refAbove = meta.refAbove; applyRefAbove(); }
     if(Array.isArray(meta.refLayout)) state.refLayoutMemo = meta.refLayout.filter(e => e && typeof e.key === 'string');
     if(typeof meta.fillUnderPx === 'number') state.fillUnderPx = Math.max(0, Math.min(3, meta.fillUnderPx | 0));
     if(Array.isArray(meta.refImages)){
@@ -11889,6 +11898,18 @@ function setRefMoveMode(on){
 document.getElementById('btn-ref-move').addEventListener('click', () => setRefMoveMode(!state.refMoveMode));
 // 共通 中央（選択中を原寸中央）
 document.getElementById('btn-ref-center').addEventListener('click', refCenterSel);
+// REF を描いた絵の上に重ねる（表示だけ。書き出し・塗りの壁には関係しない）
+function applyRefAbove(){
+  refLayerCanvas.style.zIndex = state.refAbove ? '13' : '';
+  refLayerCanvas.style.pointerEvents = state.refAbove ? 'none' : '';
+  const b = document.getElementById('btn-ref-above');
+  if(b) b.classList.toggle('on', !!state.refAbove);
+}
+document.getElementById('btn-ref-above').addEventListener('click', () => {
+  state.refAbove = !state.refAbove;
+  applyRefAbove(); markMetaDirty(); scheduleSave();
+  stageToast(state.refAbove ? 'REF を絵の上に重ねて表示' : 'REF を絵の下に戻しました');
+});
 // FRAMEレイヤーを選択（MOVE/中央の対象に）
 document.getElementById('frame-sect-h').addEventListener('click', () => {
   state.refSel = { type:'frame' };

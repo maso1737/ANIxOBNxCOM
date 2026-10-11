@@ -725,3 +725,5 @@ cd verify && npm run verify:animator
   コマロック `f.locked`（保存・JSON・タイムライン履歴に載る）：`laneBlocked` で描けない・ERASE 長押しの全消去も `deleteCurrentFrame`（Del）も止まる。サムネに 🔒 と点線。
 - 2026-10-11: タイムライン見出し列の**レーンロック（🔒）ボタンを非表示**（`.lh-lock{display:none}`）。読み込み時に `state.lanes[L].locked=false` へ戻す。ロックはコマメニューのコマ単位だけ。
 - 2026-10-11: JSON の `hidden` は**下流向けに「LINE も CELL も隠した＝コマごと出さない」**だけを意味する（COMPOSER/OBAN/REF は hidden のコマを丸ごと飛ばすため）。レーン別は `lineHidden` / `fillHidden`（ANIMATOR の読み込みは `lineHidden` 優先）。`layers` は隠したレーンの絵も持ち出す（`frameLaneCanvas(f, L, raw=true)`）。
+- 2026-10-11: **オニオンのループ回り込み**（`onionLoopRange` / `drawOnionSide`）。LOOP ON かつ今のコマがワークエリア内なら、最後のコマの「次」に先頭、先頭の「前」に最後が透ける（ワークエリアに掛かるコマが範囲）。
+- 2026-10-11: REF パネル MOVE 行に **「上に重ねる」**（`state.refAbove` / `applyRefAbove`・meta 保存）。`#ref-layer` を z-index 13（線の上・float の下）へ。表示だけ。各 REF 行の **▲▼ は撤去**（並べ替えはドラッグ）。
