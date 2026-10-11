@@ -1286,6 +1286,7 @@ input[type=range]::-moz-range-thumb{
 /* 指の長押しでつまんだコマ（並べ替え中） */
 .fc.lifted,.fc-empty.lifted{opacity:0.75;transform:translateY(-3px);box-shadow:0 0 0 2px var(--neon),0 6px 14px rgba(0,0,0,0.6);}
 .fc,.fc-empty{-webkit-touch-callout:none;}
+body{-webkit-touch-callout:none;}
 #stage.hand-key, #stage.hand-key canvas{cursor:zoom-in !important;}
 .fc.selected, .fc-empty.selected{
   outline:2px solid #FF6FB5;
@@ -2690,6 +2691,7 @@ const state = {
   // ズームとパン
   zoom: 1,
   fitMode: true,
+  viewRot: 0,           // 表示の回転（度・2本指で回す。保存しない・FIT で 0 に戻る）
   panX: 0,              // 表示オフセット (px)
   panY: 0,
   // フレーム管理
@@ -3172,7 +3174,7 @@ function selPolyMask(pts, x0, y0, w, h){
   return m;
 }
 /* 画面 px / 作業 px。ハンドルと枠線をズームしても同じ太さに保つ */
-function floatScreenK(){ return Math.max(1e-6, drawCanvas.getBoundingClientRect().width / CFG.WORK_W); }
+function floatScreenK(){ return Math.max(1e-6, state.zoom); }
 
 /* --- 持ち上げ --- */
 function selLift(pts, copy){
@@ -5122,7 +5124,26 @@ function fitAction(){
   const now = performance.now();
   if(now - _lastFitAt < 500){ _lastFitAt = -1e9; zoomActual(); return; }
   _lastFitAt = now;
+  if(state.viewRot){ state.viewRot = 0; stageToast('回転を 0° に戻しました'); }
   fitToStage();
+}
+// ── 表示の回転（2026-10-11・液タブの2本指回転）──
+//   画面 = ステージ中心 + pan + R(θ)·S(flip)·(p − 中心)·zoom。回転 0 のときは従来の式と同じ結果になる。
+function viewRotRad(){ return (state.viewRot || 0) * Math.PI / 180; }
+function rotVec(x, y, a){ const c = Math.cos(a), s = Math.sin(a); return { x: x * c - y * s, y: x * s + y * c }; }
+function stageCenter(){ const sr = stage.getBoundingClientRect(); return { x: sr.left + sr.width / 2, y: sr.top + sr.height / 2 }; }
+// 画面座標 → キャンバス座標（小数）
+function screenToCanvasF(clientX, clientY, C){
+  C = C || stageCenter();
+  const v = rotVec(clientX - C.x - state.panX, clientY - C.y - state.panY, -viewRotRad());
+  const sgn = state.flipped ? -1 : 1;
+  return { x: v.x / (state.zoom * sgn) + CFG.WORK_W / 2, y: v.y / state.zoom + CFG.WORK_H / 2 };
+}
+// キャンバス座標 p が画面座標 screen に来るような pan を返す（zoom は z）
+function panForAnchor(p, screen, z, C){
+  const sgn = state.flipped ? -1 : 1;
+  const v = rotVec((p.x - CFG.WORK_W / 2) * z * sgn, (p.y - CFG.WORK_H / 2) * z, viewRotRad());
+  return { x: screen.x - C.x - v.x, y: screen.y - C.y - v.y };
 }
 function applyZoom(){
   const w = CFG.WORK_W * state.zoom;
@@ -5131,7 +5152,8 @@ function applyZoom(){
   wrap.style.height = h + 'px';
   // パンによるオフセット (中央配置 + pan) + 表示反転
   const sx = state.flipped ? -1 : 1;
-  wrap.style.transform = `translate(${state.panX}px, ${state.panY}px) scaleX(${sx})`;
+  wrap.style.transform = `translate(${state.panX}px, ${state.panY}px)` +
+                         (state.viewRot ? ` rotate(${state.viewRot}deg)` : '') + ` scaleX(${sx})`;
   wrap.style.transformOrigin = '50% 50%';
   [bgCanvas, drawCanvas, fillCanvas, floatCanvas, onionPrev, onionNext, frameLayerCanvas, refLayerCanvas, refImgLayerCanvas, guideLayerCanvas].forEach(c => {
     c.style.width  = w + 'px';
@@ -5538,7 +5560,7 @@ const MIRROR_HIT = 22; // 軸ライン中央を覆う透明な当たり判定の
 function updateMirrorGuide(){
   const guide = document.getElementById('mirror-guide');
   if(!guide) return;
-  if(!state.mirrorOn){ guide.style.display = 'none'; guide.classList.remove('on'); return; }
+  if(!state.mirrorOn || state.viewRot){ guide.style.display = 'none'; guide.classList.remove('on'); return; }   // 回転中は軸の線を出さない（描画のミラーは効く）
   guide.style.display = 'block';
   guide.classList.add('on');
   const stageRect = stage.getBoundingClientRect();
@@ -5575,6 +5597,10 @@ function updateMirrorGuide(){
 // 画面座標 → キャンバス座標（整数）
 // ============================================================
 function toCanvasCoord(clientX, clientY){
+  if(state.viewRot){   // 回転中は外接矩形が使えないので逆変換で
+    const q = screenToCanvasF(clientX, clientY);
+    return { x: Math.floor(q.x), y: Math.floor(q.y) };
+  }
   const r = drawCanvas.getBoundingClientRect();
   let x = (clientX - r.left) / r.width  * CFG.WORK_W;
   const y = (clientY - r.top)  / r.height * CFG.WORK_H;
@@ -7447,23 +7473,35 @@ function pinchBegin(d, c){
   tPinchStartCenter = {x:c.x, y:c.y};
   tPinchStartZoom = state.zoom;
   tPinchStartPan = {x:state.panX, y:state.panY};
-  const sr = stage.getBoundingClientRect();
-  tPinchStageC = {x: sr.left + sr.width/2, y: sr.top + sr.height/2};
-  const sgn = state.flipped ? -1 : 1;
-  tPinchAnchor = {
-    x: (c.x - tPinchStageC.x - state.panX) / (state.zoom * sgn) + CFG.WORK_W / 2,
-    y: (c.y - tPinchStageC.y - state.panY) / state.zoom         + CFG.WORK_H / 2,
-  };
+  tPinchStageC = stageCenter();
+  tPinchAnchor = screenToCanvasF(c.x, c.y, tPinchStageC);
+  tPinchStartAng = touchPairAngle();
+  tPinchStartRot = state.viewRot || 0;
+}
+let tPinchStartAng = 0, tPinchStartRot = 0, tPinchArmAng = 0;
+const ROT_SNAP = 5;   // 0°/90°/180°/270° の ±5° は吸い付く
+function touchPairAngle(){
+  const pts = Array.from(touchPtrs.values());
+  if(pts.length < 2) return 0;
+  return Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * 180 / Math.PI;
 }
 function pinchApply(d, c){
   if(tPinchStartDist <= 0) return;
   const nz = Math.max(0.05, Math.min(8, tPinchStartZoom * (d / tPinchStartDist)));
-  const sgn = state.flipped ? -1 : 1;
   state.zoom = nz;
+  // 2本指をひねった角度ぶん回す（指の並びの角度の差）。90° の倍数付近は吸い付く
+  let da = touchPairAngle() - tPinchStartAng;
+  while(da > 180) da -= 360; while(da < -180) da += 360;
+  let rot = tPinchStartRot + da;
+  rot = ((rot % 360) + 540) % 360 - 180;
+  const near = Math.round(rot / 90) * 90;
+  if(Math.abs(rot - near) <= ROT_SNAP) rot = near;
+  state.viewRot = (rot === -180) ? 180 : rot;
+  if(Math.abs(state.viewRot) < 1e-6) state.viewRot = 0;
   // 掴んだキャンバス座標が「いまの2本指の中心」に居続けるようパンを逆算（zoomAt と同じ式）。
   // 指を開けばその間から拡大し、2本指をずらせばそのままパンになる。
-  state.panX = c.x - tPinchStageC.x - (tPinchAnchor.x - CFG.WORK_W / 2) * nz * sgn;
-  state.panY = c.y - tPinchStageC.y - (tPinchAnchor.y - CFG.WORK_H / 2) * nz;
+  const pan = panForAnchor(tPinchAnchor, c, nz, tPinchStageC);
+  state.panX = pan.x; state.panY = pan.y;
   state.fitMode = false;
   applyZoom();
 }
@@ -7574,6 +7612,7 @@ stage.addEventListener('pointerdown', e => {
       tPinchArmed = true;
       tPinchStartDist = m.d;
       tPinchStartCenter = {x:m.c.x, y:m.c.y};
+      tPinchArmAng = touchPairAngle();
       tPinchStartZoom = state.zoom;
       tPinchStartPan = {x:state.panX, y:state.panY};
     }
@@ -7606,7 +7645,8 @@ stage.addEventListener('pointermove', e => {
       // まだ「2本指タップかもしれない」段階。SLOP を超えるまでは絵を動かさない
       const spread = Math.abs(d - tPinchStartDist);
       const slide  = Math.hypot(c.x - tPinchStartCenter.x, c.y - tPinchStartCenter.y);
-      if(spread <= PINCH_SLOP && slide <= PINCH_SLOP) return;
+      let twist = Math.abs(touchPairAngle() - tPinchArmAng); if(twist > 180) twist = 360 - twist;
+      if(spread <= PINCH_SLOP && slide <= PINCH_SLOP && twist < 8) return;   // ひねるだけでも回転が始まる
       tPinchArmed = false; tPinching = true;
       tGestureConsumed = true;       // このセッションは UNDO/REDO にしない
       pinchBegin(d, c);              // 発動した瞬間を基準に取り直す（飛ばない）
@@ -8970,6 +9010,20 @@ window.addEventListener('keyup', e => {
 }, true);
 window.addEventListener('blur', () => setHandKey(false));
 let gKeyZoom = null;   // { x, y, z0, x0, moved }
+// Ctrl(⌘)+ペン先（左ボタン）ドラッグ＝手のひらパン（2026-10-11・液タブ用）。
+//   Ctrl+Space（ズーム）を押しているときはそちら優先。SEL（Ctrl＝コピー投げ縄・自由変形）中は SEL に渡す。
+window.addEventListener('pointerdown', e => {
+  if(gHandKey || !(e.ctrlKey || e.metaKey) || e.altKey || e.pointerType === 'touch' || e.button !== 0) return;
+  if(!stage.contains(e.target)) return;
+  if(state.tool === 'sel' || (typeof gFloat !== 'undefined' && gFloat)) return;
+  if(e.target.closest && e.target.closest('button, #zoom-ctl, #stage-info, #stage-hud')) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  try{ stage.setPointerCapture(e.pointerId); }catch(err){}
+  midPanning = true;
+  midPanStart = { x: e.clientX, y: e.clientY };
+  midPanStartPan = { x: state.panX, y: state.panY };
+  stage.style.cursor = 'grabbing';
+}, true);
 window.addEventListener('pointerdown', e => {
   if(!gHandKey || e.pointerType === 'touch' || e.button !== 0) return;
   if(!stage.contains(e.target)) return;
@@ -8995,6 +9049,12 @@ window.addEventListener('pointercancel', () => { gKeyZoom = null; }, true);
 
 // 中ボタンのオートスクロール抑止
 stage.addEventListener('auxclick', e => { if(e.button === 1) e.preventDefault(); });
+// 長押し／右クリックで出るブラウザのメニューは全画面で出さない（入力欄だけは貼り付け等のため残す）
+document.addEventListener('contextmenu', e => {
+  const t = e.target;
+  if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  e.preventDefault();
+}, true);
 stage.addEventListener('mousedown', e => { if(e.button === 1) e.preventDefault(); });
 
 // ===== 右ドラッグでブラシサイズ変更（CLIP STUDIO風）=====
@@ -9043,20 +9103,12 @@ stage.addEventListener('mousedown', e => { if(e.button === 1) e.preventDefault()
 // 指定スクリーン座標を基点にズーム（ステージ中心基準で逆算 → カーソル下が動かない）
 function zoomAt(screenX, screenY, newZoom){
   newZoom = Math.max(0.05, Math.min(8, newZoom));
-  // canvas-wrap は #stage の flex 中央に配置され、transform=translate(pan) scaleX(flip)。
-  // 画面座標 → キャンバス座標（現ズーム/パンの逆写像）
-  const sr = stage.getBoundingClientRect();
-  const cx = sr.left + sr.width / 2;   // ステージ中心（安定した基準）
-  const cy = sr.top  + sr.height / 2;
-  const sx = state.flipped ? -1 : 1;
-  const oldZ = state.zoom;
-  // カーソル位置に対応するキャンバス内座標
-  const canX = (screenX - cx - state.panX) / (oldZ * sx) + CFG.WORK_W / 2;
-  const canY = (screenY - cy - state.panY) / oldZ        + CFG.WORK_H / 2;
-  // 新ズームで同じキャンバス座標がカーソル下に来るようパンを再計算
+  // カーソルの下にあるキャンバス座標が、新ズームでも同じ画面位置に来るようパンを再計算（回転も考慮）
+  const C = stageCenter();
+  const p = screenToCanvasF(screenX, screenY, C);
   state.zoom = newZoom;
-  state.panX = screenX - cx - (canX - CFG.WORK_W / 2) * newZoom * sx;
-  state.panY = screenY - cy - (canY - CFG.WORK_H / 2) * newZoom;
+  const pan = panForAnchor(p, { x: screenX, y: screenY }, newZoom, C);
+  state.panX = pan.x; state.panY = pan.y;
   state.fitMode = false;
   applyZoom();
 }
