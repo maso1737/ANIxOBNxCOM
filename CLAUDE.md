@@ -53,7 +53,7 @@
   **econte へ `→ECONTE` でリファレンスを送る送り手**（受け側の契約は SPEC_13 §2-1a / §2-1a-2）。
   データは `localStorage['refboard.v1']` にしか無く、**HTMLファイル自体に個人データは1件も含まれない**（下の「公開リポジトリ」参照）。
   設計メモは [Tools/ref-board/CLAUDE.md](../Tools/ref-board/CLAUDE.md)（本体はこちら、資料はあちら）
-- `link-map.html` — **LINK MAP。アプリ間の連携マップ**（GLOSSテーマ・ノード5つと10ルート。
+- `link-map.html` — **LINK MAP。アプリ間の連携マップ**（GLOSSテーマ・ノード6つと11ルート。
   矢印/ノードをクリックで手順が出て、やってみたらチェック→全部で CLEAR。進捗は `localStorage['linkmap_done_v1']`）。
   **中身は `GUIDE_MANGA_LINKS.md` と同じ情報＝連携を変えたら両方直す**
 - `inbetween_lab.html` / `inbetween_warp_lab.html` — 中割り実験ラボ
@@ -85,7 +85,7 @@
 
 手順書（人間向け・ボタン名で追える）:
 `GUIDE_MANGA_LINKS.md` … ANIMATOR⇄MANGA PLATE⇄OBAN/COMPOSER。**連携ボタンの表記を変えたら更新**
-`link-map.html` … 上の内容を絵にしたもの（5アプリ・10ルート。ECONTE だけ未接続＝破線）。**同じく表記変更で更新**
+`link-map.html` … 上の内容を絵にしたもの（6アプリ・11ルート。ECONTE だけ未接続＝破線。ROUGH→ANIMATOR は 2026-10-15 追加）。**同じく表記変更で更新**
 
 仕様（SPEC）— 状態は 2026-09-02 時点:
 

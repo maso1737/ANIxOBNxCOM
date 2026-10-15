@@ -179,7 +179,7 @@ Del 消す・Space 再生（押したままドラッグ＝画面を動かす）�
 
 - [ ] iPad 実機での確認（ピンチ・4本指・長押しスポイト・Pencil のホバー・保存の即書き）
 - [ ] VRT（`verify:rough`）：まだ張っていない。`?harness=1` は IndexedDB を読まない・書かないだけで、`__HARNESS__` 契約は未実装
-- [ ] `link-map.html` / `GUIDE_MANGA_LINKS.md` に ROUGH → ANIMATOR REF のルートを足す（今は PIPELINE.md と本書だけ）
+- [x] `link-map.html` / `GUIDE_MANGA_LINKS.md` に ROUGH → ANIMATOR REF のルート（2026-10-15）
 - [ ] ECONTE → ROUGH（コンテのカットを下絵画像として送る）は未接続
 
 ## 13. 検証（2026-10-15）

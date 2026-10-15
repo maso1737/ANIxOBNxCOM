@@ -276,12 +276,21 @@ const NODES={
   ob:{x:830,y:120,nm:'OBAN',     jp:'モーションコミック',   file:'oban-builder.html'},
   mp:{x:450,y:450,nm:'MANGA PLATE',jp:'漫画ページ・コマ割り',file:'manga-plate.html'},
   co:{x:830,y:450,nm:'COMPOSER', jp:'合成・書き出し',      file:'composer.html'},
+  ro:{x:120,y:450,nm:'ROUGH',    jp:'ラフ原（2026-10-15）', file:'rough.html'},
 };
 const NW=200,NH=82;   // カードの幅・高さ
 
 /* ルート。d=SVGパス（矢印の向き＝データが流れる向き）
    lx/ly=ラベル位置。dash=まだ直結していないルート */
 const ROUTES=[
+ {id:'ro-an',a:'ro',b:'an',
+  d:'M 170,409 L 392,161', lx:250,ly:300,
+  lab:'→ ANIMATOR REF',
+  ti:'ROUGH のラフ原を ANIMATOR の REF に入れて仕上げる',
+  dt:'ROUGH で描く（SEL で囲んで <span class="k">次のコマへ ▶</span> で下絵を作りながら）→ トップバーの '
+    +'<span class="k">→ ANIMATOR REF</span>。<br>ANIMATOR が開いていればその場で REF に入り、閉じていれば<b>次に開いたとき</b>入る。'
+    +'同じラフを送り直すと、置いた位置と濃さはそのまま<b>絵だけ差し替わる</b>。<br>'
+    +'<span class="warn">※ 書き出し設定（OUT）で下書／指示を「入れない」にすると、その色は送られない。</span>'},
  {id:'ec-an',a:'ec',b:'an',dash:1,
   d:'M 220,120 L 342,120', lx:281,ly:102,
   lab:'手渡し',
