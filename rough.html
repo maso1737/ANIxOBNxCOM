@@ -192,6 +192,12 @@ body.docking .dz{display:block}
 .ink-ops button.off{color:var(--mark);border-color:rgba(255,201,79,.5)}
 .ink-wrap{display:flex;flex-direction:column;align-items:center;gap:3px}
 .dock.wide .ink-wrap,.pnl.float .ink-wrap{flex-direction:row}
+.tone-wrap{flex-direction:row!important;gap:4px}
+.tone-b{width:32px;height:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0;border:1px solid var(--line);background:var(--cell);
+  font-family:var(--saira);font-weight:600;font-size:10px;letter-spacing:.08em;color:rgba(232,236,242,.7);touch-action:manipulation}
+.tone-b i{width:18px;height:10px;background:radial-gradient(circle,currentColor 32%,transparent 36%) 0 0/4px 4px}
+#tone-2 i{background-size:3px 3px;background-image:radial-gradient(circle,currentColor 45%,transparent 50%)}
+.tone-b.on{background:var(--acc-fill);border-color:transparent;color:#fff;box-shadow:var(--acc-glow)}
 .mini-k{font-size:7.5px;letter-spacing:.18em;color:rgba(232,236,242,.35)}
 
 /* ---------- 数値スクラブ（左右ドラッグ・Wクリックで直接入力。SPEC_18：素の input[type=number] を置かない） ---------- */
@@ -484,6 +490,10 @@ body.dragover #stage{outline:1px dashed rgba(var(--accRGB),.8);outline-offset:-1
       <button class="ink" data-idx="13" id="ink-note" title="指示（3）&#10;長押し＝色を元に戻す"><i></i><span>指示</span></button>
       <div class="ink-ops"><button id="hide-note" title="指示の色を隠して見る">👁</button><button id="clr-note" title="このコマの指示の色だけ消す（Ctrl+Z で戻せる）">✕</button></div>
     </div>
+    <div class="ink-wrap tone-wrap">
+      <button class="tone-b" id="tone-1" title="トーン T1（細かく薄い網）。PEN・バケツ・投げ縄塗りが網点になる。もう一度でOFF（下書ボタンの2回押しでも）"><i></i><span>T1</span></button>
+      <button class="tone-b" id="tone-2" title="トーン T2（細かく濃い網）。もう一度でOFF（指示ボタンの2回押しでも）"><i></i><span>T2</span></button>
+    </div>
     <div class="sep"></div>
     <span class="scr" data-scr="paper" title="紙の明るさ（表示だけ。PNG を紙色で書き出すときもこの色）"><span class="k">紙</span><span class="v"></span><span class="u">%</span></span>
   </div>
@@ -594,6 +604,7 @@ const P = {   // 端末に覚えておく好み（localStorage）
   fillMode: 'bucket', fillErase: false,
   selRough: true,                              // 貼る／次のコマへ持っていくとき下書の色にする
   onion: { on: true, prev: 1, next: 1, op: 50, cPrev: '#FF4F6A', cNext: '#3FD0FF' },
+  tone: 0, toneShape: { t1: { pitch: 8, cov: 6 }, t2: { pitch: 4, cov: 40 } },
   paper: 100, colRough: ROUGH_DEF, colNote: NOTE_DEF, hideRough: false, hideNote: false,
   out: { bg: 'alpha', rough: true, note: true, ref: false, seq: 'tick' },
   refShow: true, refOp: 60, refMono: false,
@@ -1083,8 +1094,27 @@ function bresenham(x0, y0, x1, y1, visit){
   }
 }
 /* いま描いている1手の範囲（Undo の矩形・dirty の矩形） */
-const PX = { buf: null, W: 0, H: 0, v: 1, bb: null };
-function pxTarget(buf, v){ PX.buf = buf; PX.W = S.W; PX.H = S.H; PX.v = v; }
+/* スクリーントーン（ドット2種・animator の SCREEN TONE と同じ作り）。T1＝8px/6%（薄いアタリ）・T2＝4px/40%（濃い網）。
+   網点は紙の原点に固定（塗り足しても点がずれずに繋がる）。点の色はいまの色。PEN・バケツ・投げ縄塗りに効く。
+   描いた結果は普通の画素（色番号）として焼ける＝書き出し・ANIMATOR へはそのまま。 */
+const TONE_LIMIT = { pitch: [4, 48], cov: [1, 95] };
+let gToneMask = null;
+function buildTone(){
+  if(!P.tone){ gToneMask = null; return; }
+  const sh = P.toneShape[P.tone === 1 ? 't1' : 't2'];
+  const T = clamp(sh.pitch | 0, TONE_LIMIT.pitch[0], TONE_LIMIT.pitch[1]);
+  const r2 = (clamp(sh.cov, TONE_LIMIT.cov[0], TONE_LIMIT.cov[1]) / 100 * T * T) / (2 * Math.PI);
+  const centers = [[0, 0], [T, 0], [0, T], [T, T], [T / 2, T / 2]];
+  const m = new Uint8Array(T * T);
+  for(let y = 0; y < T; y++) for(let x = 0; x < T; x++){
+    const px = x + 0.5, py = y + 0.5;
+    for(const [cx0, cy0] of centers){ const dx = px - cx0, dy = py - cy0; if(dx * dx + dy * dy <= r2){ m[y * T + x] = 1; break; } }
+  }
+  gToneMask = { T, m };
+}
+const toneOn = (x, y) => { const t = gToneMask, T = t.T; return t.m[(y % T) * T + (x % T)] === 1; };
+const PX = { buf: null, W: 0, H: 0, v: 1, bb: null, tone: false };
+function pxTarget(buf, v){ PX.buf = buf; PX.W = S.W; PX.H = S.H; PX.v = v; PX.tone = !!(v && gToneMask); }
 function bbGrow(x0, y0, x1, y1){
   const b = PX.bb;
   if(!b){ PX.bb = { x0, y0, x1, y1 }; return; }
@@ -1094,7 +1124,9 @@ function span(x, y, w){
   const W = PX.W;
   if(y < 0 || y >= PX.H) return;
   const a = Math.max(0, x), b = Math.min(W, x + w);
-  if(b > a){ PX.buf.fill(PX.v, y * W + a, y * W + b); }
+  if(b <= a) return;
+  if(PX.tone){ const row = y * W; for(let x2 = a; x2 < b; x2++) if(toneOn(x2, y)) PX.buf[row + x2] = PX.v; return; }
+  PX.buf.fill(PX.v, y * W + a, y * W + b);
 }
 function dotR(x, y, r){
   x = Math.round(x); y = Math.round(y);
@@ -1118,7 +1150,9 @@ function floodFill(buf, sx, sy, v){
   sx = Math.floor(sx); sy = Math.floor(sy);
   if(sx < 0 || sy < 0 || sx >= W || sy >= H) return null;
   const t = buf[sy * W + sx];
-  if(t === v) return null;
+  const tone = !!(v && gToneMask);
+  if(t === v && !tone) return null;
+  if(tone) return floodTone(buf, sx, sy, v, t);
   let bx0 = W, by0 = H, bx1 = -1, by1 = -1;
   const stack = [sx, sy];
   while(stack.length){
@@ -1139,6 +1173,26 @@ function floodFill(buf, sx, sy, v){
   }
   if(bx1 < 0) return null;
   return { x0: bx0, y0: by0, x1: bx1 + 1, y1: by1 + 1 };
+}
+/* トーンのバケツ：同じ番号のつながりを先に囲ってから、網点の所だけ塗る（塗らない所も元の番号のまま残るので visited で止める） */
+function floodTone(buf, sx, sy, v, t){
+  const W = S.W, H = S.H, seen = new Uint8Array(W * H);
+  let bx0 = W, by0 = H, bx1 = -1, by1 = -1, any = false;
+  const stack = [sx, sy];
+  while(stack.length){
+    const y = stack.pop(), x = stack.pop(), i = y * W + x;
+    if(x < 0 || y < 0 || x >= W || y >= H || seen[i] || buf[i] !== t) continue;
+    let lx = x; while(lx > 0 && !seen[y * W + lx - 1] && buf[y * W + lx - 1] === t) lx--;
+    let rx = x; while(rx < W - 1 && !seen[y * W + rx + 1] && buf[y * W + rx + 1] === t) rx++;
+    for(let k = lx; k <= rx; k++){
+      const j = y * W + k; seen[j] = 1;
+      if(toneOn(k, y) && buf[j] !== v){ buf[j] = v; any = true; }
+      if(y > 0) stack.push(k, y - 1);
+      if(y < H - 1) stack.push(k, y + 1);
+    }
+    if(lx < bx0) bx0 = lx; if(rx > bx1) bx1 = rx; if(y < by0) by0 = y; if(y > by1) by1 = y;
+  }
+  return any ? { x0: bx0, y0: by0, x1: bx1 + 1, y1: by1 + 1 } : null;
 }
 function bboxOf(pts){
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -1173,7 +1227,8 @@ function lassoFill(buf, pts, v){
   let any = false;
   for(let y = 0; y < h; y++){
     const row = (b.y0 + y) * S.W + b.x0, q = y * w;
-    for(let x = 0; x < w; x++) if(m[q + x] && buf[row + x] !== v){ buf[row + x] = v; any = true; }
+    const tone = !!(v && gToneMask);
+    for(let x = 0; x < w; x++) if(m[q + x] && buf[row + x] !== v && (!tone || toneOn(b.x0 + x, b.y0 + y))){ buf[row + x] = v; any = true; }
   }
   return any ? { x0: b.x0, y0: b.y0, x1: b.x1 + 1, y1: b.y1 + 1 } : null;
 }
@@ -2727,7 +2782,14 @@ function updateToolUI(){
   updateSelHud(); updateStageTag();
   stageEl.style.cursor = '';
 }
+function setTone(n){
+  P.tone = P.tone === n ? 0 : n;
+  buildTone(); savePrefs(); updateColorUI(); updateStageTag();
+  if(P.tone && P.tool === 'erase') setTool('pen', true);
+  toast(P.tone ? 'トーン T' + P.tone + '：PEN・バケツ・投げ縄塗りが網点になる（点の色＝いまの色）' : 'トーン OFF');
+}
 function updateColorUI(){
+  $('#tone-1').classList.toggle('on', P.tone === 1); $('#tone-2').classList.toggle('on', P.tone === 2);
   $$('#grays .chip').forEach(c => c.classList.toggle('on', +c.dataset.idx === P.color));
   $('#ink-rough').classList.toggle('on', P.color === IDX_ROUGH);
   $('#ink-note').classList.toggle('on', P.color === IDX_NOTE);
@@ -2884,7 +2946,7 @@ function updateStageTag(){
   else {
     const tn = { pen: 'PEN', erase: 'ERASE', fill: P.fillErase ? 'FILL 消し' : P.fillMode === 'lasso' ? 'FILL 投げ縄' : 'FILL', sel: 'SEL' }[P.tool];
     h += tn + (P.tool === 'pen' || P.tool === 'erase' ? ' ' + curSize() + 'px' : '');
-    if(P.tool !== 'erase') h += ' <span class="sw" style="background:' + colHex(P.color) + '"></span> ' + colName(P.color);
+    if(P.tool !== 'erase') h += ' <span class="sw" style="background:' + colHex(P.color) + '"></span> ' + colName(P.color) + (P.tone ? ' <span class="emp">T' + P.tone + '</span>' : '');
   }
   if(f.kind === 'empty') h += ' <span class="emp">空コマ</span>';
   el.innerHTML = h;
@@ -3023,7 +3085,7 @@ const FIXED_KEYS = [
   ['Ctrl+Z', 'Undo（SEL で浮いている間は取消）'], ['Ctrl+Shift+Z / Ctrl+Y', 'Redo'], ['Ctrl+C / Ctrl+V', 'SEL：形をコピー／同じ位置に貼る（形が無ければ画像を REF に貼る）'],
   ['Enter', 'SEL を確定／多角形の投げ縄を閉じる'], ['Esc', 'SEL・投げ縄の取消 ＞ 設定を閉じる ＞ 再生停止 ＞ REF MOVE を抜ける'],
   ['Alt＋クリック', 'スポイト（透明な所は下絵画像の明るさ）'], ['Shift＋クリック', '直前の線の終点から直線（Shift＋ドラッグ＝水平・垂直）'],
-  ['ホイール', '拡縮（Shift＋ホイール＝回転・REF MOVE 中は選んだ画像の拡縮）'], ['中ボタン・Space＋ドラッグ', '画面を動かす'], ['右ドラッグ', '太さを変える（左右）'],
+  ['ホイール', '拡縮（Shift＋ホイール＝回転・REF MOVE 中は選んだ画像の拡縮）'], ['中ボタン・Space＋ドラッグ・Ctrl＋ペン先ドラッグ', '画面を動かす'], ['Ctrl＋Space＋ドラッグ／クリック', '拡縮（右で拡大・左で縮小／クリック＝1段拡大・Alt＝縮小）'], ['ペンの消しゴム側', 'そのストロークだけ消しゴム'], ['右ドラッグ', '太さを変える（左右）'],
 ];
 const FIXED_TOUCH = [
   ['ペン', '描く（指は描かない＝SPEC_18。設定で「指で描く」にもできる）'], ['指1本ドラッグ', '画面を動かす'], ['指2本', 'ピンチ＝拡縮／ひねる＝回転（90°ごとに吸い付く）'],
@@ -3168,6 +3230,7 @@ function captureKey(e){
    全ポインタは #stage で一元化（animator の約束）。ペン／マウス＝描く、指＝ナビ（SPEC_18）。
    指：1本ドラッグ＝移動・2本＝ピンチ（16px 動いてから効く＝2本指タップの指のブレで絵が動かない）・ひねり＝回転・
        2本タップ＝Undo・3本＝Redo・4本＝再生・1本長押し＝スポイト（滑らせて拾い直せる） */
+let handKey = false, tailPrev = null;
 let drag = null, penDown = false, spaceDown = false, spacePanned = false, lastPenTap = { t: 0, x: 0, y: 0 };
 const touchPtrs = new Map();
 let tPan = null, tPinch = null, tPinchArmed = null, tSession = { t0: 0, max: 0, used: false }, tEye = null, tFingerDraw = false;
@@ -3183,6 +3246,12 @@ function stageDown(e){
   if(e.pointerType === 'pen') penDown = true;
   if(S.playing) stopPlay();
   const sp = evStage(e), p = toCanvas(sp.x, sp.y);
+  // Ctrl(⌘)+Space を押している間＝スクラブズーム（animator 2026-10-11 と同じ：右ドラッグで拡大・左で縮小／クリック＝1段拡大・Alt＝縮小）
+  if(handKey && e.button === 0){ drag = { kind: 'kzoom', id: e.pointerId, x: sp.x, y: sp.y, x0: sp.x, z0: S.view.z, moved: false, alt: e.altKey }; return; }
+  // Ctrl(⌘)+ペン先ドラッグ＝手のひら（液タブ用。SEL 中は SEL に渡す）
+  if(e.button === 0 && (e.ctrlKey || e.metaKey) && !e.altKey && P.tool !== 'sel' && !gFloat && !S.refMove){ startPan(sp, e.pointerId); return; }
+  // ペンの消しゴム側（テールスイッチ）＝そのストロークだけ消しゴム、離したら直前の道具へ
+  if(e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32)) && P.tool !== 'erase'){ tailPrev = P.tool; P.tool = 'erase'; updateToolUI(); drawDown(e, p, sp); return; }
   if(e.button === 1 || (e.button === 0 && spaceDown)){ startPan(sp, e.pointerId); if(spaceDown) spacePanned = true; return; }
   if(e.button === 2){ drag = { kind: 'size', x0: sp.x, v0: curSize(), id: e.pointerId }; return; }
   if(e.button !== 0) return;
@@ -3225,6 +3294,12 @@ function dragMove(e, sp){
   else if(k === 'lasso' || k === 'sel') lassoMove(sp, p);
   else if(k === 'float'){ selDragMove(p, e.shiftKey); if(Math.hypot(sp.x - drag.sx, sp.y - drag.sy) > 4) drag.moved = true; }
   else if(k === 'ref') refMove(p, e.shiftKey);
+  else if(k === 'kzoom'){
+    const dx = sp.x - drag.x0;
+    if(!drag.moved && Math.abs(dx) < 3) return;
+    drag.moved = true;
+    zoomAt(drag.z0 * Math.pow(2, dx / 200), drag.x, drag.y);   // 200px で2倍
+  }
   else if(k === 'pan'){ S.view.tx = drag.tx + sp.x - drag.x0; S.view.ty = drag.ty + sp.y - drag.y0; S.view.fit = false; applyView(); }
   else if(k === 'size'){
     const v = drag.v0 + (sp.x - drag.x0) / 3;
@@ -3255,6 +3330,8 @@ function dragEnd(d, e){
   }
   else if(k === 'ref') refUp();
   else if(k === 'pan') stageEl.classList.remove('panning');
+  else if(k === 'kzoom' && !d.moved) zoomAt(S.view.z * (d.alt ? 1 / 1.25 : 1.25), d.x, d.y);
+  if(tailPrev){ const t = tailPrev; tailPrev = null; P.tool = t; updateToolUI(); }
 }
 function startPan(sp, id){
   drag = { kind: 'pan', x0: sp.x, y0: sp.y, tx: S.view.tx, ty: S.view.ty, id };
@@ -3399,6 +3476,7 @@ function onKeyDown(e){
   if(tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.isContentEditable)) return;
   const mod = e.ctrlKey || e.metaKey;
   const k = e.key;
+  if(mod && (k === ' ' || e.code === 'Space')){ e.preventDefault(); handKey = true; stageEl.style.cursor = 'zoom-in'; return; }   // 再生に渡さない
   if(mod){
     const kk = k.toLowerCase();
     if(kk === 'z' && !e.shiftKey){ e.preventDefault(); undo(); return; }
@@ -3444,6 +3522,7 @@ function onKeyDown(e){
 }
 function onKeyUp(e){
   clearTimeout(holdTimer);
+  if(handKey && (e.key === ' ' || e.code === 'Space' || e.key === 'Control' || e.key === 'Meta')){ handKey = false; spaceDown = false; stageEl.style.cursor = ''; return; }
   if(keyName(e) === 'Space' || e.key === ' '){
     if(spaceDown && !spacePanned) togglePlay();
     spaceDown = false; stageEl.classList.remove('pan');
@@ -3903,11 +3982,13 @@ function setupStaticUI(){
     b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end);
   });
   for(const [id, idx, which] of [['#ink-rough', IDX_ROUGH, 'rough'], ['#ink-note', IDX_NOTE, 'note']]){
-    gestureButton($(id), { tap: () => setColor(idx), hold: () => {
+    gestureButton($(id), { tap: () => setColor(idx), dbl: () => setTone(which === 'rough' ? 1 : 2), hold: () => {
       if(which === 'rough') P.colRough = ROUGH_DEF; else P.colNote = NOTE_DEF;
       colorsChanged(); toast((which === 'rough' ? '下書' : '指示') + 'の色を元に戻しました');
     } });
   }
+  $('#tone-1').addEventListener('click', () => setTone(1));
+  $('#tone-2').addEventListener('click', () => setTone(2));
   $('#hide-rough').addEventListener('click', () => toggleHide('rough'));
   $('#hide-note').addEventListener('click', () => toggleHide('note'));
   $('#clr-rough').addEventListener('click', () => clearColor(IDX_ROUGH));
@@ -3984,7 +4065,7 @@ function setupStageInput(){
   });
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
-  window.addEventListener('blur', () => { spaceDown = false; stageEl.classList.remove('pan'); clearTimeout(holdTimer); });
+  window.addEventListener('blur', () => { spaceDown = false; handKey = false; stageEl.classList.remove('pan'); clearTimeout(holdTimer); });
   window.addEventListener('paste', onPaste);
   document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flushSave(); });
   window.addEventListener('pagehide', flushSave);
@@ -3997,6 +4078,7 @@ const gBoot = (async function boot(){
   cvRef = $('#cv-ref'); cxRef = cvRef.getContext('2d', { willReadFrequently: true });
   cvFloat = $('#cv-float'); cxFloat = cvFloat.getContext('2d');
   cvOv = $('#cv-ov'); cxOv = cvOv.getContext('2d');
+  buildTone();
   loadLayout(); applyLayout();
   setupScrubDefs(); setupStaticUI(); setupPanels(); setupTimelineInput(); setupStageInput(); setupLive();
   let loaded = false;
