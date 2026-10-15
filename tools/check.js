@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
-const FILES = ['animator.html', 'oban-builder.html', 'composer.html', 'index.html', 'manga-plate.html', 'econte.html', 'link-map.html', 'brush-lab.html', 'depth-brush-lab.html', 'ref-board.html', 'inbetween_warp_lab.html', 'ipad-probe.html', 'live-plate/index.html'];
+const FILES = ['animator.html', 'rough.html', 'oban-builder.html', 'composer.html', 'index.html', 'manga-plate.html', 'econte.html', 'link-map.html', 'brush-lab.html', 'depth-brush-lab.html', 'ref-board.html', 'inbetween_warp_lab.html', 'ipad-probe.html', 'live-plate/index.html'];
 
 // JSとして扱う <script>: type無し / type="module" / text|application/javascript。
 // type="application/json" 等のデータブロック＝EXPORT WEBのビューアテンプレ等は除外する。

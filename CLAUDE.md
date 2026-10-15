@@ -6,6 +6,13 @@
 
 アプリ本体（単一HTML）:
 - `animator.html` — メインの作画エディタ（実体。最重要）
+- **`rough.html` — ROUGH（SPEC_22・2026-10-15）。ラフ原専用の小さな作画アプリ**（パイプライン上は econte と animator の間）。
+  animator の描き味（筆圧の式・バケツ・投げ縄・Shift の連結・空コマ／+ TAP）はそのまま、**レーン1本（線も塗りも同じ1枚）・色は明度11段＋下書＋指示の13色だけ**。
+  **画素は色番号 1バイト/px**（0=透明・1〜11=明度・12=下書・13=指示）＝下書の色を変えると全コマが変わる／下書だけ隠す・書き出さない・消すが1行。
+  本体は **SEL の「次のコマへ ▶」（→）**＝今のコマは元のまま、囲った形を変形込みで次のコマに下書の色で浮かせる（無ければ作る）。
+  REF＝下絵画像のコラージュ（全コマ共通）。出口＝PNG／連番 ZIP（24fps・絵だけ）／⇩ SAVE（PROJECT_v1）／**→ ANIMATOR REF**（共有DB＋受け箱 `localStorage['tdr_ref_inbox']`＋`tdr_live` の `ref-push`。
+  animator 側は `refInboxCheck` が受けて同じ projectId なら絵だけ差し替え）。UI は LIVE PLATE の SPOTLIGHT・**ドック式**（左右・下。見出しドラッグ／⇱ で浮かせる）。
+  IndexedDB `rough_db_v1`（コマごとに RLE）。iPad：ペン＝描く・指＝ナビ・2/3/4本指タップ＝Undo/Redo/再生。設計と決めたことは `SPEC_22_ROUGH.md`
 - `oban-builder.html` — OBAN BUILDER **SPECIAL EDITION（新UI・既定）**。モーションコミック製造機（画像→PLACE→TAKE→単一HTMLビューア書き出し）。パイプライン上は animator と composer の間。
   UI リデザイン版（ゲーム風・操作明快）で、**描画エンジン（canvas / TAKE / DOF / 書き出し）は従来版と同一**。3テーマ切替あり。UI 規約は `OBAN_BUILDER_UI_HANDOVER.md`
 - `oban-builder-classic.html` — 従来UI版（差し替え前の実体を温存）。**エンジンも `localStorage['oban-project']` も共通**なので、作業中のプロジェクトのまま行き来できる。
@@ -36,8 +43,8 @@
   テーマは SPOTLIGHT のみ。ファイルごとの役割は [live-plate/CLAUDE.md](live-plate/CLAUDE.md)、決めたこと・チェック表は SPEC_21 §15〜§17。
   ローカルサーバは `Projects/.claude/launch.json` の `live-plate`（port 8148）
 - `index.html` — ランディングページ。**2段構成**（2026-09-04）。
-  上＝**本編アプリ6枚**（01 ANIMATOR / 02 OBAN / 03 COMPOSER / 04 ECONTE / 05 MANGA PLATE / **06 LIVE PLATE**（2026-09-24・SPEC_21 §13-7）。rouge系・大）／
-  下＝`LAB & UTILITIES` の**サブ5枚**（07 WARP LAB / 08 LINK MAP / 09 BRUSH LAB / 10 iPad PROBE / 11 REF BOARD。ice系・小 `.card.mini`）。
+  上＝**本編アプリ7枚**（01 ANIMATOR / 02 OBAN / 03 COMPOSER / 04 ECONTE / 05 MANGA PLATE / **06 LIVE PLATE**（2026-09-24・SPEC_21 §13-7）/ **07 ROUGH**（2026-10-15・3列であまった1枚は真ん中の列）。rouge系・大）／
+  下＝`LAB & UTILITIES` の**サブ5枚**（08 WARP LAB / 09 LINK MAP / 10 BRUSH LAB / 11 iPad PROBE / 12 REF BOARD。ice系・小 `.card.mini`）。
   **道具が増えたら基本はサブ側に足す**（本編＝パイプラインの本線だけ）。
   `body` は `overflow:hidden` をやめ、`justify-content:flex-start` ＋ `.lockup{margin-top:auto}` / `footer{margin-bottom:auto}` の
   auto マージンで「入るときは中央・入らないときは上から普通にスクロール」にしてある。
@@ -50,7 +57,7 @@
   矢印/ノードをクリックで手順が出て、やってみたらチェック→全部で CLEAR。進捗は `localStorage['linkmap_done_v1']`）。
   **中身は `GUIDE_MANGA_LINKS.md` と同じ情報＝連携を変えたら両方直す**
 - `inbetween_lab.html` / `inbetween_warp_lab.html` — 中割り実験ラボ
-- `tools/check.js` — 依存ゼロのスモークチェック（構文/配線/ID重複/デッドコード）。**対象は `FILES` 配列。HTMLを足したらここにも足す**（brush-lab.html / depth-brush-lab.html 追加済み）。
+- `tools/check.js` — 依存ゼロのスモークチェック（構文/配線/ID重複/デッドコード）。**対象は `FILES` 配列。HTMLを足したらここにも足す**（brush-lab.html / depth-brush-lab.html / rough.html 追加済み）。
   **`type="module"` も JS として検査する**（2026-09-04）。以前は type属性のある `<script>` を全部データブロック扱いで飛ばしていたため、
   module のラボは「構文 OK」だけ出して配線・id重複・未参照関数を1つも見ないまま通っていた（偽のグリーン）。
   構文チェックの直前だけ `import`/`export` を落として `new Function` に渡している。
@@ -101,6 +108,7 @@
 | `SPEC_18_IPAD_GRAMMAR` | iPad 操作文法（実機測定値） | P0・P1(composer) 済／**P2 スキル化・P3 横展開 未** |
 | `SPEC_19_ECONTE_V5` | 画の単位を枠→**プレート**（同倍率の枠群）・GRID 統一解像度配置・SINGLE→FOCUS 統合 | **P0〜P2 実装済**（2026-09-23）。下書きから変えた点は §6（紙の差し替えは時刻で・段詰め・C.SCRIPT に設計図）。P3 ブラシ暫定5種も実装済（2026-09-24・§7。PEN / MARKER / FLAT / AIR / GLOW、画像は端末のブラウザにだけ保存）。iPad 実機 OK |
 | `SPEC_20_ANIMATOR_LINE_FILL` | ANIMATOR：コマを**線＋塗の2レーン**（1本のタイムライン）・塗りは線を壁にして1px潜る・**REF レーン**（帯・`offset`/`×N`）・SEQ PNG 4択・econte の変形（`箱+rot+warp`）移植・UI は**現行デザインのまま** | **P0〜P4 実装済**（2026-09-23）。レーン見出し列・REF レーン（offset/×N）・SEQ PNG 4択・EXPORT JSON `layers`・SEL（A キー・AA OFF はニアレスト焼き込み）。残りは §7-9 の任意項目と実機確認だけ |
+| `SPEC_22_ROUGH` | **ラフ原専用アプリ ROUGH**（`rough.html`）：レーン1本・13色（色番号で持つ）・SEL の「次のコマへ ▶」・REF コラージュ・ドック式 UI・→ ANIMATOR REF（受け箱） | **P0 実装済**（2026-10-15）。残りは iPad 実機・VRT・link-map への追加（§12） |
 | `SPEC_21_LIVE_PLATE` | **一本化アプリ LIVE PLATE の設計・仕様**。5本を足すのではなく「1つの BOOK に4つの見方（SHEET/DRAW/TAKE/SHOW）」。プレート（SPEC_19）・線＋塗（SPEC_20）・composer の透視式・OBAN の手つき・新 OBAN 規約を土台に、連携（10ルート・3チャンネル）を構造ごと消す。複数ファイル・ビルド無し | **P0 骨格・P1 SHEET・BOOK zip 実装済**（2026-09-24・`live-plate/`。§15＝P0・§16＝P1 に決めたことと動作チェック表）。**P2 DRAW 実装済**（2026-09-26・§17。残りはセル一覧 GRID と iPad）。次は P3 TAKE。起草 2026-09-18。§13 の発注者判断は2026-09-24に**全7件確定**（旧5本は凍結せず並行して極め続ける／名前LIVE PLATE／用紙SCREEN 3840×2160／テーマSPOTLIGHTのみ・他テーマ当面無し／複数ファイル・ビルド無し／P0はPC専念・iPadは旧アプリの知見が固まってから統一／置き場所`live-plate/`。詳細はSPEC_21 §13） |
 | `MOTION_COMIC_SPEC` | composer モーションコミック | Phase 1〜3 済／**Phase 4〜5 要判定** |
 | `EXPORT_WEB_SPEC` | スクロールビューアHTML書き出し | 実装済 |
@@ -142,6 +150,7 @@ https://claude.ai/code/artifact/a57e3c0b-064f-4e1b-97d2-a158602ab07b
 | `oban-builder`（新UI） | ⇧ EXPORT JSON / ⇩ IMPORT JSON | **⚙ SETTINGS ▸ FILE／連携** の中（バーには置かない） |
 | `oban-builder-classic` | EXPORT JSON / IMPORT JSON | `#bar-right` の中 |
 | `econte` | ⇩ PROJ / ⇧ PROJ | **ZIP**なので表記は PROJ のまま（形式が違うものを同じ名前にしない） |
+| `rough` | ⇩ SAVE / ⇧ OPEN | JSON（PROJECT_v1＋`rough`）。左隣に `→ ANIMATOR REF`（出口の主役なのでバーに出す） |
 
 `animator` / `composer` は入出力の性格が違う（ANIMATOR_v1・PROJECT_v2・連番・動画）ので**この並びには揃えない**。
 
@@ -150,7 +159,7 @@ iPad の standalone 起動には Safari の「戻る」が無いので、**HOME 
 
 | ツール | HOME |
 |---|---|
-| `animator` / `composer` / `econte` / `manga-plate` | トップバー右端（従来どおり） |
+| `animator` / `composer` / `econte` / `manga-plate` / `rough` | トップバー右端（従来どおり） |
 | `brush-lab` | トップバー右端に追加。**従来は Esc キーだけ**でキーの無い iPad から戻れなかった（キー版も残置） |
 | `inbetween_warp_lab` | `header` 右端に追加（`margin-left:auto`） |
 | `ipad-probe` | `h1` 行の右端に追加（`.homebtn`） |
@@ -165,14 +174,14 @@ iPad の standalone 起動には Safari の「戻る」が無いので、**HOME 
 守り方は1つだけ：**データをファイルに入れない**。各ツールは `localStorage` / IndexedDB にしか保存しないので、
 HTML を公開しても他人の画面には空のアプリが出るだけ（REF BOARD のリンクもメモも端末の中にしかない）。
 漏れる経路は「**書き出した JSON / ZIP をうっかりコミットする**」だけなので、`.gitignore` で止めてある
-（`ref-board-*.json` / `econte-*.zip` / `*_export.json` ほか）。**書き出しファイルをリポジトリ直下に置かない**。
+（`ref-board-*.json` / `econte-*.zip` / `rough-*.json` / `*_export.json` ほか）。**書き出しファイルをリポジトリ直下に置かない**。
 REF BOARD には `<meta name="robots" content="noindex,nofollow">` も入れてある（検索結果に載せる必要が無いため）。
 
 ## 変更後に必ず行うチェック
 ```
 node tools/check.js
 ```
-13本（animator / oban-builder / composer / index / manga-plate / econte / link-map / brush-lab / depth-brush-lab / ref-board / inbetween_warp_lab / ipad-probe / **live-plate/index.html＋src 29本**）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※JS扱いは type無し・`type="module"`・`text|application/javascript` のみ（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。**depth-brush-lab だけはローカルサーバで開く**
+14本（animator / **rough** / oban-builder / composer / index / manga-plate / econte / link-map / brush-lab / depth-brush-lab / ref-board / inbetween_warp_lab / ipad-probe / **live-plate/index.html＋src 29本**）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※JS扱いは type無し・`type="module"`・`text|application/javascript` のみ（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。**depth-brush-lab だけはローカルサーバで開く**
 （`Projects/.claude/launch.json` の `depth-brush-lab` / port 8146 → `http://localhost:8146/depth-brush-lab.html`。
 module ＋ CDN import なので `file://` での可否は未確認。書き出しの `showDirectoryPicker` も http:// のほうが確実）。
 

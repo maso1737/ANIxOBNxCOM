@@ -34,6 +34,9 @@
    コマを `line`/`fill` に分け（塗りは遅延確保）、タイムラインは1本のままセルを上下2レーンに割る。REF は時間軸上の帯。
    HANDOVER で見送っていた「線のコピペ＆選択変形」は econte の `箱+rot+warp` を移植して P4 で引き取る。
    **UI は animator の現行デザインのまま**（2026-09-19 判断。新 OBAN のテーマ機構・`.qd-*` は持ち込まない）。着手順は P0（データ＋2枚 canvas）→ 見せる → P1（レーン UI）。
+7. **ラフ原専用の新アプリ ROUGH（`rough.html`・SPEC_22）が入った**（2026-10-15）。animator が仕上げ向けに育って重くなったので、
+   「手探りでコマを動かす」だけを切り出した：レーン1本・13色（色番号で持つ）・SEL の **次のコマへ ▶**・REF コラージュ・ドック式・→ ANIMATOR REF。
+   **残り**：iPad 実機確認／`verify:rough`（VRT）／`link-map.html`・`GUIDE_MANGA_LINKS.md` に ROUGH → ANIMATOR REF を足す／ECONTE → ROUGH（SPEC_22 §12）。
 
 ---
 

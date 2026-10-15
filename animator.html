@@ -3959,11 +3959,12 @@ async function addRefStillAsImage(src){
   stageToast(src.name + ' は1枚なので IMG で置きました（' + (range.tin + 1) + '〜' + (range.tout == null ? '最後' : range.tout) + 'コマ）');
   return o;
 }
-async function addRefAnimator(json, fallbackName){
+async function addRefAnimator(json, fallbackName, opts){
   const src = parseRefSource(json, fallbackName);
   if(!src){ modalAlert('フレームが含まれていません'); return; }
   const stills = src.cells.filter(c => c.kind !== 'empty' && !c.hidden && c.image).length;
-  if(stills === 1 && await addRefStillAsImage(src)) return;
+  // opts.ani … ROUGH から届いた REF は1枚でも ANI のまま（送り直したとき同じ projectId で差し替えるため）
+  if(stills === 1 && !(opts && opts.ani) && await addRefStillAsImage(src)) return;
   const { ticks, totalTicks } = await expandRefTicks(src);
   const idx = state.refAnimators.length;
   // 新規はリスト先頭（=最前面）に挿入。「1番上から重なる」挙動
@@ -9656,6 +9657,51 @@ async function exCleanup(maxAgeMs = 24*60*60*1000){
   }catch(e){ /* silent */ }
 }
 
+// ── ROUGH → REF の受け箱（SPEC_22）──
+//   ROUGH の「→ ANIMATOR REF」は共有DB（tdr_exchange）に PROJECT_v1 を置き、localStorage 'tdr_ref_inbox' に名札を足して
+//   tdr_live で 'ref-push' を流す。ここは「知らせが来た／別タブで受け箱が書き換わった／このタブに戻った／起動した」の
+//   どれでも受け箱を見て REF に入れる（iPad の裏タブは知らせを取りこぼすことがあるので、戻ったときにも見る）。
+//   同じ projectId の REF ANIMATOR が既にあれば、置き場所・濃さ・ずらし・×N はそのまま**絵だけ差し替える**。
+//   ★ 別窓（?ro=1）は受け取らない（本窓に任せる）。受け箱は先に空にする＝2つのタブで二重に取らない。
+const REF_INBOX_KEY = 'tdr_ref_inbox';
+let gRefInboxBusy = false;
+async function refInboxCheck(){
+  if(AUTOSAVE_OFF || gRefInboxBusy) return;
+  let box = [];
+  try{ box = JSON.parse(localStorage.getItem(REF_INBOX_KEY) || '[]') || []; }catch(e){ box = []; }
+  if(!Array.isArray(box) || !box.length) return;
+  gRefInboxBusy = true;
+  try{
+    localStorage.setItem(REF_INBOX_KEY, '[]');
+    for(const it of box){
+      if(!it || !it.projectId) continue;
+      const exists = state.refAnimators.some(r => r.projectId === it.projectId);
+      postLive({ type: 'ref-ack', projectId: it.projectId, updated: exists });
+      let rec = null;
+      try{ rec = await exGet(it.projectId); }catch(e){ rec = null; }
+      if(!rec){ stageToast((it.name || 'ROUGH') + ' が共有DBに見つかりません（送り直してください）'); continue; }
+      await refUpsertFromExchange(rec);
+    }
+  }finally{ gRefInboxBusy = false; }
+}
+async function refUpsertFromExchange(rec){
+  if(!state.refMasterShow) toggleRefPanel(true);   // 閉じていると参照は全部隠れる＝届いたのが見えない
+  const r = state.refAnimators.find(x => x.projectId && x.projectId === rec.projectId);
+  if(r){
+    const src = parseRefSource(rec, r.name);
+    if(!src) return;
+    const { ticks, totalTicks } = await expandRefTicks(src);
+    r.source = src; r.ticks = ticks; r.totalTicks = totalTicks; r.name = src.name; r.fps = src.fps;
+    buildRefList(); updateTimeTrack(); renderRefLayer(); saveRefs();
+    stageToast('REF「' + r.name + '」を新しい絵に差し替えました（' + rec.cellCount + 'コマ）');
+    return;
+  }
+  await addRefAnimator(rec, rec.name || 'ROUGH', { ani: true });
+  stageToast((rec.from || 'ROUGH') + ' から REF を受け取りました：' + String(rec.name || '').toUpperCase());
+}
+window.addEventListener('storage', e => { if(e.key === REF_INBOX_KEY && e.newValue && e.newValue !== '[]') refInboxCheck(); });
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') refInboxCheck(); });
+
 function buildProjectPayload(){
   const cur = curFrame();
   if(cur) syncFrameFromCanvas(cur);
@@ -9784,6 +9830,8 @@ function setupLiveSync(){
     } else if(m.type === 'composer-hello'){
       gLiveActive = true; updateLiveUI();
       broadcastProjectNow();
+    } else if(m.type === 'ref-push'){
+      refInboxCheck();   // ROUGH の → ANIMATOR REF（SPEC_22）
     }
   };
   // 既に開いているCOMPOSERへ自分の存在を通知
@@ -12769,6 +12817,7 @@ const gBootPromise = (async function init(){
   state.lastEditWas = 'canvas'; // 初期はキャンバスUNDO優先
   resetGlobalHistory(); // 起動直後はUndo対象なし（基準のみ）
   setupLiveSync();      // COMPOSERとのライブ連携（BroadcastChannel）
+  refInboxCheck();      // ROUGH から閉じている間に届いた REF（SPEC_22）
   updateLiveUI();
   await tlInit();       // 作画タイムラプス記録エンジン（SPEC_14・既定ON / 別窓は記録しない）
   updateResLabel();     // 読込後の作業キャンバスサイズをラベルに反映

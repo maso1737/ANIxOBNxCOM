@@ -103,6 +103,11 @@
   ★ **共有DB／LIVE に流す JSON は合体1枚のまま（`layers` を載せない）**＝COMPOSER / OBAN / MANGA PLATE は改修ゼロ。`layers` はファイルの EXPORT JSON と PROJ 保存箱だけ。
   ★ **UI は animator の現行デザインのまま**（2026-09-19 に「新 OBAN 規約で」から変更）。`--acc` / `THEMES` / `.qd-*` / `CVC` 橋を**足さない**。色は既存 `--acid`、新設 UI は `.fc-vis-btn` / `#zoom-ctl` / `showModal` / `.fc-dur` を真似る。
   ★ 変形は REF パネルに入れない（道具側の `SEL`）。`flPaint` の `imageSmoothingEnabled` を `state.selAA`（既定 false）にする以外、econte の数式は変えない。
+- `SPEC_22_ROUGH.md` — **ラフ原専用アプリ ROUGH（`rough.html`）。P0 実装済み（2026-10-15）**。レーン1本・13色・SEL の「次のコマへ ▶」・REF コラージュ・ドック式・→ ANIMATOR REF。
+  ★ **画素は色番号 1バイト/px**（0=透明・1〜11=明度・12=下書・13=指示）。表示・書き出しは LUT（`makeLUT`）だけで RGBA にする＝**色を足すときは `NCOL` と `colHex` と量子化（`quantizer`）を同時に**。
+  ★ **空コマ → 絵のコマは必ず新しい id（`makeDraw`）**。同じ id の画素を白紙で上書きすると「絵→空」の Undo で元の絵が消える。
+  ★ **ステージの上のボタン（`#sel-hud` / `#zoom-hud`）は `ON_STAGE_UI` で描く入力から外す**（外さないと HUD を押した瞬間に SEL が確定していた）。
+  ★ → ANIMATOR REF の受け箱の形（`tdr_ref_inbox`・`ref-push`・`ref-ack`）を変えるときは **animator の `refInboxCheck` も同じコミットで**（§8）。
 - `SPEC_21_LIVE_PLATE.md` — **一本化アプリ LIVE PLATE の設計・仕様書。§13 の発注者判断は 2026-09-24 に全7件確定。P0 骨格・P1 SHEET・BOOK zip は 2026-09-24、P2 DRAW は 2026-09-26 に `live-plate/` へ実装済み＝決めたことと動作チェック表は §15（P0）・§16（P1）・§17（P2）、ファイルの地図は `live-plate/CLAUDE.md`**。
   ★ P2 で **Undo を1本の時系列**にした（§8-1 の「ステップごとのログ」から変更・§17-1 #3）。描いた絵の Blob は全 Undo スナップショットへ書き込む＝BOOK の Undo が絵を戻さない。**この約束を崩すと紙の操作の Undo で描いた絵が消える**。
   ★ 詳細パネルがペン（WACOM 液晶）／指で移動しにくい件は**記録だけ**（§17-0 #3。iPad 対応のときに一緒に直す）。

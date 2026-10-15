@@ -15,6 +15,17 @@ _新チャット冒頭にこのファイルを貼り付けてください_
   ```
   （3ファイルの構文 / JS→HTML id配線 / id重複 / 未参照関数を一括検査。問題があれば exit 1）
 
+### 2026-10-15 ROUGH からの REF の受け箱（SPEC_22 §8）
+
+- 新アプリ **ROUGH（`rough.html`）** の `→ ANIMATOR REF` を受ける口を足した。**改修はこれだけ**：
+  `refInboxCheck()` / `refUpsertFromExchange()`（新規・`buildProjectPayload` の直前）＋ `tdr_live` の `ref-push` で呼ぶ1行＋起動時（`setupLiveSync()` の直後）1行＋
+  `window` の `storage`（受け箱のキー）と `visibilitychange`（visible）＋ `addRefAnimator(json, name, opts)` の第3引数 `opts.ani`（1枚でも IMG にしない）。
+- 受け箱＝`localStorage['tdr_ref_inbox']`（`[{projectId, name, from, at}]`）。本体は共有DB `tdr_exchange` の PROJECT_v1。**先に受け箱を空にしてから**取りに行く（2タブで二重に入れない）。
+  受け取ったら `ref-ack {projectId, updated}` を返す（ROUGH は 1.2 秒待って、来なければ「次に開いたとき入る」と案内）。
+- **同じ projectId の REF ANIMATOR があれば `source / ticks / totalTicks / name / fps` だけ差し替え**（x・y・scale・濃さ・offset・×N・ロックはそのまま）＝ラフを直して送り直すと、置いた場所のまま新しい絵になる。
+- REF パネルが閉じている（`refMasterShow=false`＝参照は全部隠れる）ときは開いてから入れる。別窓（`?ro=1`）は受け取らない。
+- `verify:animator` はこの環境の Chromium（1194）では**変更前の animator.html でも**同じ3コマが同じ値で不一致（環境差）。今回の変更は描画に触れていない。
+
 ### 2026-09-23 使ってみての調整（SPEC_20 §8・13件）
 
 - PEN / ERASE を持つと線レーンへ。FILL / SEL から PEN に戻ると主線へ。
