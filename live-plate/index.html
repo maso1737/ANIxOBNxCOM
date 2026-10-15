@@ -62,18 +62,26 @@
 
   <main id="stage">
     <canvas id="cv"></canvas>
+    <canvas id="cv-ov"></canvas>
     <div id="stage-msg"></div>
     <div id="stage-hud"></div>
   </main>
 
+  <!-- 右は2列：SHEETS（紙の一覧）｜◆ITEMS（いまの紙の層・素材）。列ごとに ≡ で畳める（畳むと細い帯） -->
   <aside id="side-r" class="pane">
-    <div class="pn-head"><span class="en">SHEETS</span><span class="jp">紙</span><span class="cnt" id="sheet-cnt"></span><span class="sp"></span>
-      <button class="btn ico" id="sheet-add" title="空の紙を最後に足す">＋</button>
-      <button class="btn ico" id="side-r-toggle" title="一覧を畳む">≡</button></div>
-    <div class="pn-body"><div id="sheet-list"></div></div>
-    <div class="pn-sub"><span class="en">◆ ITEMS</span><span class="jp">層（上＝手前）</span><span class="sp" style="flex:1"></span><span class="pn-note" id="item-sheet"></span></div>
-    <div class="pn-body items"><div id="item-list"></div></div>
-    <div class="pn-strip" title="SHEETS を開く"><span>SHEETS</span></div>
+    <div class="rcol" id="col-sheets">
+      <div class="pn-head"><span class="en">SHEETS</span><span class="cnt" id="sheet-cnt"></span><span class="sp"></span>
+        <button class="btn ico" id="sheet-add" title="空の紙を最後に足す">＋</button>
+        <button class="btn ico" id="sheets-toggle" title="SHEETS の列を畳む">≡</button></div>
+      <div class="pn-body"><div id="sheet-list"></div></div>
+      <div class="pn-strip" id="sheets-strip" title="SHEETS を開く"><span>SHEETS</span></div>
+    </div>
+    <div class="rcol" id="col-items">
+      <div class="pn-head"><span class="en">◆ ITEMS</span><span class="jp" id="item-sheet"></span><span class="sp"></span>
+        <button class="btn ico" id="items-toggle" title="◆ITEMS の列を畳む">≡</button></div>
+      <div class="pn-body items"><div id="item-list"></div></div>
+      <div class="pn-strip" id="items-strip" title="◆ITEMS を開く"><span>ITEMS</span></div>
+    </div>
   </aside>
 
   <section id="timeline">
@@ -87,13 +95,15 @@
       <button class="btn ico" id="tl-zin" title="時間を伸ばす">＋</button>
     </div>
     <div id="tl-main">
-      <div id="tl-labels"><div class="lr">TIME</div><div class="ls">SHEET</div><div class="lc" title="選んだ層のセル（P2 で 線／塗 の2レーンに分かれる）">線</div></div>
+      <div id="tl-labels"><div class="lr">TIME</div><div class="ls">SHEET</div><div class="lref" id="tl-lref" title="参照（REF）：02 DRAW の REF で足す。帯を横ドラッグ＝ずらす・×N＝コマ打ち">REF</div><div class="lc lane" id="tl-lline" data-lane="line"></div><div class="lf lane" id="tl-lfill" data-lane="fill"></div></div>
       <div id="tl-scroll">
         <div id="tl-inner">
           <div id="tl-ruler"></div>
           <div id="tl-sheets"></div>
           <div id="tl-add" title="空の紙を最後に足す">＋</div>
+          <div id="tl-refs"></div>
           <div id="tl-cells"></div>
+          <div id="tl-fills"></div>
           <div id="tl-drop"></div>
           <div id="tl-ph"></div>
         </div>
@@ -129,8 +139,8 @@
       <span class="pn-note" style="flex-basis:100%">作品はこの端末のブラウザ（IndexedDB）に自動保存されます。持ち出し・バックアップは <b>⇩ BOOK 保存</b>（zip）。見せるのは 04 SHOW の HTML。</span>
     </div>
     <div id="set-body"></div>
-    <div id="set-note">キーは行のボタンを押してから新しいキーを打つと替わります（同じキーを使っていた操作は空になります）。
-      まだ無い道具（PEN / CAPTURE …）のキーはそのフェーズで足します。仕様は <b>SPEC_21_LIVE_PLATE.md</b>。</div>
+    <div id="set-note">キーは行のボタンを押してから新しいキーを打つと替わります（同じステップで同じキーを使っていた操作は空になります）。
+      01 SHEET と 02 DRAW は同じキーを別の道具に使えます（P＝EDIT／PEN・G＝白／FILL）。まだ無い道具（CAPTURE …）のキーはそのフェーズで足します。仕様は <b>SPEC_21_LIVE_PLATE.md</b>。</div>
   </div>
 </div>
 
@@ -153,6 +163,8 @@
 <script src="js/core/panels.js"></script>
 <script src="js/core/history.js"></script>
 <script src="js/core/store.js"></script>
+<script src="js/core/paint.js"></script>
+<script src="js/core/cells.js"></script>
 <script src="js/ui/widgets.js"></script>
 <script src="js/ui/stage.js"></script>
 <script src="js/ui/timeline.js"></script>
@@ -161,11 +173,14 @@
 <script src="js/ui/dock.js"></script>
 <script src="js/ui/settings.js"></script>
 <script src="js/mode/sheet.js"></script>
+<script src="js/mode/draw.js"></script>
+<script src="js/mode/draw-sel.js"></script>
 <script src="js/input/keymap.js"></script>
 <script src="js/io/import.js"></script>
 <script src="js/io/book-zip.js"></script>
 <script src="js/io/import-legacy.js"></script>
 <script src="js/io/export-html.js"></script>
+<script src="js/io/export-seq.js"></script>
 <script src="viewer/template.js"></script>
 <script src="js/app.js"></script>
 <script src="js/harness.js"></script>

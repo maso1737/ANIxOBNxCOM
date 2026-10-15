@@ -17,7 +17,8 @@ var LP = window.LP || (window.LP = {});
   const LASSO_DRAG_PX = 6, LASSO_CLOSE_PX = 14;
   const S = () => LP.state;
   const G = () => LP.geom;
-  let hoverObj = null, div = null, lasso = null;
+  let hoverObj = null, div = null, lasso = null, cycleT = 0;
+  const CYCLE_MS = 320;   // 選んでいる物の上で動かさずに離す → この間に次の押下／Wクリックが来なければ「1つ下」へ
 
   const sheet = () => LP.app.curSheet();
   const fr = () => LP.render.frameOf(LP.book, sheet());
@@ -43,18 +44,34 @@ var LP = window.LP || (window.LP = {});
     const k = LP.model.panelById(sheet(), o.panelId);
     return !k || G().pointInPoly(G().dispPoly(k, fr()), p.x, p.y);
   }
-  /* 上に見えているものから順に（描く順の逆）：枠の上の素材 → 枠の上の層 → コマの素材 → コマの層 */
-  function hitArt(p){
+  /* その点にあるもの全部を、上に見えている順に（描く順の逆）：枠の上の素材 → 枠の上の層 → コマの素材 → コマの層 */
+  function hitAll(p){
     const sh = sheet();
-    if(!sh) return null;
-    const lt = local();
+    if(!sh) return [];
+    const lt = local(), out = [];
     const items = LP.items.drawOrder(sh.items || []).filter(it => it.visible !== false && !it.locked && lt >= (it.tIn || 0) && (it.tOut == null || lt < it.tOut));
     const layers = sh.layers.filter(L => L.visible && !L.locked);
     for(const free of [true, false]){
-      for(let i = items.length - 1; i >= 0; i--){ const it = items[i]; if(!it.panelId === free && insidePanel(it, p) && hitItem(it, p)) return { kind: 'item', o: it }; }
-      for(let i = layers.length - 1; i >= 0; i--){ const L = layers[i]; if(!L.panelId === free && insidePanel(L, p) && hitLayer(L, p)) return { kind: 'layer', o: L }; }
+      for(let i = items.length - 1; i >= 0; i--){ const it = items[i]; if(!it.panelId === free && insidePanel(it, p) && hitItem(it, p)) out.push({ kind: 'item', o: it }); }
+      for(let i = layers.length - 1; i >= 0; i--){ const L = layers[i]; if(!L.panelId === free && insidePanel(L, p) && hitLayer(L, p)) out.push({ kind: 'layer', o: L }); }
     }
-    return null;
+    return out;
+  }
+  function isSel(h){ const st = S(); return (h.kind === 'layer' && st.selLayer === h.o.id) || (h.kind === 'item' && st.selItem === h.o.id); }
+  /* 掴む物：**選んでいる物がその点にあれば、上に別の物が重なっていてもそれ**（◆ITEMS で下の物を選んで掴める）。無ければいちばん上 */
+  function hitArt(p){
+    const hs = hitAll(p);
+    return hs.find(isSel) || hs[0] || null;
+  }
+  /* 重なりの「1つ下」を選ぶ（Alt＋クリック／選んでいる物の上でもう一度クリック） */
+  function selectBelow(p){
+    const hs = hitAll(p);
+    if(hs.length < 2) return false;
+    const i = hs.findIndex(isSel);
+    const n = hs[(i + 1) % hs.length];
+    LP.app.select(n.kind, n.o.id);
+    LP.ui.toast((i + 1 >= hs.length ? 'いちばん上' : '下') + '：' + (n.o.name || '') + '（' + ((i + 1) % hs.length + 1) + ' / ' + hs.length + '・もう一度クリックでさらに下）');
+    return true;
   }
   function hitHandle(L, sp, H){
     const cs = corners(L).map(c => H.toScreen(c.x, c.y));
@@ -144,6 +161,7 @@ var LP = window.LP || (window.LP = {});
   function down(e, sp, wp, H){
     const st = S(), sh = sheet();
     if(!sh) return null;
+    clearTimeout(cycleT);
     if(lasso && lasso.poly){ polyClick(sp, wp); return { kind: 'none' }; }
     const tool = st.tool;
     if(tool === 'div'){
@@ -192,14 +210,16 @@ var LP = window.LP || (window.LP = {});
         return { kind: 'scale', L, a: toLocal(cx, cy, L.rot, cs[(hi + 2) % 4]), c0: toLocal(cx, cy, L.rot, cs[hi]), orig: { x: L.x, y: L.y, w: L.w, h: L.h }, moved: false };
       }
     }
+    if(e.altKey && selectBelow(wp)) return { kind: 'none' };
     const hit = hitArt(wp);
     if(!hit) return null;
+    const was = isSel(hit);
     if(hit.kind === 'layer'){
       if(!L || L.id !== hit.o.id) LP.app.select('layer', hit.o.id);
-      return { kind: 'move', L: hit.o, wx: wp.x, wy: wp.y, x0: hit.o.x, y0: hit.o.y, moved: false };
+      return { kind: 'move', L: hit.o, wx: wp.x, wy: wp.y, x0: hit.o.x, y0: hit.o.y, moved: false, was, wp };
     }
-    LP.app.select('item', hit.o.id);
-    return { kind: 'item', o: hit.o, wx: wp.x, wy: wp.y, x0: hit.o.x, y0: hit.o.y, moved: false };
+    if(!was) LP.app.select('item', hit.o.id);
+    return { kind: 'item', o: hit.o, wx: wp.x, wy: wp.y, x0: hit.o.x, y0: hit.o.y, moved: false, was, wp };
   }
 
   function move(e, sp, wp, d, H){
@@ -278,7 +298,12 @@ var LP = window.LP || (window.LP = {});
       lassoFinish(); return;
     }
     if(d.kind === 'cut'){ if(d.moved){ LP.panels.sort(sheet()); LP.app.commit('分割線'); } return; }   // 線を動かすと読み順が変わることがある
-    if(d.kind === 'move' || d.kind === 'item'){ if(d.moved) LP.app.commit(d.kind === 'move' ? '層を移動' : '素材を移動'); return; }
+    if(d.kind === 'move' || d.kind === 'item'){
+      if(d.moved){ LP.app.commit(d.kind === 'move' ? '層を移動' : '素材を移動'); return; }
+      // 選んでいた物をもう一度クリック（動かさない）＝重なりの1つ下へ。Wクリック（→ 02 DRAW）なら取り消す
+      if(d.was && S().tool === 'sel'){ const p = d.wp; cycleT = setTimeout(() => selectBelow(p), CYCLE_MS); }
+      return;
+    }
     if(d.kind === 'scale'){ if(d.moved) LP.app.commit('層の大きさ'); }
   }
   function polyClick(sp, wp){
@@ -291,11 +316,12 @@ var LP = window.LP || (window.LP = {});
   }
   function tapEmpty(){ if(S().tool !== 'white') LP.app.select(null); }
   function dbl(e, sp, wp){
+    clearTimeout(cycleT);
     if(lasso && lasso.poly){ lassoFinish(); return; }
     if(S().tool !== 'sel' && S().tool !== 'text') return;
     const hit = hitArt(wp);
     if(!hit) return;
-    if(hit.kind === 'layer'){ LP.app.select('layer', hit.o.id); LP.app.setStep('draw'); }
+    if(hit.kind === 'layer'){ LP.app.select('layer', hit.o.id); LP.app.setStep('draw'); }   // hitArt＝選んでいる物が優先（下の層も Wクリックで開ける）
     else if(hit.o.type === 'text'){ LP.app.select('item', hit.o.id); LP.detail.toggle(true); LP.detail.focusText(); }
   }
   function hover(sp, wp, H, e){
@@ -311,8 +337,8 @@ var LP = window.LP || (window.LP = {});
     if(L && !L.locked && hitHandle(L, sp, H) >= 0) return 'nwse-resize';
     if(e && e.pointerType !== 'mouse') return '';
     const hit = hitArt(wp);
-    const key = hit ? hit.kind + hit.o.id : null;
-    if(key !== (hoverObj && hoverObj.key)){ hoverObj = hit ? { key, hit } : null; LP.stage.renderQ(); }
+    const key = hit && !isSel(hit) ? hit.kind + hit.o.id : null;
+    if(key !== (hoverObj && hoverObj.key)){ hoverObj = key ? { key, hit } : null; LP.stage.renderQ(); }
     return hit ? 'move' : '';
   }
   function cancel(){

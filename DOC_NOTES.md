@@ -103,7 +103,9 @@
   ★ **共有DB／LIVE に流す JSON は合体1枚のまま（`layers` を載せない）**＝COMPOSER / OBAN / MANGA PLATE は改修ゼロ。`layers` はファイルの EXPORT JSON と PROJ 保存箱だけ。
   ★ **UI は animator の現行デザインのまま**（2026-09-19 に「新 OBAN 規約で」から変更）。`--acc` / `THEMES` / `.qd-*` / `CVC` 橋を**足さない**。色は既存 `--acid`、新設 UI は `.fc-vis-btn` / `#zoom-ctl` / `showModal` / `.fc-dur` を真似る。
   ★ 変形は REF パネルに入れない（道具側の `SEL`）。`flPaint` の `imageSmoothingEnabled` を `state.selAA`（既定 false）にする以外、econte の数式は変えない。
-- `SPEC_21_LIVE_PLATE.md` — **一本化アプリ LIVE PLATE の設計・仕様書。§13 の発注者判断は 2026-09-24 に全7件確定。P0 骨格・P1 SHEET・BOOK zip は 2026-09-24 に `live-plate/` へ実装済み＝決めたことと動作チェック表は §15（P0）・§16（P1）、ファイルの地図は `live-plate/CLAUDE.md`**。
+- `SPEC_21_LIVE_PLATE.md` — **一本化アプリ LIVE PLATE の設計・仕様書。§13 の発注者判断は 2026-09-24 に全7件確定。P0 骨格・P1 SHEET・BOOK zip は 2026-09-24、P2 DRAW は 2026-09-26 に `live-plate/` へ実装済み＝決めたことと動作チェック表は §15（P0）・§16（P1）・§17（P2）、ファイルの地図は `live-plate/CLAUDE.md`**。
+  ★ P2 で **Undo を1本の時系列**にした（§8-1 の「ステップごとのログ」から変更・§17-1 #3）。描いた絵の Blob は全 Undo スナップショットへ書き込む＝BOOK の Undo が絵を戻さない。**この約束を崩すと紙の操作の Undo で描いた絵が消える**。
+  ★ 詳細パネルがペン（WACOM 液晶）／指で移動しにくい件は**記録だけ**（§17-0 #3。iPad 対応のときに一緒に直す）。
   ★ **重なり順は ◆ITEMS の並び（配列）だけ。Z は視差だけで、止まったカメラの画は Z で変わらない**（§6-2 の「z 昇順」から変更・§16-2 #3 #5）。
   ★ **割っても見えている絵は消さない**：コマを覆う層・素材は両方の子へコピー、分割を戻すと1枚に（`panels.divide` / `merge`・§16-2 #1）。
   ★ **LAYER.z は「正＝手前」**（§5）。§6-3 の式（composer は正＝奥）とは符号が逆なので `render.js perspOf` で depth = F − z − cam.z にしてある。P1 の Z 定規・P3 の AE JSX もこの向きで（§15-1 #2）。

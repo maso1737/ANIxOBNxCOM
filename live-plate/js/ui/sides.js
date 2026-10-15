@@ -19,9 +19,12 @@ var LP = window.LP || (window.LP = {});
     $('#shelf-add').addEventListener('click', () => { LP.io.pickFiles('shelf'); });
     $('#sheet-add').addEventListener('click', () => LP.app.addSheet());
     $('#side-l-toggle').addEventListener('click', () => togglePane('l'));
-    $('#side-r-toggle').addEventListener('click', () => togglePane('r'));
     $('#side-l .pn-strip').addEventListener('click', () => togglePane('l'));
-    $('#side-r .pn-strip').addEventListener('click', () => togglePane('r'));
+    // 右は2列（SHEETS｜◆ITEMS）を別々に畳む
+    $('#sheets-toggle').addEventListener('click', () => togglePane('s'));
+    $('#sheets-strip').addEventListener('click', () => togglePane('s'));
+    $('#items-toggle').addEventListener('click', () => togglePane('i'));
+    $('#items-strip').addEventListener('click', () => togglePane('i'));
     $('#shelf-list').addEventListener('pointerdown', onShelfDown);
     $('#shelf-list').addEventListener('click', onShelfClick);
     $('#sheet-list').addEventListener('pointerdown', e => rowDown(e, 'sheet'));
@@ -31,13 +34,18 @@ var LP = window.LP || (window.LP = {});
       if(g && g.dataset.pid) LP.app.select('panel', g.dataset.pid);
     });
     try{
-      if(localStorage.getItem('liveplate_pane_l') === '0') document.body.classList.add('l-off');
-      if(localStorage.getItem('liveplate_pane_r') === '0') document.body.classList.add('r-off');
+      ['l', 's', 'i'].forEach(k => { if(localStorage.getItem('liveplate_pane_' + k) === '0') document.body.classList.add(k + '-off'); });
     }catch(e){}
   }
   function togglePane(side){
     const off = document.body.classList.toggle(side + '-off');
     try{ if(!LP.HARNESS_ON) localStorage.setItem('liveplate_pane_' + side, off ? '0' : '1'); }catch(e){}
+  }
+  /* 描いた絵が Blob になったとき（cells.flush）：棚のタイル・その素材を使う紙のサムネ・◆ITEMS を描き直す */
+  function refreshPlate(pids){
+    renderShelf();
+    LP.book.sheets.forEach((s, i) => { if(s.layers.some(l => pids.indexOf(l.plateId) >= 0)) drawThumb(i); });
+    renderItems();
   }
 
   /* ---------- 素材棚 ---------- */
@@ -153,7 +161,7 @@ var LP = window.LP || (window.LP = {});
   const TYPE_MARK = { tone: '網', focus: '集', stream: '流', text: '字', white: '白', frame: '枠', brush: '筆' };
   function renderItems(){
     const sh = LP.app.curSheet(), st = LP.state;
-    $('#item-sheet').textContent = sh ? sh.name : '';
+    $('#item-sheet').textContent = sh ? sh.name + '（上＝手前）' : '';
     const items = sh ? (sh.items || []) : [];
     if(!sh || (!sh.layers.length && !items.length && !sh.panels.length)){
       $('#item-list').innerHTML = '<div class="pn-note">この紙に層はまだありません。<br>素材を<b>紙に落とす</b>と層になります。</div>';
@@ -289,5 +297,5 @@ var LP = window.LP || (window.LP = {});
   }
   function render(){ renderShelf(); renderSheets(); renderItems(); }
 
-  LP.sides = { init, render, renderItems, markCurrent, onDecoded };
+  LP.sides = { init, render, renderItems, markCurrent, onDecoded, refreshPlate };
 })();

@@ -76,6 +76,7 @@ var LP = window.LP || (window.LP = {});
     if(busy){ again = true; return; }
     busy = true;
     try{
+      if(LP.cells) await LP.cells.flush(true);    // 描いている絵を先に Blob へ（02 DRAW）
       const cur = blobEntries(LP.book);
       const tx = db.transaction(['book', 'blobs'], 'readwrite');
       tx.objectStore('book').put(bookJSON(LP.book), 'main');
@@ -118,6 +119,8 @@ var LP = window.LP || (window.LP = {});
   let bytes = 0, notifyT = 0;
 
   function img(cell, lane){
+    const lv = LP.cells ? LP.cells.live(cell, lane) : undefined;   // 02 DRAW で開いているセル＝描いた瞬間の絵
+    if(lv !== undefined) return lv;
     const b = cell[lane];
     if(!b) return null;
     const k = cell.id + '|' + lane;

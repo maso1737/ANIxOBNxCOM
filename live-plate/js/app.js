@@ -16,6 +16,8 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
     selLayer: null, selItem: null, selPanel: null, selCut: null,
     // 01 SHEET の道具とモード（mode/sheet.js）
     tool: 'sel', selMode: 'art', divMode: 'f', toneKind: 'tone', textVert: true, whiteErase: false,
+    // 02 DRAW の道具（mode/draw.js。localStorage に覚える＝作品ではない）
+    draw: LP.drawTools.D,
   };
   const STEPS = ['sheet', 'draw', 'take', 'show'];
   const TOOL_HINT = {
@@ -28,9 +30,16 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
   };
   const HINT = {
     sheet: ['01 SHEET', ''],
-    draw:  ['02 DRAW',  '選んだ層のプレートを原寸で（P0 は表示だけ・ペンは P2）'],
+    draw:  ['02 DRAW',  ''],
     take:  ['03 TAKE',  'カメラの窓＝書き出しと同じ画（KF を打つのは P3）'],
     show:  ['04 SHOW',  '▶ PLAY で全画面 ／ HTML を書き出す'],
+  };
+  const DRAW_HINT = {
+    pen:   () => 'PEN：' + (LP.state.draw.lane === 'fill' ? '塗レーン（塗り残しの補修）' : '線レーン') + '・筆圧 ' + (LP.state.draw.pressure ? 'ON' : 'OFF') + '（P を2回）・Shift＋クリック＝直線',
+    erase: () => 'ERASE：透明にする（E を2回＝このセルを全消去）',
+    fill:  () => LP.state.draw.fillErase ? 'FILL：投げ縄消し（囲った中を透明に・いまのレーン）' : LP.state.draw.fillMode === 'lasso' ? 'FILL：投げ縄塗り（塗レーン）' : 'FILL：バケツ（線が壁・' + LP.state.draw.under + 'px 潜る）',
+    sel:   () => 'SEL：ドラッグ＝投げ縄／Shift＝矩形で持ち上げる → 隅＝拡縮・外＝回転・Ctrl＋隅＝自由変形（A を2回＝WARP）',
+    eye:   () => 'EYE：クリックした所の色を拾う（Alt＋クリックはどの道具からでも）',
   };
   let lastIdx = -1, raf = 0, lastNow = 0, acc = 0;
 
@@ -53,10 +62,22 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
     clampT();
     onTime();
   }
+  let lastCell = null;
   function onTime(){
     const a = curAt(), i = a ? a.i : -1;
     LP.timeline.playhead();
     LP.stage.renderQ();
+    if(LP.state.step === 'draw'){
+      // 描いているセルが替わった＝浮いている形は先に確定・次のセルを開く・セル行の「いま」を付け直す
+      const tg = LP.drawTools.target(), cid = tg && tg.cell ? tg.cell.id : null;
+      if(cid !== lastCell){
+        lastCell = cid;
+        if(LP.drawSel.floatCell() && LP.drawSel.floatCell() !== cid) LP.drawSel.settle();
+        LP.drawTools.sync();
+        if(!LP.state.playing){ LP.timeline.renderCells(); LP.dock.render(); }
+        hud();
+      }
+    }
     if(i !== lastIdx){
       lastIdx = i;
       LP.timeline.markCurrent();
@@ -130,24 +151,29 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
   /* ---------- ステップ ---------- */
   function setStep(s){
     if(STEPS.indexOf(s) < 0) return;
+    if(s !== 'draw' && LP.state.step === 'draw'){ LP.drawSel.settle(); LP.drawTools.cancel(); }
     LP.state.step = s;
     STEPS.forEach(k => document.body.classList.toggle('step-' + k, k === s));
     document.querySelectorAll('#bar .step').forEach(b => b.classList.toggle('on', b.dataset.step === s));
     LP.dock.render();
     crumb();
     LP.stage.renderQ();
+    LP.stage.renderOv();
+    LP.timeline.renderCells();
+    if(s === 'draw') LP.drawTools.sync();
     hud();
   }
   function crumb(){
     const h = HINT[LP.state.step];
-    const txt = LP.state.step === 'sheet' ? TOOL_HINT[LP.state.tool]() : h[1];
+    const txt = LP.state.step === 'sheet' ? TOOL_HINT[LP.state.tool]() : LP.state.step === 'draw' ? DRAW_HINT[LP.state.draw.tool]() : h[1];
     $('#crumb').innerHTML = '<b>' + h[0] + '</b>' + LP.ui.esc(txt);
   }
   function hud(){
     const z = LP.stage.zoomPct();
-    $('#stage-hud').innerHTML = (LP.state.step === 'draw' ? 'PLATE' : LP.state.step === 'sheet' ? 'PAPER' : 'CAMERA') + ' <b>' + z + '%</b>';
+    $('#stage-hud').innerHTML = (LP.state.step === 'draw' ? LP.drawTools.hudText() : LP.state.step === 'sheet' ? 'PAPER' : 'CAMERA') + ' <b>' + z + '%</b>';
   }
   function escape(){
+    if(LP.state.step === 'draw' && LP.drawTools.cancel()) return;   // 変形・投げ縄（02 DRAW）
     if(LP.sheetTools.cancel()) return;          // 投げ縄・分割のプレビュー
     if(LP.settings.open){ LP.settings.toggle(false); return; }
     if(LP.state.clean){ exitClean(); return; }
@@ -166,18 +192,20 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
     LP.detail.render();
     crumb(); hud();
     LP.stage.renderQ();
+    LP.drawTools.sync();
   }
   function commit(label){
     LP.hist.commit(label);
     refresh();
   }
-  function undo(){ histGo(LP.hist.undo(), '↶ '); }
-  function redo(){ histGo(LP.hist.redo(), '↷ '); }
-  function histGo(label, mark){
-    if(label == null){ LP.ui.toast(mark === '↶ ' ? 'これ以上戻れません' : 'これ以上進めません'); return; }
+  function undo(){ if(LP.drawTools.beforeUndo()) return; histGo(LP.hist.undo(), '↶ '); }
+  function redo(){ if(LP.drawTools.beforeUndo()) return; histGo(LP.hist.redo(), '↷ '); }
+  /* book の手＝BOOK が差し替わったので全部描き直す／px の手＝画素を貼るだけ（cells.applyTiles が描き直す） */
+  function histGo(r, mark){
+    if(r == null){ LP.ui.toast(mark === '↶ ' ? 'これ以上戻れません' : 'これ以上進めません'); return; }
     stop();
-    refresh();
-    LP.ui.toast(mark + label);
+    if(r.kind === 'book') refresh();
+    LP.ui.toast(mark + r.label);
   }
 
   /* ---------- 選択（1つだけ） ---------- */
@@ -198,6 +226,7 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
   }
   function selectLayer(id){ select(id ? 'layer' : null, id); }
   function selRefresh(){
+    if(LP.state.step === 'draw'){ LP.drawSel.settle(); LP.drawTools.sync(); lastCell = null; }
     LP.sides.renderItems();
     LP.timeline.renderCells();
     if(!LP.state.exporting) LP.dock.render();

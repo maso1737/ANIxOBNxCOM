@@ -138,6 +138,11 @@ LP.lib = LP.lib || {};
     out.frame = Object.assign({}, d.frame, b.frame || {});
     out.sheets = Array.isArray(b.sheets) && b.sheets.length ? b.sheets : d.sheets;
     out.plates = b.plates || {};
+    for(const pid in out.plates){
+      const p = out.plates[pid];
+      if(!Array.isArray(p.refs)) p.refs = [];
+      p.lanes = Object.assign({ line: { visible: true, locked: false, opacity: 1 }, fill: { visible: true, locked: false, opacity: 1 } }, p.lanes || {});
+    }
     out.sheets.forEach(s => {
       s.layers = s.layers || []; s.panels = s.panels || []; s.items = s.items || [];
       if(s.frame === undefined) s.frame = null;

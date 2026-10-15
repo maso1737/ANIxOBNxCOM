@@ -58,6 +58,7 @@ var LP = window.LP || (window.LP = {});
     const ok = await LP.ui.modalConfirm('BOOK を空にします。\n紙・層・素材がすべて消え、元に戻せません。\n（残したい作品は先に 04 SHOW の HTML で書き出してください）', '空にする');
     if(!ok) return;
     await LP.store.wipe();
+    LP.cells.clear();
     LP.book = LP.model.newBook();
     LP.state.t = 0; LP.state.selLayer = null;
     LP.hist.reset();

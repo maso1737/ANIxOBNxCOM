@@ -91,6 +91,7 @@ LP.io = LP.io || {};
 
   /* BOOK → zip */
   async function saveBookZip(){
+    await LP.cells.flush();                    // 02 DRAW で描いた絵を Blob へ
     const book = LP.book;
     const paths = new Map(), files = [];
     const pathOf = (blob, base) => {
@@ -156,6 +157,7 @@ LP.io = LP.io || {};
     try{
       const r = await readBookZip(file);
       LP.app.stop();
+      LP.cells.clear();
       LP.book = r.book;
       LP.state.t = 0; LP.state.selLayer = null; LP.state.selItem = null; LP.state.selPanel = null;
       LP.hist.reset();
