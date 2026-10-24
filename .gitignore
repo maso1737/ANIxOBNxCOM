@@ -33,3 +33,5 @@ liveplate-*.zip
 rough-*.json
 rough-*.zip
 rough-*.png
+
+_out/
