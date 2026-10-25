@@ -10,7 +10,7 @@
   animator の描き味（筆圧の式・バケツ・投げ縄・Shift の連結・空コマ／+ TAP）はそのまま、**レーン1本（線も塗りも同じ1枚）・色は明度11段＋下書＋指示の13色だけ**。
   **画素は色番号 1バイト/px**（0=透明・1〜11=明度・12=下書・13=指示）＝下書の色を変えると全コマが変わる／下書だけ隠す・書き出さない・消すが1行。
   本体は **SEL の「次のコマへ ▶」（→）**＝今のコマは元のまま、囲った形を変形込みで次のコマに下書の色で浮かせる（無ければ作る）。
-  REF＝下絵画像のコラージュ（全コマ共通）。出口＝PNG／連番 ZIP（24fps・絵だけ）／⇩ SAVE（PROJECT_v1）／**→ ANIMATOR REF**（共有DB＋受け箱 `localStorage['tdr_ref_inbox']`＋`tdr_live` の `ref-push`。
+  REF＝下絵画像のコラージュ（全コマ共通）。**GIF はタイムラインの時刻で動く／SEL の相手を REF にすると見えている REF を1枚「REF 合成」にまとめて切り貼り・変形（画像の貼り付けもそこに結合。Undo 1手）**（2026-10-25・SPEC_22 §15）。**作画タイムラプス**（OUT ▸ TIMELAPSE・DB `rough_tl_v1`・timelapse-kit の芯をそのまま）。出口＝PNG／連番 ZIP（24fps・絵だけ）／⇩ SAVE（PROJECT_v1）／**→ ANIMATOR REF**（共有DB＋受け箱 `localStorage['tdr_ref_inbox']`＋`tdr_live` の `ref-push`。
   animator 側は `refInboxCheck` が受けて同じ projectId なら絵だけ差し替え）。UI は LIVE PLATE の SPOTLIGHT・**ドック式**（左右・下。見出しドラッグ／⇱ で浮かせる）。
   IndexedDB `rough_db_v1`（コマごとに RLE）。iPad：ペン＝描く・指＝ナビ・2/3/4本指タップ＝Undo/Redo/再生。設計と決めたことは `SPEC_22_ROUGH.md`
 - `oban-builder.html` — OBAN BUILDER **SPECIAL EDITION（新UI・既定）**。モーションコミック製造機（画像→PLACE→TAKE→単一HTMLビューア書き出し）。パイプライン上は animator と composer の間。

@@ -363,6 +363,25 @@ body.dragover #stage{outline:1px dashed rgba(var(--accRGB),.8);outline-offset:-1
 #set-note{font-family:var(--jp);font-size:9.5px;letter-spacing:.06em;color:rgba(232,236,242,.42);padding:4px 13px 16px;line-height:1.8}
 #set-note b{color:var(--acc2);font-weight:400}
 
+/* ---------- タイムラプス（§20。設定と同じ中央のオーバーレイ） ---------- */
+#tlp-ovl{position:fixed;inset:0;z-index:100;display:none;background:rgba(3,4,6,.6);align-items:center;justify-content:center;padding:calc(18px + var(--safe-t)) 18px calc(18px + var(--safe-b));
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#tlp-ovl.show{display:flex}
+#tlp-box{background:rgba(9,10,14,.97);border:1px solid rgba(232,236,242,.18);max-width:880px;width:100%;max-height:100%;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.7)}
+#tlp-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:9px;height:44px;padding:0 13px;background:rgba(11,13,17,.97);border-bottom:1px solid rgba(232,236,242,.12)}
+#tlp-head .ttl{font-family:var(--saira);font-weight:700;font-size:14px;letter-spacing:.24em;color:var(--acc)}
+#tlp-head .ttl2{font-family:var(--jp);font-size:9px;letter-spacing:.12em;color:rgba(232,236,242,.34)}
+#tlp-head .sp{flex:1}
+#tlp-view{padding:11px 13px 0;display:flex;justify-content:center}
+#tlp-cv{display:block;width:100%;height:auto;max-height:44vh;object-fit:contain;background:#000;border:1px solid rgba(232,236,242,.1)}
+#tlp-bar{display:flex;align-items:center;gap:9px;padding:9px 13px}
+#tlp-seek{flex:1;min-width:0;accent-color:var(--acc);height:28px}
+#tlp-at{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:rgba(232,236,242,.6);min-width:84px;text-align:right}
+#tlp-ctl{padding:0 2px 10px}
+#sel-hud .btn.on.ref{background:linear-gradient(118deg,#5AE9FF,#8F7BFF)}
+.rrow .nm .gif{font-style:normal;font-family:var(--saira);font-weight:700;font-size:8.5px;letter-spacing:.12em;color:#06070A;background:var(--acc-pt);padding:0 3px;margin-right:4px}
+.rrow .nm .gif.mg{background:var(--acc2);font-family:var(--jp);font-weight:500;letter-spacing:.02em}
+
 /* ---------- toast・confirm・書き出し中 ---------- */
 #toast{position:fixed;left:50%;top:calc(122px + var(--safe-t));transform:translateX(-50%);z-index:110;display:none;max-width:84vw;
   border:1px solid rgba(var(--accRGB),.55);background:rgba(10,12,16,.97);color:var(--ink);box-shadow:var(--acc-glow);
@@ -556,6 +575,21 @@ body.dragover #stage{outline:1px dashed rgba(var(--accRGB),.8);outline-offset:-1
       <button class="hb" id="set-close" title="閉じる（Esc）">✕</button></div>
     <div id="set-body"></div>
     <div id="set-note"></div>
+  </div>
+</div>
+
+<!-- タイムラプス（§20）：記録の早送り再生・並べ替え・動画書き出し -->
+<div id="tlp-ovl">
+  <div id="tlp-box">
+    <div id="tlp-head"><span class="ttl">TIMELAPSE</span><span class="ttl2">作画タイムラプス（紙＋描いた絵だけ）</span><span class="sp"></span>
+      <button class="hb" id="tlp-close" title="閉じる（Esc）">✕</button></div>
+    <div id="tlp-view"><canvas id="tlp-cv" width="960" height="540"></canvas></div>
+    <div id="tlp-bar">
+      <button class="btn ico" id="tlp-play" title="再生／停止（Space）">▶</button>
+      <input type="range" id="tlp-seek" min="0" max="0" value="0" step="1" title="スクラブ">
+      <span id="tlp-at">0 / 0</span>
+    </div>
+    <div id="tlp-ctl"></div>
   </div>
 </div>
 
@@ -1267,7 +1301,7 @@ function pxEnd(label, bbExtra){
   for(let i = 0; i < a.length; i++) if(a[i] !== bb[i]){ diff = true; break; }
   if(!diff) return false;
   histPush({ t: 'px', id, x: x0, y: y0, w, h, a, b: bb, label, n: a.length * 2 });
-  dirtyPix(id);
+  dirtyPix(id); tlMark(id);
   return true;
 }
 function pxAbort(){
@@ -1286,6 +1320,7 @@ function histPush(e){
 }
 function updUndoUI(){ $('#b-undo').classList.toggle('off', !HIST.undo.length); $('#b-redo').classList.toggle('off', !HIST.redo.length); }
 function applyHist(e, side){
+  if(e.t === 'ref'){ refRestore(e[side]); return true; }   // REF の切り貼り（§12c）
   if(e.t === 'px'){
     const buf = pix.get(e.id);
     const fi = S.frames.findIndex(f => f.id === e.id);
@@ -1295,7 +1330,7 @@ function applyHist(e, side){
     for(let y = 0; y < e.h; y++) buf.set(src.subarray(y * e.w, (y + 1) * e.w), (e.y + y) * S.W + e.x);
     markDirty(e.x, e.y, e.x + e.w, e.y + e.h);
     thumbLater(S.frames[fi]);
-    dirtyPix(e.id);
+    dirtyPix(e.id); tlMark(e.id);
     return true;
   }
   const s = e[side];
@@ -1334,7 +1369,7 @@ function sweepPix(){
   const keep = new Set(S.frames.map(f => f.id));
   for(const e of HIST.undo.concat(HIST.redo)){
     if(e.t === 'px') keep.add(e.id);
-    else { e.a.frames.forEach(f => keep.add(f.id)); e.b.frames.forEach(f => keep.add(f.id)); }
+    else if(e.t === 'tl'){ e.a.frames.forEach(f => keep.add(f.id)); e.b.frames.forEach(f => keep.add(f.id)); }
   }
   for(const id of Array.from(pix.keys())) if(!keep.has(id)){ pix.delete(id); thumbs.delete(id); }
 }
@@ -1597,6 +1632,7 @@ const HANDLE_PX = 10, ROT_PX = 44, WARP_N = 4;
 const FL_HANDLES = [[0, 0], [0.5, 0], [1, 0], [1, 0.5], [1, 1], [0.5, 1], [0, 1], [0, 0.5]];
 let gFloat = null, gClip = null, selWarp = false, selCorner = false;
 let selRectMode = false, selCopyMode = false;   // iPad 用（キーボードが無いと Shift＝四角・Alt＝コピーが押せない）
+let selRef = false;   // SEL の相手＝REF（下絵画像）。§12 の「REF を SEL で切り貼り」
 function selActive(){ return !!gFloat; }
 function flAxes(g){ const c = Math.cos(g.rot || 0), s = Math.sin(g.rot || 0); return { ex: { x: c, y: s }, ey: { x: -s, y: c } }; }
 function flCenter(g){ return { x: g.x + g.w / 2, y: g.y + g.h / 2 }; }
@@ -1698,7 +1734,8 @@ function flDrawTri(ctx, img, s, d){
 function flMeshSub(g){ return !g.warp ? 1 : (g.wn === 2 ? 10 : 14); }
 function flPaint(ctx, g, cv){
   ctx.save();
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = !!g.ref;   // 番号の絵は最近傍（13色のまま）・REF の写真はなめらかに
+  if(g.ref) ctx.imageSmoothingQuality = 'high';
   if(!g.warp){
     const p0 = flMap(g, 0, 0), p1 = flMap(g, 1, 0), p3 = flMap(g, 0, 1);
     ctx.transform((p1.x - p0.x) / cv.width, (p1.y - p0.y) / cv.width, (p3.x - p0.x) / cv.height, (p3.y - p0.y) / cv.height, p0.x, p0.y);
@@ -1773,6 +1810,7 @@ function renderFloatQ(){ if(!rqFloat) rqFloat = requestAnimationFrame(() => { rq
 function renderFloat(){
   cxFloat.setTransform(1, 0, 0, 1, 0, 0);
   cxFloat.clearRect(0, 0, S.W, S.H);
+  if(gFloat && gFloat.ref){ renderRef(); return; }   // REF の形は REF の層の中で（濃さ・モノクロも REF と同じに見える）
   if(gFloat) flPaint(cxFloat, gFloat, gFloat.cv);
   drawOv();
 }
@@ -1785,6 +1823,7 @@ function newFloat(id, src, w, h, x, y, opt){
   return g;
 }
 function selLift(pts, copy){
+  if(selRef){ refLift(pts, copy); return; }
   const f = curFrame();
   if(!f || f.kind !== 'draw'){ toast('空コマです（描いてから囲んでください）'); return; }
   const buf = pix.get(f.id), W = S.W;
@@ -1810,6 +1849,7 @@ function selLift(pts, copy){
 function selCommit(silent){
   const g = gFloat; if(!g) return false;
   gFloat = null;
+  if(g.ref) return refCommit(g, silent);
   const buf = pix.get(g.id);
   if(!buf || snapId !== g.id){ renderFloat(); updateSelHud(); return false; }
   const bb = flBakeNearest(buf, g);
@@ -1828,6 +1868,7 @@ function selCancel(){
   if(lasso && lasso.kind === 'sel'){ lasso = null; drawOv(); return true; }
   const g = gFloat; if(!g) return false;
   gFloat = null;
+  if(g.ref){ refAbort(g); toast('取り消しました'); return true; }
   pxAbort();
   renderWork();
   renderFloat(); updateSelHud();
@@ -1840,6 +1881,7 @@ function selDelete(){
   const g = gFloat; if(!g) return false;
   if(!g.lifted || g.copy){ selCancel(); return true; }
   gFloat = null;
+  if(g.ref){ g.cv = null; refCommit(g, true, '囲った REF を消す'); toast('囲った所の REF を消しました（Ctrl+Z で戻せます）'); return true; }
   if(g.liftBB) markDirty(g.liftBB.x0, g.liftBB.y0, g.liftBB.x1, g.liftBB.y1);
   PX.bb = null;
   if(pxEnd('囲った所を消す', g.liftBB)){ const f = S.frames.find(x => x.id === g.id); if(f) thumbLater(f); }
@@ -1851,6 +1893,7 @@ function selDelete(){
 function selCarry(dir){
   const g = gFloat;
   if(!g){ toast('SEL で囲んで持ち上げてから ▶'); return; }
+  if(g.ref){ toast('REF は全コマ共通です（◀▶ は絵の切り貼りだけ）'); return; }
   if(S.playing) stopPlay();
   const fromIdx = S.frames.findIndex(f => f.id === g.id);
   if(fromIdx < 0) return;
@@ -1884,6 +1927,7 @@ function selCarry(dir){
 function selCopy(){
   const g = gFloat;
   if(!g){ toast('SEL で囲んで持ち上げてから COPY（Ctrl+C）'); return; }
+  if(g.ref){ refCopy(g); return; }
   // 下絵色で表示中でも元の色のまま控える（貼るときに下絵色を掛け直す）
   const tmp = new Uint8Array(S.W * S.H), keep = g.cur;
   g.cur = g.src;
@@ -1897,6 +1941,7 @@ function selCopy(){
   toast('コピーしました（' + w + '×' + h + '）— 別のコマで PASTE（Ctrl+V）');
 }
 function selPaste(){
+  if(selRef){ refPasteClip(); return; }
   if(!gClip){ toast('コピーした形がありません（SEL で持ち上げて COPY）'); return; }
   selSettle();
   const f = ensureDrawFrame(); if(!f) return;
@@ -1915,6 +1960,11 @@ function selToggleRough(){
 }
 function selFlip(){
   const g = gFloat; if(!g) return;
+  if(g.ref){
+    const c = newCanvas(g.w0, g.h0), x = c.getContext('2d');
+    x.translate(g.w0, 0); x.scale(-1, 1); x.drawImage(g.cv, 0, 0);
+    g.cv = c; renderFloat(); toast('左右反転'); return;
+  }
   const w = g.w0, h = g.h0;
   const fl = a => { const o = new Uint8Array(a.length); for(let y = 0; y < h; y++) for(let x = 0; x < w; x++) o[y * w + x] = a[y * w + (w - 1 - x)]; return o; };
   const same = g.cur === g.src;
@@ -2002,8 +2052,8 @@ function selDown(e, p, sp){
   }
   if(lasso && lasso.kind === 'sel' && lasso.poly){ polyClick(sp, p); return null; }
   const f = curFrame();
-  if(!f || f.kind !== 'draw'){ toast('空コマです（PASTE か ◀▶ で形を持ってこられます）'); return null; }
-  lasso = { kind: 'sel', pts: [p], scr: [sp], moved: false, poly: false, hover: null, rect: !!e.shiftKey || selRectMode, start: p, copy: !!(e.altKey || e.ctrlKey || e.metaKey) || selCopyMode };
+  if(!selRef && (!f || f.kind !== 'draw')){ toast('空コマです（PASTE か ◀▶ で形を持ってこられます）'); return null; }
+  lasso = { kind: 'sel', ref: selRef, pts: [p], scr: [sp], moved: false, poly: false, hover: null, rect: !!e.shiftKey || selRectMode, start: p, copy: !!(e.altKey || e.ctrlKey || e.metaKey) || selCopyMode };
   drawOv();
   return 'sel';
 }
@@ -2034,6 +2084,28 @@ function updateSelHud(){
   const g = gFloat;
   const b = (id, label, title, cls) => '<button class="btn' + (cls ? ' ' + cls : '') + '" data-sel="' + id + '" title="' + esc(title) + '">' + label + '</button>';
   let h = '';
+  h += b('tgt', selRef ? '相手：REF' : '相手：絵', 'SEL で切る相手（絵のコマ ⇄ REF の下絵画像）。REF は見えている画像を1枚にまとめてから切る', 'jp' + (selRef ? ' on ref' : ''));
+  if(selRef){
+    h += '<span class="vl"></span>';
+    if(g){
+      h += b('flip', '⇋', '左右反転');
+      h += b('corner', '4隅', '自由変形：隅をドラッグするとその隅だけ動く（Ctrl+隅でも）', selCorner ? 'on' : '');
+      h += b('warp', 'WARP', '格子で曲げる（A を2回でも）', selWarp ? 'on' : '');
+      h += b('copy', 'COPY', '形をコピー（Ctrl+C）');
+      if(g.lifted && !g.copy) h += b('del', '消す', '囲った所の REF を消す（Del）', 'del jp');
+      h += '<span class="vl"></span>';
+      h += b('ok', '✓', '確定＝REF に焼き込む（Enter・形の外をクリック）', 'go');
+      h += b('cancel', '✕', '取消（Esc）');
+    }else{
+      h += b('rect', '□ 四角', '四角で囲む（Shift+ドラッグでも）', 'jp' + (selRectMode ? ' on' : ''));
+      h += b('copymode', 'コピー', '元を残して持ち上げる（Alt+ドラッグでも）', 'jp' + (selCopyMode ? ' on' : ''));
+      if(gClipRef) h += b('paste', 'PASTE', 'コピーした REF の形を同じ位置に貼る（Ctrl+V）');
+      h += b('pimg', '画像を貼る', 'クリップボードの画像を REF の上に浮かせる（Ctrl+V・ドロップでも）→ 変形して確定＝REF に合成', 'jp');
+      h += '<span class="hint">REF をなぞって囲む（荒くてよい・まとめて1枚になる）</span>';
+    }
+    hud.innerHTML = h;
+    return;
+  }
   h += b('rough', '下絵色' + (P.selRough ? ' ●' : ' ○'), '貼る・次のコマへ持っていくとき下書の色にする（その上から描ける）', 'jp' + (P.selRough ? ' on' : ''));
   if(g){
     h += '<span class="vl"></span>';
@@ -2057,7 +2129,9 @@ function updateSelHud(){
   hud.innerHTML = h;
 }
 function onSelHud(id){
-  if(id === 'rough') selToggleRough();
+  if(id === 'tgt') setSelRef(!selRef);
+  else if(id === 'pimg') pasteImageButton();
+  else if(id === 'rough') selToggleRough();
   else if(id === 'prev') selCarry(-1);
   else if(id === 'next') selCarry(1);
   else if(id === 'flip') selFlip();
@@ -2075,8 +2149,11 @@ function onSelHud(id){
 /* ============================================================ §12 REF（下絵画像のコラージュ）
    数枚の写真・資料を紙の上に並べて下敷きにする（全コマ共通・描いた絵には混ざらない）。
    MOVE を押している間だけ、ペン／マウスで掴む（中＝移動・隅＝拡縮・隅の外＝回転）。指1本＝移動・2本＝拡縮と回転。
-   画像は IndexedDB に Blob のまま（rough_db_v1 / ref）。書き出しに入れるかは OUT の「REF」。 */
+   画像は IndexedDB に Blob のまま（rough_db_v1 / ref）。書き出しに入れるかは OUT の「REF」。
+   ★ GIF（2コマ以上）は全コマをほどいて持ち、タイムラインの時刻で絵を替える（r.anim・§12b）。
+   ★ SEL の相手を REF にすると、見えている画像を紙の大きさの1枚「REF 合成」にまとめてから切り貼りできる（§12c）。 */
 let refDrag = null, rqRef = 0;
+const newCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, w | 0); c.height = Math.max(1, h | 0); return c; };
 function refById(id){ return S.refs.find(r => r.id === id) || null; }
 function refSelObj(){ return refById(S.refSel); }
 function loadImg(blob){
@@ -2090,7 +2167,8 @@ function loadImg(blob){
 async function addRefBlob(blob, name){
   const im = await loadImg(blob);
   const r = { id: uid('ref'), name: (name || 'IMG').replace(/\.[^.]+$/, '').slice(0, 40), blob, img: im, iw: im.naturalWidth, ih: im.naturalHeight,
-    x: S.W / 2, y: S.H / 2, s: 1, rot: 0, op: 100, vis: true, lock: false, flip: false };
+    x: S.W / 2, y: S.H / 2, s: 1, rot: 0, op: 100, vis: true, lock: false, flip: false, gsync: 't', gofs: 0, gpick: 0 };
+  await refAttachAnim(r);
   const fit = Math.min(1, (S.W * 0.9) / r.iw, (S.H * 0.9) / r.ih);
   r.s = fit;
   const n = S.refs.length;
@@ -2117,17 +2195,26 @@ function renderRef(){
   cvRef.classList.toggle('mono', !!P.refMono);
   cxRef.setTransform(1, 0, 0, 1, 0, 0);
   cxRef.clearRect(0, 0, S.W, S.H);
-  drawRefs(cxRef, 1);
+  drawRefs(cxRef, 1, S.tick, gFloat && gFloat.ref ? gFloat : null);
+  refAnimShown = refAnimKey(S.tick);
   drawOv();
 }
-function drawRefs(ctx, opMul){
+/* tick＝タイムラインの時刻（GIF の絵を選ぶ）。fl＝REF の上に浮いている SEL の形（REF 合成の位置に重ねて描く） */
+function drawRefs(ctx, opMul, tick, fl){
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  const t = tick == null ? S.tick : tick;
   for(const r of S.refs){
     if(!r.vis || !r.img) continue;
     ctx.save();
     ctx.globalAlpha = (r.op / 100) * (opMul == null ? 1 : opMul);
+    if(fl && r.id === fl.rf.mid){   // REF 合成は紙と同じ大きさ・原点（refMergedOK）＝紙の座標そのまま
+      ctx.drawImage(fl.rf.base, 0, 0);
+      if(fl.cv) flPaint(ctx, fl, fl.cv);
+      ctx.restore();
+      continue;
+    }
     ctx.translate(r.x, r.y); ctx.rotate(r.rot); ctx.scale(r.s * (r.flip ? -1 : 1), r.s);
-    ctx.drawImage(r.img, -r.iw / 2, -r.ih / 2);
+    ctx.drawImage(r.anim ? r.anim.frames[gifIndex(r, t)] : r.img, -r.iw / 2, -r.ih / 2, r.iw, r.ih);
     ctx.restore();
   }
   ctx.globalAlpha = 1;
@@ -2202,6 +2289,7 @@ function setRefMove(on){
   toast(S.refMove ? 'REF MOVE：画像を掴んで動かす（中＝移動・隅＝拡縮・隅の外＝回転・指2本＝拡縮と回転）' : 'REF MOVE OFF（描くに戻る）');
 }
 function refAct(act, id){
+  if(gFloat && gFloat.ref) selSettle();
   const r = refById(id);
   if(act === 'sel'){ S.refSel = id; renderRefPanel(); drawOv(); return; }
   if(!r) return;
@@ -2221,6 +2309,7 @@ function refAct(act, id){
   dirtyMeta(); renderRef(); renderRefPanel();
 }
 function refFit(mode){
+  if(gFloat && gFloat.ref) selSettle();
   const r = refSelObj();
   if(!r){ toast('画像を選んでください（一覧か、MOVE 中にタップ）'); return; }
   if(r.lock){ toast('🔒 ロック中です'); return; }
@@ -2234,10 +2323,386 @@ async function pasteImageButton(){
     const items = await navigator.clipboard.read();
     for(const it of items){
       const t = it.types.find(x => /^image\//.test(x));
-      if(t){ const b = await it.getType(t); await addRefBlob(b, 'PASTE ' + (S.refs.length + 1)); renderRef(); renderRefPanel(); toast('貼り付けた画像を下絵に置きました'); return; }
+      if(t){
+        const b = await it.getType(t);
+        if(refPasteWanted()){ await refPasteBlob(b); return; }
+        await addRefBlob(b, 'PASTE ' + (S.refs.length + 1)); renderRef(); renderRefPanel(); toast('貼り付けた画像を下絵に置きました'); return;
+      }
     }
     toast('クリップボードに画像がありません');
   }catch(e){ toast('貼り付けできませんでした（許可が要ります）'); }
+}
+
+/* ============================================================ §12b REF の GIF（タイムラインで動く）
+   <img> の GIF は勝手に動くが、canvas に描くと「その瞬間の1枚」で止まる＝紙の上では静止画になっていた。
+   そこで全コマを自前でほどいて（依存ゼロの LZW）持ち、タイムラインの時刻 tick で絵を選ぶ。
+   r.gsync … 't'＝GIF の実時間（tick/fps 秒）／ 1・2・3＝GIF の1枚を何コマ見せるか（1コマ打ち・2コマ打ち…）／ 0＝止め（r.gpick 枚目）
+   r.gofs  … ずらし（コマ）。tick − gofs から数える＝動きの頭をカットの好きな所に合わせる
+   ★ メモリ：全コマを canvas で持つ。合計が GIF_BUDGET を超える GIF は縮めて持つ（表示は元の大きさ）。 */
+const GIF_BUDGET = 192 * 1024 * 1024, GIF_MAX_FRAMES = 1000;
+let refAnimShown = '';
+function isGifHead(u8){ return u8.length > 13 && u8[0] === 0x47 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x38; }
+function gifSkipBlocks(u8, p){ while(p < u8.length && u8[p]){ p += u8[p] + 1; } return p + 1; }
+function gifLzw(minSize, data, npix){
+  const out = new Uint8Array(npix);
+  const clear = 1 << minSize, eoi = clear + 1;
+  const prefix = new Int16Array(4096), suffix = new Uint8Array(4096), stack = new Uint8Array(4097);
+  for(let i = 0; i < clear; i++){ prefix[i] = -1; suffix[i] = i; }
+  let size = minSize + 1, mask = (1 << size) - 1, next = eoi + 1, old = -1, first = 0;
+  let acc = 0, bits = 0, di = 0, op = 0;
+  while(op < npix){
+    while(bits < size){ if(di >= data.length) return out; acc |= data[di++] << bits; bits += 8; }
+    let code = acc & mask; acc >>>= size; bits -= size;
+    if(code === clear){ size = minSize + 1; mask = (1 << size) - 1; next = eoi + 1; old = -1; continue; }
+    if(code === eoi) break;
+    if(old < 0){ out[op++] = suffix[code]; old = code; first = code; continue; }
+    const inCode = code;
+    let sp = 0;
+    if(code >= next){ stack[sp++] = first; code = old; }
+    while(code >= clear && sp < 4096){ stack[sp++] = suffix[code]; code = prefix[code]; }
+    first = suffix[code];
+    stack[sp++] = first;
+    while(sp > 0 && op < npix) out[op++] = stack[--sp];
+    if(next < 4096){
+      prefix[next] = old; suffix[next] = first; next++;
+      if(next === (1 << size) && size < 12){ size++; mask = (1 << size) - 1; }
+    }
+    old = inCode;
+  }
+  return out;
+}
+/* GIF を全コマ分ほどく。戻り値 { frames:[canvas], delays:[ms], cum:[ms], total } ／ 1枚だけ・壊れている＝null */
+function decodeGif(u8){
+  if(!isGifHead(u8)) return null;
+  const W = u8[6] | (u8[7] << 8), H = u8[8] | (u8[9] << 8), fl = u8[10];
+  if(!W || !H) return null;
+  let p = 13, gct = null;
+  if(fl & 0x80){ const n = 2 << (fl & 7); gct = u8.subarray(p, p + n * 3); p += n * 3; }
+  const start = p;
+  let count = 0;   // 1回目：枚数だけ数える（縮める倍率を先に決める）
+  while(p < u8.length){
+    const b = u8[p++];
+    if(b === 0x3B) break;
+    if(b === 0x21){ p++; p = gifSkipBlocks(u8, p); continue; }
+    if(b !== 0x2C) break;
+    const pk = u8[p + 8]; p += 9;
+    if(pk & 0x80) p += (2 << (pk & 7)) * 3;
+    p++; p = gifSkipBlocks(u8, p); count++;
+  }
+  if(count < 2) return null;
+  count = Math.min(count, GIF_MAX_FRAMES);
+  const k = Math.min(1, Math.sqrt(GIF_BUDGET / (count * W * H * 4)));
+  const fw = Math.max(1, Math.round(W * k)), fh = Math.max(1, Math.round(H * k));
+  const full = newCanvas(W, H), fctx = full.getContext('2d');
+  const img = fctx.createImageData(W, H), cur = img.data;
+  let saved = null, prevDisp = 0, prevRect = null;
+  const frames = [], delays = [];
+  let gce = { disp: 0, delay: 0, tr: -1 };
+  p = start;
+  while(p < u8.length && frames.length < count){
+    const b = u8[p++];
+    if(b === 0x3B) break;
+    if(b === 0x21){
+      const lab = u8[p++];
+      if(lab === 0xF9 && u8[p] >= 4){ const pk = u8[p + 1]; gce = { disp: (pk >> 2) & 7, delay: (u8[p + 2] | (u8[p + 3] << 8)) * 10, tr: (pk & 1) ? u8[p + 4] : -1 }; }
+      p = gifSkipBlocks(u8, p);
+      continue;
+    }
+    if(b !== 0x2C) break;
+    const ix = u8[p] | (u8[p + 1] << 8), iy = u8[p + 2] | (u8[p + 3] << 8), iw = u8[p + 4] | (u8[p + 5] << 8), ih = u8[p + 6] | (u8[p + 7] << 8), pk = u8[p + 8];
+    p += 9;
+    let ct = gct;
+    if(pk & 0x80){ const n = 2 << (pk & 7); ct = u8.subarray(p, p + n * 3); p += n * 3; }
+    const minSize = u8[p++];
+    const parts = [];
+    let len = 0;
+    while(p < u8.length && u8[p]){ const n = u8[p]; parts.push(u8.subarray(p + 1, p + 1 + n)); len += n; p += n + 1; }
+    p++;
+    const data = new Uint8Array(len);
+    let o = 0; for(const a of parts){ data.set(a, o); o += a.length; }
+    // ひとつ前のコマの後始末（2＝その矩形を透明に／3＝描く前に戻す）
+    if(prevDisp === 2 && prevRect){
+      for(let y = prevRect.y; y < Math.min(H, prevRect.y + prevRect.h); y++) for(let x = prevRect.x; x < Math.min(W, prevRect.x + prevRect.w); x++){ const q = (y * W + x) * 4; cur[q] = cur[q + 1] = cur[q + 2] = cur[q + 3] = 0; }
+    }else if(prevDisp === 3 && saved) cur.set(saved);
+    if(gce.disp === 3) saved = cur.slice();
+    if(ct && iw && ih){
+      const idx = gifLzw(Math.max(2, Math.min(11, minSize)), data, iw * ih);
+      const inter = !!(pk & 0x40);
+      const rowOf = [];
+      if(inter){ for(const [s0, st] of [[0, 8], [4, 8], [2, 4], [1, 2]]) for(let y = s0; y < ih; y += st) rowOf.push(y); }
+      const ncol = ct.length / 3;
+      for(let r = 0; r < ih; r++){
+        const y = iy + (inter ? rowOf[r] : r);
+        if(y >= H) continue;
+        for(let x = 0; x < iw; x++){
+          const c = idx[r * iw + x];
+          if(c === gce.tr || c >= ncol) continue;
+          const X = ix + x; if(X >= W) continue;
+          const q = (y * W + X) * 4;
+          cur[q] = ct[c * 3]; cur[q + 1] = ct[c * 3 + 1]; cur[q + 2] = ct[c * 3 + 2]; cur[q + 3] = 255;
+        }
+      }
+    }
+    fctx.putImageData(img, 0, 0);
+    const fc = newCanvas(fw, fh), fg = fc.getContext('2d');
+    if(k < 1){ fg.imageSmoothingEnabled = true; fg.imageSmoothingQuality = 'high'; fg.drawImage(full, 0, 0, fw, fh); }
+    else fg.drawImage(full, 0, 0);
+    frames.push(fc);
+    delays.push(gce.delay < 20 ? 100 : gce.delay);   // 0・10ms はブラウザと同じく 100ms として扱う
+    prevDisp = gce.disp; prevRect = { x: ix, y: iy, w: iw, h: ih };
+    gce = { disp: 0, delay: 0, tr: -1 };
+  }
+  if(frames.length < 2) return null;
+  const cum = []; let t = 0; for(const d of delays){ cum.push(t); t += d; }
+  return { frames, delays, cum, total: t, scaled: k < 1 };
+}
+async function refAttachAnim(r){
+  r.anim = null;
+  if(!r.blob || (r.blob.type && r.blob.type !== 'image/gif')) return;   // 種類の分からない Blob は中身の頭で確かめる
+  try{
+    const u8 = new Uint8Array(await r.blob.arrayBuffer());
+    if(!isGifHead(u8)) return;
+    const a = decodeGif(u8);
+    if(a){ r.anim = a; if(r.gsync == null) r.gsync = 't'; r.gofs = r.gofs | 0; r.gpick = r.gpick | 0; }
+  }catch(e){ console.warn('GIF を読めません', e); }
+}
+function gifIndex(r, tick){
+  const A = r.anim, n = A.frames.length;
+  if(r.gsync === 0 || r.gsync === '0') return clamp(r.gpick | 0, 0, n - 1);
+  const t = tick - (r.gofs | 0);
+  if(r.gsync === 't' || !r.gsync){
+    const ms = ((t * 1000 / P.fps) % A.total + A.total) % A.total;
+    let lo = 0, hi = n - 1;
+    while(lo < hi){ const m = (lo + hi + 1) >> 1; if(A.cum[m] <= ms) lo = m; else hi = m - 1; }
+    return lo;
+  }
+  const st = Math.max(1, r.gsync | 0);
+  return ((Math.floor(t / st) % n) + n) % n;
+}
+function refAnimKey(tick){
+  if(!P.refShow) return '';
+  let k = '';
+  for(const r of S.refs) if(r.vis && r.anim) k += r.id + ':' + gifIndex(r, tick) + ',';
+  return k;
+}
+/* 時刻が変わったとき：見えている GIF の絵が替わるときだけ REF を描き直す（再生中も軽い） */
+function refTickChanged(){ if(S.refs.length && refAnimKey(S.tick) !== refAnimShown) renderRef(); }
+function gifLoopTicks(r){
+  const A = r.anim; if(!A) return 0;
+  if(r.gsync === 0 || r.gsync === '0') return 0;
+  if(r.gsync === 't' || !r.gsync) return Math.round(A.total / 1000 * P.fps);
+  return A.frames.length * Math.max(1, r.gsync | 0);
+}
+
+/* ============================================================ §12c REF を SEL で切り貼り（2026-10-25 発注者要望）
+   「下書きのアテ」用。荒くてよい・REF はくっついてよい（画像はペーストで結合でよい）＝
+   切るときに、見えている画像（ロック・非表示・GIF は除く）を紙と同じ大きさの1枚「REF 合成」にまとめてから切る。
+   形の扱い（移動・拡縮・回転・4隅・WARP・⇋・COPY／PASTE・消す）は絵の SEL と同じ gFloat（g.ref＝true・中身は RGBA の canvas）。
+   ・クリップボードの画像を貼る／ステージへ落とす（SEL・相手 REF の間）＝REF の上に浮かせる → 確定で REF 合成に焼き込む。
+   ★ 持ち上げ〜確定で Undo 1手 {t:'ref'}＝refs の並びを丸ごと控える（画像は毎回新しい canvas なので控えは書き換わらない）。
+     取消は控えに戻すだけ（まとめたのも戻る）。REF の位置・濃さの変更は従来どおり Undo に積まない。
+   ★ 紙の外にはみ出していた所はまとめた時点で切れる（荒くてよい）。紙の大きさを変えた後は次に切るときまとめ直す。 */
+let gClipRef = null;
+function refCuttable(r){ return r.vis && !r.lock && !r.anim && !!r.img; }
+function refMergedOK(r){ return !!r.merged && r.iw === S.W && r.ih === S.H && r.x === S.W / 2 && r.y === S.H / 2 && r.s === 1 && !r.rot && !r.flip && r.op === 100; }
+function refSnap(){ return { refs: S.refs.slice(), sel: S.refSel }; }
+/* refs の並びを差し替えたときの保存：消えた id は DB から消す・増えた id は書く */
+function refPersistDiff(prev, next){
+  const a = new Set(prev.map(r => r.id)), b = new Set(next.map(r => r.id));
+  for(const id of a) if(!b.has(id)) removedRefs.add(id);
+  for(const r of next) if(!a.has(r.id)){ removedRefs.delete(r.id); dirtyRef(r.id); }
+  dirtyMeta();
+}
+function refRestore(s){
+  const prev = S.refs;
+  S.refs = s.refs.slice();
+  S.refSel = refById(s.sel) ? s.sel : null;
+  refPersistDiff(prev, S.refs);
+  renderRef(); renderRefPanel();
+}
+function makeMergedRef(cv){
+  const r = { id: uid('ref'), name: 'REF 合成', blob: null, img: cv, iw: S.W, ih: S.H, x: S.W / 2, y: S.H / 2, s: 1, rot: 0, op: 100, vis: true, lock: false, flip: false, merged: true, gsync: 't', gofs: 0, gpick: 0 };
+  r.enc = true;   // PNG にしている間は保存を待つ（doSave）
+  canvasBlob(cv).then(b => { r.blob = b; r.thumb = URL.createObjectURL(b); }).catch(e => console.warn(e)).finally(() => { r.enc = false; dirtyRef(r.id); renderRefPanel(); });
+  return r;
+}
+/* 見えている REF を1枚にまとめる（もう1枚だけの REF 合成ならそれを使う）。対象が無ければ空の REF 合成を足す（貼り付け用）。
+   ★ refs の並びは差し替えるが保存の差分はまだ付けない（確定のときに refPersistDiff）。戻り値＝REF 合成 */
+function refFlatten(){
+  const list = S.refs.filter(refCuttable);
+  if(list.length === 1 && refMergedOK(list[0])) return list[0];
+  const cv = newCanvas(S.W, S.H), g = cv.getContext('2d');
+  const keep = S.refs;
+  S.refs = list;
+  drawRefs(g, 1, S.tick, null);
+  S.refs = keep;
+  const m = { id: uid('ref'), name: 'REF 合成', blob: null, img: cv, iw: S.W, ih: S.H, x: S.W / 2, y: S.H / 2, s: 1, rot: 0, op: 100, vis: true, lock: false, flip: false, merged: true, gsync: 't', gofs: 0, gpick: 0 };
+  const top = list.length ? S.refs.indexOf(list[list.length - 1]) : S.refs.length - 1;
+  const out = [];
+  S.refs.forEach((r, i) => { if(list.indexOf(r) < 0) out.push(r); if(i === top) out.push(m); });
+  if(top < 0) out.push(m);
+  S.refs = out;
+  S.refSel = m.id;
+  return m;
+}
+function newRefFloat(cv, x, y, w, h, rf, opt){
+  const g = { ref: true, id: rf.mid, cv, w0: cv.width, h0: cv.height, x, y, w, h, rot: 0, warp: null, wn: 0, _h: null, drag: null,
+    lifted: !!(opt && opt.lifted), copy: !!(opt && opt.copy), liftBB: null, rough: false, rf };
+  if(selWarp) flEnsureWarp(g, WARP_N);
+  return g;
+}
+function refLift(pts, copy){
+  if(!S.refs.some(refCuttable)){ toast(S.refs.length ? '切れる REF がありません（ロック・非表示・GIF は切れません）' : 'REF がありません（＋ 画像 か「画像を貼る」）'); return; }
+  const b = bboxOf(pts);
+  const x0 = b.x0, y0 = b.y0, w = b.x1 - b.x0 + 1, h = b.y1 - b.y0 + 1;
+  if(w < 2 || h < 2) return;
+  const before = refSnap();
+  const m = refFlatten();
+  const msk = polyMask(pts, x0, y0, w, h);
+  const pc = newCanvas(w, h), pg = pc.getContext('2d', { willReadFrequently: true });
+  pg.drawImage(m.img, -x0, -y0);
+  const im = pg.getImageData(0, 0, w, h), d = im.data;
+  let any = false;
+  for(let i = 0; i < msk.length; i++){ if(!msk[i]) d[i * 4 + 3] = 0; else if(d[i * 4 + 3]) any = true; }
+  if(!any){ S.refs = before.refs.slice(); S.refSel = before.sel; renderRef(); renderRefPanel(); toast('囲んだ中に REF の画がありません'); return; }
+  pg.putImageData(im, 0, 0);
+  const base = newCanvas(S.W, S.H), bg = base.getContext('2d', { willReadFrequently: true });
+  bg.drawImage(m.img, 0, 0);
+  if(!copy){
+    const hole = bg.getImageData(x0, y0, w, h), hd = hole.data;
+    for(let i = 0; i < msk.length; i++) if(msk[i]) hd[i * 4 + 3] = 0;
+    bg.putImageData(hole, x0, y0);
+  }
+  gFloat = newRefFloat(pc, x0, y0, w, h, { before, mid: m.id, base }, { lifted: true, copy });
+  renderFloat(); renderRefPanel(); updateSelHud();
+  toast('REF を' + (copy ? 'コピー' : '切り取り') + '：中＝移動・隅＝拡縮・隅の外＝回転・4隅・WARP ／ Enter で REF に焼き込む・Esc 取消', 4200);
+}
+/* 浮かせるだけ（PASTE・画像を貼る）。base＝いまの REF 合成のまま */
+function refFloatCanvas(cv, x, y, w, h){
+  selSettle();
+  if(P.tool !== 'sel') setTool('sel', true);
+  if(!P.refShow){ P.refShow = true; savePrefs(); }
+  const before = refSnap();
+  const m = refFlatten();
+  const base = newCanvas(S.W, S.H);
+  base.getContext('2d').drawImage(m.img, 0, 0);
+  gFloat = newRefFloat(cv, x, y, w, h, { before, mid: m.id, base }, {});
+  renderFloat(); renderRefPanel(); updateSelHud();
+}
+/* REF の形を紙に焼く。箱＋回転だけなら canvas の変形1回（なめらかな縮小）。
+   WARP・4隅は三角形を並べて描くと継ぎ目が薄く透けるので、1px ずつ逆写像してバイリニアで拾う（flBakeNearest の RGBA 版） */
+function refPaintFloat(ctx, g){
+  if(!g.warp){ flPaint(ctx, g, g.cv); return; }
+  const W = S.W, H = S.H, bb = flShapeBBox(g);
+  const bx0 = Math.max(0, Math.floor(bb.x0) - 1), by0 = Math.max(0, Math.floor(bb.y0) - 1);
+  const bx1 = Math.min(W, Math.ceil(bb.x1) + 1), by1 = Math.min(H, Math.ceil(bb.y1) + 1);
+  const bw = bx1 - bx0, bh = by1 - by0;
+  if(bw <= 0 || bh <= 0) return;
+  const sw = g.cv.width, sh = g.cv.height, sd = g.cv.getContext('2d').getImageData(0, 0, sw, sh).data;
+  const dst = ctx.getImageData(bx0, by0, bw, bh), dd = dst.data, done = new Uint8Array(bw * bh);
+  const sub = flMeshSub(g), Pp = [];
+  for(let i = 0; i <= sub; i++){ const r = []; for(let j = 0; j <= sub; j++) r.push(flMap(g, j / sub, i / sub)); Pp.push(r); }
+  const px = (x, y, k) => sd[(clamp(y, 0, sh - 1) * sw + clamp(x, 0, sw - 1)) * 4 + k];
+  const tri = (a, b, c, sa, sb, sc) => {
+    const den = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+    if(Math.abs(den) < 1e-12) return;
+    const minx = Math.max(bx0, Math.floor(Math.min(a.x, b.x, c.x))), maxx = Math.min(bx1 - 1, Math.ceil(Math.max(a.x, b.x, c.x)));
+    const miny = Math.max(by0, Math.floor(Math.min(a.y, b.y, c.y))), maxy = Math.min(by1 - 1, Math.ceil(Math.max(a.y, b.y, c.y)));
+    for(let py = miny; py <= maxy; py++){
+      const Y = py + 0.5;
+      for(let qx = minx; qx <= maxx; qx++){
+        const X = qx + 0.5;
+        const l0 = ((b.y - c.y) * (X - c.x) + (c.x - b.x) * (Y - c.y)) / den;
+        const l1 = ((c.y - a.y) * (X - c.x) + (a.x - c.x) * (Y - c.y)) / den;
+        const l2 = 1 - l0 - l1;
+        if(l0 < -1e-9 || l1 < -1e-9 || l2 < -1e-9) continue;
+        const q = (py - by0) * bw + (qx - bx0);
+        if(done[q]) continue;
+        done[q] = 1;
+        const u = l0 * sa.x + l1 * sb.x + l2 * sc.x - 0.5, v = l0 * sa.y + l1 * sb.y + l2 * sc.y - 0.5;
+        const x0 = Math.floor(u), y0 = Math.floor(v), fx = u - x0, fy = v - y0;
+        const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+        const a00 = px(x0, y0, 3), a10 = px(x0 + 1, y0, 3), a01 = px(x0, y0 + 1, 3), a11 = px(x0 + 1, y0 + 1, 3);
+        const sA = w00 * a00 + w10 * a10 + w01 * a01 + w11 * a11;   // 0..255
+        if(sA < 0.5) continue;
+        const o = q * 4, al = sA / 255, dA = dd[o + 3] / 255, oA = al + dA * (1 - al);
+        for(let k = 0; k < 3; k++){
+          const sc0 = (w00 * a00 * px(x0, y0, k) + w10 * a10 * px(x0 + 1, y0, k) + w01 * a01 * px(x0, y0 + 1, k) + w11 * a11 * px(x0 + 1, y0 + 1, k)) / sA;
+          dd[o + k] = (sc0 * al + dd[o + k] * dA * (1 - al)) / oA;
+        }
+        dd[o + 3] = oA * 255;
+      }
+    }
+  };
+  for(let i = 0; i < sub; i++) for(let j = 0; j < sub; j++){
+    const u0 = j / sub * sw, u1 = (j + 1) / sub * sw, v0 = i / sub * sh, v1 = (i + 1) / sub * sh;
+    tri(Pp[i][j], Pp[i][j + 1], Pp[i + 1][j + 1], { x: u0, y: v0 }, { x: u1, y: v0 }, { x: u1, y: v1 });
+    tri(Pp[i][j], Pp[i + 1][j + 1], Pp[i + 1][j], { x: u0, y: v0 }, { x: u1, y: v1 }, { x: u0, y: v1 });
+  }
+  ctx.putImageData(dst, bx0, by0);
+}
+function refCommit(g, silent, label){
+  const rf = g.rf, m = refById(rf.mid);
+  const out = newCanvas(S.W, S.H), og = out.getContext('2d', { willReadFrequently: true });
+  og.drawImage(rf.base, 0, 0);
+  if(g.cv) refPaintFloat(og, g);
+  const nr = makeMergedRef(out);
+  if(m){ nr.vis = m.vis; nr.name = m.name; }
+  const i = m ? S.refs.indexOf(m) : -1;
+  if(i >= 0) S.refs[i] = nr; else S.refs.push(nr);
+  S.refSel = nr.id;
+  refPersistDiff(rf.before.refs, S.refs);
+  histPush({ t: 'ref', a: rf.before, b: refSnap(), label: label || (g.lifted ? 'REF の切り貼り' : 'REF に貼り付け'), n: S.W * S.H * 4 });
+  renderRef(); renderRefPanel(); updateSelHud();
+  if(!silent) toast('REF に焼き込みました（Ctrl+Z で戻せます）');
+  return true;
+}
+function refAbort(g){
+  S.refs = g.rf.before.refs.slice();
+  S.refSel = refById(g.rf.before.sel) ? g.rf.before.sel : null;
+  renderRef(); renderRefPanel(); updateSelHud();
+}
+function refCopy(g){
+  const t = newCanvas(S.W, S.H), tg = t.getContext('2d', { willReadFrequently: true });
+  refPaintFloat(tg, g);
+  const bb = flShapeBBox(g);
+  const x0 = clamp(Math.floor(bb.x0), 0, S.W), y0 = clamp(Math.floor(bb.y0), 0, S.H), x1 = clamp(Math.ceil(bb.x1), 0, S.W), y1 = clamp(Math.ceil(bb.y1), 0, S.H);
+  if(x1 - x0 < 1 || y1 - y0 < 1){ toast('紙の外です'); return; }
+  const c = newCanvas(x1 - x0, y1 - y0);
+  c.getContext('2d').drawImage(t, -x0, -y0);
+  gClipRef = { cv: c, x: x0, y: y0 };
+  updateSelHud();
+  toast('REF の形をコピーしました（' + c.width + '×' + c.height + '）— PASTE（Ctrl+V）で同じ位置に');
+}
+function refPasteClip(){
+  if(!gClipRef){ toast('コピーした REF の形がありません（Ctrl+V の画像・「画像を貼る」は REF の上に浮かせます）'); return; }
+  const c = newCanvas(gClipRef.cv.width, gClipRef.cv.height);
+  c.getContext('2d').drawImage(gClipRef.cv, 0, 0);
+  refFloatCanvas(c, gClipRef.x, gClipRef.y, c.width, c.height);
+  toast('REF の形を同じ位置に貼りました：動かして Enter＝REF に焼き込む・Esc 取消');
+}
+/* SEL の相手が REF の間は、貼った・落とした画像を REF の上に浮かせる（確定で REF 合成に結合） */
+function refPasteWanted(){ return P.tool === 'sel' && selRef; }
+async function refPasteBlob(blob){
+  let im;
+  try{ im = await loadImg(blob); }catch(e){ toast('画像を読めませんでした'); return; }
+  let iw = im.naturalWidth, ih = im.naturalHeight;
+  const lim = Math.max(S.W, S.H) * 1.5, k0 = Math.min(1, lim / Math.max(iw, ih));   // 大きすぎる写真は先に縮める（拡大して使う余白は残す）
+  const c = newCanvas(Math.round(iw * k0), Math.round(ih * k0)), cg = c.getContext('2d');
+  cg.imageSmoothingEnabled = true; cg.imageSmoothingQuality = 'high';
+  cg.drawImage(im, 0, 0, c.width, c.height);
+  const fit = Math.min(1, (S.W * 0.9) / c.width, (S.H * 0.9) / c.height);
+  const w = c.width * fit, h = c.height * fit;
+  refFloatCanvas(c, (S.W - w) / 2, (S.H - h) / 2, w, h);
+  toast('画像を REF の上に浮かせました：変形して Enter＝REF に合成・Esc 取消', 3600);
+}
+function setSelRef(on){
+  selSettle();
+  selRef = !!on;
+  if(selRef){ if(S.refMove) setRefMove(false); if(!P.refShow){ P.refShow = true; savePrefs(); renderRef(); renderRefPanel(); } }
+  if(P.tool !== 'sel') setTool('sel', true);
+  updateSelHud(); updateStageTag(); drawOv();
+  toast(selRef ? 'SEL の相手＝REF：なぞって囲むと見えている REF を1枚にまとめて切る（画像を貼る・ドロップも REF の上に浮く）' : 'SEL の相手＝絵（いまのコマ）');
 }
 
 /* ============================================================ §13 タイムライン（コマの並びと尺）
@@ -2259,10 +2724,11 @@ function seekTick(t){
   S.tick = clamp(t | 0, 0, Math.max(0, tot - 1));
   const i = frameAt(S.tick);
   if(i !== S.cur){ S.cur = i; strokeAnchor = null; renderWork(); renderOnion(); }
+  refTickChanged();
   updatePlayhead(); updateInfo(); updateStageTag(); markCurCell();
 }
 function showFrame(){
-  renderWork(); renderOnion();
+  renderWork(); renderOnion(); refTickChanged();
   updateInfo(); updateStageTag(); updatePlayhead(); markCurCell();
 }
 function stepFrame(d){
@@ -2576,6 +3042,7 @@ function startPlay(){
       S.tick = k;
       const i = frameAt(k);
       if(i !== S.cur){ S.cur = i; renderWork(); markCurCell(); updateInfo(); updateStageTag(); }
+      refTickChanged();
       updatePlayhead();
     }
     playRAF = requestAnimationFrame(loop);
@@ -2863,7 +3330,8 @@ function renderRefPanel(){
   let h = '';
   h += '<div class="qd-row"><button class="qd-sb jp" data-ref="add" title="画像を選んで置く（複数可）。ステージへドラッグ＆ドロップ・Ctrl+V でも置ける">＋ 画像</button>'
      + '<button class="qd-sb" data-ref="paste" title="クリップボードの画像を貼る（キーボードの無い iPad 用）">PASTE</button>'
-     + '<button class="qd-sb' + (S.refMove ? ' on' : '') + '" data-ref="move" title="画像を掴んで動かす（M）。押している間は描けない">MOVE</button></div>';
+     + '<button class="qd-sb' + (S.refMove ? ' on' : '') + '" data-ref="move" title="画像を掴んで動かす（M）。押している間は描けない">MOVE</button>'
+     + '<button class="qd-sb jp' + (P.tool === 'sel' && selRef ? ' on' : '') + '" data-ref="cut" title="SEL で REF を切り貼り・変形（見えている画像を1枚にまとめてから切る。画像を貼る・ドロップもその上に浮く）">✂ SEL</button></div>';
   h += row('表示', seg('refShow', [[1, 'ON'], [0, 'OFF']], P.refShow ? 1 : 0) + scrubHTML('refOp', '濃さ', '%'), 'R で表示の ON/OFF');
   h += row('色', seg('refMono', [[0, 'カラー', 'jp'], [1, 'モノクロ', 'jp']], P.refMono ? 1 : 0));
   h += '<div class="ref-list">';
@@ -2871,8 +3339,8 @@ function renderRefPanel(){
   for(let i = S.refs.length - 1; i >= 0; i--){
     const r = S.refs[i];
     h += '<div class="rrow' + (S.refSel === r.id ? ' on' : '') + (r.vis ? '' : ' hid') + '" data-rid="' + r.id + '">'
-       + '<div class="th" data-ra="sel"><img src="' + esc(r.img ? r.img.src : '') + '"></div>'
-       + '<span class="nm" data-ra="sel">' + esc(r.name) + '</span>'
+       + '<div class="th" data-ra="sel"><img src="' + esc(r.thumb || (r.img && r.img.src) || '') + '"></div>'
+       + '<span class="nm" data-ra="sel">' + (r.anim ? '<i class="gif">GIF</i>' : r.merged ? '<i class="gif mg">合成</i>' : '') + esc(r.name) + '</span>'
        + '<button class="ic' + (r.vis ? '' : ' off') + '" data-ra="vis" title="表示">●</button>'
        + '<button class="ic' + (r.lock ? ' lk' : '') + '" data-ra="lock" title="ロック（掴めない）">' + (r.lock ? '🔒' : '🔓') + '</button>'
        + '<button class="ic" data-ra="flip" title="左右反転">⇋</button>'
@@ -2885,6 +3353,13 @@ function renderRefPanel(){
   if(sel){
     h += row('選択', scrubHTML('refItemOp', '濃さ', '%') + '<span class="qd-note" style="padding:0">' + esc(sel.name) + ' ' + Math.round(sel.s * 100) + '%</span>');
     h += '<div class="qd-row"><button class="qd-sb jp" data-ref="fit1" title="原寸で紙の中央に">原寸・中央</button><button class="qd-sb jp" data-ref="fit" title="紙に収める">紙に合わせる</button><button class="qd-sb jp" data-ref="cover" title="紙を覆う大きさ">紙を覆う</button></div>';
+    if(sel.anim){
+      const A = sel.anim, stop = sel.gsync === 0 || sel.gsync === '0';
+      h += row('GIF', seg('gsync', [['t', '実時間', 'jp'], [1, '1コマ', 'jp'], [2, '2コマ', 'jp'], [3, '3コマ', 'jp'], [0, '止め', 'jp']], stop ? 0 : sel.gsync),
+        'タイムラインの時刻で GIF の絵を替える：実時間＝GIF の速さのまま（' + P.fps + 'fps 換算）／ Nコマ＝GIF の1枚を N コマずつ／止め＝1枚だけ');
+      h += '<div class="qd-row"><span class="k"></span>' + (stop ? scrubHTML('refGPick', '何枚目', '/' + A.frames.length) : scrubHTML('refGOfs', 'ずらし', 'コマ'))
+         + '<span class="qd-note" style="padding:0">' + A.frames.length + '枚' + (stop ? '' : '・1周 ' + gifLoopTicks(sel) + 'コマ') + (A.scaled ? '・縮めて保持' : '') + '</span></div>';
+    }
   }
   el.innerHTML = h;
 }
@@ -2896,12 +3371,14 @@ function onRefPanel(e){
     if(a === 'add') $('#ref-in').click();
     else if(a === 'paste') pasteImageButton();
     else if(a === 'move') setRefMove();
+    else if(a === 'cut'){ setSelRef(!(P.tool === 'sel' && selRef)); renderRefPanel(); }
     else if(a === 'fit1') refFit('1');
     else if(a === 'fit') refFit('fit');
     else if(a === 'cover') refFit('cover');
     return;
   }
   if(b.dataset.ra){ const rr = b.closest('.rrow'); if(rr) refAct(b.dataset.ra, rr.dataset.rid); return; }
+  if(b.dataset.act === 'gsync'){ const r = refSelObj(); if(r){ r.gsync = b.dataset.v === 't' ? 't' : +b.dataset.v; dirtyMeta(); renderRef(); renderRefPanel(); } return; }
   if(b.dataset.act === 'refShow'){ P.refShow = b.dataset.v === '1'; savePrefs(); renderRef(); renderRefPanel(); }
   else if(b.dataset.act === 'refMono'){ P.refMono = b.dataset.v === '1'; savePrefs(); renderRef(); renderRefPanel(); }
 }
@@ -2920,6 +3397,11 @@ function renderOut(){
   h += '<div class="qd-row"><button class="qd-sb jp wide" data-out="png" title="いまのコマを PNG 1枚">このコマを PNG</button></div>';
   h += row('連番', seg('seq', [['tick', P.fps + 'fps（1コマ1枚）', 'jp'], ['cel', '絵だけ', 'jp']], O.seq), '24fps＝止めの間も同じ絵を並べる（AE・COMPOSER 用）／絵だけ＝1つの絵を1枚（尺は timesheet.csv）');
   h += '<div class="qd-row"><button class="qd-sb jp wide" data-out="seq" title="ZIP にまとめて保存">連番 PNG（ZIP）</button></div>';
+  h += sect('TIMELAPSE', '作画タイムラプス');
+  const tlOn = !!(TL && TL.meta && TL.meta.settings.on);
+  h += row('記録', seg('tlOn', [[1, 'ON'], [0, 'OFF']], tlOn ? 1 : 0), '描いた過程を自動で撮る（紙＋絵だけ・変化があったときだけ）。作品とは別に保存');
+  h += '<div class="qd-note" id="tl-mini">' + esc(tlMiniText()) + '</div>';
+  h += '<div class="qd-row"><button class="qd-sb jp wide" data-out="tl" title="記録を早送りで見る・動画（WebM/MP4）に書き出す">▶ 見る・動画に書き出す</button></div>';
   el.innerHTML = h;
 }
 function onOut(e){
@@ -2927,8 +3409,10 @@ function onOut(e){
   if(b.dataset.out === 'send') sendToAnimator();
   else if(b.dataset.out === 'png') exportPNG();
   else if(b.dataset.out === 'seq') exportSeq();
+  else if(b.dataset.out === 'tl') tlPanel(true);
   else if(b.dataset.act){
     const a = b.dataset.act, v = b.dataset.v;
+    if(a === 'tlOn'){ if(TL && TL.meta){ TL.setOn(v === '1'); toast('タイムラプスの記録 ' + (v === '1' ? 'ON' : 'OFF')); } renderOut(); return; }
     if(a === 'bg') P.out.bg = v;
     else if(a === 'rough') P.out.rough = v === '1';
     else if(a === 'note') P.out.note = v === '1';
@@ -2945,8 +3429,8 @@ function updateStageTag(){
   if(S.refMove) h += '<span class="emp">REF MOVE</span>';
   else {
     const tn = { pen: 'PEN', erase: 'ERASE', fill: P.fillErase ? 'FILL 消し' : P.fillMode === 'lasso' ? 'FILL 投げ縄' : 'FILL', sel: 'SEL' }[P.tool];
-    h += tn + (P.tool === 'pen' || P.tool === 'erase' ? ' ' + curSize() + 'px' : '');
-    if(P.tool !== 'erase') h += ' <span class="sw" style="background:' + colHex(P.color) + '"></span> ' + colName(P.color) + (P.tone ? ' <span class="emp">T' + P.tone + '</span>' : '');
+    h += tn + (P.tool === 'pen' || P.tool === 'erase' ? ' ' + curSize() + 'px' : '') + (P.tool === 'sel' && selRef ? '<span class="emp">・REF</span>' : '');
+    if(P.tool !== 'erase' && !(P.tool === 'sel' && selRef)) h += ' <span class="sw" style="background:' + colHex(P.color) + '"></span> ' + colName(P.color) + (P.tone ? ' <span class="emp">T' + P.tone + '</span>' : '');
   }
   if(f.kind === 'empty') h += ' <span class="emp">空コマ</span>';
   el.innerHTML = h;
@@ -2983,7 +3467,7 @@ function drawOvNow(){
       pv.forEach((q, i) => { const s = T(q.x, q.y); i ? c.lineTo(s.x, s.y) : c.moveTo(s.x, s.y); });
       if(pv.length > 2){ c.closePath(); c.fillStyle = lasso.erase ? 'rgba(255,79,168,.16)' : lasso.kind === 'sel' ? 'rgba(196,107,255,.12)' : 'rgba(90,233,255,.14)'; c.fill(); }
     }
-    c.strokeStyle = lasso.kind === 'sel' ? ACC : MARK; c.lineWidth = 1.5; c.setLineDash([7, 5]); c.stroke();
+    c.strokeStyle = lasso.ref ? PT : lasso.kind === 'sel' ? ACC : MARK; c.lineWidth = 1.5; c.setLineDash([7, 5]); c.stroke();
     if(lasso.poly){ c.setLineDash([]); c.fillStyle = ACC; lasso.pts.forEach((q, i) => { const s = T(q.x, q.y); c.beginPath(); c.arc(s.x, s.y, i ? 3.5 : 6, 0, Math.PI * 2); c.fill(); }); }
     c.restore();
   }
@@ -2991,7 +3475,7 @@ function drawOvNow(){
   if(g){
     c.save();
     const out = flOutline(g, 16).map(p => T(p.x, p.y));
-    c.lineWidth = 1.5; c.strokeStyle = ACC; c.setLineDash([8, 5]);
+    c.lineWidth = 1.5; c.strokeStyle = g.ref ? PT : ACC; c.setLineDash([8, 5]);
     c.beginPath(); out.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.stroke();
     c.setLineDash([]);
     if(g.warp && g.wn > 2 && selWarp){
@@ -3013,7 +3497,7 @@ function drawOvNow(){
     c.fillStyle = selCorner ? MARK : ACC; c.strokeStyle = 'rgba(0,0,0,.85)'; c.lineWidth = 1;
     FL_HANDLES.forEach(([hx, hy]) => { if(selCorner && (hx === 0.5 || hy === 0.5)) return; const m = flMap(g, hx, hy), q = T(m.x, m.y); c.fillRect(q.x - hs / 2, q.y - hs / 2, hs, hs); c.strokeRect(q.x - hs / 2, q.y - hs / 2, hs, hs); });
     const lp = T(flMap(g, 0, 0).x, flMap(g, 0, 0).y);
-    const label = (g.rough ? '下絵色' : '元の色') + (g.warp ? (g.wn > 2 ? ' / WARP' : ' / 4隅') : '') + (g.rot ? ' / ' + Math.round(g.rot * 180 / Math.PI) + '°' : '');
+    const label = (g.ref ? 'REF' : g.rough ? '下絵色' : '元の色') + (g.warp ? (g.wn > 2 ? ' / WARP' : ' / 4隅') : '') + (g.rot ? ' / ' + Math.round(g.rot * 180 / Math.PI) + '°' : '');
     c.font = 'bold 11px monospace'; c.textBaseline = 'bottom';
     const tw = c.measureText(label).width;
     c.fillStyle = 'rgba(0,0,0,.72)'; c.fillRect(lp.x, lp.y - 20, tw + 10, 17);
@@ -3080,6 +3564,7 @@ const SHORTCUT_ACTIONS = [
   { id: 'send', label: '→ ANIMATOR REF', def: '', run: () => sendToAnimator() },
   { id: 'png', label: 'このコマを PNG', def: '', run: () => exportPNG() },
   { id: 'seq', label: '連番 PNG（ZIP）', def: '', run: () => exportSeq() },
+  { id: 'timelapse', label: 'タイムラプスを見る', def: '', run: () => tlPanel() },
 ];
 const FIXED_KEYS = [
   ['Ctrl+Z', 'Undo（SEL で浮いている間は取消）'], ['Ctrl+Shift+Z / Ctrl+Y', 'Redo'], ['Ctrl+C / Ctrl+V', 'SEL：形をコピー／同じ位置に貼る（形が無ければ画像を REF に貼る）'],
@@ -3184,7 +3669,7 @@ async function onSettings(e){
   if(a === 'clrRoughAll'){
     if(!await confirmBox('全部のコマから下書の色を消しますか？\n（この操作は Undo できません）', '消す')) return;
     selSettle();
-    for(const f of S.frames){ if(f.kind !== 'draw') continue; const buf = pix.get(f.id); let hit = false; for(let i = 0; i < buf.length; i++) if(buf[i] === IDX_ROUGH){ buf[i] = 0; hit = true; } if(hit){ dirtyPix(f.id); updateThumb(f); } }
+    for(const f of S.frames){ if(f.kind !== 'draw') continue; const buf = pix.get(f.id); let hit = false; for(let i = 0; i < buf.length; i++) if(buf[i] === IDX_ROUGH){ buf[i] = 0; hit = true; } if(hit){ dirtyPix(f.id); tlMark(f.id); updateThumb(f); } }
     histClear(); renderWork(); renderOnion(); toast('全コマから下書の色を消しました'); return;
   }
   if(a === 'swap'){ swapDocks(); buildSettings(); return; }
@@ -3255,7 +3740,7 @@ function stageDown(e){
   if(e.button === 1 || (e.button === 0 && spaceDown)){ startPan(sp, e.pointerId); if(spaceDown) spacePanned = true; return; }
   if(e.button === 2){ drag = { kind: 'size', x0: sp.x, v0: curSize(), id: e.pointerId }; return; }
   if(e.button !== 0) return;
-  if(e.altKey){ eyedrop(p); return; }
+  if(e.altKey && P.tool !== 'sel'){ eyedrop(p); return; }   // SEL の Alt＝コピー（元を残す）
   drawDown(e, p, sp);
 }
 function drawDown(e, p, sp){
@@ -3482,11 +3967,13 @@ function onKeyDown(e){
     if(kk === 'z' && !e.shiftKey){ e.preventDefault(); undo(); return; }
     if((kk === 'z' && e.shiftKey) || kk === 'y'){ e.preventDefault(); redo(); return; }
     if(kk === 'c' && gFloat){ e.preventDefault(); selCopy(); return; }
-    if(kk === 'v' && P.tool === 'sel' && gClip){ e.preventDefault(); selPaste(); return; }
+    if(kk === 'v' && P.tool === 'sel' && (selRef ? gClipRef : gClip)){ e.preventDefault(); selPaste(); return; }
     if(kk === 's'){ e.preventDefault(); saveProject(); return; }
     return;   // Ctrl+V（画像）は paste イベントで受ける
   }
   if(k === 'Escape'){
+    if(tlExporting){ exCancel = true; return; }   // タイムラプス：書き出し中ならキャンセル ＞ 再生中なら停止 ＞ 閉じる
+    if(tlOpenNow()){ if(tlPlayer && tlPlayer.playing) tlPlayer.stop(); else tlPanel(false); return; }
     if($('#set-ovl').classList.contains('show')){ toggleSettings(false); return; }
     if(selCancel()) return;
     if(lasso){ lassoCancel(); return; }
@@ -3496,6 +3983,7 @@ function onKeyDown(e){
     return;
   }
   if($('#set-ovl').classList.contains('show')) return;
+  if(tlOpenNow()){ if(keyName(e) === 'Space'){ e.preventDefault(); if(tlPlayer.playing) tlPlayer.stop(); else tlPlayer.play(); } return; }
   if(k === 'Enter'){
     if(lasso && lasso.poly){ e.preventDefault(); lassoFinish(); return; }
     if(gFloat){ e.preventDefault(); selCommit(); return; }
@@ -3536,6 +4024,7 @@ async function onPaste(e){
   if(!it) return;
   e.preventDefault();
   const b = it.getAsFile();
+  if(b && refPasteWanted()){ await refPasteBlob(b); return; }
   if(b){ await addRefBlob(b, 'PASTE ' + (S.refs.length + 1)); if(!P.refShow){ P.refShow = true; savePrefs(); } renderRef(); renderRefPanel(); toast('貼り付けた画像を下絵（REF）に置きました'); }
 }
 
@@ -3569,7 +4058,8 @@ function metaRecord(){
   return {
     v: 1, pid: S.pid, name: S.name, W: S.W, H: S.H, fps: P.fps, cur: S.cur,
     frames: S.frames.map(f => ({ id: f.id, kind: f.kind, dur: f.dur })),
-    refs: S.refs.map(r => ({ id: r.id, name: r.name, iw: r.iw, ih: r.ih, x: r.x, y: r.y, s: r.s, rot: r.rot, op: r.op, vis: r.vis, lock: r.lock, flip: r.flip })),
+    // REF を SEL で浮かせている間は「持ち上げる前」の並びを書く（その間に閉じても REF が欠けない）
+    refs: ((gFloat && gFloat.ref) ? gFloat.rf.before.refs : S.refs).filter(r => r.blob).map(r => ({ id: r.id, name: r.name, iw: r.iw, ih: r.ih, x: r.x, y: r.y, s: r.s, rot: r.rot, op: r.op, vis: r.vis, lock: r.lock, flip: r.flip, merged: !!r.merged, gsync: r.gsync, gofs: r.gofs | 0, gpick: r.gpick | 0 })),
     refSel: S.refSel, savedAt: Date.now(),
   };
 }
@@ -3578,13 +4068,14 @@ async function doSave(){
   if(HARNESS || !db){ setSaveSt(''); return; }
   if(saving){ schedSave(); return; }
   if(stroke){ schedSave(); return; }   // 描いている途中は待つ
+  if(S.refs.some(r => r.enc)){ schedSave(); return; }   // REF 合成を PNG にしている途中は待つ（blob の無い REF を meta に書かない）
   saving = true;
   try{
     const drawIds = new Set(S.frames.filter(f => f.kind === 'draw').map(f => f.id));
     const putPix = [];
     for(const id of drawIds) if(dirtyPixSet.has(id) || !savedPix.has(id)){ const b = pix.get(id); if(b) putPix.push({ id, rle: rleEncode(b) }); }
     const delPix = Array.from(savedPix).filter(id => !drawIds.has(id));
-    const putRef = Array.from(dirtyRefSet).map(id => refById(id)).filter(Boolean).map(r => ({ id: r.id, blob: r.blob }));
+    const putRef = Array.from(dirtyRefSet).map(id => refById(id)).filter(r => r && r.blob).map(r => ({ id: r.id, blob: r.blob }));
     const delRef = Array.from(removedRefs);
     dirtyPixSet.clear(); dirtyRefSet.clear(); removedRefs.clear();
     const meta = metaRecord(); metaDirtyF = false;
@@ -3637,7 +4128,12 @@ async function loadProject(){
   for(const r of m.refs || []){
     const b = blobs.get(r.id);
     if(!b) continue;
-    try{ const im = await loadImg(b); S.refs.push(Object.assign({}, r, { blob: b, img: im, iw: im.naturalWidth, ih: im.naturalHeight })); }catch(e){}
+    try{
+      const im = await loadImg(b);
+      const o = Object.assign({ gsync: 't', gofs: 0, gpick: 0 }, r, { blob: b, img: im, iw: im.naturalWidth, ih: im.naturalHeight });
+      await refAttachAnim(o);
+      S.refs.push(o);
+    }catch(e){}
   }
   S.refSel = refById(m.refSel) ? m.refSel : null;
   return true;
@@ -3694,7 +4190,7 @@ function frameCanvas(f, opt){
   if(opt.ref && P.refShow){
     const t = document.createElement('canvas'); t.width = S.W; t.height = S.H;
     const tg = t.getContext('2d');
-    drawRefs(tg, 1);
+    drawRefs(tg, 1, opt.tick);
     if(P.refMono) monoInPlace(tg);
     g.globalAlpha = P.refOp / 100; g.drawImage(t, 0, 0); g.globalAlpha = 1;
   }
@@ -3721,7 +4217,7 @@ function download(blob, name){
 async function exportPNG(){
   selSettle();
   const f = curFrame();
-  const c = frameCanvas(f, { bg: P.out.bg, ref: P.out.ref });
+  const c = frameCanvas(f, { bg: P.out.bg, ref: P.out.ref, tick: S.tick });
   download(await canvasBlob(c), 'rough-' + safeName() + '-f' + pad(S.cur + 1) + '.png');
   toast('PNG を書き出しました（' + (S.cur + 1) + ' コマ目・' + S.W + '×' + S.H + '）');
 }
@@ -3735,10 +4231,12 @@ async function exportSeq(){
   exShow('連番 PNG を作っています…');
   try{
     const files = [], cache = new Map();
-    const enc = async f => {
-      const key = f.kind === 'draw' ? f.id : '_empty';
+    // REF を入れて GIF が動くときは時刻ごとに絵が変わる＝同じ絵の使い回しは「コマ＋GIF の何枚目」が同じときだけ
+    const animRef = P.out.ref && P.refShow && S.refs.some(r => r.vis && r.anim);
+    const enc = async (f, tick) => {
+      const key = (f.kind === 'draw' ? f.id : '_empty') + (animRef ? '|' + refAnimKey(tick) : '');
       if(cache.has(key)) return cache.get(key);
-      const b = new Uint8Array(await (await canvasBlob(frameCanvas(f.kind === 'draw' ? f : null, { bg: P.out.bg, ref: P.out.ref }))).arrayBuffer());
+      const b = new Uint8Array(await (await canvasBlob(frameCanvas(f.kind === 'draw' ? f : null, { bg: P.out.bg, ref: P.out.ref, tick }))).arrayBuffer());
       cache.set(key, b);
       return b;
     };
@@ -3746,8 +4244,7 @@ async function exportSeq(){
       const tot = totalTicks();
       let t = 0;
       for(const f of S.frames){
-        const b = await enc(f);
-        for(let k = 0; k < f.dur; k++){ files.push({ name: base + '/' + base + '_' + pad(t + 1, 4) + '.png', data: b }); t++; }
+        for(let k = 0; k < f.dur; k++){ const b = await enc(f, t); files.push({ name: base + '/' + base + '_' + pad(t + 1, 4) + '.png', data: b }); t++; }
         exProg(t / tot, t + ' / ' + tot + ' コマ');
         if(exCancel) throw new Error('cancel');
       }
@@ -3756,7 +4253,7 @@ async function exportSeq(){
       let t = 0, n = 0;
       for(let i = 0; i < S.frames.length; i++){
         const f = S.frames[i];
-        if(f.kind === 'draw'){ n++; files.push({ name: base + '/' + base + '_d' + pad(n) + '.png', data: await enc(f) }); lines.push((t + 1) + ',' + pad(n) + ',' + f.dur); }
+        if(f.kind === 'draw'){ n++; files.push({ name: base + '/' + base + '_d' + pad(n) + '.png', data: await enc(f, t) }); lines.push((t + 1) + ',' + pad(n) + ',' + f.dur); }
         else lines.push((t + 1) + ',×,' + f.dur);
         t += f.dur;
         exProg((i + 1) / S.frames.length, (i + 1) + ' / ' + S.frames.length + ' 絵');
@@ -3829,9 +4326,11 @@ async function saveProject(){
   try{
     const rec = await buildProjectV1({ full: true });
     const refs = [];
+    for(let k = 0; k < 50 && S.refs.some(r => r.enc); k++) await new Promise(r => setTimeout(r, 100));   // REF 合成の PNG を待つ
     for(const r of S.refs){
+      if(!r.blob) continue;
       const url = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(null); fr.readAsDataURL(r.blob); });
-      if(url) refs.push({ name: r.name, x: r.x, y: r.y, s: r.s, rot: r.rot, op: r.op, vis: r.vis, lock: r.lock, flip: r.flip, src: url });
+      if(url) refs.push({ name: r.name, x: r.x, y: r.y, s: r.s, rot: r.rot, op: r.op, vis: r.vis, lock: r.lock, flip: r.flip, merged: !!r.merged, gsync: r.gsync, gofs: r.gofs | 0, gpick: r.gpick | 0, src: url });
     }
     rec.rough = { v: 1, pid: S.pid, cur: S.cur, colors: { rough: P.colRough, note: P.colNote }, refs };
     download(new Blob([JSON.stringify(rec)], { type: 'application/json' }), 'rough-' + safeName() + '-' + stamp() + '.json');
@@ -3885,7 +4384,8 @@ async function openProjectFile(file){
         try{
           const b = await (await fetch(r.src)).blob();
           const o = await addRefBlob(b, r.name);
-          Object.assign(o, { x: r.x, y: r.y, s: r.s, rot: r.rot || 0, op: r.op == null ? 100 : r.op, vis: r.vis !== false, lock: !!r.lock, flip: !!r.flip });
+          Object.assign(o, { x: r.x, y: r.y, s: r.s, rot: r.rot || 0, op: r.op == null ? 100 : r.op, vis: r.vis !== false, lock: !!r.lock, flip: !!r.flip,
+            merged: !!r.merged, gsync: r.gsync == null ? 't' : r.gsync, gofs: r.gofs | 0, gpick: r.gpick | 0 });
         }catch(e){}
       }
     }
@@ -3950,6 +4450,369 @@ async function sendToAnimator(){
   if(v === 1){ flushSave(); window.open('animator.html', '_blank'); }
 }
 
+/* ============================================================ §20 作画タイムラプス（timelapse-kit ＝ animator SPEC_14 の移植・2026-10-25）
+   キャンバスの絵だけ（紙の色＋描いたコマ。REF・オニオン・枠・カーソルは写さない）を「変化があったときだけ一定間隔」で撮る。
+   DB は rough_tl_v1（作品の rough_db_v1 と混ぜない＝CLEAR しても絵と Undo は無傷）。既定 ON・上限枚数のリングバッファ。
+   ★ 「絵が変わった」の合図は tlMark の1か所（pxEnd＝ペン・消し・塗り・SEL の確定・全消去／Undo・Redo の画素／下書を全コマから消す）。
+   ★ 撮るのは最後に描いたコマ（tlIdLast）。描いてすぐ別のコマへ移っても、描いたコマの絵が撮れる。
+   ★ 下の createTimelapse / createTimelapsePlayer は timelapse-kit/references/timelapse_core.js をそのまま（直さない）。 */
+function createTimelapse (opt) {
+  const D = Object.assign({ on: true, intervalMs: 2000, maxShots: 1500, longEdge: 1280, quality: 0.72 }, opt.defaults || {});
+  const POLL_MS = 500;          // rAF は裏タブで完全に止まるので setInterval（間引きは許容）
+  let db = null, meta = null, dirty = false, lastShotAt = 0, busy = false, timer = null;
+  let mime = 'image/webp';
+  const listeners = [];
+
+  function detectMime () {
+    try { const c = document.createElement('canvas'); c.width = c.height = 1; if (c.toDataURL('image/webp').indexOf('data:image/webp') === 0) { return 'image/webp'; } } catch (e) { /* ignore */ }
+    return 'image/jpeg';
+  }
+  function req (r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+  function txDone (tx) { return new Promise(res => { tx.oncomplete = () => res(true); tx.onerror = () => res(false); tx.onabort = () => res(false); }); }
+  function openDB () {
+    return new Promise(res => {
+      let r;
+      try { r = indexedDB.open(opt.dbName, 1); } catch (e) { res(null); return; }
+      r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains('meta')) { d.createObjectStore('meta'); } if (!d.objectStoreNames.contains('shot')) { d.createObjectStore('shot'); } };
+      r.onsuccess = () => { const d = r.result; d.onversionchange = () => d.close(); res(d); };
+      r.onerror = () => res(null);
+      r.onblocked = () => console.warn('timelapse DB blocked (another tab?)');
+    });
+  }
+  function freshMeta () { return { version: 1, startedAt: 0, seqHead: 0, seqTail: 1, count: 0, bytes: 0, settings: Object.assign({}, D) }; }
+  async function putMeta () {
+    if (!db) { return; }
+    const tx = db.transaction('meta', 'readwrite'); tx.objectStore('meta').put(meta, 'tl'); await txDone(tx);
+  }
+  function emit () { if (opt.onChange) { opt.onChange(); } listeners.forEach(f => f()); }
+
+  // ── リングバッファ：上限を超えたぶんを seqTail から古い順に捨てる（止まらずに撮り続ける）──
+  async function trim () {
+    const max = meta.settings.maxShots | 0;
+    if (max <= 0 || meta.count <= max) { return; }
+    const n = meta.count - max, to = meta.seqTail + n - 1;
+    let freed = 0;
+    const tx = db.transaction('shot', 'readwrite');
+    const cur = tx.objectStore('shot').openCursor(IDBKeyRange.bound(meta.seqTail, to));
+    cur.onsuccess = e => { const c = e.target.result; if (!c) { return; } if (c.value && c.value.blob) { freed += c.value.blob.size; } c.delete(); c.continue(); };
+    await txDone(tx);
+    meta.seqTail = to + 1; meta.count = Math.max(0, meta.count - n); meta.bytes = Math.max(0, meta.bytes - freed);
+  }
+
+  async function shoot () {
+    busy = true;
+    try {
+      const cv = opt.capture(meta.settings.longEdge);
+      if (!cv) { return; }
+      dirty = false;                     // 合成した瞬間の絵で「変化あり」を消す（エンコード中の編集は次の1枚で拾う）
+      lastShotAt = Date.now();
+      const w = cv.width, h = cv.height;
+      const blob = await new Promise(res => cv.toBlob(res, mime, meta.settings.quality));
+      if (!blob) { return; }
+      const seq = meta.seqHead + 1;
+      const shot = Object.assign({ seq, t: Date.now(), w, h, blob }, opt.tag ? opt.tag() : {});
+      const tx = db.transaction('shot', 'readwrite'); tx.objectStore('shot').put(shot, seq);
+      if (!await txDone(tx)) { return; }
+      meta.seqHead = seq; meta.count += 1; meta.bytes += blob.size;
+      if (!meta.startedAt) { meta.startedAt = shot.t; }
+      await trim(); await putMeta();
+      api.lastShot = shot;
+      emit();
+    } catch (e) { console.warn('timelapse shot failed', e); } finally { busy = false; }
+  }
+
+  // 「変化があったときだけ、一定間隔」：ON・暇・(変化あり or 絵が動いている)・描画中でない・間隔経過 の全部で1枚
+  function tick () {
+    if (!db || !meta || !meta.settings.on || busy) { return; }
+    const live = opt.isLive ? opt.isLive() : false;
+    if (!dirty && !live) { return; }
+    if (opt.canShoot && !opt.canShoot()) { return; }
+    if (Date.now() - lastShotAt < meta.settings.intervalMs) { return; }
+    shoot();
+  }
+
+  async function init () {
+    mime = detectMime();
+    db = await openDB();
+    if (!db) { meta = freshMeta(); meta.settings.on = false; emit(); return false; }
+    const tx = db.transaction('meta', 'readonly');
+    meta = (await req(tx.objectStore('meta').get('tl')).catch(() => null)) || freshMeta();
+    meta.settings = Object.assign({}, D, meta.settings || {});
+    try { const v = localStorage.getItem(opt.lsOnKey); if (v === '0' || v === '1') { meta.settings.on = v === '1'; } } catch (e) { /* ignore */ }
+    dirty = false; lastShotAt = Date.now();      // 開いただけでは撮らない
+    timer = setInterval(tick, POLL_MS);
+    emit();
+    return true;
+  }
+  function setOn (on) {
+    if (!meta) { return; }
+    meta.settings.on = !!on;
+    try { localStorage.setItem(opt.lsOnKey, on ? '1' : '0'); } catch (e) { /* ignore */ }
+    putMeta(); emit();
+  }
+  async function setSettings (s) {
+    Object.assign(meta.settings, s);
+    await trim(); await putMeta(); emit();     // 上限を下げたらその場で古いぶんを捨てる
+  }
+  async function loadList () {
+    if (!db) { return []; }
+    const tx = db.transaction('shot', 'readonly');
+    const all = (await req(tx.objectStore('shot').getAll()).catch(() => [])) || [];
+    return all.filter(s => s.seq >= meta.seqTail).sort((a, b) => a.seq - b.seq);
+  }
+  async function clear () {
+    const tx = db.transaction('shot', 'readwrite'); tx.objectStore('shot').clear(); await txDone(tx);
+    Object.assign(meta, { seqHead: 0, seqTail: 1, count: 0, bytes: 0, startedAt: 0 });
+    api.lastShot = null;                       // 消す前の1枚を「新しい1枚」と取り違えない
+    await putMeta(); emit();
+  }
+
+  const api = {
+    init, setOn, setSettings, loadList, clear, tick,
+    markDirty () { dirty = true; },
+    get meta () { return meta; },
+    get busy () { return busy; },
+    get available () { return !!db; },
+    shootNow: () => shoot(),
+    onChange (f) { listeners.push(f); },
+    lastShot: null
+  };
+  return api;
+}
+
+/* ── 再生：ショット配列を canvas に contain で流す（デコードは遅延・LRU・先読み）── */
+function createTimelapsePlayer (canvas, o) {
+  o = Object.assign({ bmpMax: 240, prefetch: 10, bg: '#fff' }, o || {});
+  let list = [], idx = 0, fps = 24, playing = false, t0 = 0, from = 0, raf = 0;
+  const bmp = new Map(), ctx = canvas.getContext('2d');
+  function put (k, b) { bmp.set(k, b); while (bmp.size > o.bmpMax) { const key = bmp.keys().next().value; const v = bmp.get(key); bmp.delete(key); if (v && v.close) { v.close(); } } }
+  function get (i, redraw) {
+    const s = list[i]; if (!s) { return null; }
+    const hit = bmp.get(s.seq); if (hit) { return hit; }
+    if (!s._loading) {
+      s._loading = true;
+      createImageBitmap(s.blob).then(b => { s._loading = false; put(s.seq, b); if (redraw && idx === i) { draw(i); } }).catch(() => { s._loading = false; });
+    }
+    return null;
+  }
+  function paint (c, b, W, H) {
+    c.fillStyle = o.bg; c.fillRect(0, 0, W, H);
+    const s = Math.min(W / b.width, H / b.height), dw = b.width * s, dh = b.height * s;
+    c.drawImage(b, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  }
+  function draw (i) {
+    const b = get(i, true);
+    for (let k = 1; k <= o.prefetch; k++) { get((i + k) % Math.max(1, list.length)); }
+    if (!b) { return; }                       // デコード待ちは前の絵を残す（チラつかせない）
+    paint(ctx, b, canvas.width, canvas.height);
+  }
+  function step () {
+    if (!playing) { return; }
+    const adv = Math.floor((performance.now() - t0) / (1000 / fps));
+    const i = list.length ? (from + adv) % list.length : 0;
+    if (i !== idx) { idx = i; draw(idx); if (o.onSeek) { o.onSeek(idx); } }
+    raf = requestAnimationFrame(step);
+  }
+  const p = {
+    setList (l) { list = l; idx = Math.min(idx, Math.max(0, l.length - 1)); },
+    get list () { return list; }, get idx () { return idx; }, get playing () { return playing; },
+    setFps (f) { fps = f; if (playing) { from = idx; t0 = performance.now(); } },
+    seek (i) { if (!list.length) { idx = 0; return; } idx = Math.max(0, Math.min(list.length - 1, i | 0)); draw(idx); if (o.onSeek) { o.onSeek(idx); } },
+    play () { if (playing || !list.length) { return; } playing = true; from = idx >= list.length - 1 ? 0 : idx; t0 = performance.now(); raf = requestAnimationFrame(step); if (o.onState) { o.onState(true); } },
+    stop () { if (!playing) { return; } playing = false; cancelAnimationFrame(raf); if (o.onState) { o.onState(false); } },
+    drop () { p.stop(); for (const b of bmp.values()) { if (b && b.close) { b.close(); } } bmp.clear(); },
+    /* 動画書き出し（実時間レンダリング）。サイズは先頭ショット基準・混在は contain・間に合わない枚は直前の絵を保持。
+       holdEndSec＝最後の1枚を止めて見せる秒数（完成画で終わる）。返り値 { blob, ext } / キャンセル時 null */
+    async exportVideo (x) {
+      x = Object.assign({ fps, holdEndSec: 2, bitrate: 12000000, onProgress: null, isCanceled: () => false }, x || {});
+      const types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+      const mimeV = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+      if (!mimeV || !list.length) { return null; }
+      const base = list[0], W = base.w, H = base.h;
+      const ex = document.createElement('canvas'); ex.width = W; ex.height = H;
+      const ec = ex.getContext('2d');
+      for (let i = 0; i < Math.min(list.length, o.bmpMax); i++) { get(i); }
+      await new Promise(r => setTimeout(r, 400));
+      let last = null;
+      const drawIdx = i => { const b = get(i) || last; if (!b) { return; } last = b; paint(ec, b, W, H); };
+      const stream = ex.captureStream(x.fps);
+      const rec = new MediaRecorder(stream, { mimeType: mimeV, videoBitsPerSecond: x.bitrate });
+      const chunks = [];
+      rec.ondataavailable = e => { if (e.data && e.data.size) { chunks.push(e.data); } };
+      const stopped = new Promise(res => { rec.onstop = res; });
+      drawIdx(0); rec.start(1000);
+      const n = list.length, tick = 1000 / x.fps, total = n * tick + x.holdEndSec * 1000, start = performance.now();
+      let canceled = false;
+      await new Promise(res => {
+        const loop = () => {
+          if (x.isCanceled()) { canceled = true; res(); return; }
+          const el = performance.now() - start, i = Math.min(n - 1, Math.floor(el / tick));
+          drawIdx(i);                         // 同じ枚でも描き直してストリームへ確実に流す
+          for (let k = 1; k <= o.prefetch * 2; k++) { get(Math.min(n - 1, i + k)); }
+          if (x.onProgress) { x.onProgress(Math.min(1, el / total), i, n); }
+          if (el >= total) { res(); return; }
+          requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+      });
+      rec.stop(); await stopped;
+      if (canceled || !chunks.length) { return null; }
+      return { blob: new Blob(chunks, { type: mimeV.split(';')[0] }), ext: mimeV.includes('mp4') ? 'mp4' : 'webm' };
+    }
+  };
+  return p;
+}
+
+let TL = null, tlPlayer = null, tlIdLast = null, tlList = [], tlOrder = 'work', tlFps = 24, tlExporting = false, tlCv = null, tlFull = null;
+const TL_WORST_KB = 70;   // 1枚の最悪見積り（全面ベタ・1280 長辺の WebP 実測。animator と同じ）
+function tlMark(id){ if(id) tlIdLast = id; if(TL) TL.markDirty(); }
+function tlShotFrame(){ return S.frames.find(f => f.id === tlIdLast && f.kind === 'draw') || curFrame(); }
+function tlCapture(longEdge){
+  const f = tlShotFrame();
+  const k = Math.min(1, longEdge / Math.max(S.W, S.H)), w = Math.max(2, Math.round(S.W * k)), h = Math.max(2, Math.round(S.H * k));
+  if(!tlFull || tlFull.width !== S.W || tlFull.height !== S.H) tlFull = newCanvas(S.W, S.H);
+  const fg = tlFull.getContext('2d');
+  if(f && f.kind === 'draw' && pix.get(f.id)) paintRect(fg, pix.get(f.id), 0, 0, S.W, S.H, LUT);
+  else fg.clearRect(0, 0, S.W, S.H);
+  if(!tlCv) tlCv = newCanvas(w, h);
+  if(tlCv.width !== w || tlCv.height !== h){ tlCv.width = w; tlCv.height = h; }
+  const g = tlCv.getContext('2d');
+  g.fillStyle = paperHex(); g.fillRect(0, 0, w, h);
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(tlFull, 0, 0, w, h);
+  return tlCv;
+}
+function tlFmtBytes(b){ return b >= 1048576 ? (b / 1048576).toFixed(1) + 'MB' : Math.max(0, Math.round(b / 1024)) + 'KB'; }
+function tlOpenNow(){ return $('#tlp-ovl').classList.contains('show'); }
+function tlMiniText(){
+  if(!TL || !TL.meta) return '準備中…';
+  if(!TL.available) return 'この端末では使えません（IndexedDB）';
+  const m = TL.meta;
+  return (m.settings.on ? '● 記録中' : '○ 停止中') + ' · ' + m.count + '枚 · ' + tlFmtBytes(m.bytes);
+}
+function tlOnChange(){
+  const el = $('#tl-mini'); if(el) el.textContent = tlMiniText();
+  // パネルを開いたまま撮れた1枚をその場で足す（CLEAR 直後の「消す前の1枚」は seqTail〜seqHead で弾く）
+  const s = TL && TL.lastShot;
+  if(s && tlOpenNow() && !tlList.some(x => x.seq === s.seq) && s.seq >= TL.meta.seqTail && s.seq <= TL.meta.seqHead){
+    const atEnd = !tlPlayer.playing && tlPlayer.idx >= tlList.length - 1;
+    tlList.push(s); tlSort(); tlPlayer.setList(tlList);
+    if(atEnd) tlPlayer.seek(tlList.length - 1);
+    tlRenderCtl();
+  }
+}
+function tlSort(){
+  if(tlOrder === 'cell'){
+    const at = new Map(S.frames.map((f, i) => [f.id, i]));
+    const ix = s => at.has(s.frameId) ? at.get(s.frameId) : (s.frameIdx | 0);   // 並べ替えた後も今のコマ順で束ねる
+    tlList.sort((a, b) => (ix(a) - ix(b)) || (a.seq - b.seq));
+  }else tlList.sort((a, b) => a.seq - b.seq);
+}
+async function tlInit(){
+  if(HARNESS || !window.indexedDB) return;
+  TL = createTimelapse({
+    dbName: 'rough_tl_v1', lsOnKey: 'rough.tl.on.v1',
+    defaults: { on: true, intervalMs: 2000, maxShots: 1500, longEdge: 1280, quality: 0.72 },
+    capture: tlCapture,
+    canShoot: () => !stroke && !gFloat && !lasso && !S.playing && !tlExporting,
+    tag: () => { const f = tlShotFrame(); return { frameId: f ? f.id : null, frameIdx: f ? S.frames.indexOf(f) : -1 }; },
+    onChange: tlOnChange,
+  });
+  await TL.init();
+  renderOut();
+}
+async function tlPanel(on){
+  const ov = $('#tlp-ovl');
+  if(on == null) on = !ov.classList.contains('show');
+  if(!on){
+    if(tlPlayer) tlPlayer.drop();
+    tlList = [];
+    ov.classList.remove('show');
+    return;
+  }
+  if(!TL || !TL.available){ toast('タイムラプスはこの端末では使えません（IndexedDB）'); return; }
+  selSettle(); if(S.playing) stopPlay();
+  ov.classList.add('show');
+  const cv = $('#tlp-cv');
+  if(!tlPlayer) tlPlayer = createTimelapsePlayer(cv, { bg: paperHex(), onSeek: () => tlRenderPos(), onState: () => tlRenderPos() });
+  tlList = await TL.loadList();
+  tlSort();
+  const a = tlList.length ? (tlList[0].w / tlList[0].h) : S.W / S.H;   // 先頭ショットの縦横比（解像度を途中で変えても引き伸ばさない）
+  cv.width = 960; cv.height = Math.max(2, Math.round(960 / a));
+  tlPlayer.setList(tlList); tlPlayer.setFps(tlFps);
+  tlRenderCtl();
+  if(tlList.length) tlPlayer.seek(tlList.length - 1);
+  else { const g = cv.getContext('2d'); g.fillStyle = paperHex(); g.fillRect(0, 0, cv.width, cv.height); }
+}
+function tlRenderPos(){
+  const n = tlList.length, i = tlPlayer ? tlPlayer.idx : 0;
+  const sl = $('#tlp-seek'); if(sl){ sl.max = Math.max(0, n - 1); sl.value = i; sl.disabled = !n; }
+  const pl = $('#tlp-play'); if(pl){ pl.textContent = tlPlayer && tlPlayer.playing ? '■' : '▶'; pl.classList.toggle('on', !!(tlPlayer && tlPlayer.playing)); }
+  const at = $('#tlp-at'); if(at) at.textContent = n ? (i + 1) + ' / ' + n : '0 / 0';
+}
+function tlRenderCtl(){
+  const el = $('#tlp-ctl'); if(!el || !TL) return;
+  const m = TL.meta, st = m.settings, n = tlList.length;
+  let info = '記録 0枚（描き始めると自動で増えます）';
+  if(n){
+    const ts = tlList.map(s => s.t).filter(Boolean);
+    const mins = Math.max(1, Math.round((Math.max(...ts) - Math.min(...ts)) / 60000));
+    info = n + '枚 · 作業 約' + mins + '分ぶん · ' + tlFmtBytes(m.bytes) + ' / 再生 ' + (n / tlFps).toFixed(1) + '秒（' + tlFps + 'fps）';
+  }
+  let h = '';
+  h += row('再生', seg('tlFps', [[12, '12'], [24, '24'], [30, '30'], [60, '60']], tlFps) + '<span class="qd-note" style="padding:0">fps</span>');
+  h += row('並び', seg('tlOrder', [['work', 'WORK 作業順', 'jp'], ['cell', 'CELL コマ別', 'jp']], tlOrder));
+  h += '<div class="qd-note">' + (tlOrder === 'cell' ? 'CELL＝コマ別。1コマずつ線が増える過程が続けて見えます（手描きだと伝わりやすい）' : 'WORK＝作業順そのまま。コマを行き来した実際の流れが見えます（コマ間で絵は飛びます）') + '</div>';
+  h += '<div class="qd-note" style="color:rgba(232,236,242,.7)">' + esc(info) + '</div>';
+  h += sect('REC', '記録');
+  h += row('記録', seg('tlOn', [[1, 'ON'], [0, 'OFF']], st.on ? 1 : 0), '既定 ON。描いて変化があったときだけ、間隔ごとに1枚');
+  h += row('間隔', seg('tlInt', [[1000, '1秒', 'jp'], [2000, '2秒', 'jp'], [5000, '5秒', 'jp'], [10000, '10秒', 'jp']], st.intervalMs));
+  h += row('上限', seg('tlMax', [[500, '500'], [1500, '1500'], [3000, '3000'], [6000, '6000']], st.maxShots) + '<span class="qd-note" style="padding:0">枚</span>', '超えたら古い順に消して撮り続ける（止まらない）');
+  h += row('解像度', seg('tlRes', [[720, '720'], [1280, '1280'], [1920, '1920']], st.longEdge) + '<span class="qd-note" style="padding:0">長辺</span>');
+  h += '<div class="qd-note">現在 ' + tlFmtBytes(m.bytes) + ' / この上限での最悪見積り 約' + Math.round(st.maxShots * TL_WORST_KB / 1024) + 'MB（全面ベタばかり描いた場合。ラフの線画なら 1/10 以下）</div>';
+  h += '<div class="qd-row"><button class="qd-sb jp wide" data-tl="video"' + (n ? '' : ' disabled') + ' title="いま選んでいる並び・fps のまま動画にする（最後の絵で2秒止める）">⇩ 動画に書き出す（WebM/MP4）</button>'
+     + '<button class="qd-sb del jp" data-tl="clear"' + (m.count ? '' : ' disabled') + ' title="タイムラプスの記録だけ消す（描いた絵は消えない）">CLEAR</button></div>';
+  h += '<div class="qd-note">撮るのは<b>紙の色＋描いた絵だけ</b>（REF・オニオン・枠は写りません）。記録はこの端末のブラウザに、作品とは別に残ります＝CLEAR しても絵は無傷。</div>';
+  el.innerHTML = h;
+  tlRenderPos();
+}
+async function onTlPanel(e){
+  const b = e.target.closest('[data-tl],[data-act]'); if(!b || !TL) return;
+  const a = b.dataset.tl, act = b.dataset.act, v = b.dataset.v;
+  if(a === 'video'){ tlVideo(); return; }
+  if(a === 'clear'){
+    if(!await confirmBox('タイムラプスの記録を全部消しますか？\n（記録だけが消えます。描いた絵と Undo はそのまま）', '記録を消す')) return;
+    tlPlayer.stop(); await TL.clear(); tlList = []; tlPlayer.setList([]); tlRenderCtl();
+    const cv = $('#tlp-cv'), g = cv.getContext('2d'); g.fillStyle = paperHex(); g.fillRect(0, 0, cv.width, cv.height);
+    toast('タイムラプスの記録を消しました（絵は無傷）'); return;
+  }
+  if(act === 'tlFps'){ tlFps = +v; tlPlayer.setFps(tlFps); }
+  else if(act === 'tlOrder'){ tlOrder = v; const cur = tlList[tlPlayer.idx]; tlPlayer.stop(); tlSort(); tlPlayer.setList(tlList); tlPlayer.seek(Math.max(0, tlList.indexOf(cur))); }
+  else if(act === 'tlOn'){ TL.setOn(v === '1'); renderOut(); }
+  else if(act === 'tlInt' || act === 'tlMax' || act === 'tlRes'){
+    await TL.setSettings(act === 'tlInt' ? { intervalMs: +v } : act === 'tlMax' ? { maxShots: +v } : { longEdge: +v });
+    if(act === 'tlMax'){ tlPlayer.stop(); tlList = await TL.loadList(); tlSort(); tlPlayer.setList(tlList); tlPlayer.seek(tlList.length - 1); }
+  }else return;
+  tlRenderCtl();
+}
+async function tlVideo(){
+  if(!tlList.length){ toast('書き出す記録がありません'); return; }
+  if(!window.MediaRecorder){ await alertBox('このブラウザは動画の書き出し（MediaRecorder）に未対応です'); return; }
+  const sec = (tlList.length / tlFps + 2).toFixed(1);
+  if(!await confirmBox('タイムラプスを動画にします（' + tlList.length + '枚・' + tlFps + 'fps・' + (tlOrder === 'cell' ? 'CELL' : 'WORK') + '）。\n実時間で描き出すので約 ' + sec + ' 秒かかります。\nその間はこのタブを前に出しておいてください（裏に回すと短い動画になります）。', '書き出す')) return;
+  tlPlayer.stop();
+  tlExporting = true;
+  exShow('タイムラプスを動画にしています…');
+  try{
+    const r = await tlPlayer.exportVideo({ fps: tlFps, holdEndSec: 2, isCanceled: () => exCancel,
+      onProgress: (p, i, n) => exProg(p, Math.min(n, i + 1) + ' / ' + n + ' 枚') });
+    if(!r){ toast(exCancel ? '書き出しを取り消しました' : '動画にできませんでした'); return; }
+    download(r.blob, 'rough-' + safeName() + '-timelapse-' + stamp() + '.' + r.ext);
+    toast('タイムラプスを書き出しました（' + r.ext.toUpperCase() + '）');
+  }catch(err){ console.error(err); toast('書き出しに失敗しました：' + err.message); }
+  finally{ tlExporting = false; exHide(); }
+}
+
 /* ============================================================ §19 起動 */
 function setupScrubDefs(){
   SCR.paper = { get: () => P.paper, set: v => { P.paper = v; applyPaper(); savePrefs(); }, min: 0, max: 100, step: 5, px: 3 };
@@ -3958,6 +4821,8 @@ function setupScrubDefs(){
   SCR.eraseBig = { get: () => P.sz.erase.big, set: v => { P.sz.erase.big = v; P.sz.erase.sel = 'big'; savePrefs(); updateToolUI(); }, min: 3, max: 120, step: 1, px: 3, done: () => renderBrush() };
   SCR.stabK = { get: () => Math.round((P.stab.mode === 'pull' ? P.stab.pull : P.stab.avg) * 100), set: v => { if(P.stab.mode === 'pull') P.stab.pull = v / 100; else P.stab.avg = v / 100; savePrefs(); }, min: 0, max: 100, step: 5, px: 3 };
   SCR.refOp = { get: () => P.refOp, set: v => { P.refOp = v; savePrefs(); renderRef(); }, min: 5, max: 100, step: 5, px: 3 };
+  SCR.refGOfs = { get: () => { const r = refSelObj(); return r ? r.gofs | 0 : 0; }, set: v => { const r = refSelObj(); if(r){ r.gofs = v; renderRefQ(); } }, min: -240, max: 240, step: 1, px: 6, done: () => dirtyMeta() };
+  SCR.refGPick = { get: () => { const r = refSelObj(); return r ? (r.gpick | 0) + 1 : 1; }, set: v => { const r = refSelObj(); if(r && r.anim){ r.gpick = clamp(v - 1, 0, r.anim.frames.length - 1); renderRefQ(); } }, min: 1, max: GIF_MAX_FRAMES, step: 1, px: 6, done: () => dirtyMeta() };
   SCR.refItemOp = { get: () => { const r = refSelObj(); return r ? r.op : 100; }, set: v => { const r = refSelObj(); if(r){ r.op = v; renderRefQ(); } }, min: 5, max: 100, step: 5, px: 3, done: () => dirtyMeta() };
 }
 function setupStaticUI(){
@@ -4025,6 +4890,11 @@ function setupStaticUI(){
   $('#ref-in').addEventListener('change', async e => { const fs = Array.from(e.target.files || []); e.target.value = ''; await addRefFiles(fs); });
   $('#proj-in').addEventListener('change', async e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if(f) await openProjectFile(f); });
   $('#ex-cancel').addEventListener('click', () => { exCancel = true; });
+  $('#tlp-close').addEventListener('click', () => tlPanel(false));
+  $('#tlp-ovl').addEventListener('click', e => { if(e.target.id === 'tlp-ovl') tlPanel(false); });
+  $('#tlp-ctl').addEventListener('click', onTlPanel);
+  $('#tlp-play').addEventListener('click', () => { if(!tlPlayer) return; if(tlPlayer.playing) tlPlayer.stop(); else tlPlayer.play(); });
+  $('#tlp-seek').addEventListener('input', e => { if(!tlPlayer) return; tlPlayer.stop(); tlPlayer.seek(+e.target.value); });
   $('#tl-play').addEventListener('click', togglePlay);
   $('#tl-loop').addEventListener('click', () => { P.loop = !P.loop; savePrefs(); $('#tl-loop').classList.toggle('on', P.loop); });
   $('#on-tog').addEventListener('click', toggleOnion);
@@ -4061,6 +4931,8 @@ function setupStageInput(){
     const fs = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
     const js = fs.find(f => /\.json$/i.test(f.name) || f.type === 'application/json');
     if(js){ await openProjectFile(js); return; }
+    const im = fs.find(f => /^image\//.test(f.type));
+    if(im && refPasteWanted()){ await refPasteBlob(im); return; }   // SEL・相手 REF の間は REF の上に浮かせる
     await addRefFiles(fs);
   });
   window.addEventListener('keydown', onKeyDown);
@@ -4099,8 +4971,9 @@ const gBoot = (async function boot(){
   if(!loaded && !HARNESS){ dirtyMeta(); dirtyPix(S.frames[0].id); }
   new ResizeObserver(() => layoutCells()).observe($('#tl-body'));
   setInterval(sweepPix, 60000);
+  await tlInit();   // 開いただけでは撮らない（記録は描き始めてから）
 })();
-window.__ROUGH__ = { S, P, pix, HIST, ready: () => gBoot, get float(){ return gFloat; }, get clip(){ return gClip; }, flushSave: () => doSave() };
+window.__ROUGH__ = { S, P, pix, HIST, ready: () => gBoot, get float(){ return gFloat; }, get clip(){ return gClip; }, get tl(){ return TL; }, flushSave: () => doSave() };
 </script>
 </body>
 </html>
