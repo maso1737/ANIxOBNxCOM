@@ -40,6 +40,17 @@
 
 ---
 
+## 0-b. 派生アプリで見つかった本家の不具合（本家へも直す）
+
+派生（コピー）で開発中に見つけた不具合は、本家にも同じものがあればここに積む。派生側の直し方をそのまま写せる。
+
+- [ ] **econte：入力モーダルに REF BOARD 用の例文が出る**（2026-10-25・CIMxFIS で発見／派生側は修正済み）
+  - 症状：`modalPrompt()` は `#modal-input` を共用していて、HTML に `placeholder='{"v":1,"ts":…,"item":{…}}'` が固定で入っている。
+    そのため REF BOARD の貼り付け以外（マーカーのメモ `modalPrompt('マーカーのメモ…')`・brush-lab の JSON 貼り付けなど）でも、空欄にこの JSON の例文が薄く出て「変なデータが入っている」ように見える。
+  - 直し方（派生 `CIMxFIS/econte.html` で実施済み）：`modalPrompt(msg, value, placeholder)` にして `inp.value = value || ''`・`inp.placeholder = placeholder || ''`。
+    例文が要る `clipPasteJson()` だけ第3引数で `'{"v":1,"ts":…,"item":{…}}'` を渡す。
+  - 確認：マーカーのメモ・ブラシの JSON 貼り付け・REF BOARD の貼り付けの3か所で、例文が出る／出ないが正しいこと。`node tools/check.js` ＋ `cd verify && npm run verify:econte`。
+
 ## 1. 全アプリの操作の統一（SPEC_17 INPUT GRAMMAR）
 
 ### いまの実測
