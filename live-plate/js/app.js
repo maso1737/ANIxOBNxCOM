@@ -35,7 +35,9 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
     show:  ['04 SHOW',  '▶ PLAY で全画面 ／ HTML を書き出す'],
   };
   const DRAW_HINT = {
-    pen:   () => 'PEN：' + (LP.state.draw.lane === 'fill' ? '塗レーン（塗り残しの補修）' : '線レーン') + '・筆圧 ' + (LP.state.draw.pressure ? 'ON' : 'OFF') + '（P を2回）・Shift＋クリック＝直線',
+    pen:   () => { const D = LP.state.draw, tn = LP.drawTools.toneOf(D.lane), B = LP.brush.get(D.brush);
+                   return (tn ? 'PEN（網 T' + (D.lane === 'fill' ? D.paintTone : D.inkTone) + '）：' : B.id === 'pen' ? 'PEN：' : B.name + '：') + (D.lane === 'fill' ? '塗レーン（塗り残しの補修）' : '線レーン')
+                     + (tn || B.id === 'pen' ? '・筆圧 ' + (D.pressure ? 'ON' : 'OFF') + '（P を2回）' : '・筆圧はペンなら常時') + '・Shift＋クリック＝直線・B＝次のブラシ'; },
     erase: () => 'ERASE：透明にする（E を2回＝このセルを全消去）',
     fill:  () => LP.state.draw.fillErase ? 'FILL：投げ縄消し（囲った中を透明に・いまのレーン）' : LP.state.draw.fillMode === 'lasso' ? 'FILL：投げ縄塗り（塗レーン）' : 'FILL：バケツ（線が壁・' + LP.state.draw.under + 'px 潜る）',
     sel:   () => 'SEL：ドラッグ＝投げ縄／Shift＝矩形で持ち上げる → 隅＝拡縮・外＝回転・Ctrl＋隅＝自由変形（A を2回＝WARP）',
@@ -74,6 +76,7 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
         lastCell = cid;
         if(LP.drawSel.floatCell() && LP.drawSel.floatCell() !== cid) LP.drawSel.settle();
         LP.drawTools.sync();
+        LP.drawGrid.mark();
         if(!LP.state.playing){ LP.timeline.renderCells(); LP.dock.render(); }
         hud();
       }
@@ -151,7 +154,7 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
   /* ---------- ステップ ---------- */
   function setStep(s){
     if(STEPS.indexOf(s) < 0) return;
-    if(s !== 'draw' && LP.state.step === 'draw'){ LP.drawSel.settle(); LP.drawTools.cancel(); }
+    if(s !== 'draw' && LP.state.step === 'draw'){ LP.drawSel.settle(); LP.drawTools.cancel(); LP.drawGrid.close(); }
     LP.state.step = s;
     STEPS.forEach(k => document.body.classList.toggle('step-' + k, k === s));
     document.querySelectorAll('#bar .step').forEach(b => b.classList.toggle('on', b.dataset.step === s));
@@ -174,6 +177,7 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
   }
   function escape(){
     if(LP.state.step === 'draw' && LP.drawTools.cancel()) return;   // 変形・投げ縄（02 DRAW）
+    if(LP.drawGrid.close()) return;              // セル一覧 GRID → FOCUS
     if(LP.sheetTools.cancel()) return;          // 投げ縄・分割のプレビュー
     if(LP.settings.open){ LP.settings.toggle(false); return; }
     if(LP.state.clean){ exitClean(); return; }
@@ -193,6 +197,7 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
     crumb(); hud();
     LP.stage.renderQ();
     LP.drawTools.sync();
+    if(LP.drawGrid.on) LP.drawGrid.render();
   }
   function commit(label){
     LP.hist.commit(label);
@@ -346,7 +351,7 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
   }
 
   /* ---------- 通知 ---------- */
-  function onDecoded(){ LP.stage.renderQ(); LP.sides.onDecoded(); }
+  function onDecoded(){ LP.stage.renderQ(); LP.sides.onDecoded(); LP.drawGrid.onDecoded(); }
   function onSaved(ok){
     const el = $('#save-st');
     if(!el) return;
@@ -366,6 +371,7 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
     LP.sides.init();
     LP.detail.init();
     LP.dock.init();
+    LP.drawGrid.init();
     LP.settings.init();
     LP.io.init();
     // バー

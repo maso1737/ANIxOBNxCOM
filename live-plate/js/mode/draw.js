@@ -10,6 +10,11 @@
      REF   … 参照（同じ BOOK の他のプレート）をドックで選ぶ・タイムラインの REF 行で offset / ×N
    描く先＝選んだ層のプレートの「いまのセル」（cellIndexAt）。画素は core/cells.js の編集バッファ、Undo は矩形タイル。
    正準：animator.html（pressureRadius・筆圧の均しと入りのテーパー・Shift 連結・FILL のレーン規則）
+   §18（2026-10-31）：
+     ブラシ（B で次）… PEN＝AA なしの丸ペン（いままで）／MARKER・FLAT・AIR・GLOW＝econte の暫定4種（core/brush.js）。消しゴムはいつも丸ペン
+     トーンインク   … 色の横の T1・T2＝網点で描く・塗る（レーンごと。ペンは丸ペンで網・バケツ／投げ縄はドットの位置だけ）
+     パレット       … mode/draw-pal.js（明度11＋カスタム枠・スポイトで選んだ枠を上書き・JSON）
+     GRID（X）      … mode/draw-grid.js（いまのプレートのセル一覧）
    ★ 指（pointerType:'touch'）は描かない＝ナビ（SPEC_18「指はナビ・ペンは描く」）
    ============================================================ */
 var LP = window.LP || (window.LP = {});
@@ -18,7 +23,6 @@ var LP = window.LP || (window.LP = {});
   'use strict';
   const PREF_LS = 'liveplate_draw_v1';
   const P_EMA_A = 0.25, TAPER_PX = 12;
-  const PAL = ['#000000', '#FFFFFF', '#9AA3AD', '#E8433F', '#F28C28', '#F5D442', '#5CC46A', '#3FA8E8', '#6A5BE0', '#D96BD0', '#8B5A3C', '#F2C9B0'];
   const ONION = { prev: '#FF4F6A', next: '#3FD0FF' };
   const LANE_JP = { line: '線', fill: '塗' };
   const REF_COLORS = ['#FF4FA8', '#5AE9FF', '#FFC94F', '#7CFF8A'];
@@ -26,14 +30,80 @@ var LP = window.LP || (window.LP = {});
     tool: 'pen', lane: 'line', penSize: 6, eraseSize: 30, pressure: true, pressureErase: false,
     ink: '#000000', paint: '#F2C9B0', fillMode: 'bucket', fillErase: false, under: 1,
     onion: true, onionFill: false, selAA: false, selBoth: false, selWarp: false, refOpen: false,
+    // §18：ブラシ（PEN 以外の太さはブラシごと）・トーンインク（0＝無し／1＝T1／2＝T2。レーンごと）・GRID のセル幅
+    brush: 'pen', bSize: { marker: 34, flat: 40, air: 120, glow: 100 },
+    inkTone: 0, paintTone: 0, tone1: { pitch: 8, cov: 0.06 }, tone2: { pitch: 4, cov: 0.40 }, gridW: 200,
   };
-  try{ const o = JSON.parse(localStorage.getItem(PREF_LS) || '{}'); for(const k in D) if(o[k] !== undefined && typeof o[k] === typeof D[k]) D[k] = o[k]; }catch(e){}
+  try{
+    const o = JSON.parse(localStorage.getItem(PREF_LS) || '{}');
+    for(const k in D){
+      if(o[k] === undefined || typeof o[k] !== typeof D[k]) continue;
+      D[k] = (D[k] && typeof D[k] === 'object') ? Object.assign({}, D[k], o[k]) : o[k];   // 入れ子は既定に重ねる（足したキーが消えない）
+    }
+  }catch(e){}
+  if(!LP.brush.LIST.some(b => b.id === D.brush)) D.brush = 'pen';
   // 一時的なモード（EYE・投げ縄消し・REF の棚）は覚えない。LP.state.draw は app.js がこれを指す
   if(D.tool === 'eye') D.tool = 'pen';
   D.fillErase = false; D.refOpen = false;
   function savePrefs(){ try{ if(!LP.HARNESS_ON) localStorage.setItem(PREF_LS, JSON.stringify(D)); }catch(e){} }
 
-  let stroke = null, lasso = null, hoverPt = null, lastEnd = null, prevTool = 'pen', pSm = null, arc = 0;
+  let stroke = null, lasso = null, hoverPt = null, lastEnd = null, prevTool = 'pen', pSm = null, arc = 0, lastPress = 0.5;
+
+  /* ---------- ブラシ・トーン（§18） ---------- */
+  /* いまの道具の太さ（消しゴム＝丸ペン・PEN＝penSize・他のブラシ＝bSize[id]） */
+  function sizeOf(tool){
+    if((tool || D.tool) === 'erase') return D.eraseSize;
+    return D.brush === 'pen' || toneOf(D.lane) ? D.penSize : (D.bSize[D.brush] || LP.brush.get(D.brush).size);
+  }
+  function setSize(v){
+    v = Math.max(1, Math.min(300, Math.round(v)));
+    if(D.tool === 'erase') D.eraseSize = v;
+    else if(D.brush === 'pen' || toneOf(D.lane)) D.penSize = v;
+    else D.bSize[D.brush] = v;
+  }
+  /* そのレーンのトーン（網点のタイル）。無ければ null。網点の色＝そのレーンの色 */
+  function toneOf(lane){
+    const k = lane === 'fill' ? D.paintTone : D.inkTone;
+    if(!k) return null;
+    const s = D['tone' + k];
+    return LP.paint.tone(s.pitch, s.cov, lane === 'fill' ? D.paint : D.ink);
+  }
+  function setTone(k){
+    if(LP.state.step !== 'draw') return;
+    const key = D.lane === 'fill' ? 'paintTone' : 'inkTone';
+    D[key] = D[key] === k ? 0 : k;
+    savePrefs(); refreshUI();
+    LP.ui.toast(D[key] ? 'トーンインク T' + k + '（' + LANE_JP[D.lane] + 'レーン）：ペン・バケツ・投げ縄が網点に（ペンは丸ペン）' : LANE_JP[D.lane] + 'レーン：ベタに戻しました');
+  }
+  function setBrush(id){
+    if(!LP.brush.LIST.some(b => b.id === id)) return;
+    D.brush = id;
+    if(LP.state.step === 'draw' && D.tool !== 'pen') setTool('pen', true);
+    savePrefs(); refreshUI();
+    const B = LP.brush.get(id);
+    LP.ui.toast('ブラシ ' + B.name + '：' + B.jp + (toneOf(D.lane) ? '（いまはトーンなので丸ペンで描きます）' : ''));
+  }
+  function nextBrush(){
+    if(LP.state.step !== 'draw') return;
+    const L = LP.brush.LIST, i = L.findIndex(b => b.id === D.brush);
+    setBrush(L[(i + 1) % L.length].id);
+  }
+  /* 筆圧ちょうど 0 は「読み取れなかった」＝直前の値を保つ（SPEC_19 §7）。マウスは見ない＝いつも 1 */
+  function brushPress(e){
+    if(e.pointerType === 'mouse') return 1;
+    const p = e.pressure;
+    if(typeof p === 'number' && p > 0){ lastPress = p; return p; }
+    return lastPress;
+  }
+  /* 1区間：plan 1回 → txTouch(plan.bbox) → draw 1回（線モードの濃度<1 は1本まとめて合成）。BRUSH LAB の契約4点 */
+  function brushSeg(s, a, b, e){
+    const env = { color: s.lane === 'fill' ? D.paint : D.ink, size: s.size, press: brushPress(e) };
+    const pl = LP.brush.plan(s.S, a, b, s.B, env);
+    if(pl.bbox[2] < pl.bbox[0]) return;
+    LP.cells.txTouch(s.b, s.lane, pl.bbox[0], pl.bbox[1], pl.bbox[2], pl.bbox[3]);
+    if(pl.mode === 'line' && s.B.opacity < 0.999) LP.brush.drawWhole(s.ctx, pl, s.S, LP.cells.txSnap(s.b, s.lane));
+    else LP.brush.draw(s.ctx, pl);
+  }
 
   /* ---------- 描く先 ---------- */
   function target(){
@@ -101,18 +171,32 @@ var LP = window.LP || (window.LP = {});
     const erase = D.tool === 'erase', lane = D.lane;
     if(laneLocked(tg.plate, lane)){ LP.ui.toast('🔒 ' + LANE_JP[lane] + 'レーンはロック中'); return { kind: 'none' }; }
     pSm = null; arc = 0;
+    const tone = erase ? null : toneOf(lane);
+    if(!erase && !tone && D.brush !== 'pen'){
+      // ブラシ（MARKER / FLAT / AIR / GLOW）：座標は小数のまま・手ブレ補正はブラシごと
+      const B = LP.brush.get(D.brush);
+      LP.cells.txBegin();
+      const ctx = laneCtx(b, lane);
+      const s = { kind: 'stroke', brush: true, B, S: LP.brush.begin(), b, lane, ctx, size: sizeOf('pen'), sm: { x: wp.x, y: wp.y }, raw: { x: wp.x, y: wp.y }, n: 0 };
+      lastPress = e.pressure > 0 ? e.pressure : 0.5;
+      const from = e.shiftKey && lastEnd && lastEnd.cellId === b.cellId && lastEnd.lane === lane ? { x: lastEnd.x, y: lastEnd.y } : s.sm;
+      brushSeg(s, from, s.sm, e);
+      stroke = s;
+      LP.stage.renderQ();
+      return stroke;
+    }
     const x = Math.round(wp.x), y = Math.round(wp.y);
     const r = radius(e, erase);
     LP.cells.txBegin();
-    const pad = Math.max(r, erase ? D.eraseSize : D.penSize) + 2;
+    const pad = Math.max(r, sizeOf()) + 2;
     LP.cells.txTouch(b, lane, x - pad, y - pad, x + pad, y + pad);
     const ctx = laneCtx(b, lane);
-    ctx.fillStyle = lane === 'fill' ? D.paint : D.ink;
+    ctx.fillStyle = tone ? tone.pattern : (lane === 'fill' ? D.paint : D.ink);   // トーン＝網点のパターン（プレートの原点に固定）
     // Shift＋クリック＝直前のストロークの終点から直線（animator の連結）
     if(e.shiftKey && lastEnd && lastEnd.cellId === b.cellId && lastEnd.lane === lane){
       LP.cells.txTouch(b, lane, Math.min(lastEnd.x, x) - pad, Math.min(lastEnd.y, y) - pad, Math.max(lastEnd.x, x) + pad, Math.max(lastEnd.y, y) + pad);
-      const rr = (erase ? D.eraseSize : D.penSize) / 2;
-      LP.paint.line(ctx, lastEnd.x, lastEnd.y, x, y, rr, rr, erase);
+      const rr = sizeOf() / 2;
+      LP.paint.line(ctx, Math.round(lastEnd.x), Math.round(lastEnd.y), x, y, rr, rr, erase);
     }else{
       LP.paint.dot(ctx, x, y, r, erase);
     }
@@ -133,7 +217,24 @@ var LP = window.LP || (window.LP = {});
     if(d.kind !== 'stroke' || !stroke) return;
     const evs = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
     const list = evs.length ? evs : [e];
-    const s = stroke, pad0 = (s.erase ? D.eraseSize : D.penSize) + 2;
+    if(stroke.brush){
+      const s = stroke, k = Math.max(0, Math.min(0.95, s.B.smooth || 0));
+      for(const ev of list){
+        const p = H.evWorld(ev);
+        s.raw = p;
+        const nx = s.sm.x + (p.x - s.sm.x) * (1 - k), ny = s.sm.y + (p.y - s.sm.y) * (1 - k);
+        if(Math.hypot(nx - s.sm.x, ny - s.sm.y) < 0.35) continue;
+        const a = s.sm;
+        s.sm = { x: nx, y: ny };
+        brushSeg(s, a, s.sm, ev);
+        s.n++;
+      }
+      s.lastEv = e;
+      LP.stage.renderQ();
+      LP.stage.renderOv();
+      return;
+    }
+    const s = stroke, pad0 = sizeOf() + 2;
     for(const ev of list){
       const p = H.evWorld(ev);
       const x = Math.round(p.x), y = Math.round(p.y);
@@ -157,6 +258,14 @@ var LP = window.LP || (window.LP = {});
     if(d.kind !== 'stroke' || !stroke) return;
     const s = stroke;
     stroke = null;
+    if(s.brush){
+      // 手ブレ補正で遅れていた最後の区間を足す（離した所まで届かせる）
+      if(Math.hypot(s.raw.x - s.sm.x, s.raw.y - s.sm.y) >= 0.35) brushSeg(s, s.sm, s.raw, s.lastEv || e);
+      lastEnd = { cellId: s.b.cellId, lane: s.lane, x: s.raw.x, y: s.raw.y };
+      LP.cells.txEnd(s.B.name + '（' + LANE_JP[s.lane] + '）');
+      afterPixels();
+      return;
+    }
     lastEnd = { cellId: s.b.cellId, lane: s.lane, x: s.x, y: s.y };
     LP.cells.txEnd(s.erase ? '消しゴム' : 'ペン（' + LANE_JP[s.lane] + '）');
     afterPixels();
@@ -175,10 +284,10 @@ var LP = window.LP || (window.LP = {});
     if(laneLocked(tg.plate, 'fill')){ LP.ui.toast('🔒 塗レーンはロック中'); return; }
     LP.cells.txBegin();
     LP.cells.txTouch(b, 'fill', wp.x, wp.y, wp.x + 1, wp.y + 1);   // 控え（紙1枚）を取るだけ。Undo の矩形は塗った範囲
-    const r = LP.paint.floodFill(laneCtx(b, 'fill'), b.line ? b.line.getContext('2d') : null, wp.x, wp.y, D.paint, { under: D.under });
+    const r = LP.paint.floodFill(laneCtx(b, 'fill'), b.line ? b.line.getContext('2d') : null, wp.x, wp.y, D.paint, { under: D.under, tone: toneOf('fill') });
     if(!r){ LP.cells.txAbort(); LP.ui.toast('ここは塗れません（線の上／もう同じ色）'); return; }
     LP.cells.txTouch(b, 'fill', r.x0, r.y0, r.x1, r.y1);
-    LP.cells.txEnd('塗り');
+    LP.cells.txEnd(toneOf('fill') ? '塗り（網点）' : '塗り');
     afterPixels();
   }
   function polyClick(sp, wp){
@@ -196,7 +305,7 @@ var LP = window.LP || (window.LP = {});
     const bb = LP.paint.bboxOf(L.pts, b.w, b.h);
     LP.cells.txBegin();
     LP.cells.txTouch(b, L.lane, bb.x0, bb.y0, bb.x1 + 1, bb.y1 + 1);
-    const r = LP.paint.lassoFill(laneCtx(b, L.lane), L.pts, D.paint, L.erase);
+    const r = LP.paint.lassoFill(laneCtx(b, L.lane), L.pts, D.paint, L.erase, L.erase ? null : toneOf('fill'));
     if(!r){ LP.cells.txAbort(); return; }
     LP.cells.txEnd(L.erase ? '投げ縄消し（' + LANE_JP[L.lane] + '）' : '投げ縄塗り');
     afterPixels();
@@ -226,13 +335,24 @@ var LP = window.LP || (window.LP = {});
     }
     if(!hex){ LP.ui.toast('色がありません（透明）'); return; }
     setColor(hex);
-    LP.ui.toast('スポイト ' + hex + ' → ' + (D.lane === 'fill' ? '塗りの色' : 'インク'));
+    const note = LP.drawPal.take(hex);
+    LP.dock.render();
+    LP.ui.toast('スポイト ' + hex + ' → ' + (D.lane === 'fill' ? '塗りの色' : 'インク') + note);
     if(D.tool === 'eye') setTool(prevTool || 'pen');
   }
+  /* いまのレーンの色（トーン中は網点の色も同じ）。palette＝パレットの枠から（枠は書き換えない） */
   function setColor(hex){
     if(D.lane === 'fill') D.paint = hex; else D.ink = hex;
     savePrefs();
     LP.dock.render();
+    LP.stage.renderOv();
+  }
+  /* ドックの色ピッカー：色を替えて、選んでいる枠にも入れる（明度チップなら枠を足す） */
+  function pickColor(hex){
+    setColor(hex);
+    const note = LP.drawPal.take(hex, true);
+    LP.dock.render();
+    if(note) LP.ui.toast(hex + note);
   }
 
   /* ---------- 道具・レーン ---------- */
@@ -242,6 +362,7 @@ var LP = window.LP || (window.LP = {});
     if(LP.state.step !== 'draw'){ LP.ui.toast('02 DRAW の道具です（2 で入る）'); return; }
     if(t !== 'sel' && LP.drawSel) LP.drawSel.settle();
     cancelLasso();
+    if(LP.drawGrid && LP.drawGrid.on) LP.drawGrid.close();   // 道具を持つ＝描く（FOCUS）へ
     if(t === 'eye' && D.tool !== 'eye') prevTool = D.tool;   // EYE は拾ったら元の道具へ戻る
     const from = D.tool;
     D.tool = t;
@@ -296,6 +417,7 @@ var LP = window.LP || (window.LP = {});
     return false;
   }
   function enter(){
+    if(LP.drawGrid && LP.drawGrid.on){ LP.drawGrid.close(); return true; }
     if(lasso && lasso.poly){ lassoFinish(); return true; }
     return !!(LP.drawSel && LP.drawSel.commit());
   }
@@ -306,7 +428,7 @@ var LP = window.LP || (window.LP = {});
     if(LP.drawSel && LP.drawSel.cancel()) return true;
     return false;
   }
-  function afterPixels(){ LP.stage.renderQ(); LP.timeline.renderCells(); }
+  function afterPixels(){ LP.stage.renderQ(); LP.timeline.renderCells(); if(LP.drawGrid && LP.drawGrid.on) LP.drawGrid.render(); }
 
   /* ---------- セル（タイムラインの 線／塗 行・ドックの CELL） ---------- */
   function findLocal(plate, L, ci, from){
@@ -463,7 +585,7 @@ var LP = window.LP || (window.LP = {});
       ctx.restore();
     }
     if(hoverPt && (D.tool === 'pen' || D.tool === 'erase') && !lasso){
-      const size = D.tool === 'erase' ? D.eraseSize : D.penSize;
+      const size = sizeOf();
       const s = P(hoverPt.x, hoverPt.y), r = Math.max(1.5 * d, size / 2 * H.scale * d);
       ctx.save();
       ctx.lineWidth = d;
@@ -481,7 +603,7 @@ var LP = window.LP || (window.LP = {});
   }
 
   LP.drawTools = {
-    D, PAL, LANE_JP, TOOLS, target, sync, protectedCells, down, move, up, hover, leave, dbl, overlay, under, mid,
+    D, LANE_JP, TOOLS, sizeOf, setSize, toneOf, setTone, setBrush, nextBrush, pickColor, target, sync, protectedCells, down, move, up, hover, leave, dbl, overlay, under, mid,
     setTool, toggleMode, fillEraseToggle, setLane, toggleLane, toggleOnion, toggleRef, setColor, savePrefs, clearCell,
     cancel, enter, beforeUndo, afterPixels, seekCell, cellAdd, cellDelete, cellStep, newDrawLayer,
     refAdd, refDel, refOf, hudText, get busy(){ return !!stroke; },

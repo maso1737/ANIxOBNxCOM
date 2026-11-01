@@ -162,6 +162,8 @@ var LP = window.LP || (window.LP = {});
     e.x1 = Math.max(e.x1, x1); e.y1 = Math.max(e.y1, y1);
   }
   function txTouchAll(b, lane){ txTouch(b, lane, 0, 0, b.w, b.h); }
+  /* その回の「触る前の紙」（ブラシの1本まとめて合成が使う。無い＝そのレーンはこの回に作った＝透明） */
+  function txSnap(b, lane){ const e = gTx && gTx.get(b.cellId + ':' + lane); return e ? e.snap : null; }
   const clamp = (v, a, z) => v < a ? a : (v > z ? z : v);
   function txEnd(label){
     const tx = gTx;
@@ -223,5 +225,5 @@ var LP = window.LP || (window.LP = {});
   function stats(){ let n = 0, d = 0; for(const b of bufs.values()){ n++; if(b.dirty.line || b.dirty.fill) d++; } return { bufs: n, dirty: d }; }
   function clear(){ bufs.clear(); opening.clear(); gTx = null; clearTimeout(encT); }
 
-  LP.cells = { live, get, open, adopt, laneCanvas, mark, flush, anyDirty, txBegin, txTouch, txTouchAll, txEnd, txAbort, txOpen, applyTiles, copyInto, stats, clear };
+  LP.cells = { live, get, open, adopt, laneCanvas, mark, flush, anyDirty, txBegin, txTouch, txTouchAll, txSnap, txEnd, txAbort, txOpen, applyTiles, copyInto, stats, clear };
 })();

@@ -34,6 +34,8 @@ var LP = window.LP || (window.LP = {});
     { id: 'dFill', step: 'draw', label: 'FILL 塗り（2回：バケツ ⇄ 投げ縄・長押し／Shift：投げ縄消し）', def: 'G', spring: true, run: () => DT().setTool('fill'), dbl: () => DT().toggleMode('fill'), hold: () => DT().fillEraseToggle(), shift: () => DT().fillEraseToggle(true) },
     { id: 'dSel', step: 'draw', label: 'SEL 持ち上げて変形（2回：WARP）', def: 'A', run: () => DT().setTool('sel'), dbl: () => DT().toggleMode('sel') },
     { id: 'dLane', step: 'draw', label: '線 ⇄ 塗 レーン', def: 'L', run: () => DT().toggleLane() },
+    { id: 'dBrush', step: 'draw', label: 'ブラシを次へ（PEN → MARKER → FLAT → AIR → GLOW）', def: 'B', run: () => DT().nextBrush() },
+    { id: 'dGrid', step: 'draw', label: 'GRID セル一覧 ⇄ 描く', def: 'X', run: () => LP.drawGrid.toggle() },
     { id: 'dRef', step: 'draw', label: 'REF 参照の棚 開閉', def: 'R', run: () => DT().toggleRef() },
     { id: 'dOnion', step: 'draw', label: 'オニオン ON/OFF（前＝赤・後＝青）', def: 'O', run: () => DT().toggleOnion() },
     { id: 'dCellPrev', step: 'draw', label: '前のセル', def: 'ArrowUp', prevent: true, run: () => DT().cellStep(-1) },
