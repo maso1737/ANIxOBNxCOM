@@ -40,6 +40,7 @@
   コマ割り（DIV／EDIT・断ち切り・分割を戻す）・仕上げ素材（網・集中線・流線・文字・ホワイト）・層のコマ所属と Z・BOOK zip（保存／開く）・旧 MANGA_BOOK_v2 の読み込み・
   描画は `renderFrame(ctx, book, t, view)` 1本（ステージ・サムネ・PLAY・HTML ビューア・VRT 共通）・HTML 書き出し（画像埋め込み）・IndexedDB `live_plate_db_v1`。
   **P2 DRAW**：ペン／消し／バケツ（線が壁・1px 潜る）／投げ縄・線＋塗レーン・セル・オニオン・REF・SEL 変形・タイル Undo（BOOK の Undo と1本の時系列）・SEQ PNG 4択・旧 ANIMATOR_v1 読み込み。
+  **P3a TAKE のカメラの芯（2026-11-01・SPEC_21 §19）**：KF（f・d・x,y,z,rot,s・ease）・CAPTURE（C／Shift＋C で上書き）・窓を触る＝下書き・AUTO（OBAN の配分）・TAKE 行の ◆・MONITOR・HTML ビューアにカメラ。P3b（DOF・FX・繋ぎ・画ブレ）／P3c（MP4・AE JSX）／P3d（旧形式）は未。
   **P2 の残り（2026-11-01・SPEC_21 §18）**：ブラシ5種（PEN＝AA なし丸ペン＋ econte の MARKER/FLAT/AIR/GLOW）・トーンインク T1/T2・パレットの編集（明度11＋カスタム・`PALETTE_v1`）・セル一覧 GRID（X・並べ替え・⇩ 一覧 PNG）。
   テーマは SPOTLIGHT のみ。ファイルごとの役割は [live-plate/CLAUDE.md](live-plate/CLAUDE.md)、決めたこと・チェック表は SPEC_21 §15〜§17。
   ローカルサーバは `Projects/.claude/launch.json` の `live-plate`（port 8148）
@@ -110,7 +111,7 @@
 | `SPEC_19_ECONTE_V5` | 画の単位を枠→**プレート**（同倍率の枠群）・GRID 統一解像度配置・SINGLE→FOCUS 統合 | **P0〜P2 実装済**（2026-09-23）。下書きから変えた点は §6（紙の差し替えは時刻で・段詰め・C.SCRIPT に設計図）。P3 ブラシ暫定5種も実装済（2026-09-24・§7。PEN / MARKER / FLAT / AIR / GLOW、画像は端末のブラウザにだけ保存）。iPad 実機 OK |
 | `SPEC_20_ANIMATOR_LINE_FILL` | ANIMATOR：コマを**線＋塗の2レーン**（1本のタイムライン）・塗りは線を壁にして1px潜る・**REF レーン**（帯・`offset`/`×N`）・SEQ PNG 4択・econte の変形（`箱+rot+warp`）移植・UI は**現行デザインのまま** | **P0〜P4 実装済**（2026-09-23）。レーン見出し列・REF レーン（offset/×N）・SEQ PNG 4択・EXPORT JSON `layers`・SEL（A キー・AA OFF はニアレスト焼き込み）。残りは §7-9 の任意項目と実機確認だけ |
 | `SPEC_22_ROUGH` | **ラフ原専用アプリ ROUGH**（`rough.html`）：レーン1本・13色（色番号で持つ）・SEL の「次のコマへ ▶」・REF コラージュ・ドック式 UI・→ ANIMATOR REF（受け箱） | **P0 実装済**（2026-10-15）。残りは iPad 実機・VRT・link-map への追加（§12） |
-| `SPEC_21_LIVE_PLATE` | **一本化アプリ LIVE PLATE の設計・仕様**。5本を足すのではなく「1つの BOOK に4つの見方（SHEET/DRAW/TAKE/SHOW）」。プレート（SPEC_19）・線＋塗（SPEC_20）・composer の透視式・OBAN の手つき・新 OBAN 規約を土台に、連携（10ルート・3チャンネル）を構造ごと消す。複数ファイル・ビルド無し | **P0 骨格・P1 SHEET・BOOK zip 実装済**（2026-09-24・`live-plate/`。§15＝P0・§16＝P1 に決めたことと動作チェック表）。**P2 DRAW 実装済**（2026-09-26・§17）＋ **P2 の残り（ブラシ・トーンインク・パレット・GRID）実装済**（2026-11-01・§18。残りは iPad／ペン）。次は P3 TAKE。起草 2026-09-18。§13 の発注者判断は2026-09-24に**全7件確定**（旧5本は凍結せず並行して極め続ける／名前LIVE PLATE／用紙SCREEN 3840×2160／テーマSPOTLIGHTのみ・他テーマ当面無し／複数ファイル・ビルド無し／P0はPC専念・iPadは旧アプリの知見が固まってから統一／置き場所`live-plate/`。詳細はSPEC_21 §13） |
+| `SPEC_21_LIVE_PLATE` | **一本化アプリ LIVE PLATE の設計・仕様**。5本を足すのではなく「1つの BOOK に4つの見方（SHEET/DRAW/TAKE/SHOW）」。プレート（SPEC_19）・線＋塗（SPEC_20）・composer の透視式・OBAN の手つき・新 OBAN 規約を土台に、連携（10ルート・3チャンネル）を構造ごと消す。複数ファイル・ビルド無し | **P0 骨格・P1 SHEET・BOOK zip 実装済**（2026-09-24・`live-plate/`。§15＝P0・§16＝P1 に決めたことと動作チェック表）。**P2 DRAW 実装済**（2026-09-26・§17）＋ **P2 の残り（ブラシ・トーンインク・パレット・GRID）実装済**（2026-11-01・§18。残りは iPad／ペン）。**P3a カメラの芯 実装済**（2026-11-01・§19）。次は P3b（DOF・FX・繋ぎ・画ブレ）。起草 2026-09-18。§13 の発注者判断は2026-09-24に**全7件確定**（旧5本は凍結せず並行して極め続ける／名前LIVE PLATE／用紙SCREEN 3840×2160／テーマSPOTLIGHTのみ・他テーマ当面無し／複数ファイル・ビルド無し／P0はPC専念・iPadは旧アプリの知見が固まってから統一／置き場所`live-plate/`。詳細はSPEC_21 §13） |
 | `MOTION_COMIC_SPEC` | composer モーションコミック | Phase 1〜3 済／**Phase 4〜5 要判定** |
 | `EXPORT_WEB_SPEC` | スクロールビューアHTML書き出し | 実装済 |
 | `申し送り_MANGA_PLATE_to_OBAN_TEXT.md` | 読み文字の往復 | P0〜P2 済。残っている選択肢だけ書いてある |
@@ -182,7 +183,7 @@ REF BOARD には `<meta name="robots" content="noindex,nofollow">` も入れて�
 ```
 node tools/check.js
 ```
-14本（animator / **rough** / oban-builder / composer / index / manga-plate / econte / link-map / brush-lab / depth-brush-lab / ref-board / inbetween_warp_lab / ipad-probe / **live-plate/index.html＋src 32本**）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※JS扱いは type無し・`type="module"`・`text|application/javascript` のみ（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。**depth-brush-lab だけはローカルサーバで開く**
+14本（animator / **rough** / oban-builder / composer / index / manga-plate / econte / link-map / brush-lab / depth-brush-lab / ref-board / inbetween_warp_lab / ipad-probe / **live-plate/index.html＋src 34本**）すべての 構文 / JS→HTML の id 配線 / id 重複 / 未参照関数 を一括検査（問題があれば exit 1）。※JS扱いは type無し・`type="module"`・`text|application/javascript` のみ（`type="application/json"` 等のデータブロックは除外）。実機確認は Pages か `file://` で。**depth-brush-lab だけはローカルサーバで開く**
 （`Projects/.claude/launch.json` の `depth-brush-lab` / port 8146 → `http://localhost:8146/depth-brush-lab.html`。
 module ＋ CDN import なので `file://` での可否は未確認。書き出しの `showDirectoryPicker` も http:// のほうが確実）。
 

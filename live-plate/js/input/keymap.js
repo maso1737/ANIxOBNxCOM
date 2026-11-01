@@ -40,6 +40,11 @@ var LP = window.LP || (window.LP = {});
     { id: 'dOnion', step: 'draw', label: 'オニオン ON/OFF（前＝赤・後＝青）', def: 'O', run: () => DT().toggleOnion() },
     { id: 'dCellPrev', step: 'draw', label: '前のセル', def: 'ArrowUp', prevent: true, run: () => DT().cellStep(-1) },
     { id: 'dCellNext', step: 'draw', label: '次のセル', def: 'ArrowDown', prevent: true, run: () => DT().cellStep(1) },
+    { cat: '03 TAKE（カメラ）', id: 'tCap', step: 'take', label: 'CAPTURE（いまの窓を KF に）／Shift：選んでいる KF に上書き', def: 'C', run: () => LP.takeTools.capture(), shift: () => LP.takeTools.overwrite() },
+    { id: 'tPrevKf', step: 'take', label: '前の KF', def: 'ArrowLeft', prevent: true, run: () => LP.takeTools.step(-1) },
+    { id: 'tNextKf', step: 'take', label: '次の KF', def: 'ArrowRight', prevent: true, run: () => LP.takeTools.step(1) },
+    { id: 'tDelKf', step: 'take', label: '選んでいる KF を消す', def: 'Delete', prevent: true, alt: 'Backspace', run: () => LP.takeTools.del() },
+    { id: 'tMon', step: 'take', label: 'MONITOR 開閉', def: 'P', run: () => LP.takeTools.toggleMonitor() },
     { cat: '再生 / 時間', id: 'play', label: '再生 / 停止', def: 'Space', prevent: true, run: () => A().togglePlay() },
     { id: 'prevFrame', label: '前のコマ（Shift＝10）', def: 'ArrowLeft', prevent: true, run: e => { A().stop(); A().seek(LP.state.t - (e && e.shiftKey ? 10 : 1)); } },
     { id: 'nextFrame', label: '次のコマ（Shift＝10）', def: 'ArrowRight', prevent: true, run: e => { A().stop(); A().seek(LP.state.t + (e && e.shiftKey ? 10 : 1)); } },
@@ -114,6 +119,7 @@ var LP = window.LP || (window.LP = {});
     if(mod && e.code === 'KeyZ'){ e.preventDefault(); e.shiftKey ? A().redo() : A().undo(); return; }
     if(mod && e.code === 'KeyY'){ e.preventDefault(); A().redo(); return; }
     if(mod && e.code === 'KeyD'){ e.preventDefault(); A().dupSel(); return; }
+    if(mod && LP.state.step === 'take' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')){ e.preventDefault(); LP.takeTools.swap(e.key === 'ArrowLeft' ? -1 : 1); return; }
     if(mod && e.code === 'KeyC' && LP.state.step === 'draw' && LP.drawSel.active){ e.preventDefault(); LP.drawSel.copy(); return; }
     if(mod && e.code === 'KeyV' && LP.state.step === 'draw' && LP.drawSel.hasClip && LP.state.draw.tool === 'sel'){ e.preventDefault(); LP.drawSel.paste(); return; }
     if(e.key === 'Escape'){ e.preventDefault(); A().escape(); return; }

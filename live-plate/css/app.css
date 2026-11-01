@@ -178,8 +178,27 @@ body.has-refs #tl-labels .lref{height:var(--ref-h,18px)}
 body.step-draw #tl-labels .lane.on{background:rgba(var(--accRGB),.18);box-shadow:inset 2px 0 0 var(--acc)}
 body.step-draw #tl-labels .lane.on .nm{color:var(--acc2)}
 #tl-scroll{position:relative;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden}
-#tl-inner{position:relative;height:calc(110px + var(--ref-row,0px))}
+#tl-inner{position:relative;height:calc(110px + var(--ref-row,0px) + var(--take-row,0px))}
 body.has-refs{--ref-row:18px}
+body.step-take{--take-row:20px}
+/* TAKE の行（§19）：◆＝KF の着く時刻・帯＝止め。03 TAKE のときだけ */
+#tl-labels .lt{height:0;overflow:hidden;font-size:9px}
+body.step-take #tl-labels .lt{height:var(--take-row);color:var(--mark)}
+#tl-take{position:absolute;left:0;top:calc(110px + var(--ref-row,0px));height:var(--take-row,0px);right:0;overflow:hidden;border-top:1px solid var(--line-2)}
+#tl-take .hb{position:absolute;top:8px;height:4px;background:rgba(255,201,79,.35);pointer-events:none}
+#tl-take .hb.on{background:rgba(255,201,79,.7)}
+#tl-take .kd{position:absolute;top:4px;width:11px;height:11px;margin-left:-5.5px;transform:rotate(45deg);background:rgba(255,201,79,.55);border:1px solid var(--mark);cursor:ew-resize;touch-action:none}
+#tl-take .kd.man{background:rgba(90,233,255,.45);border-color:var(--acc-pt)}
+#tl-take .kd.on{background:var(--mark);box-shadow:0 0 8px rgba(255,201,79,.9)}
+/* MONITOR（03 TAKE・P）：ステージの右下 */
+#monitor{position:absolute;right:12px;bottom:12px;z-index:4;width:clamp(200px,22%,340px);display:none;flex-direction:column;gap:3px;pointer-events:none;
+  padding:5px;border:1px solid var(--line);background:rgba(8,9,12,.88);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#monitor.show{display:flex}
+#monitor canvas{display:block;width:100%;height:auto;background:#000}
+#monitor .lb{font-family:var(--saira);font-weight:600;font-size:10px;letter-spacing:.2em;color:var(--acc2)}
+#dock .dk-kfs{max-width:260px;overflow-x:auto}
+#dock .qd-sb.kf{padding:0 7px;font-family:var(--saira);letter-spacing:.06em}
+#dock .qd-sb.kf.now{box-shadow:inset 0 -2px 0 var(--mark)}
 #tl-ruler{position:absolute;left:0;top:0;height:20px;right:0;cursor:ew-resize;touch-action:none;border-bottom:1px solid var(--line-2)}
 #tl-ruler i{position:absolute;bottom:0;width:1px;height:5px;background:rgba(232,236,242,.18)}
 #tl-ruler i.s{height:10px;background:rgba(232,236,242,.35)}

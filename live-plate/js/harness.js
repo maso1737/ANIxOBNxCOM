@@ -12,6 +12,7 @@
        C4 84〜107 … コマ割り（斜めの縦線＋右を横線・右下は断ち切り）。背景は割ると全コマにコピー（panels.divide）、
                     フチ付きの層（コマ1）・網（コマ2・乗算）・集中線（コマ3）・流線（枠の上）・ホワイト（コマ1）・Z 付きの層
                     ★ 文字は入れない（書体の読み込みが検証窓で揺れる＝決定論にならない）
+       C5 108〜155 … カメラ：KF 3つ（止め・EASE で寄りつつ回る・LINEAR で引く）＋ Z の違う層（−400／＋200）の視差
    ============================================================ */
 var LP = window.LP || (window.LP = {});
 
@@ -113,6 +114,17 @@ var LP = window.LP || (window.LP = {});
     addIt('focus', P(2), { count: 90 });
     addIt('stream', null, { x: 1920, y: 1950, w: 3000, h: 260, count: 12, lw: 8 });
     addIt('white', P(0), { x: 2900, y: 900, poly: [{ x: -200, y: -120 }, { x: 220, y: -90 }, { x: 180, y: 140 }, { x: -160, y: 110 }] });
+    // C5：カメラ（SPEC_21 §19）。手動の f・d で3つの KF（EASE で寄りながら回る → LINEAR で引く）。Z の違う層で視差
+    const s5 = LP.model.newSheet(b, 48);
+    b.sheets.push(s5);
+    put(s5, bg, { x: 0, y: 0, w: 3840, h: 2160 });
+    put(s5, br, { x: 600, y: 1400, w: 1600, h: 400 }, { z: -400 });
+    put(s5, sp, { x: 2200, y: 600, w: 800, h: 720 }, { z: 200 });
+    s5.take = { auto: false, kf: [
+      { id: 'hk1', f: 0, d: 6, x: -600, y: -300, z: 0, rot: 0, s: 1.8, dwell: 1, ease: 'ease' },
+      { id: 'hk2', f: 24, d: 6, x: 500, y: 200, z: 200, rot: 8, s: 2.5, dwell: 1, ease: 'ease' },
+      { id: 'hk3', f: 40, d: 7, x: 0, y: 0, z: 0, rot: 0, s: 1, dwell: 1, ease: 'linear' },
+    ] };
 
     LP.hist.reset();
     LP.state.t = 0;

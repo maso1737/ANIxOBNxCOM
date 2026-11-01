@@ -199,15 +199,46 @@ var LP = window.LP || (window.LP = {});
     return h;
   }
 
+  /* 03 TAKE（mode/take.js）：CAPTURE・窓の数値・KF のチップ（止め・動き方・✕）・AUTO・MONITOR */
   function takeHTML(){
-    const b = LP.render.camBase(LP.book), o = LP.app.outSize(LP.book.out.long);
+    const u = U(), TT = LP.takeTools, at = LP.app.curAt();
     let h = grp('CAMERA', '撮る',
-      rail('cap', 'CAPTURE', 'C', { later: 'P3', tip: 'いまの窓を KF に' }) + rail('focus', '◎FOCUS', '', { later: 'P3', tip: 'ピント（多点 DOF）' })
-      + rail('fx', 'FX', 'F', { later: 'P3', tip: '撮影処理' }) + rail('join', '繋ぎ', '', { later: 'P3', tip: 'cut / fade / wipe' }) + rail('shake', '∿', '', { later: 'P3', tip: '画ブレ' }));
+      '<div class="rail on" data-act="tcap" title="CAPTURE：いまの窓を KF に（C）。AUTO＝選んでいる KF の後ろ／手動＝いまのコマ"><span class="t">CAPTURE</span><span class="k">C</span></div>'
+      + rail('focus', '◎FOCUS', '', { later: 'P3b', tip: 'ピント（多点 DOF）' })
+      + rail('fx', 'FX', 'F', { later: 'P3b', tip: '撮影処理' }) + rail('join', '繋ぎ', '', { later: 'P3b', tip: 'cut / fade / wipe' }) + rail('shake', '∿', '', { later: 'P3b', tip: '画ブレ' }));
     h += VL;
-    h += '<div class="dk-info"><span class="t">既定カメラ — 紙全面</span><span class="s">窓 <b>' + b.w + '×' + b.h + '</b>（紙）→ 出力 <b>' + o.w + '×' + o.h + '</b>。枠の中＝書き出しと同じ式（composer の透視 1本）'
-      + '<br>カメラを打つ（KF・dwell・ピント）のは P3。いまは Space で再生だけ確認できます。</span></div>';
+    if(!at) return h;
+    const p = TT.livePose(at), kf = LP.take.kfs(at.sheet), tk = at.sheet.take;
+    h += grp('WINDOW', LP.state.camDraft ? '下書き — C で KF' : 'カメラの画（触ると下書き）',
+      '<div class="dk-set"><div class="dk-row">' + u.qdNum('cs', '寄り', '×' + (+p.s).toFixed(2), '') + u.qdNum('cr', '回転', Math.round(p.rot), '°') + u.qdNum('cz', 'Z', Math.round(p.z), 'px') + '</div>'
+      + '<div class="dk-row"><button class="qd-sb" data-act="tReset" title="窓を紙全面に（x=y=0・×1・0°・Z 0）">紙全面</button>'
+      + (LP.state.camDraft ? '<button class="qd-sb del" data-act="tDraftX" title="下書きの窓を捨てる（Esc）">捨てる</button>' : '')
+      + '<button class="qd-sb' + (LP.state.monitor ? ' on' : '') + '" data-act="tMon" title="MONITOR：カメラの出口を小さく（P）">MONITOR</button></div></div>');
+    if(!kf.length){
+      h += '<div class="dk-info"><span class="t">KF なし — 紙全面のまま</span><span class="s">窓をドラッグ・ホイールで寄り引き・●で回転して <b>C（CAPTURE）</b>。<br>2つ打てば、その間をカメラが動きます（AUTO：止めと移動をこの紙の尺に配分）</span></div>';
+      return h;
+    }
+    const sel = TT.selKf(at);
+    h += grp('KEYS', 'KF ' + kf.length + '・' + (tk.auto ? 'AUTO（止めと移動を配分）' : '手動（◆ を動かす）'),
+      '<div class="dk-set"><div class="dk-row dk-kfs">' + kf.map((k, i) => '<button class="qd-sb kf' + (sel === k ? ' on' : '') + (at.local >= k.f && at.local <= k.f + (k.d || 0) ? ' now' : '') + '" data-act="tKf" data-v="' + k.id + '" title="KF ' + (i + 1) + '：' + k.f + 'コマ目から ' + (k.d || 0) + 'コマ止め（←→ で選ぶ・Ctrl＋←→ で入れ替え）">◆' + (i + 1) + '</button>').join('') + '</div>'
+      + '<div class="dk-row"><button class="qd-sb' + (tk.auto ? ' on' : '') + '" data-act="tAuto" title="AUTO：止め（重み）と移動の距離で f を配分（OBAN）。◆ を手で動かすと外れる">AUTO</button><span class="dk-jp">' + (tk.auto ? '' : '◆ をドラッグで時刻') + '</span></div></div>');
+    if(sel){
+      const i = kf.indexOf(sel);
+      h += grp('KF ' + (i + 1), sel.f + 'f〜' + (sel.f + (sel.d || 0)) + 'f',
+        '<div class="dk-set"><div class="dk-row">' + u.qdNum('kdw', '止め', tk.auto ? '×' + (+(sel.dwell == null ? 1 : sel.dwell)).toFixed(2) : (sel.d || 0), tk.auto ? '' : 'コマ')
+        + '<button class="qd-sb' + (LP.state.camDraft ? ' on' : ' off') + '" data-act="tOver" title="下書きの窓をこの KF に上書き（Shift＋C）">↻ 上書き</button>'
+        + '<button class="qd-sb del" data-act="tDel" data-v="' + sel.id + '" title="この KF を消す（Delete）">✕</button></div>'
+        + '<div class="dk-row"><span class="dk-jp dk-nw" style="width:auto">着き方</span>' + (i === 0 ? '<span class="dk-jp">（最初の KF）</span>' : u.qdSeg('tEase', [[sel.id + ':linear', 'LINEAR'], [sel.id + ':ease', 'EASE'], [sel.id + ':hold', 'HOLD']], sel.id + ':' + (sel.ease || 'ease'))) + '</div></div>');
+    }
     return h;
+  }
+  /* 窓をドラッグ中：ドックを作り直さずに数字だけ */
+  function liveTake(){
+    const at = LP.app.curAt();
+    if(!at || LP.state.step !== 'take') return;
+    const p = LP.takeTools.livePose(at), set = (k, v) => { const e = document.querySelector('#dock [data-scr="' + k + '"] .v'); if(e) e.textContent = v; };
+    set('cs', '×' + (+p.s).toFixed(2)); set('cr', Math.round(p.rot)); set('cz', Math.round(p.z));
+    LP.app.hud();
   }
 
   function showHTML(){
@@ -331,6 +362,16 @@ var LP = window.LP || (window.LP = {});
       case 'exQ': LP.io.exportState().q = b.dataset.v; LP.io.saveExportPrefs(); render(); break;
       case 'exPpf': LP.io.exportState().ppf = +b.dataset.v; LP.io.saveExportPrefs(); render(); break;
       case 'expHtml': LP.io.exportHtml(); break;
+      /* ---- 03 TAKE ---- */
+      case 'tcap': LP.takeTools.capture(); break;
+      case 'tKf': LP.takeTools.select(b.dataset.v); break;
+      case 'tOver': LP.takeTools.overwrite(); break;
+      case 'tDel': LP.takeTools.del(b.dataset.v); break;
+      case 'tAuto': { const at = LP.app.curAt(); if(at && at.sheet.take) LP.takeTools.setAuto(!at.sheet.take.auto); break; }
+      case 'tEase': { const [id, e2] = b.dataset.v.split(':'); LP.takeTools.setEase(id, e2); break; }
+      case 'tReset': LP.takeTools.resetWindow(); break;
+      case 'tDraftX': LP.takeTools.cancel(); break;
+      case 'tMon': LP.takeTools.toggleMonitor(); break;
     }
   }
   /* Z 定規：ドラッグ中は ◆ と文字だけ、離したら commit（「ドラッグ中はテキストだけ」の約束） */
@@ -368,10 +409,20 @@ var LP = window.LP || (window.LP = {});
   function drawScr(){
     const D = () => LP.state.draw;
     const cell = () => { const tg = LP.drawTools.target(); return tg && tg.cell; };
+    const camO = () => LP.takeTools.editTarget(null, true);
+    const camSet = (key, v) => { const tg = camO(); if(!tg) return; tg.o[key] = v; LP.take.clampPose(tg.o); LP.stage.renderQ(); LP.app.hud(); };
+    const camDone = () => { render(); LP.app.crumb(); };
     const tone = () => { const k = D().lane === 'fill' ? D().paintTone : D().inkTone; return k ? D()['tone' + k] : null; };
     Object.assign(LP.detail.SCR, {
       dsize: { get: () => LP.drawTools.sizeOf(), set: v => { LP.drawTools.setSize(v); LP.stage.renderOv(); },
                min: 1, max: 300, px: 3, step: 1, done: () => { LP.drawTools.savePrefs(); render(); } },
+      // 03 TAKE：窓（下書き／止めの中の KF）と、選んでいる KF の止め
+      cs: { get: () => camO() ? +(camO().o.s || 1).toFixed(2) : 1, set: v => camSet('s', v), min: LP.take.S_MIN, max: LP.take.S_MAX, px: 4, step: 0.01, fmt: v => '×' + (+v).toFixed(2), done: () => camDone('寄り引き') },
+      cr: { get: () => camO() ? Math.round(camO().o.rot || 0) : 0, set: v => camSet('rot', v), min: -180, max: 180, px: 2, step: 1, done: () => camDone('回転') },
+      cz: { get: () => camO() ? Math.round(camO().o.z || 0) : 0, set: v => camSet('z', v), min: LP.take.Z_MIN, max: LP.take.Z_MAX, px: 0.5, step: 5, done: () => camDone('カメラの前後（Z）') },
+      kdw: { get: () => { const k = LP.takeTools.selKf(); const tk = LP.app.curSheet() && LP.app.curSheet().take; return !k ? 0 : tk && tk.auto ? +(k.dwell == null ? 1 : k.dwell).toFixed(2) : (k.d || 0); },
+             set: v => { const k = LP.takeTools.selKf(), sh = LP.app.curSheet(); if(!k || !sh) return; if(sh.take.auto) k.dwell = Math.max(0.05, Math.min(8, Math.round(v * 20) / 20)); else k.d = Math.max(0, Math.round(v)); },
+             min: 0, max: 400, px: 4, step: 0.05, fmt: v => { const sh = LP.app.curSheet(); return sh && sh.take && sh.take.auto ? '×' + (+v).toFixed(2) : Math.round(v); }, done: () => LP.app.commit('KF の止め') },
       // トーンインク（いまのレーンの T1／T2）。これから描くぶんだけ（もう描いた網点は変わらない）
       tpitch: { get: () => tone() ? tone().pitch : 8, set: v => { if(tone()) tone().pitch = Math.max(LP.paint.TONE_LIMIT.pitch[0], Math.min(LP.paint.TONE_LIMIT.pitch[1], Math.round(v))); },
                min: 3, max: 48, px: 6, step: 1, done: () => { LP.drawTools.savePrefs(); render(); } },
@@ -390,5 +441,5 @@ var LP = window.LP || (window.LP = {});
     U().bindScrub($('#dock'), LP.detail.SCR);
   }
 
-  LP.dock = { init, render, progress };
+  LP.dock = { init, render, progress, liveTake };
 })();

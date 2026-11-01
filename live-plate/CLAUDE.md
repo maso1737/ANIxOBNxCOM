@@ -1,13 +1,14 @@
 # CLAUDE.md — LIVE PLATE（`live-plate/`）
 
 SPEC_21 の一本化アプリ。**1つの BOOK に 4つの見方（01 SHEET / 02 DRAW / 03 TAKE / 04 SHOW）**。
-仕様は [../SPEC_21_LIVE_PLATE.md](../SPEC_21_LIVE_PLATE.md)、決めたこと・仕様から変えたことは同 **§15（P0）・§16（P1）・§17（P2）・§18（P2 の残り）**。
+仕様は [../SPEC_21_LIVE_PLATE.md](../SPEC_21_LIVE_PLATE.md)、決めたこと・仕様から変えたことは同 **§15（P0）・§16（P1）・§17（P2）・§18（P2 の残り）・§19（P3a カメラ）**。
 
 **状態（2026-11-01）: P0 骨格＋ P1 SHEET（コマ割り・仕上げ素材・文字）＋ BOOK zip ＋ P2 DRAW 実装済み。**
 P2＝ペン／消し／バケツ（線が壁・1px 潜る）／投げ縄／スポイト・線／塗レーン・セル（足す・複製・長さ）・オニオン・REF・SEL 変形（WARP・COPY/PASTE）・
 タイル Undo・SEQ PNG 4択・旧 ANIMATOR_v1 の読み込み。SHEET は「選んでいる物を優先して掴む・重なりの1つ下」と右ペイン2列（SHEETS｜◆ITEMS）。
 **§18（2026-11-01）**：ブラシ5種（PEN＝AA なし丸ペン＋ econte の MARKER／FLAT／AIR／GLOW・B で次）・トーンインク T1／T2・パレットの編集（明度11＋カスタム・スポイトで枠を上書き・PALETTE_v1）・セル一覧 GRID（X・並べ替え・⇩ 一覧 PNG）。
-次は P3 TAKE（カメラ・MP4）。P2 の残りは iPad／ペンの対応だけ（SPEC_21 §18-7）。
+**§19 P3a（2026-11-01）**：03 TAKE のカメラの芯＝KF（f・d・x,y,z,rot,s・ease）・CAPTURE（C／Shift＋C で上書き）・窓をドラッグ／隅／●／ホイール（いつも下書き）・止めと着き方・AUTO（OBAN の配分）・タイムラインの TAKE 行（◆）・MONITOR（P）・HTML ビューアにカメラ。
+次は P3b（ピント・FX・繋ぎ・画ブレ）→ P3c（MP4／WebM・AE JSX）→ P3d（旧形式）。P2 の残りは iPad／ペンの対応だけ（SPEC_21 §18-7）。
 
 ## 開き方
 
@@ -34,6 +35,7 @@ P2＝ペン／消し／バケツ（線が壁・1px 潜る）／投げ縄／ス�
 | `js/core/history.js` | Undo／Redo は**1本の時系列**：book（BOOK のスナップショット）と px（02 DRAW の矩形タイル）を同じ列に 80手 | 操作の**後**に `LP.app.commit(label)`。描いた絵の Blob は `patchBlob` で**全スナップショットへ**＝BOOK の Undo が絵を巻き戻さない |
 | `js/core/paint.js` | `LP.paint`：AA なしの画素の道具（`fillCircleRows` `bresenham` `line` `floodFill`（壁＝線 α≥128・潜り）`lassoFill` `polyMask`）＋ トーンインクの `tone()`／`toneOn()`（網点のタイル・プレートの原点に固定） | animator の式そのまま。state を読まない（canvas と色は引数）。網点はバケツで潜らせない |
 | `js/core/brush.js` | `LP.brush`：ブラシ（MARKER / FLAT / AIR / GLOW）の `plan`（区間1回・`bbox`）／`draw`／`drawWhole`（線モード濃度<1 の1本まとめて合成）・筆先とマスクのキャッシュ | econte SPEC_19 §7 の移植・値も同じ。**PEN はここを通らない**（paint.js の丸ペン）。ストロークの状態は呼ぶ側が `begin()` で持つ |
+| `js/core/take.js` | `LP.take`：03 TAKE の KF の**配分**（AUTO＝OBAN buildTake の重みで f・d を書く／手動＝並べ直すだけ）・窓 ⇄ pose（`windowOf` `corners` `toLocal`）・`capture` `remove` `swap` `moveF` | 補間（f・d を読む）は render.js `camAt`＝ビューアに同梱。**配分は `app.commit` のたびに `rebuildAll`** |
 | `js/core/cells.js` | 02 DRAW の**編集バッファ**（セル×レーンのプレート原寸 canvas・LRU 16）・Blob への書き戻し（`flush`）・矩形タイル Undo（`txBegin/txTouch/txEnd/txAbort`） | `LP.cache.img` はバッファを先に見る＝描いた瞬間の絵が全部の見方に乗る。**保存・書き出し・BOOK zip の前に `flush()`**。塗レーンは最初に塗るまで作らない |
 | `js/core/store.js` | IndexedDB `live_plate_db_v1`（book / blobs / assets）＋ ビットマップ常駐（LRU・1GB） | `HARNESS_ON` では読まない・書かない。持ち出しは BOOK zip（book-zip.js）。`save` は先に `cells.flush` |
 | `js/ui/widgets.js` | toast / modalConfirm / パネル移動・リサイズ・▾ / qd-* / 数値スクラブ / CVC | |
@@ -42,8 +44,9 @@ P2＝ペン／消し／バケツ（線が壁・1px 潜る）／投げ縄／ス�
 | `js/mode/draw.js` | 02 DRAW の道具：PEN（ブラシ・トーン）・ERASE・FILL（バケツ／投げ縄／投げ縄消し）・EYE・レーン・セル（足す・複製・消す・長さ）・オニオン（`view.mid`）・REF（`view.under`）・＋ 描く層 | 描く先＝選んだ層の「いまのセル」（`cellIndexAt`）。道具×レーンは SPEC_20 §1-2。prefs は `liveplate_draw_v1`（一時モードは覚えない） |
 | `js/mode/draw-pal.js` | 02 DRAW のパレット：明度11（固定）＋カスタム枠・選んだ枠へスポイト／ピッカー・＋ −・JSON（`PALETTE_v1`＝ANIMATOR と同じ） | localStorage `liveplate_palette_v1`（BOOK に入れない）。先頭の明度は `normalize` 1本で揃える |
 | `js/mode/draw-grid.js` | 02 DRAW のセル一覧 GRID（`#grid`＝#stage の上の DOM）：いまのプレートのセルを同じ縮尺で・クリック／Wクリック／ドラッグ並べ替え・⇩ 一覧 PNG（画面と同じ `layout`） | ステージのポインタ・ホイールに渡さない（stopPropagation）。BOOK が変わったら `app.refresh` が `render`、セルが替わったら `mark` |
+| `js/mode/take.js` | 03 TAKE の道具：窓のドラッグ／隅／●／ホイール（**いつも下書きの窓** `LP.state.camDraft`）・CAPTURE／上書き・KF の選択／入れ替え／削除・AUTO・止め／着き方・重ね描き（窓・KF の破線・札） | 下書きは BOOK に入らない（紙が替わる・ステップを出る・Esc で捨てる）。再生中はカメラの画に付いていく |
 | `js/mode/draw-sel.js` | 02 DRAW の SEL：持ち上げて変形（箱+rot+warp・AA OFF は `flBakeNearest`・COPY/PASTE） | animator gFloat の移植。持ち上げ〜確定で Undo 1手／取消は `txAbort`。他の操作へ移る前に `settle()` |
-| `js/ui/timeline.js` | ルーラー・SHEET 行（尺ドラッグ）・REF 行（参照の帯）・線／塗の行（セル・右端＝長さ）・レーン見出し（◉🔒）・プレイヘッド | ドラッグ中は DOM を作り直さない |
+| `js/ui/timeline.js` | ルーラー・SHEET 行（尺ドラッグ）・REF 行（参照の帯）・線／塗の行（セル・右端＝長さ）・レーン見出し（◉🔒）・**TAKE 行（◆＝KF・帯＝止め。03 TAKE のときだけ）**・プレイヘッド | ドラッグ中は DOM を作り直さない（◆ のドラッグ中は `renderTake` を止める） |
 | `js/ui/sides.js` | 素材棚（タイルを紙／タイムラインへドラッグ）・右は**2列 SHEETS｜◆ITEMS（列ごとに ≡ で畳む）** | 行の Wクリックは自前で数える（`lastTap`）。描いた絵が Blob になったら `refreshPlate` |
 | `js/ui/detail.js` | 詳細パネル（U）と **SCR（数値の定義）**。層／素材（種類ごとの DEFS）／コマ／紙＋コマ割りの設定 | ドックの SIZE / OPACITY も同じ SCR。文字を打っている間は作り直さない |
 | `js/ui/dock.js` | ステップごとのドック | 未実装フェーズの道具は `later:'P1'` などで**押せない札付き**で並べる |
@@ -52,7 +55,7 @@ P2＝ペン／消し／バケツ（線が壁・1px 潜る）／投げ縄／ス�
 | `js/io/import.js` | 画像・連番の取り込み（D&D・ファイル選択・Ctrl+V）。落とした場所で行き先が決まる | 取り込みは順番待ち（`queue`） |
 | `js/io/book-zip.js` | BOOK zip（保存・開く）と依存ゼロの zip 読み書き | 開く＝置き換え（確認あり） |
 | `js/io/import-legacy.js` | `openAny`（zip／JSON を見分ける）・旧 MANGA_BOOK_v2 → 新しい紙・**旧 ANIMATOR_v1（PROJECT_v1）→ プレート＋新しい紙** | 他の旧形式（PROJECT_v2 / ECONTE / OBAN）は P3 |
-| `js/io/export-html.js` | HTML ビューア書き出し・出口の設定（`exportState`：html／seq） | 描画コードは `LP.lib.*.toString()` で同梱（time / geom / items / render。書き写さない） |
+| `js/io/export-html.js` | HTML ビューア書き出し・出口の設定（`exportState`：html／seq）。紙ごとの `take`（f・d・pose・ease）も書き出す | 描画コードは `LP.lib.*.toString()` で同梱（time / geom / items / render。書き写さない） |
 | `js/io/export-seq.js` | SEQ PNG（合体 frames/・線 line/・塗 fill/・線+塗）を ZIP／フォルダへ | `renderFrame` の `view.pass`（そのレーンだけ・透明の地）。欠けた画は書かない（デコード待ち） |
 | `viewer/template.js` | ビューアの雛形（スクロール → t・チャプター・ローダ） | 合成の式を書かない |
 | `js/app.js` | 状態（`LP.state`）・ステップ・再生・BOOK の操作・起動 | いまの紙＝プレイヘッドの紙 |
@@ -69,4 +72,4 @@ P2＝ペン／消し／バケツ（線が壁・1px 潜る）／投げ縄／ス�
 ## 検証
 
 - `node tools/check.js`（リポジトリ直下）— live-plate は **HTML＋src 列を1単位**で検査（1本ずつの構文・つないだ構文・配線・重複・未参照関数）
-- `cd verify && npm run verify:liveplate` — 決定論 VRT 8コマ（960×540。C4＝コマ割りの紙）。契約と負のコントロールは [../verify/CLAUDE.md](../verify/CLAUDE.md)
+- `cd verify && npm run verify:liveplate` — 決定論 VRT 13コマ（960×540。C4＝コマ割りの紙・C5＝カメラ）。契約と負のコントロールは [../verify/CLAUDE.md](../verify/CLAUDE.md)

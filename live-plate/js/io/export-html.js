@@ -106,6 +106,8 @@ LP.io = LP.io || {};
         sheets: book.sheets.map(s => ({
           id: s.id, name: s.name, dur: s.dur, bg: s.bg, in: s.in,
           frame: s.frame || null,
+          // カメラ（§19）：補間は同梱の render.js camAt が f・d を読むだけ＝配分の式は持っていかない
+          take: s.take && s.take.kf && s.take.kf.length ? { kf: s.take.kf.map(k => ({ f: k.f, d: k.d || 0, x: k.x || 0, y: k.y || 0, z: k.z || 0, rot: k.rot || 0, s: k.s || 1, ease: k.ease || 'ease', ei: k.ei, eo: k.eo })) } : null,
           panels: (s.panels || []).map(k => ({ id: k.id, poly: k.poly, base: k.base, cuts: k.cuts, border: k.border, bleed: k.bleed })),
           items: (s.items || []).filter(it => it.visible !== false && !(it.type === 'text' && !String(it.text || '').trim())),
           layers: s.layers.filter(l => book.plates[l.plateId]).map(l => ({

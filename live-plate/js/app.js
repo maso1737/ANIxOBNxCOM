@@ -18,6 +18,8 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
     tool: 'sel', selMode: 'art', divMode: 'f', toneKind: 'tone', textVert: true, whiteErase: false,
     // 02 DRAW の道具（mode/draw.js。localStorage に覚える＝作品ではない）
     draw: LP.drawTools.D,
+    // 03 TAKE（mode/take.js）：下書きの窓（BOOK に入らない）・選んでいる KF・MONITOR
+    camDraft: null, kfSel: null, monitor: (() => { try{ return localStorage.getItem('liveplate_monitor_v1') !== '0'; }catch(e){ return true; } })(),
   };
   const STEPS = ['sheet', 'draw', 'take', 'show'];
   const TOOL_HINT = {
@@ -31,7 +33,7 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
   const HINT = {
     sheet: ['01 SHEET', ''],
     draw:  ['02 DRAW',  ''],
-    take:  ['03 TAKE',  'カメラの窓＝書き出しと同じ画（KF を打つのは P3）'],
+    take:  ['03 TAKE',  ''],
     show:  ['04 SHOW',  '▶ PLAY で全画面 ／ HTML を書き出す'],
   };
   const DRAW_HINT = {
@@ -81,6 +83,7 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
         hud();
       }
     }
+    if(LP.state.step === 'take' && !LP.state.playing){ LP.dock.render(); crumb(); hud(); LP.timeline.renderTake(); }
     if(i !== lastIdx){
       lastIdx = i;
       LP.timeline.markCurrent();
@@ -155,6 +158,7 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
   function setStep(s){
     if(STEPS.indexOf(s) < 0) return;
     if(s !== 'draw' && LP.state.step === 'draw'){ LP.drawSel.settle(); LP.drawTools.cancel(); LP.drawGrid.close(); }
+    if(s !== 'take') LP.state.camDraft = null;
     LP.state.step = s;
     STEPS.forEach(k => document.body.classList.toggle('step-' + k, k === s));
     document.querySelectorAll('#bar .step').forEach(b => b.classList.toggle('on', b.dataset.step === s));
@@ -168,16 +172,18 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
   }
   function crumb(){
     const h = HINT[LP.state.step];
-    const txt = LP.state.step === 'sheet' ? TOOL_HINT[LP.state.tool]() : LP.state.step === 'draw' ? DRAW_HINT[LP.state.draw.tool]() : h[1];
+    const txt = LP.state.step === 'sheet' ? TOOL_HINT[LP.state.tool]() : LP.state.step === 'draw' ? DRAW_HINT[LP.state.draw.tool]()
+      : LP.state.step === 'take' ? LP.takeTools.label() + '　窓の中＝パン・隅＝寄り・●＝回転・ホイール＝寄り（Alt＝表示）・C＝CAPTURE' : h[1];
     $('#crumb').innerHTML = '<b>' + h[0] + '</b>' + LP.ui.esc(txt);
   }
   function hud(){
     const z = LP.stage.zoomPct();
-    $('#stage-hud').innerHTML = (LP.state.step === 'draw' ? LP.drawTools.hudText() : LP.state.step === 'sheet' ? 'PAPER' : 'CAMERA') + ' <b>' + z + '%</b>';
+    $('#stage-hud').innerHTML = (LP.state.step === 'draw' ? LP.drawTools.hudText() : LP.state.step === 'sheet' ? 'PAPER' : LP.takeTools.hudText()) + ' <b>' + z + '%</b>';
   }
   function escape(){
     if(LP.state.step === 'draw' && LP.drawTools.cancel()) return;   // 変形・投げ縄（02 DRAW）
     if(LP.drawGrid.close()) return;              // セル一覧 GRID → FOCUS
+    if(LP.takeTools.cancel()) return;            // 03 TAKE の下書きの窓
     if(LP.sheetTools.cancel()) return;          // 投げ縄・分割のプレビュー
     if(LP.settings.open){ LP.settings.toggle(false); return; }
     if(LP.state.clean){ exitClean(); return; }
@@ -200,6 +206,7 @@ LP.HARNESS_ON = /[?&]harness=1\b/.test(location.search);
     if(LP.drawGrid.on) LP.drawGrid.render();
   }
   function commit(label){
+    LP.take.rebuildAll(LP.book);   // 紙の尺・KF が変わったら AUTO の配分を書き直す（f・d は BOOK に入る＝ビューアは読むだけ）
     LP.hist.commit(label);
     refresh();
   }

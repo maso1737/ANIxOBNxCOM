@@ -66,6 +66,7 @@
     <div id="stage-msg"></div>
     <div id="stage-hud"></div>
     <div id="grid"></div>
+    <div id="monitor" title="MONITOR：カメラの出口（書き出しと同じ画）。P で開閉"><canvas></canvas><span class="lb">MONITOR</span></div>
   </main>
 
   <!-- 右は2列：SHEETS（紙の一覧）｜◆ITEMS（いまの紙の層・素材）。列ごとに ≡ で畳める（畳むと細い帯） -->
@@ -96,7 +97,7 @@
       <button class="btn ico" id="tl-zin" title="時間を伸ばす">＋</button>
     </div>
     <div id="tl-main">
-      <div id="tl-labels"><div class="lr">TIME</div><div class="ls">SHEET</div><div class="lref" id="tl-lref" title="参照（REF）：02 DRAW の REF で足す。帯を横ドラッグ＝ずらす・×N＝コマ打ち">REF</div><div class="lc lane" id="tl-lline" data-lane="line"></div><div class="lf lane" id="tl-lfill" data-lane="fill"></div></div>
+      <div id="tl-labels"><div class="lr">TIME</div><div class="ls">SHEET</div><div class="lref" id="tl-lref" title="参照（REF）：02 DRAW の REF で足す。帯を横ドラッグ＝ずらす・×N＝コマ打ち">REF</div><div class="lc lane" id="tl-lline" data-lane="line"></div><div class="lf lane" id="tl-lfill" data-lane="fill"></div><div class="lt" id="tl-ltake" title="カメラの KF（03 TAKE）：◆＝着く時刻・帯＝止め。◆ をドラッグ＝手動の時刻">TAKE</div></div>
       <div id="tl-scroll">
         <div id="tl-inner">
           <div id="tl-ruler"></div>
@@ -105,6 +106,7 @@
           <div id="tl-refs"></div>
           <div id="tl-cells"></div>
           <div id="tl-fills"></div>
+          <div id="tl-take"></div>
           <div id="tl-drop"></div>
           <div id="tl-ph"></div>
         </div>
@@ -167,6 +169,7 @@
 <script src="js/core/paint.js"></script>
 <script src="js/core/cells.js"></script>
 <script src="js/core/brush.js"></script>
+<script src="js/core/take.js"></script>
 <script src="js/ui/widgets.js"></script>
 <script src="js/ui/stage.js"></script>
 <script src="js/ui/timeline.js"></script>
@@ -179,6 +182,7 @@
 <script src="js/mode/draw-sel.js"></script>
 <script src="js/mode/draw-pal.js"></script>
 <script src="js/mode/draw-grid.js"></script>
+<script src="js/mode/take.js"></script>
 <script src="js/input/keymap.js"></script>
 <script src="js/io/import.js"></script>
 <script src="js/io/book-zip.js"></script>

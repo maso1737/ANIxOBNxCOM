@@ -25,8 +25,50 @@ LP.lib.render = function(T, G, IT){
     if(h > ph){ h = ph; w = ph * 16 / 9; }
     return { w: w, h: h };
   }
-  /* 紙のカメラ（P3 で sheet.take の KF 補間が入る。いまは既定＝紙の中央・等倍） */
-  function camAt(book, sheet, local){ return { x: 0, y: 0, z: 0, rot: 0, s: 1 }; }
+  /* ---------- カメラ（SPEC_21 §6-3 / §19）----------
+     sheet.take.kf = [{ f, d, x, y, z, rot, s, ease, ei, eo }]（f の昇順）
+       f＝着く紙内フレーム・d＝止まっている長さ（f〜f+d は KF のまま）・x,y＝紙の中央からのずれ（紙 px）・
+       s＝寄り（1＝紙の幅いっぱいの 16:9）・rot＝度・z＝カメラの前後（正＝前へ。§6-3 の persp）
+     区間 A→B は A の止めが終わって（A.f+A.d）から B.f まで動く。動き方は着く側 B の ease：
+       'linear'／'ease'（smoothstep＝composer ez=1）／'hold'（B.f で切り替わる）。A.eo / B.ei（0〜100）があれば composer の bezier。
+     ★ f と d は auto（OBAN の dwell/travel 配分）でも手動でも**ここでは数字を読むだけ**（配分はアプリ側 core/take.js が書く）。
+       ＝ビューア・SEQ・MP4 は配分の式を持たなくてよい */
+  const CAM0 = { x: 0, y: 0, z: 0, rot: 0, s: 1 };
+  function bezierEaseT(t, x1, x2){
+    if(t <= 0) return 0; if(t >= 1) return 1;
+    let u = t;
+    for(let i = 0; i < 8; i++){
+      const iu = 1 - u;
+      const x = 3 * iu * iu * u * x1 + 3 * iu * u * u * x2 + u * u * u;
+      const dx = 3 * iu * iu * x1 + 6 * iu * u * (x2 - x1) + 3 * u * u * (1 - x2);
+      if(Math.abs(x - t) < 1e-5) break;
+      if(dx > 1e-6) u -= (x - t) / dx; else break;
+      u = Math.max(0, Math.min(1, u));
+    }
+    return u * u * (3 - 2 * u);
+  }
+  function pose(k){ return { x: k.x || 0, y: k.y || 0, z: k.z || 0, rot: k.rot || 0, s: k.s || 1 }; }
+  function camLerp(A, B, u){
+    if(B.ease === 'hold') u = 0;
+    else if(A.eo != null || B.ei != null) u = bezierEaseT(u, (A.eo || 0) / 100, 1 - (B.ei || 0) / 100);
+    else if(B.ease !== 'linear') u = u * u * (3 - 2 * u);
+    const a = pose(A), b = pose(B), m = (p, q) => p + (q - p) * u;
+    return { x: m(a.x, b.x), y: m(a.y, b.y), z: m(a.z, b.z), rot: m(a.rot, b.rot), s: m(a.s, b.s) };
+  }
+  function camAt(book, sheet, local){
+    const kf = sheet && sheet.take && sheet.take.kf;
+    if(!kf || !kf.length) return pose(CAM0);
+    if(local <= kf[0].f + (kf[0].d || 0)) return pose(kf[0]);
+    for(let i = 0; i < kf.length - 1; i++){
+      const A = kf[i], B = kf[i + 1], g = A.f + (A.d || 0);
+      if(local < B.f){
+        if(local <= g || B.f <= g) return pose(A);
+        return camLerp(A, B, (local - g) / (B.f - g));
+      }
+      if(local <= B.f + (B.d || 0)) return pose(B);
+    }
+    return pose(kf[kf.length - 1]);
+  }
   /* 重なり順＝配列順（奥→手前）。Z では並べ替えない */
   function layersInDrawOrder(sheet){ return sheet.layers.slice(); }
   /* LAYER.z は「正＝手前」。composer の z（正＝奥）とは符号が逆：depth = F − z − cam.z（§15-1 #2） */

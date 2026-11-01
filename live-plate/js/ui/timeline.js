@@ -1,7 +1,7 @@
 /* ============================================================
    LIVE PLATE — ui/timeline.js（タイムラインは1本・行は4種。SPEC_21 §4-3）
    行：SHEET（紙＝クリップ。幅＝尺）／ REF（参照の帯・参照があるときだけ）／ 線・塗（選んだ層のセル）
-   TAKE（P3）はそのフェーズで足す。**行は増やさない**（層ごとのトラックは作らない）。
+   TAKE＝カメラの KF（◆＋止めの帯。03 TAKE のときだけ出す・§19）。**行は増やさない**（層ごとのトラックは作らない）。
    操作：ルーラー／クリップ本体をドラッグ＝スクラブ・右端ドラッグ＝尺・＋＝紙を足す・
          Ctrl+ホイール＝時間の拡縮・ホイール＝横送り・ファイルを落とす＝その位置に新しい紙。
    ★ ドラッグ中は DOM を作り直さない（掴んだ要素が消えると capture が切れる）。位置と文字だけ差し替える。
@@ -26,6 +26,7 @@ var LP = window.LP || (window.LP = {});
     $('#tl-cells').addEventListener('pointerdown', onCellsDown);
     $('#tl-fills').addEventListener('pointerdown', onCellsDown);
     $('#tl-refs').addEventListener('pointerdown', onRefsDown);
+    $('#tl-take').addEventListener('pointerdown', onTakeDown);
     $('#tl-labels').addEventListener('click', onLaneHead);
     scroller.addEventListener('wheel', e => {
       if(e.ctrlKey){
@@ -91,7 +92,60 @@ var LP = window.LP || (window.LP = {});
     $('#tl-add').style.left = (acc * ppf + 8) + 'px';
 
     renderCells();
+    renderTake();
     playhead();
+  }
+  /* TAKE の行：紙ごとの KF。◆＝着く時刻（f）・帯＝止め（d）。◆ を横ドラッグ＝手動の時刻（AUTO が外れる） */
+  let kdDrag = false;
+  function renderTake(){
+    const el = $('#tl-take');
+    if(!el || !LP.book || kdDrag) return;
+    const cur = LP.app.curAt();
+    let h = '', acc = 0;
+    LP.book.sheets.forEach((sh, si) => {
+      const kf = LP.take.kfs(sh);
+      kf.forEach((k, i) => {
+        const x = (acc + k.f) * ppf, w = (k.d || 0) * ppf;
+        const on = cur && cur.i === si && LP.state.kfSel === k.id;
+        if(w >= 2) h += '<i class="hb' + (on ? ' on' : '') + '" style="left:' + (x + ppf / 2) + 'px;width:' + w + 'px"></i>';
+        h += '<b class="kd' + (on ? ' on' : '') + (sh.take.auto ? '' : ' man') + '" data-kf="' + k.id + '" data-si="' + si + '" style="left:' + (x + ppf / 2) + 'px" title="' + LP.ui.esc(sh.name) + ' KF ' + (i + 1) + '：' + k.f + 'コマ目・止め ' + (k.d || 0) + 'コマ　クリック＝選ぶ／横ドラッグ＝時刻（AUTO が外れる）"></b>';
+      });
+      acc += sh.dur;
+    });
+    el.innerHTML = h;
+  }
+  function onTakeDown(e){
+    const d = e.target.closest('[data-kf]');
+    if(!d) return;
+    e.preventDefault();
+    const sh = LP.book.sheets[+d.dataset.si], id = d.dataset.kf, k = LP.take.kfs(sh).find(o => o.id === id);
+    if(!sh || !k) return;
+    const start = LP.time.sheetStart(LP.book, +d.dataset.si);
+    LP.app.stop();
+    kdDrag = true;   // ドラッグ中は行を作り直さない（掴んだ ◆ が消えると capture が切れる）
+    LP.app.seek(start + k.f);
+    LP.takeTools.select(id, true);
+    d.classList.add('on');
+    const x0 = e.clientX, f0 = k.f, wasAuto = sh.take.auto;
+    let moved = false;
+    d.setPointerCapture(e.pointerId);
+    const mv = ev => {
+      const f = Math.round(f0 + (ev.clientX - x0) / ppf);
+      if(!moved && f === f0) return;
+      moved = true;
+      LP.take.moveF(LP.book, sh, id, f);
+      d.style.left = ((start + k.f) * ppf + ppf / 2) + 'px';
+      LP.app.seek(start + k.f);
+    };
+    const up = () => {
+      d.removeEventListener('pointermove', mv); d.removeEventListener('pointerup', up); d.removeEventListener('pointercancel', up);
+      kdDrag = false;
+      if(!moved) renderTake();
+      if(moved){ LP.app.commit('KF の時刻'); if(wasAuto) LP.ui.toast('◆ を動かしたので手動になりました（AUTO で配分し直せます）'); }
+    };
+    d.addEventListener('pointermove', mv);
+    d.addEventListener('pointerup', up);
+    d.addEventListener('pointercancel', up);
   }
 
   /* 線／塗の行：選んだ層のセルを、紙の中の時間に並べる（cellIndexAt そのもの＝ステージと同じ式）。
@@ -340,5 +394,5 @@ var LP = window.LP || (window.LP = {});
     m.style.left = (f * ppf - 1) + 'px';
   }
 
-  LP.timeline = { init, render, playhead, markCurrent, renderCells, insertIndexAt, showDropAt, fit };
+  LP.timeline = { init, render, playhead, markCurrent, renderCells, renderTake, insertIndexAt, showDropAt, fit };
 })();

@@ -11,7 +11,12 @@
     { "label": "l05_c2_seq_loop",    "timeMs": 2334 },
     { "label": "l06_c3_mul_rot",     "timeMs": 2584 },
     { "label": "l07_c4_panels",      "timeMs": 3585 },
-    { "label": "l08_c4_panels_mid",  "timeMs": 4002 }
+    { "label": "l08_c4_panels_mid",  "timeMs": 4002 },
+    { "label": "l09_c5_cam_kf1",     "timeMs": 4502 },
+    { "label": "l10_c5_cam_ease",    "timeMs": 5002 },
+    { "label": "l11_c5_cam_ease_end","timeMs": 5418 },
+    { "label": "l12_c5_cam_kf2",     "timeMs": 5626 },
+    { "label": "l13_c5_cam_linear",  "timeMs": 6043 }
   ],
 
   "vrt": { "colorThreshold": 0.1, "allowedPixelRatio": 0.0002 },

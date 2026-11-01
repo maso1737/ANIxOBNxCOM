@@ -135,17 +135,22 @@ var LP = window.LP || (window.LP = {});
         showMsg = 'draw';
       }
     }else if(st.step === 'take' || st.step === 'show'){
-      // 窓の外の紙は暗く（OBAN と同じ）。窓の中はカメラの画＝書き出しと同じ式
+      // 窓の外の紙は暗く（OBAN と同じ）。窓の中はカメラの画＝書き出しと同じ式（render.js camAt）。
+      // 窓は紙の上の足あと（中心＝紙の中央＋x,y・大きさ＝camBase÷(s×persp₀)・向き＝rot）に、カメラの画をそのまま重ねる
       ctx.globalAlpha = 0.25;
       LP.render.renderFrame(ctx, LP.book, T, sheetView());
       ctx.globalAlpha = 1;
-      const b = LP.render.camBase(LP.book);
-      const p0 = { x: (LP.book.paper.w - b.w) / 2, y: (LP.book.paper.h - b.h) / 2 };
-      const r = { x: (v.ox + p0.x * v.s) * dpr, y: (v.oy + p0.y * v.s) * dpr, w: b.w * v.s * dpr, h: b.h * v.s * dpr };
-      res = LP.render.renderFrame(ctx, LP.book, T, { mode: 'camera', img, rect: r });
-      ctx.lineWidth = dpr; ctx.strokeStyle = C.pt;
-      ctx.strokeRect(r.x - 0.5 * dpr, r.y - 0.5 * dpr, r.w + dpr, r.h + dpr);
-      drawGateTicks(r);
+      const pose = LP.takeTools.livePose(), win = LP.take.windowOf(LP.book, pose);
+      const cx = (v.ox + win.cx * v.s) * dpr, cy = (v.oy + win.cy * v.s) * dpr, ww = win.w * v.s * dpr, wh = win.h * v.s * dpr;
+      ctx.save();
+      ctx.translate(cx, cy);
+      if(win.rot) ctx.rotate(win.rot * Math.PI / 180);
+      const r = { x: -ww / 2, y: -wh / 2, w: ww, h: wh };
+      res = LP.render.renderFrame(ctx, LP.book, T, { mode: 'camera', img, rect: r, cam: pose });
+      if(st.step === 'show'){ ctx.lineWidth = dpr; ctx.strokeStyle = C.pt; ctx.strokeRect(r.x - 0.5 * dpr, r.y - 0.5 * dpr, r.w + dpr, r.h + dpr); drawGateTicks(r); }
+      ctx.restore();
+      if(st.step === 'take') LP.takeTools.overlay(ctx, helpers);
+      drawMonitor(pose);
     }else{
       res = LP.render.renderFrame(ctx, LP.book, T, sheetView({ guides: true, guideColor: C.pt, px: dpr }));
       LP.sheetTools.overlay(ctx, helpers);
@@ -160,6 +165,22 @@ var LP = window.LP || (window.LP = {});
       else if(showMsg === 'empty') msg.innerHTML = '<div class="big">DROP IMAGES</div><div class="rule"></div><div class="sm">ここ（紙）に落とす＝<b>この紙に層として置く</b><br>下のタイムラインに落とす＝<b>1枚ずつ新しい紙にする</b>／左の棚＝<b>しまうだけ</b><br>コマを割るなら <b>DIV（D）</b> で紙の上に線を引く</div>';
     }
     return res;
+  }
+  /* MONITOR（03 TAKE・P）：カメラの出口をそのまま小さく（renderFrame mode:'camera'＝書き出しと同じ） */
+  function drawMonitor(pose){
+    const box = $('#monitor'), on = LP.state.step === 'take' && LP.state.monitor && !LP.state.clean;
+    if(!box) return;
+    box.classList.toggle('show', on);
+    if(!on) return;
+    const mc = box.querySelector('canvas'), b = LP.render.camBase(LP.book);
+    const w = Math.round(box.clientWidth * dpr) || Math.round(288 * dpr), h = Math.round(w * b.h / b.w);
+    if(mc.width !== w || mc.height !== h){ mc.width = w; mc.height = h; }
+    const g = mc.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, w, h);
+    LP.render.renderFrame(g, LP.book, LP.state.t, { mode: 'camera', img: LP.cache.img, rect: { x: 0, y: 0, w, h }, cam: pose });
+    const o = LP.app.outSize();
+    box.querySelector('.lb').textContent = 'MONITOR  ' + o.w + '×' + o.h + (LP.state.camDraft ? '  · DRAFT' : '');
   }
   function drawGateTicks(r){
     const C = LP.ui.CVC, L = 12 * dpr, m = 5 * dpr;
@@ -199,6 +220,11 @@ var LP = window.LP || (window.LP = {});
       if(d) drag = d; else startPan(e, sp, true);
       return;
     }
+    if(LP.state.step === 'take'){
+      const d = e.pointerType === 'touch' ? null : LP.takeTools.down(e, sp, toWorld(sp.x, sp.y), helpers);
+      if(d) drag = d; else startPan(e, sp, true);
+      return;
+    }
     if(LP.state.step !== 'sheet'){ startPan(e, sp, true); return; }
     if(LP.state.playing) LP.app.stop();
     const d = LP.sheetTools.down(e, sp, toWorld(sp.x, sp.y), helpers);
@@ -209,6 +235,7 @@ var LP = window.LP || (window.LP = {});
     const sp = evPt(e);
     if(!drag){
       if(LP.state.step === 'draw' && e.pointerType !== 'touch'){ stageEl.style.cursor = LP.drawTools.hover(sp, toWorld(sp.x, sp.y), helpers, e) || ''; return; }
+      if(LP.state.step === 'take'){ stageEl.style.cursor = LP.takeTools.hover(sp, toWorld(sp.x, sp.y), helpers) || ''; return; }
       if(LP.state.step === 'sheet'){
         const cur = LP.sheetTools.hover(sp, toWorld(sp.x, sp.y), helpers, e);
         stageEl.style.cursor = cur || '';
@@ -224,6 +251,7 @@ var LP = window.LP || (window.LP = {});
       renderQ();
       return;
     }
+    if(drag.kind === 'cam'){ LP.takeTools.move(e, sp, toWorld(sp.x, sp.y), drag, helpers); return; }
     if(LP.state.step === 'draw'){ LP.drawTools.move(e, sp, toWorld(sp.x, sp.y), drag, helpers); return; }
     LP.sheetTools.move(e, sp, toWorld(sp.x, sp.y), drag, helpers);
   }
@@ -238,6 +266,7 @@ var LP = window.LP || (window.LP = {});
       LP.app.hud();
       return;
     }
+    if(d.kind === 'cam'){ LP.takeTools.up(e, sp, wp, d); return; }
     if(LP.state.step === 'draw'){ LP.drawTools.up(e, sp, wp, d, helpers); return; }
     LP.sheetTools.up(e, sp, wp, d, helpers);
   }
@@ -251,6 +280,7 @@ var LP = window.LP || (window.LP = {});
   function onWheel(e){
     if(LP.state.clean) return;
     e.preventDefault();
+    if(LP.state.step === 'take' && !e.altKey && LP.takeTools.wheel(e)) return;   // 03 TAKE：ホイール＝寄り引き／Alt＋ホイール＝表示のズーム
     const sp = evPt(e);
     const f = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
     zoomAt(viewKey(), f, sp.x, sp.y);
