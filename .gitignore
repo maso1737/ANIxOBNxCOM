@@ -29,6 +29,8 @@ ref_frame_*.json
 ref_frame_*.zip
 # LIVE PLATE の BOOK zip（作品データ。公開リポジトリに置かない）
 liveplate-*.zip
+# LIVE PLATE のセル一覧 PNG（02 DRAW の GRID ▸ ⇩ 一覧 PNG）
+liveplate-*.png
 # ROUGH の書き出し（⇩ SAVE の JSON・連番 ZIP・PNG。作品データ。公開リポジトリに置かない）
 rough-*.json
 rough-*.zip

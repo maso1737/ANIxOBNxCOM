@@ -151,13 +151,17 @@ var LP = window.LP || (window.LP = {});
         + '<button class="qd-sb' + (fa ? '' : ' off') + '" data-act="selCancel" title="取消（Esc）">✕ 取消</button>');
     }else if(D.tool === 'fill'){
       h += grp('FILL', D.fillErase ? '投げ縄消し：いまのレーン' : '塗レーン',
-        u.qdSeg('dfmode', [['bucket', 'バケツ'], ['lasso', '投げ縄'], ['erase', '投げ縄消し']], D.fillErase ? 'erase' : D.fillMode)
-        + '<span class="dk-jp" style="margin-left:4px">潜り</span>' + u.qdSeg('dunder', [[0, '0'], [1, '1'], [2, '2'], [3, '3']], D.under) + '<span class="dk-jp">px</span>');
+        '<div class="dk-set"><div class="dk-row">' + u.qdSeg('dfmode', [['bucket', 'バケツ'], ['lasso', '投げ縄'], ['erase', '投げ縄消し']], D.fillErase ? 'erase' : D.fillMode) + '</div>'
+        + '<div class="dk-row"><span class="dk-jp dk-nw" style="width:auto">潜り</span>' + u.qdSeg('dunder', [[0, '0'], [1, '1'], [2, '2'], [3, '3']], D.under) + '<span class="dk-jp">px</span></div></div>');
     }else if(D.tool === 'pen' || D.tool === 'erase'){
-      const er = D.tool === 'erase';
-      h += grp('BRUSH', er ? '消しゴム' : 'ペン',
-        '<button class="qd-sb" data-act="dsizeDn" title="細く">－</button>' + u.qdNum('dsize', 'SIZE', er ? D.eraseSize : D.penSize, 'px') + '<button class="qd-sb" data-act="dsizeUp" title="太く">＋</button>'
-        + '<button class="qd-sb' + ((er ? D.pressureErase : D.pressure) ? ' on' : '') + '" data-act="dpress" title="筆圧（ペンと消しゴムで別々。' + (er ? '' : 'P を2回') + '）">筆圧</button>');
+      const er = D.tool === 'erase', tone = !er && DT.toneOf(D.lane), legacy = er || tone || D.brush === 'pen';
+      const sizeRow = '<button class="qd-sb" data-act="dsizeDn" title="細く">－</button>' + u.qdNum('dsize', 'SIZE', DT.sizeOf(), 'px') + '<button class="qd-sb" data-act="dsizeUp" title="太く">＋</button>'
+        + (legacy ? '<button class="qd-sb' + ((er ? D.pressureErase : D.pressure) ? ' on' : '') + '" data-act="dpress" title="筆圧（ペンと消しゴムで別々。' + (er ? '' : 'P を2回') + '）">筆圧</button>'
+                  : '<span class="dk-jp dk-nw" title="PEN 以外のブラシは、ペンなら筆圧がいつも効く（マウスは見ない）">筆圧 常時</span>');
+      if(er) h += grp('BRUSH', '消しゴム＝丸ペン', sizeRow);
+      else h += grp('BRUSH', tone ? '網は丸ペン' : 'B で次',
+        '<div class="dk-set"><div class="dk-row">' + LP.brush.LIST.map(b => '<button class="qd-sb br' + (D.brush === b.id ? ' on' : '') + (tone && b.id !== 'pen' ? ' off' : '') + '" data-act="dbrush" data-v="' + b.id + '" title="' + u.esc(b.name + '：' + b.jp) + '">' + b.name + '</button>').join('') + '</div>'
+        + '<div class="dk-row">' + sizeRow + '</div></div>');
     }
     if(D.refOpen){
       const others = Object.values(LP.book.plates).filter(o => o.id !== p.id);
@@ -167,20 +171,30 @@ var LP = window.LP || (window.LP = {});
           + u.qdSeg('refOp', [[rf.id + ':0.2', '20'], [rf.id + ':0.4', '40'], [rf.id + ':0.7', '70']], rf.id + ':' + rf.opacity) + '<button class="qd-sb del" data-act="refDel" data-v="' + rf.id + '">✕</button></div>'; }).join('') : '<span class="dk-jp">下の素材を押すと参照に足します。タイムラインの REF 行で ずらす・×N</span>') + '</div>'
         + '<div class="dk-plates">' + others.map(o => '<button data-act="refAdd" data-v="' + o.id + '" title="' + u.esc(o.name) + '（' + o.w + '×' + o.h + '・セル ' + o.cells.length + '）を参照に" style="background-image:url(' + (o.thumb ? LP.cache.thumbURL(o.thumb) : '') + ')"><span>' + u.esc(o.name) + '</span></button>').join('') + '</div>');
     }else{
-      const cur = D.lane === 'fill' ? D.paint : D.ink;
-      h += grp('COLOR', D.lane === 'fill' ? '塗りの色' : 'インク',
-        '<div class="dk-cur"><div class="chip" style="background:' + cur + '" title="色を選ぶ"><input type="color" data-f="dcolor" value="' + cur.toLowerCase() + '"></div><span class="lb">' + cur + '</span></div>'
-        + '<div class="dk-sw">' + LP.drawTools.PAL.map(c => '<button class="' + (c === cur ? 'on' : '') + '" data-act="dpal" data-v="' + c + '" style="background:' + c + '" title="' + c + '"></button>').join('') + '</div>');
+      const cur = D.lane === 'fill' ? D.paint : D.ink, tk = D.lane === 'fill' ? D.paintTone : D.inkTone;
+      const tchip = k => { const s = D['tone' + k], t = LP.paint.tone(s.pitch, s.cov, cur);
+        return '<button class="dk-tn' + (tk === k ? ' on' : '') + '" data-act="dtone" data-v="' + k + '" style="background-image:url(' + t.url + ')" title="トーンインク T' + k + '（網点 ' + t.T + 'px・' + Math.round(t.cov * 100) + '%）：ペン・バケツ・投げ縄が網点に。もう一度押す＝ベタ"><span>T' + k + '</span></button>'; };
+      h += grp('COLOR', (D.lane === 'fill' ? '塗りの色' : 'インク') + (tk ? '・網 T' + tk : ''),
+        '<div class="dk-cur"><div class="chip" style="background:' + cur + '" title="色を選ぶ（選んでいる枠にも入る）"><input type="color" data-f="dcolor" value="' + cur.toLowerCase() + '"></div><span class="lb">' + cur + '</span></div>'
+        + '<div class="dk-tns">' + tchip(1) + tchip(2) + '</div>'
+        + LP.drawPal.html(cur)
+        + '<div class="dk-palb"><button class="qd-sb" data-act="palAdd" title="いまの色で枠を足す">＋</button><button class="qd-sb" data-act="palDel" title="選んでいる枠を消す（明度チップは消せない）">−</button>'
+        + '<button class="qd-sb" data-act="palSave" title="パレットを JSON で書き出す（ANIMATOR と同じ PALETTE_v1）">⇩</button><button class="qd-sb" data-act="palLoad" title="パレット JSON を読む（ANIMATOR の書き出しも読める）">⇧</button></div>');
+      if(tk){
+        h += grp('TONE', 'T' + tk,
+          '<div class="dk-set"><div class="dk-row">' + u.qdNum('tpitch', 'ピッチ', D['tone' + tk].pitch, 'px') + '</div><div class="dk-row">' + u.qdNum('tcov', '濃度', Math.round(D['tone' + tk].cov * 100), '%') + '</div></div>');
+      }
     }
     const n = p.cells.length, ci = tg.ci, cell = ci >= 0 ? p.cells[ci] : null;
     h += grp('CELL', ci < 0 ? 'このコマは出ていない' : 'セル ' + (ci + 1) + ' / ' + n,
-      '<button class="qd-sb" data-act="cellPrev" title="前のセル（↑）">◀</button><button class="qd-sb" data-act="cellNext" title="次のセル（↓）">▶</button>'
+      '<div class="dk-set"><div class="dk-row"><button class="qd-sb" data-act="cellPrev" title="前のセル（↑）">◀</button><button class="qd-sb" data-act="cellNext" title="次のセル（↓）">▶</button>'
       + '<button class="qd-sb" data-act="cellAdd" title="いまのセルの後ろに空のセルを足す">＋</button>'
       + '<button class="qd-sb" data-act="cellDup" title="いまのセルを複製して後ろへ">複製</button>'
       + '<button class="qd-sb del" data-act="cellDel" title="いまのセルを消す（Ctrl+Z で戻る）">削除</button>'
-      + (cell ? u.qdNum('cdur', '長さ', cell.dur, 'コマ') : '')
+      + '</div><div class="dk-row">' + (cell ? u.qdNum('cdur', '長さ', cell.dur, 'コマ') : '')
+      + '<button class="qd-sb' + (LP.drawGrid.on ? ' on' : '') + '" data-act="dgrid" title="GRID：このプレートのセル一覧（X）。クリック＝そのセル／Wクリック＝描く／ドラッグ＝並べ替え">GRID</button>'
       + '<button class="qd-sb' + (D.onion ? ' on' : '') + '" data-act="onion" title="オニオン：前＝赤・後＝青（O）">オニオン</button>'
-      + '<button class="qd-sb' + (D.onionFill ? ' on' : '') + '" data-act="onionFill" title="オニオンに塗りも含める">＋塗</button>');
+      + '<button class="qd-sb' + (D.onionFill ? ' on' : '') + '" data-act="onionFill" title="オニオンに塗りも含める">＋塗</button></div></div>');
     h += '<span class="dk-sp"></span>' + grp('BACK', '戻る', '<button class="btn" data-act="toSheet" title="01 SHEET へ戻る（Esc）">◀ 01 SHEET</button>');
     return h;
   }
@@ -276,11 +290,18 @@ var LP = window.LP || (window.LP = {});
       }
       case 'dref': LP.drawTools.toggleRef(); break;
       case 'dlane': LP.drawTools.setLane(b.dataset.v); break;
-      case 'dsizeUp': case 'dsizeDn': { const d = LP.detail.SCR.dsize; d.set(Math.max(1, Math.min(200, Math.round(d.get() * (a === 'dsizeUp' ? 1.25 : 0.8)) + (a === 'dsizeUp' ? 1 : 0)))); d.done(); break; }
+      case 'dsizeUp': case 'dsizeDn': { const d = LP.detail.SCR.dsize; d.set(Math.max(1, Math.min(300, Math.round(d.get() * (a === 'dsizeUp' ? 1.25 : 0.8)) + (a === 'dsizeUp' ? 1 : 0)))); d.done(); break; }
+      case 'dbrush': LP.drawTools.setBrush(b.dataset.v); break;
+      case 'dtone': LP.drawTools.setTone(+b.dataset.v); break;
+      case 'palAdd': LP.drawPal.add(); break;
+      case 'palDel': LP.drawPal.del(); break;
+      case 'palSave': LP.drawPal.exportJSON(); break;
+      case 'palLoad': LP.drawPal.importJSON(); break;
+      case 'dgrid': LP.drawGrid.toggle(); break;
       case 'dpress': { const D = LP.state.draw; if(D.tool === 'erase') D.pressureErase = !D.pressureErase; else D.pressure = !D.pressure; LP.drawTools.savePrefs(); render(); LP.app.crumb(); break; }
       case 'dfmode': { const D = LP.state.draw; if(b.dataset.v === 'erase') LP.drawTools.fillEraseToggle(true); else { D.fillErase = false; D.fillMode = b.dataset.v; LP.drawTools.setTool('fill', true); } break; }
       case 'dunder': LP.state.draw.under = +b.dataset.v; LP.drawTools.savePrefs(); render(); LP.app.crumb(); LP.ui.toast('塗りの潜り ' + LP.state.draw.under + 'px（これから塗るぶん）'); break;
-      case 'dpal': LP.drawTools.setColor(b.dataset.v); break;
+      case 'dpal': LP.drawPal.select(+b.dataset.v); break;
       case 'selAA': LP.drawSel.toggleAA(); break;
       case 'selBoth': LP.drawSel.toggleBoth(); break;
       case 'selWarp': LP.drawSel.toggleWarp(); break;
@@ -347,9 +368,15 @@ var LP = window.LP || (window.LP = {});
   function drawScr(){
     const D = () => LP.state.draw;
     const cell = () => { const tg = LP.drawTools.target(); return tg && tg.cell; };
+    const tone = () => { const k = D().lane === 'fill' ? D().paintTone : D().inkTone; return k ? D()['tone' + k] : null; };
     Object.assign(LP.detail.SCR, {
-      dsize: { get: () => D().tool === 'erase' ? D().eraseSize : D().penSize, set: v => { v = Math.round(v); if(D().tool === 'erase') D().eraseSize = v; else D().penSize = v; LP.stage.renderOv(); },
-               min: 1, max: 200, px: 3, step: 1, done: () => { LP.drawTools.savePrefs(); render(); } },
+      dsize: { get: () => LP.drawTools.sizeOf(), set: v => { LP.drawTools.setSize(v); LP.stage.renderOv(); },
+               min: 1, max: 300, px: 3, step: 1, done: () => { LP.drawTools.savePrefs(); render(); } },
+      // トーンインク（いまのレーンの T1／T2）。これから描くぶんだけ（もう描いた網点は変わらない）
+      tpitch: { get: () => tone() ? tone().pitch : 8, set: v => { if(tone()) tone().pitch = Math.max(LP.paint.TONE_LIMIT.pitch[0], Math.min(LP.paint.TONE_LIMIT.pitch[1], Math.round(v))); },
+               min: 3, max: 48, px: 6, step: 1, done: () => { LP.drawTools.savePrefs(); render(); } },
+      tcov:  { get: () => tone() ? Math.round(tone().cov * 100) : 10, set: v => { if(tone()) tone().cov = Math.max(1, Math.min(95, Math.round(v))) / 100; },
+               min: 1, max: 95, px: 3, step: 1, done: () => { LP.drawTools.savePrefs(); render(); } },
       cdur:  { get: () => cell() ? cell().dur : 1, set: v => { const c = cell(); if(c){ c.dur = Math.max(1, Math.round(v)); LP.stage.renderQ(); } }, min: 1, max: 240, px: 8, step: 1,
                done: () => LP.app.commit('セルの長さ') },
     });
@@ -358,7 +385,7 @@ var LP = window.LP || (window.LP = {});
   function init(){
     drawScr();
     $('#dock').addEventListener('click', onClick);
-    $('#dock').addEventListener('change', e => { if(e.target.dataset.f === 'dcolor') LP.drawTools.setColor(e.target.value.toUpperCase()); });
+    $('#dock').addEventListener('change', e => { if(e.target.dataset.f === 'dcolor') LP.drawTools.pickColor(e.target.value.toUpperCase()); });
     $('#dock').addEventListener('pointerdown', onDown);
     U().bindScrub($('#dock'), LP.detail.SCR);
   }

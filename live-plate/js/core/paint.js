@@ -4,6 +4,8 @@
    数式と落とし穴はそのまま、canvas と色だけ引数で受け取る（state を読まない）。
    ★ アンチ無し（AA なし）。円は水平スパンで fillRect／clearRect（1px 毎判定と塗る画素は同じ・呼び出しは約2r回）
    ★ 座標は整数で渡す（bresenham は整数刻み。小数だと終点に届かない＝SPEC_20 §7-4）。入口で丸める。
+   ★ トーンインク（網点・§18-2）：tone() のタイルはプレートの原点に固定＝塗り足しても網点がずれずに繋がる（animator buildTone と同じ式）。
+     ペンは CanvasPattern を fillStyle に、バケツ／投げ縄は mask で「ドットの位置だけ」に色を置く
    ============================================================ */
 var LP = window.LP || (window.LP = {});
 
@@ -19,6 +21,36 @@ var LP = window.LP || (window.LP = {});
     const c = n => Math.max(0, Math.min(255, n | 0)).toString(16).padStart(2, '0');
     return ('#' + c(r) + c(g) + c(b)).toUpperCase();
   }
+
+  /* ---------- トーンインク（網点）。animator buildTone の式：45°配置・タイルあたりドット2個 ---------- */
+  const TONE_LIMIT = { pitch: [3, 48], cov: [0.01, 0.95] };
+  const toneCache = new Map();
+  function tone(pitch, cov, hex){
+    const T = Math.max(TONE_LIMIT.pitch[0], Math.min(TONE_LIMIT.pitch[1], Math.round(+pitch || 8)));
+    const cv = Math.max(TONE_LIMIT.cov[0], Math.min(TONE_LIMIT.cov[1], +cov || 0.1));
+    const key = T + '|' + cv.toFixed(3) + '|' + hex;
+    let t = toneCache.get(key);
+    if(t) return t;
+    const c = document.createElement('canvas'); c.width = T; c.height = T;
+    const g = c.getContext('2d'), img = g.createImageData(T, T), rgb = hexToRgb(hex);
+    const r2 = (cv * T * T) / (2 * Math.PI);
+    const centers = [[0, 0], [T, 0], [0, T], [T, T], [T / 2, T / 2]];
+    const mask = new Uint8Array(T * T);
+    for(let y = 0; y < T; y++){
+      for(let x = 0; x < T; x++){
+        const px = x + 0.5, py = y + 0.5;
+        for(const [cx, cy] of centers){ const dx = px - cx, dy = py - cy; if(dx * dx + dy * dy <= r2){ mask[y * T + x] = 1; break; } }
+        if(mask[y * T + x]){ const i = (y * T + x) * 4; img.data[i] = rgb.r; img.data[i + 1] = rgb.g; img.data[i + 2] = rgb.b; img.data[i + 3] = 255; }
+      }
+    }
+    g.putImageData(img, 0, 0);
+    t = { T, cov: cv, hex, mask, tile: c, pattern: g.createPattern(c, 'repeat'), get url(){ return this._u || (this._u = c.toDataURL()); } };
+    if(toneCache.size > 16) toneCache.delete(toneCache.keys().next().value);
+    toneCache.set(key, t);
+    return t;
+  }
+  /* その画素がドットの上か（キャンバス原点固定） */
+  function toneOn(t, x, y){ const T = t.T; return t.mask[((y % T + T) % T) * T + ((x % T + T) % T)] === 1; }
 
   /* 円を水平スパンで塗る（1行＝1矩形） */
   function fillCircleRows(x, y, r, row){
@@ -64,6 +96,7 @@ var LP = window.LP || (window.LP = {});
   /* バケツ（スキャンライン）。SPEC_20 §1-3：
        wallCtx があれば「その α ≥ 128」が壁（塗レーンで塗るとき＝線レーン）。自分のバッファは同色の連続が領域。
        under（0〜3）だけ線の下へ膨らませる（線のアンチの縁に白い隙間を出さない）。伸ばす先は「線の上」か「まだ透明」だけ。
+       opt.tone（tone() の戻り値）＝ドットの位置だけ色を置く（走った所は visited で覚える。網点は潜らせない＝animator と同じ）
      戻り値：塗った矩形 { x0, y0, x1, y1 }（何も塗らなければ false）＝ Undo のタイルをその範囲だけにする */
   function floodFill(ctx, wallCtx, sx, sy, hex, opt){
     opt = opt || {};
@@ -78,16 +111,17 @@ var LP = window.LP || (window.LP = {});
       for(let i = 0, q = 0; q < wall.length; i += 4, q++) if(ld[i + 3] >= FILL_WALL_A) wall[q] = 1;
       if(wall[sy * W + sx]) return false;   // 線の上を突いたときは何もしない
     }
-    const erase = !!opt.erase;
+    const erase = !!opt.erase, tn = erase ? null : (opt.tone || null);
     const si = (sy * W + sx) * 4;
     const tR = data[si], tG = data[si + 1], tB = data[si + 2], tA = data[si + 3];
     const fc = erase ? { r: 0, g: 0, b: 0 } : hexToRgb(hex), fA = erase ? 0 : 255;
     if(erase){ if(tA === 0) return false; }
-    else if(tR === fc.r && tG === fc.g && tB === fc.b && tA === 255) return false;
+    else if(!tn && tR === fc.r && tG === fc.g && tB === fc.b && tA === 255) return false;
     const painted = wall ? new Uint8Array(W * H) : null;
+    const visited = tn ? new Uint8Array(W * H) : null;
     let bx0 = W, by0 = H, bx1 = -1, by1 = -1;
     const grow = (x, y) => { if(x < bx0) bx0 = x; if(x > bx1) bx1 = x; if(y < by0) by0 = y; if(y > by1) by1 = y; };
-    const matches = i => !(wall && wall[i >> 2]) && data[i] === tR && data[i + 1] === tG && data[i + 2] === tB && data[i + 3] === tA;
+    const matches = i => !(wall && wall[i >> 2]) && !(visited && visited[i >> 2]) && data[i] === tR && data[i + 1] === tG && data[i + 2] === tB && data[i + 3] === tA;
     const stack = [[sx, sy]];
     while(stack.length){
       const [x, y] = stack.pop();
@@ -97,15 +131,18 @@ var LP = window.LP || (window.LP = {});
       let up = false, dn = false;
       while(lx < W && matches((y * W + lx) * 4)){
         const i = (y * W + lx) * 4;
-        data[i] = fc.r; data[i + 1] = fc.g; data[i + 2] = fc.b; data[i + 3] = fA;
-        if(painted) painted[i >> 2] = 1;
-        grow(lx, y);
+        if(visited) visited[i >> 2] = 1;
+        if(!tn || toneOn(tn, lx, y)){
+          data[i] = fc.r; data[i + 1] = fc.g; data[i + 2] = fc.b; data[i + 3] = fA;
+          if(painted) painted[i >> 2] = 1;
+          grow(lx, y);
+        }
         if(y > 0){ if(matches(i - W * 4)){ if(!up){ stack.push([lx, y - 1]); up = true; } } else up = false; }
         if(y < H - 1){ if(matches(i + W * 4)){ if(!dn){ stack.push([lx, y + 1]); dn = true; } } else dn = false; }
         lx++;
       }
     }
-    const under = wall && !erase ? Math.max(0, Math.min(3, opt.under | 0)) : 0;
+    const under = wall && !erase && !tn ? Math.max(0, Math.min(3, opt.under | 0)) : 0;
     if(under > 0){
       let cur = painted;
       for(let step = 0; step < under; step++){
@@ -157,8 +194,9 @@ var LP = window.LP || (window.LP = {});
     }
     return m;
   }
-  /* 投げ縄塗り／投げ縄消し。戻り値：塗った矩形（無ければ null） */
-  function lassoFill(ctx, pts, hex, erase){
+  /* 投げ縄塗り／投げ縄消し。tn（tone() の戻り値）＝ドットの位置だけ。戻り値：塗った矩形（無ければ null） */
+  function lassoFill(ctx, pts, hex, erase, tn){
+    if(erase) tn = null;
     if(!pts || pts.length < 3) return null;
     const W = ctx.canvas.width, H = ctx.canvas.height;
     const b = bboxOf(pts, W, H);
@@ -169,6 +207,7 @@ var LP = window.LP || (window.LP = {});
     const fc = erase ? { r: 0, g: 0, b: 0 } : hexToRgb(hex), fA = erase ? 0 : 255;
     for(let q = 0; q < m.length; q++){
       if(!m[q]) continue;
+      if(tn && !toneOn(tn, b.x0 + q % bw, b.y0 + ((q / bw) | 0))) continue;
       const i = q * 4;
       d[i] = fc.r; d[i + 1] = fc.g; d[i + 2] = fc.b; d[i + 3] = fA;
     }
@@ -176,5 +215,5 @@ var LP = window.LP || (window.LP = {});
     return { x: b.x0, y: b.y0, w: bw, h: bh };
   }
 
-  LP.paint = { FILL_WALL_A, hexToRgb, rgbToHex, fillCircleRows, bresenham, dot, line, floodFill, lassoFill, polyMask, bboxOf };
+  LP.paint = { FILL_WALL_A, TONE_LIMIT, tone, toneOn, hexToRgb, rgbToHex, fillCircleRows, bresenham, dot, line, floodFill, lassoFill, polyMask, bboxOf };
 })();
