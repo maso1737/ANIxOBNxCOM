@@ -1,7 +1,7 @@
 /* ============================================================
    LIVE PLATE — ui/timeline.js（タイムラインは1本・行は4種。SPEC_21 §4-3）
-   行：SHEET（紙＝クリップ。幅＝尺）／ REF（参照の帯・参照があるときだけ）／ 線・塗（選んだ層のセル）
-   TAKE（P3）はそのフェーズで足す。**行は増やさない**（層ごとのトラックは作らない）。
+   行：SHEET（紙＝クリップ。幅＝尺・頭に繋ぎの印）／ TAKE（カメラの KF ◆・止まりの帯）／ REF（参照の帯・参照があるときだけ）／ 線・塗（選んだ層のセル）
+   **行は増やさない**（層ごとのトラックは作らない）。
    操作：ルーラー／クリップ本体をドラッグ＝スクラブ・右端ドラッグ＝尺・＋＝紙を足す・
          Ctrl+ホイール＝時間の拡縮・ホイール＝横送り・ファイルを落とす＝その位置に新しい紙。
    ★ ドラッグ中は DOM を作り直さない（掴んだ要素が消えると capture が切れる）。位置と文字だけ差し替える。
@@ -26,6 +26,7 @@ var LP = window.LP || (window.LP = {});
     $('#tl-cells').addEventListener('pointerdown', onCellsDown);
     $('#tl-fills').addEventListener('pointerdown', onCellsDown);
     $('#tl-refs').addEventListener('pointerdown', onRefsDown);
+    $('#tl-take').addEventListener('pointerdown', onTakeDown);
     $('#tl-labels').addEventListener('click', onLaneHead);
     scroller.addEventListener('wheel', e => {
       if(e.ctrlKey){
@@ -83,7 +84,9 @@ var LP = window.LP || (window.LP = {});
     const cur = LP.app.curAt();
     let h = '', acc = 0;
     book.sheets.forEach((s, i) => {
+      const tin = s.in || {}, jn = i > 0 && (tin.type === 'fade' || tin.type === 'wipe') && tin.dur > 0;
       h += '<div class="clip' + (cur && cur.i === i ? ' on' : '') + '" data-i="' + i + '" style="left:' + (acc * ppf) + 'px;width:' + Math.max(2, s.dur * ppf - 2) + 'px" title="' + LP.ui.esc(s.name) + '　ドラッグ＝スクラブ／右端ドラッグ＝尺">'
+        + (jn ? '<span class="jn ' + tin.type + '" data-jn="' + i + '" style="width:' + Math.max(4, Math.min(s.dur, tin.dur) * ppf) + 'px;' + (tin.color ? 'background:' + LP.ui.esc(tin.color) + ';' : '') + '" title="繋ぎ：' + JOIN_JP[tin.type] + (tin.color ? '（' + (tin.color.toLowerCase() === '#ffffff' ? '白' : '黒') + '）' : '') + ' ' + tin.dur + 'コマ　押す＝03 TAKE の繋ぎ"></span>' : '')
         + '<span class="nm">' + LP.ui.esc(s.name) + '</span><span class="du">' + LP.time.fmtDur(s.dur, fps) + '</span><span class="rh" data-rh="' + i + '"></span></div>';
       acc += s.dur;
     });
@@ -91,7 +94,76 @@ var LP = window.LP || (window.LP = {});
     $('#tl-add').style.left = (acc * ppf + 8) + 'px';
 
     renderCells();
+    renderTake();
     playhead();
+  }
+  const JOIN_JP = { fade: 'フェード', wipe: 'ワイプ', cut: 'カット' };
+
+  /* TAKE 行：紙ごとのカメラの KF ◆（いまの紙だけ触れる・ほかの紙は薄く）・止まり（hold）の帯・AUTO 札 */
+  function renderTake(){
+    const el = $('#tl-take');
+    if(!el || !LP.book) return;
+    const at = LP.app.curAt(), fps = LP.book.fps;
+    let h = '', acc = 0;
+    LP.book.sheets.forEach((s, i) => {
+      const cur = !!at && at.i === i;
+      const list = (s.take && s.take.kf) || [];
+      list.forEach((k, j) => {
+        const f = Math.max(0, Math.min(s.dur - 1, k.f)), x = (acc + f) * ppf + ppf / 2;
+        const hold = Math.max(0, Math.min(k.hold || 0, s.dur - 1 - f));
+        if(hold > 0) h += '<i class="hb' + (cur ? '' : ' dim') + '" style="left:' + x + 'px;width:' + Math.max(1, hold * ppf) + 'px"></i>';
+        h += '<b class="kd' + (cur ? '' : ' dim') + (cur && LP.state.selKf === k.id ? ' on' : '') + '" data-k="' + k.id + '" data-si="' + i + '" style="left:' + x + 'px" title="'
+          + LP.ui.esc(s.name) + ' KF ' + (j + 1) + ' / ' + list.length + '（' + LP.time.fmtDur(f, fps) + (hold ? '・止まり ' + hold + 'コマ' : '') + '）　クリック＝選んで頭出し／ドラッグ＝時刻（AUTO が外れる）"></b>';
+      });
+      if(cur && list.length) h += '<span class="tk-auto' + (s.take.auto ? ' on' : '') + '" data-tauto="' + i + '" style="left:' + Math.max(acc * ppf + 3, (acc + s.dur) * ppf - 40) + 'px" title="' + (s.take.auto ? 'AUTO：KF の時刻は dwell と移動の重みで紙の尺に配る（押す＝外す）' : '手動：KF の時刻は ◆ のドラッグで決める（押す＝AUTO に戻して配り直す）') + '">' + (s.take.auto ? 'AUTO' : 'MAN') + '</span>';
+      acc += s.dur;
+    });
+    if(!h) h = '<span class="none">03 TAKE で C＝いまの窓を KF に（2つ打つとカメラが動く）</span>';
+    el.innerHTML = h;
+  }
+  function onTakeDown(e){
+    const au = e.target.closest('[data-tauto]');
+    if(au){ e.preventDefault(); const s = LP.book.sheets[+au.dataset.tauto]; if(s && s.take){ if(LP.state.step !== 'take') LP.app.setStep('take'); LP.takeTools.setAuto(!s.take.auto); } return; }
+    const d = e.target.closest('.kd');
+    if(!d){ scrubStart(e); return; }
+    e.preventDefault();
+    LP.app.stop();
+    const id = d.dataset.k, si = +d.dataset.si;
+    const at = LP.app.curAt();
+    if(!at || at.i !== si){
+      // ほかの紙の KF：その紙へ移って選ぶ
+      LP.app.selectSheet(si);
+      if(LP.state.step !== 'take') LP.app.setStep('take');
+      LP.takeTools.select(id, true);
+      return;
+    }
+    if(LP.state.step !== 'take') LP.app.setStep('take');
+    LP.takeTools.select(id, true);
+    const sh = at.sheet, k = sh.take.kf.find(o => o.id === id);
+    if(!k) return;
+    const el = $('#tl-take').querySelector('[data-k="' + id + '"]');
+    if(!el) return;
+    el.setPointerCapture(e.pointerId);
+    const x0 = e.clientX, f0 = k.f;
+    let moved = false, wasAuto = false;
+    const mv = ev => {
+      const f = Math.max(0, Math.min(sh.dur - 1, Math.round(f0 + (ev.clientX - x0) / ppf)));
+      if(!moved && f === f0) return;
+      if(!moved){ moved = true; wasAuto = LP.takeTools.moveKf(id, f); }
+      else LP.takeTools.moveKf(id, f);
+      el.style.left = ((at.start + f) * ppf + ppf / 2) + 'px';
+      LP.app.seek(at.start + f);
+    };
+    const up = () => {
+      el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+      if(moved){
+        LP.app.commit('KF の時刻');
+        LP.ui.toast('KF の時刻 ' + LP.time.fmtDur(k.f, LP.book.fps) + (wasAuto ? '（AUTO を外しました＝以後は手で決める時刻）' : ''));
+      }
+    };
+    el.addEventListener('pointermove', mv);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
   }
 
   /* 線／塗の行：選んだ層のセルを、紙の中の時間に並べる（cellIndexAt そのもの＝ステージと同じ式）。
@@ -284,6 +356,8 @@ var LP = window.LP || (window.LP = {});
   function onSheetsDown(e){
     const rh = e.target.closest('[data-rh]');
     if(rh){ durStart(e, +rh.dataset.rh, rh); return; }
+    const jn = e.target.closest('[data-jn]');
+    if(jn){ e.preventDefault(); LP.app.selectSheet(+jn.dataset.jn); LP.state.takePanel = 'join'; LP.app.setStep('take'); return; }
     if(e.target.closest('.clip')) scrubStart(e);
   }
   /* 右端ドラッグ＝尺。ドラッグ中は幅・後続の位置・文字だけ、離したら commit＋全再描画 */
@@ -308,6 +382,8 @@ var LP = window.LP || (window.LP = {});
       });
       clips[i].querySelector('.du').textContent = LP.time.fmtDur(d, LP.book.fps);
       $('#tl-add').style.left = (acc * ppf + 8) + 'px';
+      LP.takeTools.relayout(sh);   // AUTO のカメラは尺についてくる
+      renderTake();
       LP.app.clampT();
       playhead(); LP.stage.renderQ();
     };
@@ -340,5 +416,5 @@ var LP = window.LP || (window.LP = {});
     m.style.left = (f * ppf - 1) + 'px';
   }
 
-  LP.timeline = { init, render, playhead, markCurrent, renderCells, insertIndexAt, showDropAt, fit };
+  LP.timeline = { init, render, playhead, markCurrent, renderCells, renderTake, insertIndexAt, showDropAt, fit };
 })();

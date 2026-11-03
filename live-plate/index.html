@@ -65,6 +65,7 @@
     <canvas id="cv-ov"></canvas>
     <div id="stage-msg"></div>
     <div id="stage-hud"></div>
+    <canvas id="mon" title="MONITOR：出力の画（書き出しと同じ式）。M で消す"></canvas>
     <div id="grid"></div>
   </main>
 
@@ -96,12 +97,13 @@
       <button class="btn ico" id="tl-zin" title="時間を伸ばす">＋</button>
     </div>
     <div id="tl-main">
-      <div id="tl-labels"><div class="lr">TIME</div><div class="ls">SHEET</div><div class="lref" id="tl-lref" title="参照（REF）：02 DRAW の REF で足す。帯を横ドラッグ＝ずらす・×N＝コマ打ち">REF</div><div class="lc lane" id="tl-lline" data-lane="line"></div><div class="lf lane" id="tl-lfill" data-lane="fill"></div></div>
+      <div id="tl-labels"><div class="lr">TIME</div><div class="ls">SHEET</div><div class="lt" title="カメラ（03 TAKE）：KF ◆。クリック＝選んで頭出し・ドラッグ＝時刻（AUTO が外れる）">TAKE</div><div class="lref" id="tl-lref" title="参照（REF）：02 DRAW の REF で足す。帯を横ドラッグ＝ずらす・×N＝コマ打ち">REF</div><div class="lc lane" id="tl-lline" data-lane="line"></div><div class="lf lane" id="tl-lfill" data-lane="fill"></div></div>
       <div id="tl-scroll">
         <div id="tl-inner">
           <div id="tl-ruler"></div>
           <div id="tl-sheets"></div>
           <div id="tl-add" title="空の紙を最後に足す">＋</div>
+          <div id="tl-take"></div>
           <div id="tl-refs"></div>
           <div id="tl-cells"></div>
           <div id="tl-fills"></div>
@@ -179,12 +181,14 @@
 <script src="js/mode/draw-sel.js"></script>
 <script src="js/mode/draw-pal.js"></script>
 <script src="js/mode/draw-grid.js"></script>
+<script src="js/mode/take.js"></script>
 <script src="js/input/keymap.js"></script>
 <script src="js/io/import.js"></script>
 <script src="js/io/book-zip.js"></script>
 <script src="js/io/import-legacy.js"></script>
 <script src="js/io/export-html.js"></script>
 <script src="js/io/export-seq.js"></script>
+<script src="js/io/export-video.js"></script>
 <script src="viewer/template.js"></script>
 <script src="js/app.js"></script>
 <script src="js/harness.js"></script>

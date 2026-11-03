@@ -3,7 +3,8 @@
    描くのは全部 LP.render.renderFrame。ここは「どの見方で・どこに」を決めるだけ。
      01 SHEET … 紙の全面（mode:'sheet'）＋ 道具のオーバーレイ（js/mode/sheet.js）
      02 DRAW  … 選んだ層のプレート全面（mode:'focus'。紙は透かし）
-     03 TAKE / 04 SHOW … カメラの窓（mode:'camera'）。窓の外の紙は暗く
+     03 TAKE / 04 SHOW … カメラの窓（mode:'camera'・over＝窓の外まで撮って外だけ暗く）。03 のポインタ・ホイールは LP.takeTools
+     MONITOR（M）… 01・02 の右下に出力の画を小さく（#mon）
      SHOW の PLAY（cleanview）… 窓を画面いっぱい
    ★ 全ポインタ処理は #stage で一元化（animator の約束）。01 SHEET の中身は LP.sheetTools に渡す。
    ============================================================ */
@@ -61,7 +62,7 @@ var LP = window.LP || (window.LP = {});
   function fitView(k){
     k = k || viewKey();
     const v = views[k], ws = worldSize(k);
-    const m = LP.state.clean ? 0 : 28;
+    const m = LP.state.clean ? 0 : (k === 'paper' && (LP.state.step === 'take' || LP.state.step === 'show')) ? Math.round(Math.max(28, Math.min(W, H) * 0.08)) : 28;
     v.s = Math.max(0.01, Math.min((W - m * 2) / ws.w, (H - m * 2) / ws.h));
     v.ox = (W - ws.w * v.s) / 2; v.oy = (H - ws.h * v.s) / 2;
     v.fit = true;
@@ -135,15 +136,16 @@ var LP = window.LP || (window.LP = {});
         showMsg = 'draw';
       }
     }else if(st.step === 'take' || st.step === 'show'){
-      // 窓の外の紙は暗く（OBAN と同じ）。窓の中はカメラの画＝書き出しと同じ式
-      ctx.globalAlpha = 0.25;
-      LP.render.renderFrame(ctx, LP.book, T, sheetView());
-      ctx.globalAlpha = 1;
-      const b = LP.render.camBase(LP.book);
-      const p0 = { x: (LP.book.paper.w - b.w) / 2, y: (LP.book.paper.h - b.h) / 2 };
-      const r = { x: (v.ox + p0.x * v.s) * dpr, y: (v.oy + p0.y * v.s) * dpr, w: b.w * v.s * dpr, h: b.h * v.s * dpr };
-      res = LP.render.renderFrame(ctx, LP.book, T, { mode: 'camera', img, rect: r });
-      ctx.lineWidth = dpr; ctx.strokeStyle = C.pt;
+      // カメラの画を窓の外まで撮る（over）→ 窓の外だけ暗くする＝隣のコマが見えたままカメラが動く（SPEC_21 §19）。
+      // 窓の中＝書き出しと同じ式。03 TAKE は手持ちのカメラ（未登録）があればそれで撮る
+      const r = gateRect();
+      res = LP.render.renderFrame(ctx, LP.book, T, { mode: 'camera', img, rect: r, over: true, cam: st.step === 'take' ? LP.takeTools.getHand() : null });
+      ctx.save();
+      ctx.fillStyle = 'rgba(6,7,10,.62)';
+      ctx.beginPath(); ctx.rect(0, 0, cv.width, cv.height); ctx.rect(r.x, r.y, r.w, r.h); ctx.fill('evenodd');
+      ctx.restore();
+      if(st.step === 'take') LP.takeTools.overlay(ctx, r, dpr);
+      ctx.lineWidth = dpr; ctx.strokeStyle = st.step === 'take' && LP.takeTools.getHand() ? C.mark : C.pt;
       ctx.strokeRect(r.x - 0.5 * dpr, r.y - 0.5 * dpr, r.w + dpr, r.h + dpr);
       drawGateTicks(r);
     }else{
@@ -153,6 +155,7 @@ var LP = window.LP || (window.LP = {});
       if(sh && !sh.layers.length && !(sh.items || []).length && !(sh.panels || []).length) showMsg = 'empty';
     }
     drawOv();
+    drawMon();
     if(msg){
       msg.classList.toggle('show', !!showMsg);
       msg.classList.toggle('dark', showMsg === 'draw');
@@ -160,6 +163,27 @@ var LP = window.LP || (window.LP = {});
       else if(showMsg === 'empty') msg.innerHTML = '<div class="big">DROP IMAGES</div><div class="rule"></div><div class="sm">ここ（紙）に落とす＝<b>この紙に層として置く</b><br>下のタイムラインに落とす＝<b>1枚ずつ新しい紙にする</b>／左の棚＝<b>しまうだけ</b><br>コマを割るなら <b>DIV（D）</b> で紙の上に線を引く</div>';
     }
     return res;
+  }
+  /* カメラの窓（device px）。紙の中央に基準の窓（camBase）を置いた位置＝表示の拡縮・移動だけで動く */
+  function gateRect(){
+    const v = views.paper, b = LP.render.camBase(LP.book);
+    const p0 = { x: (LP.book.paper.w - b.w) / 2, y: (LP.book.paper.h - b.h) / 2 };
+    return { x: (v.ox + p0.x * v.s) * dpr, y: (v.oy + p0.y * v.s) * dpr, w: b.w * v.s * dpr, h: b.h * v.s * dpr };
+  }
+  /* MONITOR（M）：01 SHEET・02 DRAW の右下に「出力の画」を小さく（renderFrame mode:'camera'＝書き出しと同じ式） */
+  function drawMon(){
+    const mon = $('#mon');
+    if(!mon) return;
+    const on = LP.state.monitor && !LP.state.clean && (LP.state.step === 'sheet' || LP.state.step === 'draw');
+    mon.classList.toggle('show', !!on);
+    if(!on) return;
+    const w = Math.round(mon.clientWidth * dpr), h = Math.round(mon.clientHeight * dpr);
+    if(!w || !h) return;
+    if(mon.width !== w || mon.height !== h){ mon.width = w; mon.height = h; }
+    const g = mon.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, w, h);
+    LP.render.renderFrame(g, LP.book, LP.state.t, { mode: 'camera', img: LP.cache.img, rect: { x: 0, y: 0, w, h } });
   }
   function drawGateTicks(r){
     const C = LP.ui.CVC, L = 12 * dpr, m = 5 * dpr;
@@ -199,6 +223,12 @@ var LP = window.LP || (window.LP = {});
       if(d) drag = d; else startPan(e, sp, true);
       return;
     }
+    if(LP.state.step === 'take'){
+      // 03 TAKE：左ドラッグ＝カメラ（指もカメラ。描かないので SPEC_18 の「指＝ナビ」と同じ扱い）
+      drag = LP.takeTools.down(e, { x: sp.x * dpr, y: sp.y * dpr }, gateRect());
+      LP.app.hud();
+      return;
+    }
     if(LP.state.step !== 'sheet'){ startPan(e, sp, true); return; }
     if(LP.state.playing) LP.app.stop();
     const d = LP.sheetTools.down(e, sp, toWorld(sp.x, sp.y), helpers);
@@ -212,7 +242,7 @@ var LP = window.LP || (window.LP = {});
       if(LP.state.step === 'sheet'){
         const cur = LP.sheetTools.hover(sp, toWorld(sp.x, sp.y), helpers, e);
         stageEl.style.cursor = cur || '';
-      }
+      }else stageEl.style.cursor = LP.state.step === 'take' ? 'grab' : '';
       return;
     }
     if(drag.kind === 'pan'){
@@ -225,6 +255,7 @@ var LP = window.LP || (window.LP = {});
       return;
     }
     if(LP.state.step === 'draw'){ LP.drawTools.move(e, sp, toWorld(sp.x, sp.y), drag, helpers); return; }
+    if(drag.kind === 'cam'){ LP.takeTools.move(e, { x: sp.x * dpr, y: sp.y * dpr }); return; }
     LP.sheetTools.move(e, sp, toWorld(sp.x, sp.y), drag, helpers);
   }
   function onUp(e){
@@ -239,6 +270,7 @@ var LP = window.LP || (window.LP = {});
       return;
     }
     if(LP.state.step === 'draw'){ LP.drawTools.up(e, sp, wp, d, helpers); return; }
+    if(d.kind === 'cam'){ LP.takeTools.up(); return; }
     LP.sheetTools.up(e, sp, wp, d, helpers);
   }
   function onDbl(e){
@@ -252,6 +284,8 @@ var LP = window.LP || (window.LP = {});
     if(LP.state.clean) return;
     e.preventDefault();
     const sp = evPt(e);
+    // 03 TAKE：ホイール＝カメラ（寄る・引く／Shift＝回す）。Alt＋ホイール＝表示の拡縮（§7-3）
+    if(LP.state.step === 'take' && !e.altKey){ LP.takeTools.wheel(e, { x: sp.x * dpr, y: sp.y * dpr }, gateRect()); return; }
     const f = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
     zoomAt(viewKey(), f, sp.x, sp.y);
   }

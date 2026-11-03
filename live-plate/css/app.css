@@ -165,6 +165,7 @@ body.dragover #stage{outline:1px dashed rgba(var(--accRGB),.8);outline-offset:-1
 #tl-labels div{display:flex;align-items:center;padding-left:10px;font-family:var(--saira);font-weight:600;font-size:11px;letter-spacing:.2em;color:rgba(232,236,242,.5)}
 #tl-labels .lr{height:20px;font-size:8px;color:rgba(232,236,242,.25)}
 #tl-labels .ls{height:44px}
+#tl-labels .lt{height:18px;font-size:9px}
 #tl-labels .lref{height:0;overflow:hidden;font-size:9px}
 body.has-refs #tl-labels .lref{height:var(--ref-h,18px)}
 #tl-labels .lc{height:30px}
@@ -178,7 +179,7 @@ body.has-refs #tl-labels .lref{height:var(--ref-h,18px)}
 body.step-draw #tl-labels .lane.on{background:rgba(var(--accRGB),.18);box-shadow:inset 2px 0 0 var(--acc)}
 body.step-draw #tl-labels .lane.on .nm{color:var(--acc2)}
 #tl-scroll{position:relative;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden}
-#tl-inner{position:relative;height:calc(110px + var(--ref-row,0px))}
+#tl-inner{position:relative;height:calc(128px + var(--ref-row,0px))}
 body.has-refs{--ref-row:18px}
 #tl-ruler{position:absolute;left:0;top:0;height:20px;right:0;cursor:ew-resize;touch-action:none;border-bottom:1px solid var(--line-2)}
 #tl-ruler i{position:absolute;bottom:0;width:1px;height:5px;background:rgba(232,236,242,.18)}
@@ -198,14 +199,35 @@ body.has-refs{--ref-row:18px}
 #tl-add{position:absolute;top:8px;height:28px;width:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;
   border:1px dashed rgba(232,236,242,.3);color:rgba(232,236,242,.6);font-size:14px}
 #tl-add:hover{border-color:var(--acc-hover-line);color:var(--ink)}
-#tl-refs{position:absolute;left:0;top:64px;height:var(--ref-row,0px);right:0;overflow:hidden}
+/* TAKE 行：カメラの KF ◆（菱形）・止まりの帯・AUTO 札（SPEC_21 §4-3）*/
+#tl-take{position:absolute;left:0;top:64px;height:18px;right:0;border-bottom:1px solid var(--line-2);touch-action:none}
+#tl-take .kd{position:absolute;top:4px;width:10px;height:10px;margin-left:-5px;transform:rotate(45deg);cursor:ew-resize;
+  background:var(--acc-pt);border:1px solid rgba(0,0,0,.5);z-index:2}
+#tl-take .kd.on{background:var(--acc2);box-shadow:0 0 0 2px rgba(var(--accRGB),.9),0 0 8px rgba(var(--acc-ptRGB),.9)}
+#tl-take .kd.dim{opacity:.35;cursor:pointer}
+#tl-take .hb{position:absolute;top:8px;height:3px;background:rgba(var(--acc-ptRGB),.55)}
+#tl-take .hb.dim{opacity:.35}
+#tl-take .tk-auto{position:absolute;top:3px;height:12px;padding:0 4px;display:flex;align-items:center;cursor:pointer;z-index:3;
+  font-family:var(--saira);font-weight:700;font-size:8px;letter-spacing:.12em;color:rgba(232,236,242,.55);border:1px solid rgba(232,236,242,.25);background:rgba(11,13,18,.8)}
+#tl-take .tk-auto.on{color:#0B0D12;background:var(--acc-pt);border-color:var(--acc-pt)}
+#tl-take .none{position:absolute;left:10px;top:3px;font-family:var(--jp);font-size:9px;letter-spacing:.08em;color:rgba(232,236,242,.3);white-space:nowrap}
+/* SHEET 行の繋ぎの印（紙の頭・幅＝in.dur）*/
+.clip .jn{position:absolute;left:0;top:0;bottom:0;cursor:pointer;opacity:.5;
+  background:linear-gradient(90deg,rgba(232,236,242,.55),rgba(232,236,242,0))}
+.clip .jn.wipe{background:linear-gradient(90deg,rgba(var(--acc-ptRGB),.7) 0 50%,rgba(var(--acc-ptRGB),0) 50%)}
+.clip .jn:hover{opacity:.9}
+/* MONITOR（M）：01・02 の右下に出力の画 */
+#mon{position:absolute;right:12px;bottom:12px;width:320px;height:180px;display:none;z-index:6;pointer-events:none;
+  border:1px solid rgba(var(--acc-ptRGB),.7);box-shadow:0 6px 24px rgba(0,0,0,.6);background:#000}
+#mon.show{display:block}
+#tl-refs{position:absolute;left:0;top:82px;height:var(--ref-row,0px);right:0;overflow:hidden}
 .refb{position:absolute;top:3px;height:12px;display:flex;align-items:center;gap:4px;padding:0 3px 0 6px;cursor:ew-resize;touch-action:none;
   font-size:8px;letter-spacing:.06em;color:#0B0D11;white-space:nowrap;overflow:hidden;opacity:.85}
 .refb.off{opacity:.3}
 .refb .x{cursor:pointer;padding:0 3px;font-weight:700;background:rgba(0,0,0,.25);color:#fff}
 .refb .sn{cursor:pointer;padding:0 3px;background:rgba(0,0,0,.25);color:#fff}
-#tl-cells{position:absolute;left:0;top:calc(64px + var(--ref-row,0px));height:30px;right:0}
-#tl-fills{position:absolute;left:0;top:calc(94px + var(--ref-row,0px));height:16px;right:0}
+#tl-cells{position:absolute;left:0;top:calc(82px + var(--ref-row,0px));height:30px;right:0}
+#tl-fills{position:absolute;left:0;top:calc(112px + var(--ref-row,0px));height:16px;right:0}
 .fb{position:absolute;top:2px;height:11px;border:1px solid rgba(255,201,79,.35);cursor:pointer}
 .fb.has{background:rgba(255,201,79,.55);border-color:rgba(255,201,79,.8)}
 .fb.rep{opacity:.35;border-style:dashed}

@@ -5,7 +5,8 @@
      ＝ステージで見ている画とビューアの画が**同じコード**。ロジックを書き写さない。
    ★ 画像は必ず埋め込み（OBAN の「同フォルダ参照」はやめた＝別 PC でそのまま開ける）。>200MB は確認。
    P1 からコマ（切り抜き・枠線・断ち切り）・仕上げ素材・文字（縦書き・アンチック体）も同じ関数で出る。
-   まだ入れていないもの：字幕・クリック FX・DOF・ATTRACT・マウス微パララックス（カメラが来る P3 で）
+   P3 からカメラ（TAKE の KF）・繋ぎ・画ブレも同じ関数で出る（sheet.take / shake / in を渡すだけ）。
+   まだ入れていないもの：字幕・クリック FX・DOF・ATTRACT・マウス微パララックス
    ============================================================ */
 var LP = window.LP || (window.LP = {});
 LP.io = LP.io || {};
@@ -14,8 +15,9 @@ LP.io = LP.io || {};
   'use strict';
   const PREF_LS = 'liveplate_export_v1';
   // kind＝ドックで選んでいる出口（html／seq）。seq＝SEQ PNG（io/export-seq.js）。seqMode＝合体／線／塗／線+塗、seqTo＝zip／フォルダ
-  const ex = { kind: 'html', res: 1920, q: 'webp80', ppf: 20, seqMode: 'comp', seqTo: 'zip', busy: false, abort: false, msg: '', p: 0 };
-  const PREF_KEYS = ['kind', 'res', 'q', 'ppf', 'seqMode', 'seqTo'];
+  // vid＝動画の形式（mp4／webm）・vbr＝ビットレート（Mbps）。io/export-video.js
+  const ex = { kind: 'html', res: 1920, q: 'webp80', ppf: 20, seqMode: 'comp', seqTo: 'zip', vid: 'mp4', vbr: 16, busy: false, abort: false, msg: '', p: 0 };
+  const PREF_KEYS = ['kind', 'res', 'q', 'ppf', 'seqMode', 'seqTo', 'vid', 'vbr'];
   try{ const o = JSON.parse(localStorage.getItem(PREF_LS) || '{}'); PREF_KEYS.forEach(k => { if(o[k] != null) ex[k] = o[k]; }); }catch(e){}
 
   function exportState(){ return ex; }
@@ -105,6 +107,8 @@ LP.io = LP.io || {};
         out: out, ppf: ex.ppf,
         sheets: book.sheets.map(s => ({
           id: s.id, name: s.name, dur: s.dur, bg: s.bg, in: s.in,
+          take: s.take && s.take.kf && s.take.kf.length ? { kf: s.take.kf.map(k => ({ f: k.f, hold: k.hold || 0, x: k.x, y: k.y, z: k.z, rot: k.rot, s: k.s, ei: k.ei, eo: k.eo })) } : null,
+          shake: s.shake || null,
           frame: s.frame || null,
           panels: (s.panels || []).map(k => ({ id: k.id, poly: k.poly, base: k.base, cuts: k.cuts, border: k.border, bleed: k.bleed })),
           items: (s.items || []).filter(it => it.visible !== false && !(it.type === 'text' && !String(it.text || '').trim())),

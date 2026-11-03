@@ -52,7 +52,7 @@ LP.lib = LP.lib || {};
     return {
       id: uid('s'), name: 'C' + book.seqNo,
       dur: Math.max(1, Math.round(dur || DEF_SHEET_DUR)),
-      in: { type: 'cut', dur: 0 },
+      in: { type: 'cut', dur: 0, color: '', dir: 'l' },   // 繋ぎ：cut / fade（color＝色を経由）/ wipe（dir＝入ってくる側）
       panels: [], items: [], layers: [],
       frame: null,     // 紙ごとのコマ割り設定の上書き（旧 MANGA_BOOK を読んだ紙＝ページの範囲）
       take: null, fx: null, shake: null,
@@ -73,6 +73,15 @@ LP.lib = LP.lib || {};
 
   function newCell(line, dur){
     return { id: uid('c'), dur: Math.max(1, dur || 1), line: line || null, fill: null };
+  }
+
+  /* カメラ（TAKE。SPEC_21 §5 / §19）。kf の形は time.js の kfAt が正 */
+  const EASE_DEF = 40;   // 新しい KF の緩急（composer influence 0〜100）。OBAN の 'smooth' 相当
+  function newTake(){ return { kf: [], auto: true }; }
+  function newKf(cam, f){
+    return { id: uid('k'), f: Math.max(0, Math.round(f || 0)), hold: 0,
+      x: +(cam.x || 0).toFixed(2), y: +(cam.y || 0).toFixed(2), z: +(cam.z || 0).toFixed(2), rot: +(cam.rot || 0).toFixed(3), s: +(cam.s == null ? 1 : cam.s).toFixed(4),
+      ei: EASE_DEF, eo: EASE_DEF, dwell: 1 };
   }
 
   function newLayer(plate, rect){
@@ -148,7 +157,14 @@ LP.lib = LP.lib || {};
       if(s.frame === undefined) s.frame = null;
       s.panels.forEach(k => { if(!Array.isArray(k.cuts)) k.cuts = []; if(!Array.isArray(k.base)) k.base = k.poly; if(k.border === undefined) k.border = true; });
       s.items.forEach(it => { if(it.visible === undefined) it.visible = true; if(it.panelId === undefined) it.panelId = null; if(it.tIn == null) it.tIn = 0; if(it.tOut === undefined) it.tOut = null; });
-      s.in = s.in || { type: 'cut', dur: 0 };
+      s.in = Object.assign({ type: 'cut', dur: 0, color: '', dir: 'l' }, s.in || {});
+      if(s.take){
+        if(!Array.isArray(s.take.kf)) s.take.kf = [];
+        if(s.take.auto === undefined) s.take.auto = true;
+        s.take.kf.forEach(k => { if(!k.id) k.id = uid('k'); if(k.hold == null) k.hold = 0; if(k.dwell == null) k.dwell = 1; if(k.ei == null) k.ei = EASE_DEF; if(k.eo == null) k.eo = EASE_DEF; });
+        s.take.kf.sort((a, b) => a.f - b.f);
+      }
+      if(s.shake === undefined) s.shake = null;
       s.dur = Math.max(1, s.dur | 0 || DEF_SHEET_DUR);
       if(s.bg == null) s.bg = 255;
       s.layers.forEach(l => {
@@ -176,7 +192,7 @@ LP.lib = LP.lib || {};
 
   LP.model = {
     PAPER_PRESETS, MAX_AREA, DEF_SHEET_DUR,
-    uid, newBook, newSheet, newPlate, newCell, newLayer, newItem, ITEM_NAMES,
+    uid, newBook, newSheet, newPlate, newCell, newLayer, newItem, ITEM_NAMES, newTake, newKf, EASE_DEF,
     placeSize, fitRect, clone, migrate,
     sheetById, layerById, itemById, panelById, plateUse,
   };

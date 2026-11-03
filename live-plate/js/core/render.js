@@ -25,8 +25,28 @@ LP.lib.render = function(T, G, IT){
     if(h > ph){ h = ph; w = ph * 16 / 9; }
     return { w: w, h: h };
   }
-  /* 紙のカメラ（P3 で sheet.take の KF 補間が入る。いまは既定＝紙の中央・等倍） */
-  function camAt(book, sheet, local){ return { x: 0, y: 0, z: 0, rot: 0, s: 1 }; }
+  /* 紙のカメラ＝TAKE の KF 補間（time.js kfAt）＋画ブレ。KF が無い紙＝既定（紙の中央・等倍）。
+     ★ 画ブレは「出力のカメラ」にだけ足す。CAPTURE が拾う窓（編集のカメラ）は camRaw＝ブレなし */
+  function camRaw(sheet, local){ return T.kfAt(sheet && sheet.take, local); }
+  function camAt(book, sheet, local){
+    const c = camRaw(sheet, local);
+    const sh = T.shakeAt(sheet, local, camBase(book).w / Math.max(0.01, c.s), book.fps);
+    if(sh){ c.x += sh.dx; c.y += sh.dy; }
+    return c;
+  }
+  /* 紙の面（z=0）の点 ⇄ 出口の矩形 R の上の点（P.paper() と同じ式。ステージの手すり・CAPTURE の掴みで使う）
+       screen = Rc + Rot(−rot)·(s·p·k)·(paper − pc − cam) */
+  function camK(book, cam, R){ return (R.w / camBase(book).w) * (cam.s || 1) * (perspOf(0, cam.z) || 1); }
+  function paperToCam(book, cam, R, px, py){
+    const K = camK(book, cam, R), a = -(cam.rot || 0) * Math.PI / 180;
+    const dx = (px - book.paper.w / 2 - cam.x) * K, dy = (py - book.paper.h / 2 - cam.y) * K;
+    return { x: R.x + R.w / 2 + dx * Math.cos(a) - dy * Math.sin(a), y: R.y + R.h / 2 + dx * Math.sin(a) + dy * Math.cos(a) };
+  }
+  function camToPaper(book, cam, R, sx, sy){
+    const K = camK(book, cam, R), a = (cam.rot || 0) * Math.PI / 180;
+    const dx = (sx - R.x - R.w / 2) / K, dy = (sy - R.y - R.h / 2) / K;
+    return { x: book.paper.w / 2 + cam.x + dx * Math.cos(a) - dy * Math.sin(a), y: book.paper.h / 2 + cam.y + dx * Math.sin(a) + dy * Math.cos(a) };
+  }
   /* 重なり順＝配列順（奥→手前）。Z では並べ替えない */
   function layersInDrawOrder(sheet){ return sheet.layers.slice(); }
   /* LAYER.z は「正＝手前」。composer の z（正＝奥）とは符号が逆：depth = F − z − cam.z（§15-1 #2） */
@@ -182,16 +202,84 @@ LP.lib.render = function(T, G, IT){
      composer の透視式：位置は「カメラのずれ×persp」だけ動き、大きさに persp が掛かる。
      ★ 大きさは persp / persp₀（カメラが止まっているときの persp）で割る＝**止まったカメラの画＝紙に置いた通り**。
        Z は視差にだけ効く（composer applyObanPlacements の「depth→Z ＋ 大きさの打ち消し」と同じ。SPEC_12 ②） */
+  /* 繋ぎ（sheet.in）。紙の頭の in.dur コマだけ、前の紙が「続きの時間」（prev.dur + local）で後ろに居る。
+       fade … color 無し＝前の紙からディゾルブ／color あり＝前半で色へ・後半で色から（白飛び・黒味。SPEC_23 R6 の最小）
+       wipe … 新しい紙が dir（l/r/u/d）の側から窓を覆っていく（硬い縁・1種類だけ。§6-4「増やさない」）
+     ★ ディゾルブだけは「紙1枚を合成し終えた絵」に α を掛けたい（層ごとに α を掛けると重なりが透ける）ので、作業用の canvas に1回描く */
+  let scratch = null;
+  function scratchOf(cv){
+    if(!scratch) scratch = document.createElement('canvas');
+    if(scratch.width !== cv.width || scratch.height !== cv.height){ scratch.width = cv.width; scratch.height = cv.height; }
+    return scratch.getContext('2d');
+  }
   function drawCamera(ctx, book, at, view){
     const sheet = at.sheet, local = at.local;
     const R = view.rect;
+    // 塗る範囲：窓だけ（書き出し）／ステージ全面（03 TAKE の「窓の外も見える」表示。view.over・ctx は素の座標で呼ぶこと）
+    const A = view.over ? { x: 0, y: 0, w: ctx.canvas.width, h: ctx.canvas.height } : R;
+    const prev = at.i > 0 ? book.sheets[at.i - 1] : null;
+    const tin = sheet.in || {};
+    const tdur = prev && (tin.type === 'fade' || tin.type === 'wipe') ? Math.max(0, tin.dur | 0) : 0;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(A.x, A.y, A.w, A.h); ctx.clip();
+    let miss = 0;
+    const cur = g => shot(g, book, sheet, local, view, A, view.cam || null);
+    if(tdur > 0 && local < tdur){
+      const u = (local + 1) / (tdur + 1);
+      const back = g => shot(g, book, prev, prev.dur + local, view, A, null);
+      if(tin.type === 'wipe'){
+        miss += back(ctx);
+        ctx.save();
+        const d = tin.dir || 'l';
+        ctx.beginPath();
+        if(d === 'r') ctx.rect(R.x + R.w * (1 - u), A.y, A.x + A.w - (R.x + R.w * (1 - u)), A.h);
+        else if(d === 'u') ctx.rect(A.x, A.y, A.w, R.y + R.h * u - A.y);
+        else if(d === 'd') ctx.rect(A.x, R.y + R.h * (1 - u), A.w, A.y + A.h - (R.y + R.h * (1 - u)));
+        else ctx.rect(A.x, A.y, R.x + R.w * u - A.x, A.h);
+        ctx.clip();
+        miss += cur(ctx);
+        ctx.restore();
+      }else if(tin.color){
+        miss += u < 0.5 ? back(ctx) : cur(ctx);
+        if(!view.pass){   // 線／塗だけの書き出し（SEQ PNG）には色を敷かない（透明の地のまま切り替わる）
+          ctx.save();
+          ctx.globalAlpha = u < 0.5 ? u * 2 : (1 - u) * 2;
+          ctx.fillStyle = tin.color;
+          ctx.fillRect(A.x, A.y, A.w, A.h);
+          ctx.restore();
+        }
+      }else{
+        miss += back(ctx);
+        const g = scratchOf(ctx.canvas);
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.clearRect(0, 0, g.canvas.width, g.canvas.height);
+        g.setTransform(ctx.getTransform());
+        g.save(); g.beginPath(); g.rect(A.x, A.y, A.w, A.h); g.clip();
+        g.imageSmoothingEnabled = true;
+        if('imageSmoothingQuality' in g) g.imageSmoothingQuality = 'high';
+        miss += cur(g);
+        g.restore();
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = u;
+        ctx.drawImage(g.canvas, 0, 0);
+        ctx.restore();
+      }
+    }else{
+      miss += cur(ctx);
+    }
+    ctx.restore();
+    return miss;
+  }
+  /* 紙1枚をカメラで撮る（A＝塗る範囲・R＝出口の窓）。cam を渡せばそれ（03 TAKE の手持ちのカメラ）、無ければ TAKE の KF */
+  function shot(ctx, book, sheet, local, view, A, camIn){
+    const R = view.rect;
     const base = camBase(book);
-    const cam = view.cam || camAt(book, sheet, local);
+    const cam = camIn || camAt(book, sheet, local);
     const k = R.w / base.w;
     const pcx = book.paper.w / 2, pcy = book.paper.h / 2;
     ctx.save();
-    ctx.beginPath(); ctx.rect(R.x, R.y, R.w, R.h); ctx.clip();
-    if(!view.pass){ ctx.fillStyle = gray(sheet.bg); ctx.fillRect(R.x, R.y, R.w, R.h); }
+    if(!view.pass){ ctx.fillStyle = gray(sheet.bg); ctx.fillRect(A.x, A.y, A.w, A.h); }
     ctx.translate(R.x + R.w / 2, R.y + R.h / 2);
     if(cam.rot) ctx.rotate(-cam.rot * Math.PI / 180);
     ctx.scale(cam.s || 1, cam.s || 1);
@@ -224,6 +312,8 @@ LP.lib.render = function(T, G, IT){
   /* view: { mode:'sheet'|'focus'|'camera'|'export', img, pass（'line'|'fill'＝そのレーンだけ・地なし）,
             under / mid（focus：参照・オニオンを描く手すり。原点＝プレート左上）,
             scale, ox, oy（sheet/focus：世界→ctx）, rect（camera/export：出口の矩形）,
+            cam（camera：このカメラで撮る＝03 TAKE の手持ち。無ければ TAKE の KF＋画ブレ）,
+            over（camera：窓の外まで撮る＝03・04 の表示。ctx は素の座標で呼ぶ）,
             guides, guideColor, layerId（focus）, baseAlpha（focus の紙の透かし）, px（ガイド線の太さ＝ctx px） } */
   function renderFrame(ctx, book, t, view){
     const at = T.sheetAt(book, t);
@@ -301,6 +391,6 @@ LP.lib.render = function(T, G, IT){
     return { missing: miss, at: at };
   }
 
-  return { PERSP_FOCAL, renderFrame, camBase, camAt, layersInDrawOrder, perspOf, frameOf };
+  return { PERSP_FOCAL, renderFrame, camBase, camAt, camRaw, paperToCam, camToPaper, layersInDrawOrder, perspOf, frameOf };
 };
 LP.render = LP.lib.render(LP.time, LP.geom, LP.items);

@@ -111,6 +111,7 @@
 - `SPEC_21_LIVE_PLATE.md` — **一本化アプリ LIVE PLATE の設計・仕様書。§13 の発注者判断は 2026-09-24 に全7件確定。P0 骨格・P1 SHEET・BOOK zip は 2026-09-24、P2 DRAW は 2026-09-26 に `live-plate/` へ実装済み＝決めたことと動作チェック表は §15（P0）・§16（P1）・§17（P2）、ファイルの地図は `live-plate/CLAUDE.md`**。
   ★ P2 で **Undo を1本の時系列**にした（§8-1 の「ステップごとのログ」から変更・§17-1 #3）。描いた絵の Blob は全 Undo スナップショットへ書き込む＝BOOK の Undo が絵を戻さない。**この約束を崩すと紙の操作の Undo で描いた絵が消える**。
   ★ 詳細パネルがペン（WACOM 液晶）／指で移動しにくい件は**記録だけ**（§17-0 #3。iPad 対応のときに一緒に直す）。
+  ★ §19（2026-11-03・P3a TAKE）：**カメラの式（`kfAt`＝composer bezierEaseT・`layoutTake`＝OBAN buildTake・`shakeAt`＝econte shake）は `time.js` にだけ**（ビューアに同梱）。econte の画ブレの式を変えたら `time.js shakeAt` も直す。**作品の時刻 → 紙は `time.js` の `sheetAt`/`sheetStart`/`totalFrames` だけを通す**・カメラの読み出しは `render.camAt`/`camRaw` だけ（将来の編集リスト＝複数参照・A/B のため・§19-1 #17）。AUTO の紙は `app.commit` が毎回 `takeTools.relayoutAll` で f/hold を書き直す＝**KF の f を直接書き換えるなら auto を外すこと**。VIDEO の muxer 版（mp4-muxer@5.1.5／webm-muxer@5.1.4）は econte と揃えてある。**カメラの VRT は KF の止まりの中を撮らない**（負のコントロールが落ちない）。コンセプト＝**作る作業そのものが見せもの（VJ）**・光の処理は既定 OFF（§19-0）。
   ★ §18（2026-11-01）：**ブラシの値は econte BR_FACTORY と同じ**＝econte のブラシを詰め直したら `live-plate/js/core/brush.js` の LIST も直す。**PEN（AA なし丸ペン）は brush.js を通らない**（バケツの壁・SEL の AA OFF が乗っている）。パレット JSON は ANIMATOR と同じ `PALETTE_v1`。GRID の置き場は §7-2 から変えた（REF の隣ではなくステージ）。
   ★ **重なり順は ◆ITEMS の並び（配列）だけ。Z は視差だけで、止まったカメラの画は Z で変わらない**（§6-2 の「z 昇順」から変更・§16-2 #3 #5）。
   ★ **割っても見えている絵は消さない**：コマを覆う層・素材は両方の子へコピー、分割を戻すと1枚に（`panels.divide` / `merge`・§16-2 #1）。

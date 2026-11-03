@@ -199,35 +199,101 @@ var LP = window.LP || (window.LP = {});
     return h;
   }
 
+  /* 03 TAKE：レール＝CAPTURE（押す）と中身の切替（KF／繋ぎ／画ブレ）。◎FOCUS・FX は次（P3b）で */
   function takeHTML(){
-    const b = LP.render.camBase(LP.book), o = LP.app.outSize(LP.book.out.long);
+    const u = U(), st = LP.state, TT = LP.takeTools, sh = LP.app.curSheet(), at = LP.app.curAt();
+    const pn = st.takePanel || 'kf';
+    const tab = (v, t, k, tip) => '<div class="rail' + (pn === v ? ' on' : '') + '" data-act="tPanel" data-v="' + v + '" title="' + u.esc(tip) + '"><span class="t">' + t + '</span><span class="k">' + k + '</span></div>';
     let h = grp('CAMERA', '撮る',
-      rail('cap', 'CAPTURE', 'C', { later: 'P3', tip: 'いまの窓を KF に' }) + rail('focus', '◎FOCUS', '', { later: 'P3', tip: 'ピント（多点 DOF）' })
-      + rail('fx', 'FX', 'F', { later: 'P3', tip: '撮影処理' }) + rail('join', '繋ぎ', '', { later: 'P3', tip: 'cut / fade / wipe' }) + rail('shake', '∿', '', { later: 'P3', tip: '画ブレ' }));
+      '<div class="rail cap" data-act="tCap" title="いまの窓を KF にする（C）。AUTO＝選んだ KF の次に挿入して紙の尺に配る／手動＝再生位置の時刻に打つ"><span class="t">CAPTURE</span><span class="k">C</span></div>'
+      + tab('kf', 'KF', '◆', 'カメラの KF：手持ちの窓・止まり・緩急')
+      + tab('join', '繋ぎ', at && at.i > 0 ? JOIN_K[(sh && sh.in && sh.in.type) || 'cut'] : '—', 'この紙の頭の繋ぎ（前の紙から）：カット／フェード（色経由）／ワイプ')
+      + tab('shake', '∿', sh && LP.time.shakeOf(sh) ? 'ON' : '画ブレ', '画ブレ（この紙・頭→尻で強さ）')
+      + rail('focus', '◎FOCUS', '', { later: 'P3b', tip: 'ピント（多点 DOF）' })
+      + rail('fx', 'FX', 'F', { later: 'P3b', tip: '撮影処理' }));
     h += VL;
-    h += '<div class="dk-info"><span class="t">既定カメラ — 紙全面</span><span class="s">窓 <b>' + b.w + '×' + b.h + '</b>（紙）→ 出力 <b>' + o.w + '×' + o.h + '</b>。枠の中＝書き出しと同じ式（composer の透視 1本）'
-      + '<br>カメラを打つ（KF・dwell・ピント）のは P3。いまは Space で再生だけ確認できます。</span></div>';
+    if(!sh) return h;
+    if(pn === 'join') return h + joinHTML(sh, at);
+    if(pn === 'shake') return h + shakeHTML(sh);
+    // KF：手持ちのカメラ（いじっている窓）＋選んでいる KF
+    const hand = TT.getHand(), c = TT.cam();
+    h += grp('WINDOW', '<span id="dk-hand" class="dk-hand' + (hand ? ' on' : '') + '">' + (hand ? '● 手持ち（C で KF ・ Esc で戻す）' : 'TAKE の窓') + '</span>',
+      u.qdNum('cx', 'X', Math.round(c.x), '') + u.qdNum('cy', 'Y', Math.round(c.y), '')
+      + u.qdNum('cs', 'ZOOM', Math.round(c.s * 100), '%') + u.qdNum('crot', 'ROT', (+c.rot).toFixed(1), '°') + u.qdNum('cz', 'DOLLY', Math.round(c.z), '')
+      + '<button class="qd-sb" data-act="hReset" title="手持ちのカメラを既定の窓（紙全面・等倍）に">既定の窓</button>');
+    h += VL;
+    const list = TT.kfs(), k = TT.selKf(), tk = sh.take;
+    if(!list.length){
+      h += '<div class="dk-info"><span class="t">KF なし — 既定の窓（紙全面）</span><span class="s">ステージを<b>ドラッグ</b>で動かす・<b>ホイール</b>で寄る／引く・<b>Shift</b>で回す → <b>C</b> で KF。'
+        + '<br>2つ以上打つと、そのあいだをカメラが動く（AUTO：紙の尺に配る）。窓の外の暗い所＝隣のコマ</span></div>';
+      return h;
+    }
+    const n = k ? list.indexOf(k) + 1 : 0;
+    let body = '<button class="qd-sb" data-act="kPrev" title="前の KF（←）">◀</button><span class="dk-kn">' + (k ? n + ' / ' + list.length : '— / ' + list.length) + '</span><button class="qd-sb" data-act="kNext" title="次の KF（→）">▶</button>';
+    if(k){
+      body += '<span style="width:6px"></span>'
+        + (tk.auto ? u.qdNum('kdwell', 'DWELL', (+(k.dwell == null ? 1 : k.dwell)).toFixed(2), '') : u.qdNum('khold', 'HOLD', k.hold || 0, 'f'))
+        + u.qdNum('kei', 'IN', k.ei || 0, '') + u.qdNum('keo', 'OUT', k.eo || 0, '')
+        + u.qdSeg('kEase', [['0/0', 'LIN'], ['40/40', 'EASE'], ['80/80', 'SOFT']], (k.ei || 0) + '/' + (k.eo || 0))
+        + '<button class="qd-sb" data-act="tUpd" title="この KF を今の窓で上書き（Shift＋C）。時刻・緩急はそのまま">↻ 上書き</button>'
+        + '<button class="qd-sb" data-act="kDel" title="この KF を消す（Del）">消す</button>';
+    }
+    body += '<button class="qd-sb' + (tk.auto ? ' on' : '') + '" data-act="kAuto" title="' + (tk.auto ? 'AUTO：dwell（止まりの重み）と移動の距離で紙の尺に配る。押す＝外す' : '手動：KF の時刻はタイムラインの ◆ で決める。押す＝AUTO で配り直す') + '">AUTO</button>'
+      + '<button class="qd-sb" data-act="kClear" title="この紙のカメラを外す（既定の窓に戻る・Ctrl+Z で戻せる）">外す</button>';
+    h += grp('KF', k ? (tk.auto ? 'AUTO・止まり＝DWELL の重み' : '手動・止まり＝HOLD コマ') + '　IN/OUT＝緩急 0〜100' : 'KF を選ぶ（← → ／ タイムラインの ◆）', body);
     return h;
+  }
+  const JOIN_K = { cut: 'CUT', fade: 'FADE', wipe: 'WIPE' };
+  function joinHTML(sh, at){
+    const u = U();
+    if(!at || at.i === 0) return '<div class="dk-info"><span class="t">最初の紙</span><span class="s">繋ぎは「前の紙からこの紙へ」の切り替わり。2枚目からの紙で決めます</span></div>';
+    const tin = sh.in || {}, ty = tin.type || 'cut';
+    let body = u.qdSeg('jType', [['cut', 'CUT'], ['fade', 'FADE'], ['wipe', 'WIPE']], ty);
+    if(ty !== 'cut'){
+      body += '<span style="width:6px"></span>' + u.qdNum('tdur', 'LEN', tin.dur | 0, 'f');
+      if(ty === 'fade') body += u.qdSeg('jColor', [['', 'ディゾルブ'], ['#FFFFFF', '白'], ['#000000', '黒']], tin.color || '');
+      else body += u.qdSeg('jDir', [['l', '左から'], ['r', '右から'], ['u', '上から'], ['d', '下から']], tin.dir || 'l');
+    }
+    const prev = LP.book.sheets[at.i - 1];
+    const tip = ty === 'cut' ? 'そのまま切り替わる' : ty === 'fade' ? (tin.color ? '前の紙 → ' + (tin.color.toLowerCase() === '#ffffff' ? '白' : '黒') + ' → この紙（前半で色へ・後半で色から）' : '前の紙からディゾルブ（前の紙は続きの時間で動く）') : 'この紙が窓を覆っていく（硬い縁）';
+    return grp('JOIN', u.esc(prev.name) + ' → ' + u.esc(sh.name) + '　' + tip, body);
+  }
+  function shakeHTML(sh){
+    const u = U(), k = sh.shake || {};
+    return grp('SHAKE', '画ブレ（' + u.esc(sh.name) + '）　頭→尻で強さが直線に変わる・揺れ幅＝写っている窓の幅の割合',
+      u.qdNum('sa0', '頭', k.a0 | 0, '') + u.qdNum('sa1', '尻', k.a1 | 0, '') + u.qdNum('sfreq', '速さ', k.freq || LP.time.SHAKE_FREQ_DEF, '/s')
+      + u.qdSeg('shPre', [['30/30', '一定'], ['0/60', '強めていく'], ['60/0', '収まる']], (k.a0 | 0) + '/' + (k.a1 | 0))
+      + '<button class="qd-sb" data-act="shOff" title="画ブレを外す">OFF</button>');
   }
 
   function showHTML(){
     const ex = LP.io.exportState();
-    const o = LP.app.outSize(ex.res), seq = ex.kind === 'seq';
+    const o = LP.app.outSize(ex.res), seq = ex.kind === 'seq', vid = ex.kind === 'video';
     let h = grp('SHOW', '見せる',
       '<div class="rail" data-act="playFull" title="UI を全部消して全画面で再生（Space＝再生/停止・←→＝コマ・J/K＝紙の頭・Esc＝戻る）"><span class="t">▶ PLAY</span><span class="k">全画面</span></div>'
       + rail('rec', '● REC', 'LIVE', { later: 'P4', tip: '再生しながら描いて録画' }));
     h += VL;
     h += grp('OUTPUT', '出す',
-      '<div class="dk-out' + (seq ? '' : ' on') + '" data-act="exKind" data-v="html" title="スクロールで動く単一 HTML（画像はすべて埋め込み＝別 PC でもそのまま開ける）"><span class="t">HTML</span><span class="s">スクロールビューア<br>画像は全部埋め込み</span></div>'
-      + '<div class="dk-out later"><span class="t">VIDEO</span><span class="s">MP4（非実時間）／WebM</span><span class="ph">P3</span></div>'
+      '<div class="dk-out' + (seq || vid ? '' : ' on') + '" data-act="exKind" data-v="html" title="スクロールで動く単一 HTML（画像はすべて埋め込み＝別 PC でもそのまま開ける）"><span class="t">HTML</span><span class="s">スクロールビューア<br>画像は全部埋め込み</span></div>'
+      + '<div class="dk-out' + (vid ? ' on' : '') + '" data-act="exKind" data-v="video" title="カメラの出力を動画に（MP4＝WebCodecs の非実時間・WebM）"><span class="t">VIDEO</span><span class="s">MP4（非実時間）<br>WebM</span></div>'
       + '<div class="dk-out' + (seq ? ' on' : '') + '" data-act="exKind" data-v="seq" title="カメラの出力を1コマ1枚の PNG に（合体・線・塗・線+塗）"><span class="t">SEQ PNG</span><span class="s">合体・線・塗・線+塗<br>ZIP／フォルダ</span></div>');
     h += VL;
     if(ex.busy){
       h += '<div class="dk-prog"><span class="m" id="dk-pmsg">' + U().esc(ex.msg) + '</span><div class="bar"><i id="dk-pbar" style="width:' + Math.round(ex.p * 100) + '%"></i></div></div>'
-        + '<button class="btn dk-go" data-act="' + (seq ? 'expSeq' : 'expHtml') + '" title="もう一度押すと中断">中断</button>';
+        + '<button class="btn dk-go" data-act="' + (seq ? 'expSeq' : vid ? 'expVideo' : 'expHtml') + '" title="もう一度押すと中断">中断</button>';
       return h;
     }
     const resRow = '<div class="dk-row"><span class="dk-jp">解像度</span>' + U().qdSeg('exRes', [[1280, '1280'], [1920, '1920'], [3840, '3840']], ex.res) + '<span class="dk-jp" style="width:auto">' + o.w + '×' + o.h + '</span></div>';
+    if(vid){
+      h += grp('VIDEO', '書き出しの設定',
+        '<div class="dk-set">' + resRow
+        + '<div class="dk-row"><span class="dk-jp">形式</span>' + U().qdSeg('exVid', [['mp4', 'MP4'], ['webm', 'WebM']], ex.vid) + '</div>'
+        + '<div class="dk-row"><span class="dk-jp">画質</span>' + U().qdSeg('exVbr', [[8, '8M'], [16, '16M'], [32, '32M']], ex.vbr) + '<span class="dk-jp" style="width:auto">bps</span></div>'
+        + '</div>');
+      h += '<div class="dk-est"><span class="s"><b>' + LP.time.fmtDur(LP.time.totalFrames(LP.book), LP.book.fps) + '</b>・' + LP.time.totalFrames(LP.book) + 'コマ @' + LP.book.fps + 'fps'
+        + '<br>' + (ex.vid === 'mp4' ? 'H.264' : 'VP9') + '・非実時間（タブが裏でも進む）／音は入りません</span><button class="btn on dk-go" data-act="expVideo" title="動画を書き出す">書き出す</button></div>';
+      return h;
+    }
     if(seq){
       h += grp('SEQ PNG', '書き出しの設定',
         '<div class="dk-set">' + resRow
@@ -319,7 +385,26 @@ var LP = window.LP || (window.LP = {});
       case 'refAdd': LP.drawTools.refAdd(b.dataset.v); break;
       case 'refDel': LP.drawTools.refDel(b.dataset.v); break;
       case 'refOp': { const [id, op] = b.dataset.v.split(':'); const rf = LP.drawTools.refOf(id); if(rf){ rf.opacity = +op; LP.app.commit('参照の濃さ'); } break; }
+      /* ---- 03 TAKE ---- */
+      case 'tCap': LP.takeTools.capture(); break;
+      case 'tUpd': LP.takeTools.update(); break;
+      case 'tPanel': LP.state.takePanel = b.dataset.v; render(); break;
+      case 'hReset': LP.takeTools.resetHand(); break;
+      case 'kPrev': LP.takeTools.step(-1); break;
+      case 'kNext': LP.takeTools.step(1); break;
+      case 'kDel': LP.takeTools.deleteSel(); break;
+      case 'kAuto': { const s0 = LP.app.curSheet(); LP.takeTools.setAuto(!(s0 && s0.take && s0.take.auto)); break; }
+      case 'kClear': LP.takeTools.clearTake(); break;
+      case 'kEase': { const kk = LP.takeTools.selKf(); if(kk){ const [ei, eo] = b.dataset.v.split('/').map(Number); LP.takeTools.setEase(kk, ei, eo); LP.app.commit('KF の緩急'); } break; }
+      case 'jType': if(sh){ sh.in.type = b.dataset.v; if(sh.in.type !== 'cut' && !(sh.in.dur > 0)) sh.in.dur = 12; LP.app.commit('繋ぎ'); } break;
+      case 'jColor': if(sh){ sh.in.color = b.dataset.v; LP.app.commit('繋ぎの色'); } break;
+      case 'jDir': if(sh){ sh.in.dir = b.dataset.v; LP.app.commit('ワイプの向き'); } break;
+      case 'shPre': if(sh){ const [a0, a1] = b.dataset.v.split('/').map(Number); sh.shake = { a0, a1, freq: (sh.shake && sh.shake.freq) || LP.time.SHAKE_FREQ_DEF }; LP.app.commit('画ブレ'); } break;
+      case 'shOff': if(sh && sh.shake){ sh.shake = null; LP.app.commit('画ブレを外す'); } break;
       /* ---- 04 SHOW ---- */
+      case 'exVid': LP.io.exportState().vid = b.dataset.v; LP.io.saveExportPrefs(); render(); break;
+      case 'exVbr': LP.io.exportState().vbr = +b.dataset.v; LP.io.saveExportPrefs(); render(); break;
+      case 'expVideo': LP.io.exportVideo(); break;
       case 'exKind': LP.io.exportState().kind = b.dataset.v; LP.io.saveExportPrefs(); render(); break;
       case 'exSeqMode': LP.io.exportState().seqMode = b.dataset.v; LP.io.saveExportPrefs(); render(); break;
       case 'exSeqTo': if(LP.io.canFolder()){ LP.io.exportState().seqTo = b.dataset.v; LP.io.saveExportPrefs(); render(); } break;

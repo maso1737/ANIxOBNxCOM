@@ -1,8 +1,8 @@
 /* ============================================================
    LIVE PLATE — input/keymap.js（キー。SPEC_21 §8-1）
    正準：composer-timeline-kit（SHORTCUT_ACTIONS 登録制＋gKeymap＋キャプチャで再割当）。
-   ★ 登録するのは**いま実在する操作だけ**。P3 以降の道具キー（C/F…）はそのフェーズで1行ずつ足す。
-   ★ step: 'sheet' | 'draw' の操作はそのステップでだけ効く＝**同じキーを別のステップの道具に使える**（P＝EDIT／PEN・G＝白／FILL。§8-1）。
+   ★ 登録するのは**いま実在する操作だけ**。まだ無い道具のキー（F＝FX…）はそのフェーズで1行ずつ足す。
+   ★ step: 'sheet' | 'draw' | 'take' の操作はそのステップでだけ効く＝**同じキーを別のステップの道具に使える**（P＝EDIT／PEN・G＝白／FILL。§8-1）。
      step の無い操作はどのステップでも効く。重複の判定・「同じキーは奪う」も同じステップの中だけ。
    ★ SPEC_17 の押し方：単押し＝run ／ 2連打（KEY_DBL_MS 以内）＝dbl ／ 長押し（HOLD_MS）＝hold ／ Shift＋キー＝shift ／
      バネ（spring：SPRING_MS 以上押して離す＝元の道具へ戻る）。長押しが成立したらバネは起こさない。
@@ -40,9 +40,11 @@ var LP = window.LP || (window.LP = {});
     { id: 'dOnion', step: 'draw', label: 'オニオン ON/OFF（前＝赤・後＝青）', def: 'O', run: () => DT().toggleOnion() },
     { id: 'dCellPrev', step: 'draw', label: '前のセル', def: 'ArrowUp', prevent: true, run: () => DT().cellStep(-1) },
     { id: 'dCellNext', step: 'draw', label: '次のセル', def: 'ArrowDown', prevent: true, run: () => DT().cellStep(1) },
+    { cat: '03 TAKE（カメラ）', id: 'kCap', step: 'take', label: 'CAPTURE いまの窓を KF に（Shift：選んだ KF を上書き）', def: 'C', run: () => LP.takeTools.capture(), shift: () => LP.takeTools.update() },
+    { id: 'kGuides', step: 'take', label: '窓の手すり（KF の窓と道筋）ON/OFF', def: 'H', run: () => A().toggleTakeGuides() },
     { cat: '再生 / 時間', id: 'play', label: '再生 / 停止', def: 'Space', prevent: true, run: () => A().togglePlay() },
-    { id: 'prevFrame', label: '前のコマ（Shift＝10）', def: 'ArrowLeft', prevent: true, run: e => { A().stop(); A().seek(LP.state.t - (e && e.shiftKey ? 10 : 1)); } },
-    { id: 'nextFrame', label: '次のコマ（Shift＝10）', def: 'ArrowRight', prevent: true, run: e => { A().stop(); A().seek(LP.state.t + (e && e.shiftKey ? 10 : 1)); } },
+    { id: 'prevFrame', label: '前のコマ（Shift＝10）／03 TAKE：前の KF（Shift＝1コマ）', def: 'ArrowLeft', prevent: true, run: e => frameKey(e, -1) },
+    { id: 'nextFrame', label: '次のコマ（Shift＝10）／03 TAKE：次の KF（Shift＝1コマ）', def: 'ArrowRight', prevent: true, run: e => frameKey(e, 1) },
     { id: 'prevSheet', label: '前の紙の頭', def: 'J', run: () => A().jumpSheet(-1) },
     { id: 'nextSheet', label: '次の紙の頭', def: 'K', run: () => A().jumpSheet(1) },
     { id: 'first', label: '先頭', def: 'Home', prevent: true, run: () => { A().stop(); A().seek(0); } },
@@ -53,13 +55,23 @@ var LP = window.LP || (window.LP = {});
     { id: 'zoomOut', label: 'ステージを縮小', def: ',', run: () => LP.stage.zoomBy(1 / 1.25) },
     { id: 'zoomIn', label: 'ステージを拡大', def: '.', run: () => LP.stage.zoomBy(1.25) },
     { id: 'fit', label: 'ステージを全体表示', def: '0', run: () => LP.stage.fit() },
+    { id: 'monitor', label: 'MONITOR（01・02 の右下に出力の画）', def: 'M', run: () => A().toggleMonitor() },
   ];
+  /* ←→：03 TAKE は KF を順に（§8-1「03 では KF 選択」）・Shift で1コマ。ほかのステップはコマ送り（Shift＝10） */
+  function frameKey(e, d){
+    const sh = e && e.shiftKey;
+    if(LP.state.step === 'take' && !sh){ LP.takeTools.step(d); return; }
+    A().stop();
+    A().seek(LP.state.t + d * (sh && LP.state.step !== 'take' ? 10 : 1));
+  }
   /* 固定キー（一覧に出すだけ・再割当不可） */
   const FIXED = [
     ['Ctrl+Z', 'Undo'], ['Ctrl+Shift+Z / Ctrl+Y', 'Redo'], ['Ctrl+D', '選んだ層を複製'], ['Ctrl+V', '画像を貼り付け（いまの紙に層として）'],
     ['Esc', '変形の取消 ＞ 投げ縄・分割の取消 ＞ 設定 ＞ 全画面 ＞ 再生停止 ＞ FOCUS を出る ＞ 選択解除'], ['Enter', '多角形の投げ縄を閉じる／変形を確定'], ['ホイール', 'ステージの拡縮（カーソル中心）'], ['中ボタン / 右ドラッグ', 'ステージの移動（紙の外をドラッグでも）'],
     ['Alt＋クリック', '01：重なりの1つ下を選ぶ ／ 02：スポイト'], ['Shift＋クリック（02 PEN）', '直前の線の終点から直線'], ['Ctrl+C / Ctrl+V（02 SEL）', '浮いた形をコピー／同じ位置に貼る'], ['指（02 DRAW）', '描かない＝ステージの移動'],
     ['Ctrl+ホイール', 'タイムラインの拡縮（ホイール＝横送り）'],
+    ['03 TAKE：ドラッグ／Shift＋ドラッグ', 'カメラを動かす／回す（Alt で 15° 刻み）'], ['03 TAKE：ホイール／Shift＋ホイール', 'カメラが寄る・引く（カーソルの下が動かない）／回す'],
+    ['03 TAKE：Alt＋ホイール', '表示の拡縮（窓の外をもっと見る）'], ['03 TAKE：Esc', '手持ちのカメラを捨てて TAKE の窓に戻す'], ['03 TAKE：Del', '選んだ KF を消す'],
   ];
   const KEYMAP_LS = 'liveplate_keymap_v1';
   let gKeymap = {}, gCaptureId = null, lastKey = { id: '', at: 0 };

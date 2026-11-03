@@ -12,6 +12,7 @@
        C4 84〜107 … コマ割り（斜めの縦線＋右を横線・右下は断ち切り）。背景は割ると全コマにコピー（panels.divide）、
                     フチ付きの層（コマ1）・網（コマ2・乗算）・集中線（コマ3）・流線（枠の上）・ホワイト（コマ1）・Z 付きの層
                     ★ 文字は入れない（書体の読み込みが検証窓で揺れる＝決定論にならない）
+       C5 108〜143 … カメラ（P3）：C4 から黒を経由して 6コマ・KF 3つ（AUTO・寄り→パン＋ドリー→回し）・Z の違う3層（視差）・画ブレ 0→40
    ============================================================ */
 var LP = window.LP || (window.LP = {});
 
@@ -113,6 +114,18 @@ var LP = window.LP || (window.LP = {});
     addIt('focus', P(2), { count: 90 });
     addIt('stream', null, { x: 1920, y: 1950, w: 3000, h: 260, count: 12, lw: 8 });
     addIt('white', P(0), { x: 2900, y: 900, poly: [{ x: -200, y: -120 }, { x: 220, y: -90 }, { x: 180, y: 140 }, { x: -160, y: 110 }] });
+    // C5：カメラ（P3 TAKE）。前の紙からディゾルブで入る・KF 3つ（寄り→パン＋ドリー→回し）・Z の違う層で視差・画ブレ（頭0→尻40）
+    const s5 = LP.model.newSheet(b, 36);
+    b.sheets.push(s5);
+    // 黒を経由するフェード。VRT で撮るのは後半（C5＋黒だけ）＝C4 の画（ブラウザ差の出るコマ割り）を混ぜない
+    s5.in = { type: 'fade', dur: 6, color: '#000000', dir: 'l' };
+    put(s5, bg, { x: 0, y: 0, w: 3840, h: 2160 }, { z: -300 });
+    put(s5, sq, { x: 600, y: 700, w: 1280, h: 720 }, { step: 2 });
+    put(s5, sp, { x: 2300, y: 900, w: 800, h: 720 }, { z: 260 });
+    const K = (c, dw, ei, eo) => Object.assign(LP.model.newKf(c, 0), { dwell: dw, ei, eo });
+    s5.take = { auto: true, kf: [K({ x: -500, y: -150, z: 0, rot: 0, s: 1.4 }, 0.6, 0, 60), K({ x: 600, y: 200, z: 180, rot: 0, s: 1.8 }, 0.4, 60, 30), K({ x: 300, y: 100, z: 60, rot: -10, s: 1.2 }, 1, 80, 0)] };
+    s5.shake = { a0: 0, a1: 40, freq: 8 };
+    LP.takeTools.relayoutAll();
 
     LP.hist.reset();
     LP.state.t = 0;
