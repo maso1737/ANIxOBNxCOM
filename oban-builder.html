@@ -2044,7 +2044,7 @@ async function addApPanel(rec){
   toast(bits.length?('MANGA PLATE を追加 — '+bits.join(' ／ '))
     :('AP:'+ap.name+' を追加 — '+p.seq.n+'f / '+p.seq.fps+'fps loop（ANIMATOR保存で自動更新）'));
 }
-$('#b-ap').addEventListener('click',()=>toggleApModal());
+$('#b-ap').addEventListener('click',()=>{toggleSetModal(false);toggleApModal(true);});
 $('#ap-close').addEventListener('click',()=>toggleApModal(false));
 $('#ap-body').addEventListener('click',e=>{
   const row=e.target&&e.target.closest?e.target.closest('.qd-ent'):null;

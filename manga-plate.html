@@ -434,7 +434,7 @@ select{width:100%}
         <button class="btn rouge" id="lk-lay-oban" title="選択コマを 奥/中間/手前 に分けたまま OBAN へ（1コマ=1フレーム＋子パネル＝コマ内パララックス）">▶▶ OBAN レイヤー</button>
       </div>
       <div class="note" id="lk-lay-note">コマを選ぶとレイヤー構成が出ます。</div>
-      <div class="note" id="lk-note">選択コマを上の解像度に合わせて送ります。ANIMATOR側は <b>REF ▸ ＋ FROM SAVED</b> で拾えます。戻りは <b>◀ ANIMATOR 取込</b>、以後は保存のたび自動更新（LIVE）。</div>
+      <div class="note" id="lk-note">選択コマを上の解像度に合わせて送ります。ANIMATOR側は <b>REF ▸ + SAVED</b> で拾えます。戻りは <b>◀ ANIMATOR 取込</b>、以後は保存のたび自動更新（LIVE）。</div>
     </div></details>
 
     <details class="sp"><summary>◆ Export</summary><div class="spb">
@@ -2219,7 +2219,7 @@ $('#bind-r').addEventListener('click',()=>{
 /* ============================================================
    サイドパネル: Items
    ============================================================ */
-function addItem(type,srcId,linkId){
+function addItem(type,srcId,linkId,imgFields){
   const pg=curPage();
   /* 入れ先は ◆Items の「追加先」チップ（＝コマを選ぶと自動で追従）。
      連続で足しても外れない＝コマ2を選んでおけば何枚でもコマ2に入る */
@@ -2234,6 +2234,7 @@ function addItem(type,srcId,linkId){
     it.srcId=srcId||null;it.linkId=linkId||null;
     const im=MATIMG[it.srcId];
     if(im&&im.width)it.scale=Math.min(box.w/im.width,box.h/im.height);
+    Object.assign(it,imgFields);
   }
   pg.items.push(it);selItem=it;selItems=[it];
   normalizeItems(pg);
@@ -2262,11 +2263,20 @@ async function addImage(dataURLs,name,linkId){
   const arr=Array.isArray(dataURLs)?dataURLs:[dataURLs];
   const srcs=[];
   for(const du of arr)srcs.push(await putSrc(du));
-  const it=addItem('img',srcs[0],linkId);
-  it.srcs=srcs;it.cell=0;
-  if(name)it.name=name.slice(0,20);
-  commit();renderItemList();renderItemParams();
-  return it;
+  const fields={srcs:srcs,cell:0};
+  if(name)fields.name=name.slice(0,20);
+  const lk=linkId&&BOOK.links[linkId];
+  if(lk){
+    const page=BOOK.pages.findIndex(pg=>pg.id===lk.pageId);
+    if(page>=0&&(!lk.panelId||findPanel(BOOK.pages[page],lk.panelId))){
+      if(page!==curPageIdx)gotoPage(page);
+      fields.panelId=lk.panelId||null;
+      fields.x=lk.box.x+lk.box.w/2;fields.y=lk.box.y+lk.box.h/2;
+      fields.scale=1/lk.scale;
+      if(Z_DEPTH[lk.z]!==undefined)fields.z=lk.z;
+    }
+  }
+  return addItem('img',srcs[0],linkId,fields);
 }
 function setItemCell(it,i){
   if(!it.srcs||!it.srcs.length)return;
@@ -3316,7 +3326,7 @@ $('#lk-to-ani').addEventListener('click',async()=>{
   try{await exPut(rec);}catch(e){toast('✗ 共有DBに書けませんでした');return;}
   postLive({type:'project-update',projectId:pid,payload:rec});
   commit();
-  modalConfirm('ANIMATOR へ送りました（'+w+'×'+h+'）。\n\nANIMATOR を開いて  REF ▸ ＋ FROM SAVED  から\n「'+name+'」を選ぶと下敷きに乗ります。\n\nANIMATOR を新しいタブで開きますか？',
+  modalConfirm('ANIMATOR へ送りました（'+w+'×'+h+'）。\n\nANIMATOR を開いて  REF ▸ + SAVED  から\n「'+name+'」を選ぶと下敷きに乗ります。\n\nANIMATOR を新しいタブで開きますか？',
     ()=>{window.open('animator.html','_blank');});
 });
 /* S4: 描き足し（のりしろ付きで ANIMATOR へ）
@@ -3348,8 +3358,8 @@ async function sendFillToAnimator(z){
     +'  ・桃の実線 がコマ枠。ここより内側が紙に出ます\n'
     +'  ・水色の破線 までがのりしろ '+Math.round(G.pad*100)+'%。動かすとここが出てきます\n'
     +'  ・その隙間を描き足してください\n\n'
-    +'ANIMATOR で  REF ▸ ＋ FROM SAVED  から「'+name+'」を選んで下敷きにし、\n'
-    +'描いたら  ◀ ANIMATOR 取込  で戻すと「'+zl+'」の層に入ります。\n\n'
+    +'ANIMATOR で  REF ▸ + SAVED  から「'+name+'」を選んで下敷きにし、\n'
+    +'描いたら元のコマを選び、◀ ANIMATOR 取込。◆Item で「'+zl+'」の層と倍率を確認してください。\n\n'
     +'ANIMATOR を新しいタブで開きますか？',
     ()=>{window.open('animator.html','_blank');});
 }
@@ -3380,36 +3390,12 @@ $('#lk-from-ani').addEventListener('click',async()=>{
     value:r})),async r=>{
       const imgs=r.cells.filter(c=>c.kind==='draw'&&c.image).map(c=>c.image);
       const it=await addImage(imgs,String(r.name||'ANI').slice(0,16),r.projectId);
-      placeLinked(it,r);
-      commit();renderItemList();renderItemParams();
-      const lz=(BOOK.links[r.projectId]||{}).z;
-      toast((imgs.length>1
-        ?'◀ '+imgs.length+'コマ取り込みました（◆Items の コマ送り で切替）'
-        :'◀ 取り込みました（以後 ANIMATOR の保存で自動更新）')
-        +(lz?('　層＝'+Z_DEFS.find(a=>a[0]===lz)[2]):''));
+      const k=curPage().panels.findIndex(p=>p.id===it.panelId);
+      toast('受信 P'+(curPageIdx+1)+' / '+(k<0?'枠の上':'コマ '+(k+1))
+        +' · '+r.width+'×'+r.height+' · '+imgs.length+'コマ · '+zLabel(it,true)
+        +'（LIVEで更新 / Ctrl+Zで取込を戻す）');
     });
 });
-/* 送った時の矩形が残っていれば、そのコマにピッタリ戻す */
-function placeLinked(it,rec){
-  const lk=BOOK.links[rec.projectId];
-  const pg=curPage();
-  if(!lk){const b=PAPER.bas;const im=MATIMG[it.srcId];
-    if(im&&im.width)it.scale=Math.min(b.w/im.width,b.h/im.height);
-    it.x=b.x+b.w/2;it.y=b.y+b.h/2;return;}
-  const pgIdx=BOOK.pages.findIndex(p=>p.id===lk.pageId);
-  if(pgIdx>=0&&pgIdx!==curPageIdx)gotoPage(pgIdx);
-  const tp=curPage();
-  const k=lk.panelId?findPanel(tp,lk.panelId):null;
-  it.panelId=k?k.id:null;
-  if(lk.z&&Z_DEPTH[lk.z]!==undefined)it.z=lk.z;   // S4: 描き足しで送った層へ戻す
-  const im=MATIMG[it.srcId];
-  if(im&&im.width){
-    it.scale=1/lk.scale;                       // 送った倍率の逆
-    it.x=lk.box.x+lk.box.w/2;it.y=lk.box.y+lk.box.h/2;
-  }
-  BOOK.pages.forEach(normalizeItems);            // 別ページに置かれた場合もコマ欄順を保つ
-  if(pg!==tp){renderPanelSec();}
-}
 async function sendPageTo(target){
   const w=BOOK.link.w, h=BOOK.link.h;
   const pid='mp_'+target+'_'+BOOK.title.replace(/[^\w\-]/g,'')+'_p'+(curPageIdx+1);
@@ -3655,7 +3641,7 @@ function updateLinkNote(){
     what+' → <b>'+w+'×'+h+'</b> に収めて送ります（画素の使用率 <b style="color:'+
     (use<55?'var(--rouge)':'var(--gold)')+'">'+use+'%</b>）。'+
     (use<55?'<br><b>コマ比</b>を押すと余白なしの解像度になります。ANIMATOR側も同じ解像度にしてください。':'')+
-    '<br>ANIMATOR側は <b>REF ▸ ＋ FROM SAVED</b> で拾えます。戻りは <b>◀ ANIMATOR 取込</b>、以後は保存のたび自動更新（LIVE）。';
+    '<br>ANIMATOR側は <b>REF ▸ + SAVED</b> で拾えます。戻りは <b>◀ ANIMATOR 取込</b>、以後は保存のたび自動更新（LIVE）。';
 }
 (function initLinkPresets(){
   const box=$('#lk-presets');
@@ -3803,8 +3789,8 @@ const HELP_GROUPS=[
     ['—','スライダーは指の当たり判定を広げてあります（見た目より上下に余裕あり）'],
   ]],
   ['連携',[
-    ['▶ ANIMATOR REF','選択コマを送る。ANIMATOR側は <b>REF ▸ ＋FROM SAVED</b>。1コマなので全ティックで出しっぱなしになる'],
-    ['◀ ANIMATOR 取込','送った位置にピタリ戻る。複数コマなら <b>コマ送り</b> が出る'],
+    ['▶ ANIMATOR REF','選択コマを送る。ANIMATOR側は <b>REF ▸ + SAVED</b>。1コマなので全ティックで出しっぱなしになる'],
+    ['◀ ANIMATOR 取込','◆Items の追加先に縦横比を保って入る。複数コマなら <b>コマ送り</b> が出る'],
     ['—','以後 ANIMATOR で保存するたび自動で差し替わる（LIVE）'],
     ['▶ COMPOSER / OBAN','ページを送って向こうで開く（1枚に焼いた絵）'],
     ['▶▶ ○○ レイヤー','<b>選択コマを層のまま送る</b>（地 / 奥 / 中間 / 手前 / 枠の上）。'
@@ -3824,7 +3810,7 @@ const HELP_GROUPS=[
       +'OBAN はなめらかに拡大しますが、<b>COMPOSER はニアレストなので線がジャギります</b>——詰めに使うなら 100% に'],
     ['▶ 描き足し','パララックスで動かすと足りなくなる<b>コマ枠の外</b>を描くための往復。'
       +'のりしろ付きで ANIMATOR へ送り（桃の実線＝コマ枠／水色の破線＝のりしろの端）、'
-      +'<b>◀ ANIMATOR 取込</b> で選んでおいた層に戻る'],
+      +'<b>◀ ANIMATOR 取込</b> のあと、元のコマ・奥行き・のりしろの倍率を確認'],
   ]],
   ['表示・その他',[
     ['S','選択コマ以外を青くする ON/OFF'],

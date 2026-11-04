@@ -332,10 +332,10 @@ const ROUTES=[
   lab:'下敷き／描き足し',
   ti:'MANGA PLATE のコマを ANIMATOR で描く・描き足す',
   dt:'<b>①中身を描く</b>: コマを選んで <span class="k">▶ ANIMATOR REF</span> → ANIMATOR の '
-    +'<span class="k">REF（R）▸ + FROM SAVED</span> で下敷きにして描く。<br>'
+    +'<span class="k">REF（R）▸ + SAVED</span> で下敷きにして描く。<br>'
     +'<b>②はみ出しを描き足す</b>: <span class="k">▶ 描き足し（のりしろ付き）</span> → 戻す層（奥/中間/手前）を選ぶ。'
     +'<b>桃の実線＝コマ枠／水色の破線＝のりしろの端</b>、その間を描く。<br>'
-    +'どちらも戻りは <span class="k">◀ ANIMATOR 取込</span>で、送った位置にピタリ入ります。'},
+    +'元のコマを選び直し、<span class="k">◀ ANIMATOR 取込</span>。描き足しは ◆Item で奥行きと倍率を確認。'},
 
  {id:'mp-ob',a:'mp',b:'ob',
   d:'M 550,428 Q 700,394 758,161', lx:694,ly:200,
@@ -374,7 +374,7 @@ const ROUTES=[
   dt:'<b>①かんたん</b>: <span class="k">▶ COMPOSER</span> でページが1トラックとして入ります。<br>'
     +'<b>②レイヤー</b>: <span class="k">▶▶ COMPOSER レイヤー</span> で '
     +'<b>地 → 奥 → 中間 → 手前 → 枠の上</b> が奥から手前の順に別トラックで並びます。'
-    +'カメラを動かすとトラックごとに違う速さで動く＝奥行きが出ます。<br>'
+    +'取り込み時の Z は共通。視差を付けるには、COMPOSER でトラックごとに Z を設定します。<br>'
     +'<span class="warn">※ COMPOSER は拡大がニアレストなので、'
     +'ぱかぱか層の解像度を下げていると線がジャギります。詰めに使うなら 100% に。</span>'},
 

@@ -223,6 +223,16 @@ cd verify && npm run verify:liveplate
 - **ガイド**: 解像度枠/セーフフレームは `guide-layer` に表示のみ（書き出し非合成）。
 - **座標/入力**: 全ポインタ処理は `#stage` で一元化。`toCanvasCoord()` が flip/mirror 換算。
 
+## 地雷（踏んだもの）
+- **MANGA PLATE の `◀ ANIMATOR 取込` で、旧 `placeLinked` が座標を上書きしていた**（2026-11-03 GPT 検証 → 11-04 取り込み）。
+  `addItem` は追加先のコマから中心・倍率を計算するのに、送った控え（`BOOK.links[projectId]`）が無いと `placeLinked` が `PAPER.bas`（ページ全体）で上書き
+  ＝上段コマの絵がページ中心に置かれ、枠外がマスクで消えていた。いまは `addImage` が控えを見て `addItem(type,src,link,fields)` に1回で渡す（`placeLinked` は削除）。
+  **取込の置き場所を変えるときは `addImage` の `fields` だけを触る。あとから座標を書き換える関数を足さない。**
+- **取込が3つの履歴に分裂していた**（同上）。追加・画像情報（`srcs`/`cell`/`name`）・配置がそれぞれ `commit()` を呼び、Ctrl+Z 1回で Y だけ戻って IMG が残った。
+  いまは `addItem` の中の1回だけ。**取込・受信の処理に `commit()` を足すと Undo がまた割れる。**
+- OBAN の `#b-ap`（⚙ ▸ FILE／連携 ▸ ▶ ANIMATOR）は**設定画面を閉じてから一覧を開く**（`toggleSetModal(false);toggleApModal(true)`）。設定画面が前面に残るとクリックを奪う。
+  実測値と再現手順は [TAB_LINK_HANDOFF.md](TAB_LINK_HANDOFF.md)。
+
 ## 既知の制限
 - ライブ連携は同一ブラウザ・同一オリジンのタブ間のみ。
 - キャンバス拡大はメモリ×コマ数で増える（8Kは多コマ不可。上限4K面積）。

@@ -35,7 +35,7 @@
 5. animator → composer → EXPORT WEB(LP) …fx rt実行(P2b〜)。fx有効時のみコア同梱・`?fx=0`でOFF
 6. manga-plate →（透過PNG）→ OBAN（コマ内=FRAME子/飛び出し=ルート）/ composer …トーン・スピード線・枠の板（SPEC_09）
 7. **manga-plate `▶▶ OBAN レイヤー` → 1コマ＝1フレーム＋子パネル N枚（奥行き別）＝コマ内パララックス。スピード線に「ぱかぱか」を付けておくと、その層だけ n種×stepコマ打ちの seq になる（SPEC_09 §v2-13）**
-10. **manga-plate でコマを割る → コマを選んで `▶ ANIMATOR REF`（共有DB経由）→ ANIMATOR で枠内の絵/ふきだし/擬音を描く → manga-plate `◀ ANIMATOR 取込` で送った位置にピタリ戻る（以後は保存のたび自動更新）→ はみ出しはコマのマスクでカット、スピード線/トーンを乗せて仕上げ → `▶ OBAN`（あたり・展開）／`▶ COMPOSER`（詰め）**
+10. **manga-plate でコマを割る → コマを選んで `▶ ANIMATOR REF`（共有DB経由）→ ANIMATOR で枠内の絵/ふきだし/擬音を描く → manga-plate `◀ ANIMATOR 取込` で元のコマを選んで受信（通常は追加先に等比配置。REF の位置・倍率やのりしろを逆算するための往復 ID は未対応）（以後は保存のたび自動更新）→ はみ出しはコマのマスクでカット、スピード線/トーンを乗せて仕上げ → `▶ OBAN`（あたり・展開）／`▶ COMPOSER`（詰め）**
     …漫画ページ主導ルート（SPEC_09 v2）。**送受信は既存の `tdr_exchange` / `tdr_live` にそのまま相乗りしており、animator / oban / composer 側の改修は不要**
 11. **rough（ラフ原：描く → SEL で囲んで少し動かす → 次のコマへ ▶ で下絵 → 上から描く…）→ `→ ANIMATOR REF` → ANIMATOR の REF に入る（送り直すと同じ REF の絵だけ差し替わる）→ 仕上げ** …ラフ原ルート（SPEC_22）。animator 側の改修は受け箱だけ（`refInboxCheck`）
 8. 紙ネーム/ラフ写真 → econte（BOARD切り出し→SHEET絵コンテ→TIMELINE）→ **動画コンテ WebM/mp4** …プリプロ（SPEC_10 P0+P1）。**P2で → animator REF（本作画へ）／ → カラースクリプト一覧PNG を接続予定**
