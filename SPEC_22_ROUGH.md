@@ -148,7 +148,7 @@ ROUGH                                         ANIMATOR（animator.html）
 - 別窓（`?ro=1`）は受け取らない。共有DB の記録は ANIMATOR の `exCleanup` で24時間後に消える（REF に入った後は ANIMATOR の refs に `source` ごと残る）。
 - ROUGH から来た REF は**1枚でも IMG にせず ANI のまま**（`addRefAnimator(json, name, {ani:true})`）＝送り直したとき同じ projectId で差し替えられるように。1コマだけの ANI は animator 側の既存規則で全ティックに出る。
 - 画は**透明の地で、OUT の「下書／指示」に従う**（下書を入れないで送る、ができる）。REF 画像は送らない。
-- ANIMATOR の REF ▸ **+ FROM SAVED** にも出る（共有DB の一覧）。
+- ANIMATOR の REF ▸ **+ SAVED** にも出る（共有DB の一覧）。
 - **ANIMATOR 側の改修はこれだけ**：`refInboxCheck` / `refUpsertFromExchange`（新規）＋ `tdr_live` の `ref-push` 1行＋起動時1行＋ `addRefAnimator` に第3引数 `opts.ani`。
 
 ## 9. iPad（SPEC_18 の文法）

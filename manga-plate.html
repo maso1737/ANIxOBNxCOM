@@ -3214,7 +3214,9 @@ async function onAnimatorUpdate(pid,payload){
     hit=true;
   }
   if(hit){edgeCache.clear();toneCache.clear();thumbCache={};save();render();renderItemList();renderItemParams();
-    toast('● ANIMATOR の更新を反映しました（'+imgs.length+'コマ）');}
+    const it0=BOOK.pages.reduce((a,pg)=>a||pg.items.find(it=>it.type==='img'&&it.linkId===pid),null);
+    const msg=it0?recvLine(it0,payload,imgs.length,'更新（絵だけ）'):('ANIMATOR の更新（'+imgs.length+'コマ）');
+    toast('● '+msg);linkLog('an-mp','recv',msg);}
 }
 /* OBAN で直された読み文字を書き戻す（SPEC_09 §v2-11）。
    反映するのは **文字だけ**。位置・サイズ・色・行間・フォントはこちらを正とする
@@ -3235,6 +3237,7 @@ function onPlateTextBack(texts){
   postLive({type:'plate-text-ack',hit:hit,n:n});
   if(!n)return;
   commit();renderItemList();renderItemParams();
+  linkLog('ob-mp','recv','文字 '+n+'個を反映');
   const other=pages.filter(i=>i!==curPageIdx).map(i=>'P'+(i+1));
   toast('◀ OBAN の文字を '+n+'個 反映しました'+(other.length?'（'+other.join(' / ')+'）':'')+' — Ctrl+Z で戻せます');
 }
@@ -3300,6 +3303,14 @@ function plateTexts(L,w,h,only){
   }
   return out;
 }
+/* L5（2026-11-04）: LINK MAP が読む「ルートごとの最後の送信／受信」。
+   キーは tdr_link_log_v1:<ルート>:<send|recv> の1件ずつ（1つのキーに全部入れると、
+   送り側と受け側のタブがほぼ同時に読み書きして片方の記録が消える＝実測で消えた）。
+   oban-builder / manga-plate / composer / rough で同じ形にそろえること */
+function linkLog(rt,kind,msg){
+  try{localStorage.setItem('tdr_link_log_v1:'+rt+':'+kind,
+    JSON.stringify({t:new Date().toISOString(),app:'MANGA PLATE',msg:String(msg).slice(0,160)}));}catch(e){}
+}
 function linkRecord(pid,name,w,h,opt){
   const L=linkCanvas(w,h,opt);
   const rec={
@@ -3326,6 +3337,7 @@ $('#lk-to-ani').addEventListener('click',async()=>{
   try{await exPut(rec);}catch(e){toast('✗ 共有DBに書けませんでした');return;}
   postLive({type:'project-update',projectId:pid,payload:rec});
   commit();
+  linkLog('mp-an','send',name+'｜下敷き '+w+'×'+h);
   modalConfirm('ANIMATOR へ送りました（'+w+'×'+h+'）。\n\nANIMATOR を開いて  REF ▸ + SAVED  から\n「'+name+'」を選ぶと下敷きに乗ります。\n\nANIMATOR を新しいタブで開きますか？',
     ()=>{window.open('animator.html','_blank');});
 });
@@ -3354,6 +3366,7 @@ async function sendFillToAnimator(z){
   try{await exPut(rec);}catch(e){toast('✗ 共有DBに書けませんでした');return;}
   postLive({type:'project-update',projectId:pid,payload:rec});
   commit();
+  linkLog('mp-an','send',name+'｜枠 '+G.fw+'×'+G.fh+'・のりしろ込み '+G.w+'×'+G.h+'（'+Math.round(G.pad*100)+'%）');
   modalConfirm('ANIMATOR へ のりしろ付き で送りました（'+G.w+'×'+G.h+'）。\n\n'
     +'  ・桃の実線 がコマ枠。ここより内側が紙に出ます\n'
     +'  ・水色の破線 までがのりしろ '+Math.round(G.pad*100)+'%。動かすとここが出てきます\n'
@@ -3390,12 +3403,26 @@ $('#lk-from-ani').addEventListener('click',async()=>{
     value:r})),async r=>{
       const imgs=r.cells.filter(c=>c.kind==='draw'&&c.image).map(c=>c.image);
       const it=await addImage(imgs,String(r.name||'ANI').slice(0,16),r.projectId);
-      const k=curPage().panels.findIndex(p=>p.id===it.panelId);
-      toast('受信 P'+(curPageIdx+1)+' / '+(k<0?'枠の上':'コマ '+(k+1))
-        +' · '+r.width+'×'+r.height+' · '+imgs.length+'コマ · '+zLabel(it,true)
-        +'（LIVEで更新 / Ctrl+Zで取込を戻す）');
+      const msg=recvLine(it,r,imgs.length,'新規');
+      toast(msg+'（LIVEで更新 / Ctrl+Zで取込を戻す）');linkLog('an-mp','recv',msg);
     });
 });
+/* L4（2026-11-04）: 受信の1行。「P1 コマ2・手前 ← ANIMATOR｜作画2048×1152 → コマ 4252×3159（×2.08・上下に余白）｜新規」 */
+function recvLine(it,r,nCells,kind){
+  const pi=BOOK.pages.findIndex(pg=>pg.items.indexOf(it)>=0);
+  const pg=BOOK.pages[pi<0?curPageIdx:pi];
+  const k=pg.panels.findIndex(p=>p.id===it.panelId);
+  let dst='';
+  if(k>=0){
+    const B=polyBounds(dispPoly(pg.panels[k]));
+    const dw=r.width*it.scale, dh=r.height*it.scale;
+    const gap=(Math.abs(dw-B.w)<2&&Math.abs(dh-B.h)<2)?'ぴったり'
+      :(dh<B.h-1?'上下に余白':(dw<B.w-1?'左右に余白':'はみ出しあり'));
+    dst=' → コマ '+Math.round(B.w)+'×'+Math.round(B.h)+'（×'+(+it.scale).toFixed(2)+'・'+gap+'）';
+  }
+  return 'P'+((pi<0?curPageIdx:pi)+1)+' '+(k<0?'枠の上':'コマ'+(k+1))+'・'+zLabel(it,true)
+    +' ← '+(String(r.projectId||'').indexOf('rough_')===0?'ROUGH':'ANIMATOR')+'｜作画 '+r.width+'×'+r.height+(nCells>1?('・'+nCells+'コマ'):'')+dst+'｜'+kind;
+}
 async function sendPageTo(target){
   const w=BOOK.link.w, h=BOOK.link.h;
   const pid='mp_'+target+'_'+BOOK.title.replace(/[^\w\-]/g,'')+'_p'+(curPageIdx+1);
@@ -3406,12 +3433,14 @@ async function sendPageTo(target){
   try{await exPut(rec);}catch(e){toast('✗ 共有DBに書けませんでした');return;}
   postLive({type:'project-update',projectId:pid,payload:rec});
   if(target==='comp'){
+    linkLog('mp-co','send',name+'｜ページ1枚 '+w+'×'+h);
     window.open('composer.html?id='+encodeURIComponent(pid),'_blank');
     toast('▶ COMPOSER をトラック付きで開きました');
   }else{
-    window.open('oban-builder.html','_blank');
     const nt=(rec.plate&&rec.plate.texts.length)||0;
-    modalAlert('OBAN へ送りました。\n\nOBAN 側の  ＋ FROM ANIMATOR  を開くと\n「'+name+'」が候補に出ます。'
+    linkLog('mp-ob','send',name+'｜ページ1枚 '+w+'×'+h+(nt?('・文字'+nt):''));
+    window.open('oban-builder.html','_blank');
+    modalAlert('OBAN へ送りました。\n\nOBAN の  ⚙ SETTINGS ▸ FILE／連携 ▸ ▶ ANIMATOR  を開くと\n「'+name+'」が候補に出ます。'
       +(nt?('\n\n読み文字 '+nt+'個は絵に焼かずに送っています。\nOBAN 側では文字のまま編集できます（フレームに入った状態で届きます）。')
           :'\nそれを選ぶとパネルになります。'));
   }
@@ -3528,10 +3557,12 @@ async function sendPanelLayers(target){
   if(target==='comp'){
     const rec={format:'PROJECT_v2',projectId:base,name:nm,scene:nm,
       exportedAt:new Date().toISOString(),fps:24,width:G.w,height:G.h,bgBright:100,
+      plate:{v:2,src:'manga-plate',w:G.fw,h:G.fh,pad:+G.pad.toFixed(4)},   // L4: 受け側が「枠／のりしろ込み」を言えるように
       tracks:built.map(b=>Object.assign(layerRecord(b.pid,nm+' '+b.sp.label,b.cells,G.w,G.h),
         {type:'anim',tid:b.pid}))};
     try{await exPut(rec);}catch(e){toast('✗ 共有DBに書けませんでした');return;}
     postLive({type:'project-update',projectId:base,payload:rec});
+    linkLog('mp-co','send',nm+'｜'+built.length+'レイヤー・枠 '+G.fw+'×'+G.fh+'・のりしろ込み '+G.w+'×'+G.h);
     window.open('composer.html?id='+encodeURIComponent(base),'_blank');
     const tot=built.reduce((a,b)=>a+b.cells.reduce((x,c)=>x+c.image.length,0),0);
     toast('▶▶ COMPOSER へ '+built.length+' レイヤー（奥→手前の順にトラック・'
@@ -3551,6 +3582,8 @@ async function sendPanelLayers(target){
     await exPut(man);
   }catch(e){toast('✗ 共有DBに書けませんでした');return;}
   postLive({type:'project-update',projectId:base,payload:man});
+  linkLog('mp-ob','send',nm+'｜'+built.length+'レイヤー'+(texts.length?('・文字'+texts.length):'')
+    +'・枠 '+G.fw+'×'+G.fh+'・のりしろ込み '+G.w+'×'+G.h);
   window.open('oban-builder.html','_blank');
   const MB=x=>(x/1024/1024).toFixed(1)+'MB';
   const tot=built.reduce((a,b)=>a+b.cells.reduce((x,c)=>x+c.image.length,0),0);
@@ -3560,8 +3593,9 @@ async function sendPanelLayers(target){
             +(BOOK.link.pkRes<1?(' / 画素 '+Math.round(BOOK.link.pkRes*100)+'%'):'')):'')
         +'  '+MB(b.cells.reduce((x,c)=>x+c.image.length,0))).join('\n')
     +'\n  ── 合計 '+MB(tot)+(tot>40*1024*1024?'（重いです。解像度かぱかぱかの種類を減らすと軽くなります）':'')
-    +'\n\nOBAN 側の  ＋ FROM ANIMATOR  で「'+nm+'」を選ぶと、\n'
+    +'\n\nOBAN の  ⚙ SETTINGS ▸ FILE／連携 ▸ ▶ ANIMATOR  で「'+nm+'」を選ぶと、\n'
     +'1コマ＝1フレーム＋子パネル '+built.length+'枚 で入ります（＝コマ内パララックス）。\n'
+    +'同じコマを送り直したときは「更新」になり、置いた位置・カメラはそのまま絵と文字だけ差し替わります。\n'
     +'のりしろ '+Math.round(G.pad*100)+'% ぶん外まで送ってあるので、少し動かしても欠けません。'
     +(texts.length?('\n\n読み文字 '+texts.length+'個は焼かずに渡しています。'):''));
 }

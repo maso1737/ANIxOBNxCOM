@@ -173,6 +173,13 @@ body{
 .mi.on .go{display:flex}
 .mi .go a{height:26px;padding:0 10px;font-size:11px;letter-spacing:.12em}
 .mi .warn{color:var(--mark)}
+/* L5（2026-11-04）: 最後の送受信。各アプリが localStorage['tdr_link_log_v1'] に書いたものを読むだけ */
+.mi .lg{margin:6px 0 0 32px;font-family:var(--mono);font-size:10.5px;line-height:1.65;letter-spacing:.04em;color:rgba(232,236,242,.42)}
+.mi .lg .r{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mi.on .lg .r{white-space:normal}
+.mi .lg .r.has{color:rgba(232,236,242,.72)}
+.mi .lg .r.has::before{content:'● ';color:var(--acc-pt)}
+.mi .lg .t{color:var(--acc2)}
 
 /* ---------- CLEAR 演出 ---------- */
 #clear{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;
@@ -347,7 +354,10 @@ const ROUTES=[
     +'<span class="k">▶▶ OBAN レイヤー</span>。1コマが<b>フレーム＋子パネル</b>で入り、'
     +'カメラを振ると層ごとに違う速さで動きます。<br>'
     +'寄り（T.U.）でも分けたいときはフレームの <span class="k">Z</span> を上げる'
-    +'（レイヤー送りなら 1.00 で届く）。'},
+    +'（レイヤー送りなら 1.00 で届く）。<br>'
+    +'<b>同じコマを送り直したら</b>、OBAN の一覧の <span class="k">更新</span> の付いた行を押す＝'
+    +'置いたフレームの中身だけ差し替わり、位置・カメラはそのまま。別に置くときだけ '
+    +'<span class="k">＋ 別素材として追加</span>。'},
 
  {id:'ob-mp',a:'ob',b:'mp',
   d:'M 792,161 Q 742,430 552,458', lx:648,ly:452,
@@ -382,8 +392,11 @@ const ROUTES=[
   d:'M 843,161 L 843,401', lx:888,ly:280,
   lab:'カメラを渡す',
   ti:'OBAN で作ったカメラワークを COMPOSER へ持っていく',
-  dt:'OBAN の <span class="k">COMPOSER ▶</span> で TAKE を CAMERA トラックの JSON に変換してコピー → '
-    +'COMPOSER の <span class="k">▶ OBAN</span> で貼り付け。<br>'
+  dt:'OBAN の <span class="k">⚙ ▸ COMPOSER ▶</span> で TAKE を CAMERA トラックの JSON に変換して '
+    +'<span class="k">COPY JSON</span> か <span class="k">カメラJSONを保存</span> → '
+    +'COMPOSER の <span class="k">▶ OBAN</span>。<br>'
+    +'どちらでも<b>共有DBに同じものが入る</b>ので、クリップボードが別の内容でも読めます'
+    +'（読めないときは何を読んだかと、共有DB・ファイルから読む道が出る）。<br>'
     +'撮影処理（FX）と<b>ルートパネルの配置</b>も一緒に付いてくるので、'
     +'COMPOSER 側に同じ名前の画像を先に入れておくと<b>位置・サイズ・重ね順が自動で乗ります</b>。'},
 ];
@@ -442,6 +455,7 @@ function drawList(){
       +'<span class="rt">'+NODES[r.a].nm+' <em>▶</em> '+NODES[r.b].nm+'</span>'
       +'</div>'
       +'<div class="ti">'+r.ti+'</div>'
+      +'<div class="lg" data-lg="'+r.id+'"></div>'
       +'<div class="dt">'+r.dt+'</div>'
       +'<div class="go">'
       +'<a class="btn" href="'+NODES[r.a].file+'" target="_blank" rel="noopener">'+NODES[r.a].nm+' を開く</a>'
@@ -526,7 +540,41 @@ document.addEventListener('keydown',e=>{
   }
 });
 
-drawNodes();drawEdges();drawList();render();
+/* ---- L5（2026-11-04）: 最後の送受信 ----
+   各アプリ（MANGA PLATE / OBAN / COMPOSER / ROUGH）が送った・受け取った瞬間に
+   localStorage['tdr_link_log_v1:<ルートid>:<send|recv>'] = {t,app,msg} を1件ずつ上書きする
+   （キーを分けているのは、送り側と受け側のタブが同時に書いて片方が消えるのを防ぐため）。
+   ここは読んで見せるだけ。**完了チェックには使わない**（チェックは手で付けるもの）。
+   ANIMATOR は改修しないので、ANIMATOR が送る側・受ける側の記録は無い（LOG_SIDES で「記録しない」と出す） */
+const LOG_KEY='tdr_link_log_v1';
+const LOG_SIDES={'ro-an':['send','recv'],'ec-an':[],'an-ob':['recv'],'ob-an':[],'an-mp':['recv'],'mp-an':['send'],
+  'mp-ob':['send','recv'],'ob-mp':['send','recv'],'an-co':['recv'],'mp-co':['send','recv'],'ob-co':['send','recv']};
+function fmtLogT(iso){
+  const d=new Date(iso);if(isNaN(d))return '';
+  const p=n=>String(n).padStart(2,'0');
+  return p(d.getMonth()+1)+'/'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function readLog(id,k){
+  try{return JSON.parse(localStorage.getItem(LOG_KEY+':'+id+':'+k)||'null');}catch(e){return null;}
+}
+function renderLog(){
+  document.querySelectorAll('.mi .lg').forEach(box=>{
+    const id=box.dataset.lg, sides=LOG_SIDES[id]||[];
+    if(!sides.length){box.innerHTML='<span class="r">送受信の記録：この経路は記録しません</span>';return;}
+    box.innerHTML=[['send','最後の送信'],['recv','最後の受信']].map(([k,lab])=>{
+      if(sides.indexOf(k)<0)return '<span class="r">'+lab+'：記録しない（ANIMATOR 側）</span>';
+      const e=readLog(id,k);
+      if(!e)return '<span class="r">'+lab+'：まだありません（このブラウザ）</span>';
+      return '<span class="r has">'+lab+'：<span class="t">'+fmtLogT(e.t)+'</span>　'+esc(e.app||'')+'　'+esc(e.msg||'')+'</span>';
+    }).join('');
+  });
+}
+/* 別タブで送受信したらすぐ反映（storage は他タブの書き込みでだけ飛ぶ） */
+window.addEventListener('storage',e=>{if(e.key&&e.key.indexOf(LOG_KEY+':')===0)renderLog();});
+window.addEventListener('focus',renderLog);
+
+drawNodes();drawEdges();drawList();render();renderLog();
 </script>
 </body>
 </html>

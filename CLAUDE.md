@@ -58,6 +58,7 @@
   設計メモは [Tools/ref-board/CLAUDE.md](../Tools/ref-board/CLAUDE.md)（本体はこちら、資料はあちら）
 - `link-map.html` — **LINK MAP。アプリ間の連携マップ**（GLOSSテーマ・ノード6つと11ルート。
   矢印/ノードをクリックで手順が出て、やってみたらチェック→全部で CLEAR。進捗は `localStorage['linkmap_done_v1']`）。
+  **2026-11-04〜 各ルートに「最後の送信／最後の受信」**（時刻・アプリ・中身1行。各アプリが `localStorage['tdr_link_log_v1:<ルート>:<send|recv>']` に書いたものを読むだけ・完了チェックには使わない）。
   **中身は `GUIDE_MANGA_LINKS.md` と同じ情報＝連携を変えたら両方直す**
 - `inbetween_lab.html` / `inbetween_warp_lab.html` — 中割り実験ラボ
 - `tools/check.js` — 依存ゼロのスモークチェック（構文/配線/ID重複/デッドコード）。**対象は `FILES` 配列。HTMLを足したらここにも足す**（brush-lab.html / depth-brush-lab.html / rough.html 追加済み）。
@@ -232,6 +233,13 @@ cd verify && npm run verify:liveplate
   いまは `addItem` の中の1回だけ。**取込・受信の処理に `commit()` を足すと Undo がまた割れる。**
 - OBAN の `#b-ap`（⚙ ▸ FILE／連携 ▸ ▶ ANIMATOR）は**設定画面を閉じてから一覧を開く**（`toggleSetModal(false);toggleApModal(true)`）。設定画面が前面に残るとクリックを奪う。
   実測値と再現手順は [TAB_LINK_HANDOFF.md](TAB_LINK_HANDOFF.md)。
+- **OBAN で同じコマを選び直すとフレームが増えていた**（2026-11-04 TAB LINK STEP 2・L1）。いまは `plateFramesOf(rec)` が
+  フレームの `plateSrc`（manifest の projectId）か、子パネルの apId（`…_L0` など）か、読み文字の `srcProj` で既存フレームを見つけ、`plateUpdate` で中身だけ差し替える。
+  **層の projectId は番号（`_L0` 地・`_L1`…）なので、MANGA で層が増減すると同じ番号に別の層が入る**＝更新では depth/ord/name も MANGA に合わせている（位置・大きさ・TAKE は触らない）。
+- **連携の記録（LINK MAP の「最後の送信／受信」）は 1件ずつ別キー `tdr_link_log_v1:<ルート>:<send|recv>`**。
+  最初は1つのキーに全部入れていたが、送り側と受け側のタブがほぼ同時に読み書きして**片方の記録が消えた**（実測）。`linkLog` は manga-plate / oban-builder / composer / rough に同じ形で置いてある。ANIMATOR は触っていない。
+- **COMPOSER の CAMERA は1本だけ**（`dedupeCameras` が**先にあった方**を残す）。カメラがあるところへ OBAN のカメラを読むと、新しい方は黙って捨てられていた。
+  いまは `▶ OBAN` の通知に「カメラは既にあるので入れていません」と出す（動き自体は変えていない）。
 
 ## 既知の制限
 - ライブ連携は同一ブラウザ・同一オリジンのタブ間のみ。

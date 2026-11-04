@@ -3388,7 +3388,7 @@ function renderOut(){
   let h = '';
   h += sect('→ ANIMATOR', '仕上げへ');
   h += '<div class="qd-row"><button class="btn go qd-big" data-out="send" title="ANIMATOR の REF に入れる（同じブラウザ）">→ ANIMATOR REF</button></div>';
-  h += '<div class="qd-note">ANIMATOR が開いていればその場で REF に入り、閉じていれば次に開いたとき入ります（同じプロジェクトを送り直すと REF が新しい絵に差し替わる）。ANIMATOR の <b>REF ▸ + FROM SAVED</b> にも出ます。</div>';
+  h += '<div class="qd-note">ANIMATOR が開いていればその場で REF に入り、閉じていれば次に開いたとき入ります（同じプロジェクトを送り直すと REF が新しい絵に差し替わる）。ANIMATOR の <b>REF ▸ + SAVED</b> にも出ます。</div>';
   h += sect('PNG', '書き出し');
   h += row('背景', seg('bg', [['alpha', '透明', 'jp'], ['paper', '紙の色', 'jp']], O.bg));
   h += row('下書', seg('rough', [[1, '入れる', 'jp'], [0, '入れない', 'jp']], O.rough ? 1 : 0), '下書の色を書き出す／書き出さない（→ ANIMATOR REF にも効く）');
@@ -4424,6 +4424,15 @@ function setupLive(){
     if(m.type === 'ref-ack' && gAckWait && m.projectId === gAckWait.id) gAckWait.done(m);
   };
 }
+/* L5（2026-11-04）: LINK MAP が読む「ルートごとの最後の送信／受信」。
+   キーは tdr_link_log_v1:<ルート>:<send|recv> の1件ずつ（1つのキーに全部入れると、
+   送り側と受け側のタブがほぼ同時に読み書きして片方の記録が消える＝実測で消えた）。
+   oban-builder / manga-plate / composer / rough で同じ形にそろえること
+   ANIMATOR は触らないので、ROUGH→ANIMATOR の受信は ref-ack が返ってきたときに ROUGH 側で書く */
+function linkLog(rt, kind, msg){
+  try{localStorage.setItem('tdr_link_log_v1:'+rt+':'+kind,
+    JSON.stringify({t:new Date().toISOString(),app:'ROUGH',msg:String(msg).slice(0,160)}));}catch(e){}
+}
 async function sendToAnimator(){
   selSettle(); if(S.playing) stopPlay();
   if(!S.frames.some(f => f.kind === 'draw')){ toast('絵のコマがありません'); return; }
@@ -4444,8 +4453,12 @@ async function sendToAnimator(){
     gAckWait = { id: rec.projectId, done: m => { clearTimeout(t); gAckWait = null; res(m); } };
     if(gLive) gLive.postMessage({ type: 'ref-push', projectId: rec.projectId, name: rec.name, from: 'ROUGH' });
   });
-  if(ack){ toast('ANIMATOR の REF に' + (ack.updated ? '差し替えました' : '入れました') + '（' + rec.name + '・' + rec.cellCount + ' コマ）', 3600); return; }
-  const v = await modal('共有DBに置きました（' + rec.name + '・' + rec.cellCount + ' コマ）。\n\nANIMATOR がまだ開いていないようです。\n・開いているなら、そのタブに切り替えるだけで REF に入ります\n・開いていなければ、開いたときに入ります\n（ANIMATOR の REF ▸ + FROM SAVED にも出ます）',
+  const what = rec.name + '・' + rec.cellCount + ' コマ・' + rec.width + '×' + rec.height;
+  linkLog('ro-an', 'send', what);
+  if(ack){
+    linkLog('ro-an', 'recv', 'ANIMATOR の REF に' + (ack.updated ? '差し替え' : '追加') + '（' + what + '）');
+    toast('ANIMATOR の REF に' + (ack.updated ? '差し替えました' : '入れました') + '（' + rec.name + '・' + rec.cellCount + ' コマ）', 3600); return; }
+  const v = await modal('共有DBに置きました（' + rec.name + '・' + rec.cellCount + ' コマ）。\n\nANIMATOR がまだ開いていないようです。\n・開いているなら、そのタブに切り替えるだけで REF に入ります\n・開いていなければ、開いたときに入ります\n（ANIMATOR の REF ▸ + SAVED にも出ます）',
     [{ label: 'OK', value: 0, esc: true }, { label: 'ANIMATOR を開く', value: 1, pri: true }]);
   if(v === 1){ flushSave(); window.open('animator.html', '_blank'); }
 }

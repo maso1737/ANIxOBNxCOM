@@ -507,8 +507,9 @@ body.cvtopen #cvt-modal{display:block}
 }
 #cvt-body select option{background:#0D0F14;color:var(--ice)}
 #cvt-body .cvt-note{font-family:var(--jp);letter-spacing:.03em;opacity:.5;margin:8px 0;line-height:1.6}
-#cvt-body #cvt-copy{display:block;width:100%;margin-top:4px;border-color:rgba(90,233,255,.45);color:var(--ice)}
-#cvt-body #cvt-copy:hover{background:rgba(90,233,255,.14);border-color:var(--ice)}
+#cvt-body .cvt-btns{display:flex;gap:6px;margin-top:4px}
+#cvt-body #cvt-copy,#cvt-body #cvt-save{flex:1;border-color:rgba(90,233,255,.45);color:var(--ice)}
+#cvt-body #cvt-copy:hover,#cvt-body #cvt-save:hover{background:rgba(90,233,255,.14);border-color:var(--ice)}
 
 /* ---------- EXPORT モーダル（HTML / 動画 の選択。COPY FOR COMPOSER と同じ作法） ---------- */
 #exp-modal{
@@ -584,6 +585,12 @@ body.apopen #ap-modal{display:flex;flex-direction:column}
 .qd-ent .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   font-family:var(--saira);font-weight:600;font-size:13px;letter-spacing:.14em;color:var(--acc)}
 .qd-ent .mt{flex:none;font-size:9px;line-height:1.5;letter-spacing:.12em;color:rgba(232,236,242,.45);text-align:right}
+/* L1: 同じコマの再受信＝「更新」。別に置く小ボタンは行の右端 */
+.qd-ent .qd-upd{flex:none;padding:1px 6px;border:1px solid var(--acc-hover-line);color:var(--acc-hover-line);font-size:9px;letter-spacing:.1em;vertical-align:1px}
+.qd-ent.upd{flex-wrap:wrap;row-gap:6px}
+.qd-ent .qd-br{flex-basis:100%;height:0}
+.qd-ent .qd-asnew{flex:none;margin-left:auto;padding:4px 7px;border:1px solid rgba(232,236,242,.3);font-size:9px;letter-spacing:.06em;color:rgba(232,236,242,.7);white-space:nowrap}
+.qd-ent .qd-asnew:hover{border-color:var(--acc-hover-line);color:var(--ink,#E8ECF2)}
 
 /* ---------- V2-D: 縦書きテキスト編集 / EN字幕 / クリックFX ---------- */
 #text-ed{
@@ -890,7 +897,7 @@ body.cleanview{cursor:none}
 <span id="set-acts-src" style="display:none">
   <span>
     <button class="btn" id="b-ap" title="ANIMATORの連番をPNG書き出しなしで取り込み（同一ブラウザ・EX_DB経由。保存で自動同期）">▶<span class="lbl">ANIMATOR</span></button>
-    <button class="btn" id="b-comp" title="TAKEをCOMPOSERのCAMERAトラックJSONに変換してコピー（COMPOSER側の + FROM OBAN で貼り付け）"><span class="lbl">COMPOSER </span>▶</button>
+    <button class="btn" id="b-comp" title="TAKEをCOMPOSERのCAMERAトラックJSONに変換（COPY／ファイル保存。共有DBにも置くので COMPOSER の ▶ OBAN で読める）"><span class="lbl">COMPOSER </span>▶</button>
     <input type="file" id="oban-json-input" accept="application/json,.json" style="display:none;">
     <span class="vline"></span>
     <button class="btn" id="b-export-json" title="プロジェクト全体をJSONファイルで書き出し">⇧ EXPORT JSON</button>
@@ -1001,7 +1008,7 @@ body.cleanview{cursor:none}
 <!-- ==================== COPY FOR COMPOSER MODAL (SPEC_06 P3) ==================== -->
 <div id="cvt-modal">
   <div id="cvt-head"><span>COMPOSER ▶</span><button class="btn" id="cvt-close" title="閉じる (Esc)">✕</button>
-    <div class="cvt-note">TAKEをcomposerのCAMERAトラックJSONへ変換してコピー。パネルの絵はcomposer側で別途IMPORT。</div></div>
+    <div class="cvt-note">TAKEをcomposerのCAMERAトラックJSONへ変換。COPY でも保存でも<b>共有DBに同じものを置く</b>ので、COMPOSER の ▶ OBAN はクリップボードが別の内容でも読めます。パネルの絵はcomposer側で別途IMPORT。</div></div>
   <div id="cvt-body">
     <div class="row"><span class="k">FPS</span><input type="number" id="cvt-fps" value="24" min="1" max="120" step="1"></div>
     <div class="row"><span class="k">尺（秒）</span><input type="number" id="cvt-sec" value="6" min="0.5" step="0.5"></div>
@@ -1013,7 +1020,7 @@ body.cleanview{cursor:none}
     </select></div>
     <div class="cvt-note">W/H は composer のコンポ解像度に合わせる（カメラ位置を px に換算するため）。take.fx と<b>ルートパネルの配置情報</b>も同梱——composer 側に同名の画像を先に IMPORT しておくと、貼った時に位置/サイズ/Z/重ね順が自動で乗る（FRAME・コマ内の子は対象外）。<br>
     案B はズームを Z ドリーに写像（Z=1000·(1−1/z)）。パネルに Z が付くので多層視差が出る。構図の完全一致は案A。</div>
-    <button class="btn" id="cvt-copy">COPY JSON</button>
+    <div class="cvt-btns"><button class="btn" id="cvt-copy">COPY JSON</button><button class="btn" id="cvt-save" title="同じJSONをファイルに保存（COMPOSER の IMPORT で読める）">カメラJSONを保存</button></div>
   </div>
 </div>
 
@@ -1798,7 +1805,7 @@ const AP={};          // apId -> {frameRefs,w,h,name,at}（ランタイム補助
 const gApSeen={};     // apId -> 最新payload（パネル未作成でも保持: + FROM ANIMATOR 一覧用）
 let gApChan=null,gApExList=null;
 
-/* ---- EXCHANGE DB（composer.htmlと同じ読み出し・OBANからは読み取りのみ） ---- */
+/* ---- EXCHANGE DB（composer.htmlと同じ読み出し。書くのは L3 のカメラ1件 'oban_camera' だけ） ---- */
 const EX_DB='tdr_exchange',EX_STORE='projects',EX_VERSION=1;
 function exOpenDB(){
   return new Promise((res,rej)=>{
@@ -1811,6 +1818,18 @@ function exOpenDB(){
 async function exGet(id){
   const d=await exOpenDB();
   return new Promise((res,rej)=>{const tx=d.transaction(EX_STORE,'readonly');const r=tx.objectStore(EX_STORE).get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error);});
+}
+async function exPut(rec){
+  const d=await exOpenDB();
+  return new Promise((res,rej)=>{const tx=d.transaction(EX_STORE,'readwrite');tx.objectStore(EX_STORE).put(rec);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});
+}
+/* L5（2026-11-04）: LINK MAP が読む「ルートごとの最後の送信／受信」。
+   キーは tdr_link_log_v1:<ルート>:<send|recv> の1件ずつ（1つのキーに全部入れると、
+   送り側と受け側のタブがほぼ同時に読み書きして片方の記録が消える＝実測で消えた）。
+   oban-builder / manga-plate / composer / rough で同じ形にそろえること */
+function linkLog(rt,kind,msg){
+  try{localStorage.setItem('tdr_link_log_v1:'+rt+':'+kind,
+    JSON.stringify({t:new Date().toISOString(),app:'OBAN',msg:String(msg).slice(0,160)}));}catch(e){}
 }
 async function exGetAll(){
   const d=await exOpenDB();
@@ -1945,10 +1964,16 @@ function renderApList(){
   root.innerHTML=hd+'<div class="qd-list">'+cands.map(r=>{
     const nm=String(r.scene||r.name||r.projectId).slice(0,18);
     const at=r.exportedAt?String(r.exportedAt).replace('T',' ').slice(5,16):'—';
-    return '<button class="qd-ent" data-ap="'+r.projectId+'"><span class="nm">'+nm+'</span>'
-      +'<span class="mt">'+(r.cellCount||r.cells.length)+' CELL ・ '+(r.width||'?')+'×'+(r.height||'?')+'<br>'+at+'</span></button>';
+    /* L1: 同じコマから来たフレームが既にある → 押すと「更新」。別に置きたいときだけ右の小ボタン */
+    const upd=r.plate?plateFramesOf(r).length:0;
+    return '<button class="qd-ent'+(upd?' upd':'')+'" data-ap="'+r.projectId+'"><span class="nm">'+nm+'</span>'
+      +(upd?'<span class="qd-upd" title="すでに置いたフレームの中身だけ差し替えます">更新</span>':'')
+      +'<span class="mt">'+(r.cellCount||r.cells.length)+' CELL ・ '+(r.width||'?')+'×'+(r.height||'?')+'<br>'+at+'</span>'
+      +(upd?'<span class="qd-br"></span><span class="qd-asnew" data-asnew="1" title="同じコマでも、もう1つ新しいフレームとして置く">＋ 別素材として追加</span>':'')
+      +'</button>';
   }).join('')+'</div>'
-    +'<div class="qd-note">PNG の書き出しなしでコマになります。取り込んだあとは ANIMATOR で保存するたびに自動で更新（絵は常に ANIMATOR が正）。</div>';
+    +'<div class="qd-note">PNG の書き出しなしでコマになります。取り込んだあとは ANIMATOR で保存するたびに自動で更新（絵は常に ANIMATOR が正）。'
+    +'<br><b>更新</b> の付いた行は、すでに置いたフレームの中身（絵・層・読み文字）だけを差し替えます。位置・大きさ・カメラはそのまま。</div>';
 }
 /* ---- MANGA PLATE の読み文字（申し送り P1） ----
  * 送られてくるのは「画像の画素座標のアンカー」。OBAN 側は
@@ -1986,12 +2011,23 @@ async function plateLayers(f,rec){
   }
   return n;
 }
+/* MANGA PLATE の読み文字1個 → フレーム子テキストの値（新規・更新で共通） */
+function plateTextVals(t,W,H,ar){
+  return {str:String(t.str),
+    x:+(((t.ax/W)-0.5)*ar).toFixed(4),
+    y:+((t.ay/H)-0.5).toFixed(4),
+    size:+((t.size/H)*1000).toFixed(1),col:nearBW(t.col),
+    vert:t.vert!==false,
+    /* MANGA PLATE のフチ幅(px)を、OBANの4方向シャドウのオフセット比に直す */
+    ew:(t.edge&&t.edge.on)?+clamp(t.edge.w/Math.max(1,t.size/24),0,8).toFixed(2):0};
+}
 async function plateWrap(p,rec){
   const W=rec.plate.w||rec.width||1, H=rec.plate.h||rec.height||1;
   const fr=rec.plate.frame||null;
   const ar=(fr&&fr.ar)||p.ar||(W/H);
   const maxOrd=rootItems().reduce((m,o)=>Math.max(m,o.ord??0),-1);
   const f={id:'f'+(pid++),name:String(p.name).replace(/^AP:/,'').slice(0,16),
+    plateSrc:rec.projectId||null,   // L1（2026-11-04）: どのコマから来たか。同じコマの再受信を「更新」にする鍵
     x:p.x,y:p.y,h:p.h,depth:p.depth??0.5,ord:maxOrd+1,ar:ar,
     quad:[{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:1}],par:0.6,
     /* レイヤーで届いたときだけ「寄りの奥行き」を最初から入れておく。
@@ -2011,29 +2047,117 @@ async function plateWrap(p,rec){
   let n=0;
   (rec.plate.texts||[]).forEach(t=>{
     if(!t||!String(t.str||'').trim())return;
-    const size=+((t.size/H)*1000).toFixed(1);
-    PROJECT.texts.push({id:'t'+(pid++),type:'v',str:String(t.str),
-      x:+(((t.ax/W)-0.5)*ar).toFixed(4),
-      y:+((t.ay/H)-0.5).toFixed(4),
-      size:size,col:nearBW(t.col),
-      vert:t.vert!==false,font:'antique',
-      /* MANGA PLATE のフチ幅(px)を、OBANの4方向シャドウのオフセット比に直す */
-      ew:(t.edge&&t.edge.on)?+clamp(t.edge.w/Math.max(1,t.size/24),0,8).toFixed(2):0,
+    PROJECT.texts.push(Object.assign({id:'t'+(pid++),type:'v'},plateTextVals(t,W,H,ar),{font:'antique',
       parent:f.id,kf:null,
       /* P2 戻り用の控え。これが無いと「どの文字を書き戻すか」を特定できない */
-      srcId:t.id||null,srcProj:rec.projectId||null});
+      srcId:t.id||null,srcProj:rec.projectId||null}));
     n++;
   });
   return {frame:f,texts:n,layers:nLay};
 }
-async function addApPanel(rec){
+/* ---- L1（2026-11-04）: 同じコマの送り直しは「更新」 ----
+ * MANGA PLATE が同じコマを送り直すと、manifest の projectId（mp_…_p<頁>_k<コマ>）とレイヤーの
+ * projectId（…_L0, _L1…）は前回と同じになる。それを手がかりに、すでに置いたルートフレームを探す。
+ * 古いデータ（plateSrc 導入前）は「子パネルの apId」か「読み文字の srcProj」で見つける。
+ * 安定 ID（bookId/pageId/panelId）の全面導入はしない＝LIVE PLATE の設計と合わせて別途。 */
+function plateFramesOf(rec){
+  const id=rec&&rec.projectId;if(!id||!rec.plate)return [];
+  const lay=new Set((rec.plate.layers||[]).map(l=>l&&l.projectId).filter(Boolean));
+  return PROJECT.frames.filter(f=>!f.parent&&(f.plateSrc===id
+    ||PROJECT.panels.some(p=>p.parent===f.id&&p.seq&&p.seq.src==='ap'
+        &&(p.seq.apId===id||lay.has(p.seq.apId)||String(p.seq.apId).indexOf(id+'_L')===0))
+    ||PROJECT.texts.some(t=>t.parent===f.id&&t.srcProj===id)));
+}
+/* 位置・大きさ・奥行き・カメラ（TAKE）・FX は触らない。中身（層の絵・層の並び・読み文字）は MANGA PLATE が正 */
+async function plateUpdate(frames,rec){
+  const W=rec.plate.w||rec.width||1, H=rec.plate.h||rec.height||1;
+  const fr=rec.plate.frame||null;
+  const childH=(fr&&fr.childH)||1;
+  const lays=(rec.plate.layers||[]).filter(l=>l&&l.projectId);
+  const R={layers:0,added:0,removed:0,tUpd:0,tAdd:0,tKeep:0};
+  /* 層の記録を先に全部読む（apIngest＝絵の差し替え。同じ apId の子は全フレームで一斉に変わる） */
+  const got={};
+  for(const ly of lays){
+    let lrec=gApSeen[ly.projectId]||null;
+    if(!lrec){try{lrec=await exGet(ly.projectId);}catch(e){}}
+    if(lrec&&apIngest(lrec))got[ly.projectId]=lrec;
+  }
+  R.layers=Object.keys(got).length;
+  for(const f of frames){
+    const ar=(fr&&fr.ar)||f.ar;
+    if(fr&&fr.ar)f.ar=fr.ar;                       // コマの形が変わっていたら枠の比だけ追従
+    if(fr&&fr.line)f.line={on:!!fr.line.on,w:Math.max(1,fr.line.w||10)};
+    f.plateSrc=rec.projectId;                      // 古いフレームにも控えを付けておく
+    if(lays.length){
+      const kids=PROJECT.panels.filter(p=>p.parent===f.id&&p.seq&&p.seq.src==='ap');
+      const keep=new Set(Object.keys(got));
+      /* MANGA 側で空になった層（同じコマ由来のものだけ）は外す */
+      const gone=kids.filter(p=>!keep.has(p.seq.apId)
+        &&(String(p.seq.apId).indexOf(rec.projectId+'_L')===0||p.seq.apId===rec.projectId));
+      if(gone.length){PROJECT.panels=PROJECT.panels.filter(p=>gone.indexOf(p)<0);R.removed+=gone.length;}
+      lays.forEach((ly,i)=>{
+        if(!got[ly.projectId])return;
+        const ap=AP[ly.projectId];
+        const k=kids.find(p=>p.seq.apId===ly.projectId);
+        const seq={src:'ap',apId:ly.projectId,n:ap.frameRefs.length||1,fps:got[ly.projectId].fps||24,
+          mode:'loop',trigger:'always',apName:ap.name,apAt:ap.at};
+        if(k){   // 同じ番号の層＝中身が入れ替わっている可能性がある（中間が消えて手前が繰り上がる等）ので層の情報も追従
+          k.name=String(ly.name||k.name).slice(0,16);k.depth=clamp(ly.depth??k.depth,0,1);k.ord=(ly.ord??i);
+          k.seq=Object.assign(k.seq,seq);if(ap.w&&ap.h)k.ar=ap.w/ap.h;
+        }else{
+          PROJECT.panels.push({id:pid++,name:String(ly.name||('L'+i)).slice(0,16),
+            x:0,y:0,h:childH,depth:clamp(ly.depth??0.5,0,1),ord:(ly.ord??i),
+            ar:(ap.w&&ap.h)?(ap.w/ap.h):(f.ar||1.777),parent:f.id,seq:seq});
+          R.added++;
+        }
+      });
+    }
+    /* 読み文字: 同じ srcId は MANGA の値で上書き・新しいものは足す・MANGA で消えたものは残す（数だけ知らせる） */
+    const incoming=(rec.plate.texts||[]).filter(t=>t&&t.id&&String(t.str||'').trim());
+    const ids=new Set(incoming.map(t=>t.id));
+    incoming.forEach(t=>{
+      const v=plateTextVals(t,W,H,ar);
+      const ex=PROJECT.texts.find(x=>x.parent===f.id&&x.srcId===t.id);
+      if(ex){Object.assign(ex,v);R.tUpd++;}
+      else{PROJECT.texts.push(Object.assign({id:'t'+(pid++),type:'v'},v,{font:'antique',parent:f.id,kf:null,
+        srcId:t.id,srcProj:rec.projectId}));R.tAdd++;}
+    });
+    R.tKeep+=PROJECT.texts.filter(x=>x.parent===f.id&&x.srcProj===rec.projectId&&!ids.has(x.srcId)).length;
+  }
+  return R;
+}
+/* L4（2026-11-04）: 受信の1行。どこから・寸法3つ（枠／のりしろ込み）・新規か更新か */
+function plateSizeLine(rec){
+  const fw=rec.plate.w||rec.width, fh=rec.plate.h||rec.height;
+  const l0=(rec.plate.layers||[]).map(l=>l&&AP[l.projectId]).find(a=>a&&a.w);
+  const pad=rec.plate.frame&&rec.plate.frame.childH;
+  return '枠 '+fw+'×'+fh+(l0?('・のりしろ込み '+l0.w+'×'+l0.h+(pad?('（'+Math.round(pad*100)+'%）'):'')):'');
+}
+async function addApPanel(rec,opt){
   if(!apIngest(rec)){toast('プロジェクトを読み込めませんでした');return;}
   const apId=rec.projectId,ap=AP[apId];
+  const isPlate=!!(rec.plate&&((Array.isArray(rec.plate.texts)&&rec.plate.texts.length)
+                             ||(Array.isArray(rec.plate.layers)&&rec.plate.layers.length)));
+  const nm=String(rec.scene||rec.name||apId).slice(0,24);
+  /* L1: 同じコマから来たフレームがあれば、既定は「更新」（位置・カメラはそのまま）。
+     「別素材として追加」を選んだときだけ新しいフレームを作る */
+  const same=(isPlate&&!(opt&&opt.asNew))?plateFramesOf(rec):[];
+  if(same.length){
+    const U=await plateUpdate(same,rec);
+    sel=same[same.length-1];qeOpen=true;renderChip();commit();
+    toggleApModal(false);
+    const tb=[];
+    if(U.tUpd)tb.push('更新'+U.tUpd);if(U.tAdd)tb.push('追加'+U.tAdd);
+    const msg=nm+' ← MANGA PLATE｜'+plateSizeLine(rec)+'｜更新 '+same.length+'フレーム（位置・カメラはそのまま）'
+      +'：レイヤー '+U.layers+(U.added?('（+'+U.added+'）'):'')+(U.removed?('（−'+U.removed+'）'):'')
+      +(tb.length?(' ／ 文字 '+tb.join('・')):'')
+      +(U.tKeep?(' ／ MANGA で消えた文字 '+U.tKeep+'個は残しています'):'')+'。Ctrl+Z で戻せます';
+    toast(msg);linkLog('mp-ob','recv',msg);
+    return;
+  }
   pushPanel('AP:'+ap.name,{src:'ap',apId,n:ap.frameRefs.length||1,fps:rec.fps||24,mode:'loop',trigger:'always',apName:ap.name,apAt:ap.at});
   const p=PROJECT.panels[PROJECT.panels.length-1];
   if(ap.w&&ap.h)p.ar=ap.w/ap.h;
-  const isPlate=!!(rec.plate&&((Array.isArray(rec.plate.texts)&&rec.plate.texts.length)
-                             ||(Array.isArray(rec.plate.layers)&&rec.plate.layers.length)));
   const R=isPlate?await plateWrap(p,rec):null;
   sel=R?R.frame:p;qeOpen=true;renderChip();commit();
   $('#drop').classList.add('hide');
@@ -2041,8 +2165,11 @@ async function addApPanel(rec){
   const bits=[];
   if(R&&R.layers)bits.push('レイヤー '+R.layers+'枚（コマ内パララックス）');
   if(R&&R.texts)bits.push('読み文字 '+R.texts+'個（Tで再編集）');
-  toast(bits.length?('MANGA PLATE を追加 — '+bits.join(' ／ '))
-    :('AP:'+ap.name+' を追加 — '+p.seq.n+'f / '+p.seq.fps+'fps loop（ANIMATOR保存で自動更新）'));
+  const msg=isPlate
+    ?(nm+' ← MANGA PLATE｜'+plateSizeLine(rec)+'｜新規'+((opt&&opt.asNew)?'（別素材として追加）':'')
+      +(bits.length?('：'+bits.join(' ／ ')):''))
+    :('AP:'+ap.name+' ← ANIMATOR｜'+(ap.w||'?')+'×'+(ap.h||'?')+'｜新規：'+p.seq.n+'f / '+p.seq.fps+'fps loop（ANIMATOR保存で自動更新）');
+  toast(msg);linkLog(isPlate?'mp-ob':'an-ob','recv',msg);
 }
 $('#b-ap').addEventListener('click',()=>{toggleSetModal(false);toggleApModal(true);});
 $('#ap-close').addEventListener('click',()=>toggleApModal(false));
@@ -2050,7 +2177,10 @@ $('#ap-body').addEventListener('click',e=>{
   const row=e.target&&e.target.closest?e.target.closest('.qd-ent'):null;
   if(!row)return;
   const rec=apCandidates().find(r=>r.projectId===row.dataset.ap);
-  if(rec)addApPanel(rec);
+  if(!rec)return;
+  /* 行の中の「＋ 別素材として追加」だけは、同じコマでも新しいフレームを作る */
+  const asNew=!!(e.target.closest&&e.target.closest('[data-asnew]'));
+  addApPanel(rec,{asNew:asNew});
 });
 
 /* ---- チップ: RELOAD / EDIT IN ANIMATOR ---- */
@@ -4121,6 +4251,7 @@ function plateBack(t){
   gBackAck=false;
   apPost({type:'plate-text-update',src:'oban-builder',projectId:t.srcProj||null,
     texts:[{srcId:t.srcId,str:String(t.str)}]});
+  linkLog('ob-mp','send','文字「'+String(t.str).replace(/\n/g,' ').slice(0,20)+'」');
   clearTimeout(gBackT);
   gBackT=setTimeout(()=>{if(!gBackAck)toast('MANGA PLATE が開いていないので戻せませんでした — 開いた状態でもう一度確定してください');},800);
 }
@@ -4660,27 +4791,57 @@ function buildComposerJSON(fps,secs,Wc,Hc,zoomMode){
       composer:{keyframes:zoomMode==='z'?{x:kx,y:ky,z:kz}:{x:kx,y:ky,s:ks}}}]
   };
 }
-function toggleCvtModal(){
-  const open=!document.body.classList.contains('cvtopen');
+function toggleCvtModal(force){
+  const open=(typeof force==='boolean')?force:!document.body.classList.contains('cvtopen');
   if(open&&!PROJECT.take.kf.length){toast('KFがまだありません — TAKEモードで C=CAPTURE');return;}
   document.body.classList.toggle('cvtopen',open);
   if(open){const s=$('#cvt-sec');if(s)s.value=Math.max(0.5,Math.round((TT.total||1)*10)/10);}   // 既定尺=TAKE重み合計
 }
-async function copyForComposer(){
+function cvtBuild(){
   const fps=clamp(Math.round(parseFloat($('#cvt-fps').value)||24),1,120);
   const sec=Math.max(0.1,parseFloat($('#cvt-sec').value)||TT.total||1);
   const W=Math.max(16,Math.round(parseFloat($('#cvt-w').value)||1920));
   const H=Math.max(16,Math.round(parseFloat($('#cvt-h').value)||1080));
   const zoomMode=($('#cvt-zoom')&&$('#cvt-zoom').value)||'scl';
-  const j=JSON.stringify(buildComposerJSON(fps,sec,W,H,zoomMode));
-  try{await navigator.clipboard.writeText(j);toast('COMPOSER用 CAMERAトラックJSONをコピー — composerの IMPORT JSON に貼り付け');}
+  return {json:buildComposerJSON(fps,sec,W,H,zoomMode),fps,sec,W,H};
+}
+/* L3（2026-11-04）: クリップボードは別のコピーで上書きされる。COMPOSER の ▶ OBAN が
+   読めなかったときの受け皿として、共有DB（tdr_exchange）に最後の1件だけ置く。
+   cells を持たない＝ANIMATOR / MANGA / OBAN の「取り込み一覧」には出ない */
+async function cvtShare(C){
+  const kf=(C.json.tracks[0].composer.keyframes.x||[]).length;
+  try{await exPut({projectId:'oban_camera',src:'oban-builder',name:(PROJECT.take.name||'OBAN CAM'),
+    exportedAt:new Date().toISOString(),width:C.W,height:C.H,fps:C.fps,sec:C.sec,json:C.json});}catch(e){}
+  linkLog('ob-co','send','カメラ '+C.W+'×'+C.H+'・'+C.fps+'fps・'+C.sec+'秒・Xキー'+kf+'個');
+}
+async function copyForComposer(){
+  const C=cvtBuild();
+  const j=JSON.stringify(C.json);
+  await cvtShare(C);
+  try{await navigator.clipboard.writeText(j);toast('COMPOSER用 CAMERAトラックJSONをコピー（共有DBにも保存）— COMPOSER の ▶ OBAN で読み込み');}
   catch(e){window.prompt('COPY FOR COMPOSER JSON:',j);}
   document.body.classList.remove('cvtopen');
 }
+/* L2: COPY と並べてファイル保存。クリップボードを経由しない出口 */
+async function saveCameraJSON(){
+  const C=cvtBuild();
+  await cvtShare(C);
+  const blob=new Blob([JSON.stringify(C.json)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  a.href=url;a.download='oban_camera_'+C.W+'x'+C.H+'_'+ts+'.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('カメラJSONを保存しました（共有DBにも保存）— COMPOSER の IMPORT か ▶ OBAN で読み込み');
+  document.body.classList.remove('cvtopen');
+}
 {
-  const bc=$('#b-comp');if(bc)bc.addEventListener('click',toggleCvtModal);
-  const cc=$('#cvt-close');if(cc)cc.addEventListener('click',toggleCvtModal);
+  /* L2（2026-11-04）: ⚙ SETTINGS の中から開くので、設定画面を閉じてから出す（#b-ap と同じ作法）。
+     閉じないと設定画面（後から描かれる全面パネル）が変換パネルを覆い、COPY JSON が押せない */
+  const bc=$('#b-comp');if(bc)bc.addEventListener('click',()=>{toggleSetModal(false);toggleCvtModal(true);});
+  const cc=$('#cvt-close');if(cc)cc.addEventListener('click',()=>toggleCvtModal(false));
   const cp=$('#cvt-copy');if(cp)cp.addEventListener('click',copyForComposer);
+  const cs=$('#cvt-save');if(cs)cs.addEventListener('click',saveCameraJSON);
 }
 
 /* ---------- project export/import (file) / clear ---------- */

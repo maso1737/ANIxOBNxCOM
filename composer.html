@@ -59,7 +59,7 @@ html,body{width:100%;height:100%;background:var(--black);color:var(--white);font
 #topbar button.primary:hover{background:rgba(255,79,168,0.1);}
 #topbar button:disabled{opacity:0.3;cursor:default;}
 #draft-play-toggle{white-space:nowrap;} /* 「½ DRAFT」が2行に折り返して行高を押し上げないように */
-#live-toast{position:fixed;top:46px;right:16px;z-index:300;background:rgba(16,7,34,0.96);border:1px solid var(--acid);color:var(--acid);font-family:var(--mono);font-size:9px;letter-spacing:0.14em;padding:6px 12px;opacity:0;transform:translateY(-6px);transition:opacity 0.18s,transform 0.18s;pointer-events:none;}
+#live-toast{position:fixed;top:46px;right:16px;z-index:300;background:rgba(16,7,34,0.96);border:1px solid var(--acid);color:var(--acid);font-family:var(--mono);font-size:9px;letter-spacing:0.14em;padding:6px 12px;opacity:0;transform:translateY(-6px);transition:opacity 0.18s,transform 0.18s;pointer-events:none;max-width:min(640px,calc(100vw - 32px));line-height:1.6;}
 #live-toast.show{opacity:1;transform:translateY(0);}
 
 /* VIEWPORT */
@@ -5643,13 +5643,59 @@ async function exCleanup(maxAgeMs=24*60*60*1000){
 // ── EVENTS ──
 $('#btn-import').addEventListener('click',()=>{ $('#file-input').click(); });
 // SPEC_06 P3: クリップボードから直接IMPORT（OBANの COPY FOR COMPOSER → ワンクリック貼り付け）
+/* L3（2026-11-04）: クリップボードには別のコピー（URL・文章など）が残っていることがある。
+   読めなかったら「何を読んだか」を見せ、OBAN が共有DB（tdr_exchange の 'oban_camera'）に置いた
+   最後のカメラか、ファイルから読む道へ案内する。クリップボードが正しい JSON ならそれを使う（従来どおり） */
+function clipKind(s){
+  const t=String(s||'').trim();
+  if(!t) return '空';
+  if(/^https?:\/\//i.test(t)) return 'URL';
+  if(/^</.test(t)) return 'HTML などのタグ';
+  if(/^[\[{]/.test(t)) return '壊れた（途中で切れた）JSON';
+  return 'ふつうの文字';
+}
+function isComposerJSON(o){ return !!(o&&typeof o==='object'&&(Array.isArray(o.tracks)||Array.isArray(o.cells)||Array.isArray(o.frames))); }
+async function obanCameraFromDB(){ try{ const r=await exGet('oban_camera'); return (r&&isComposerJSON(r.json))?r:null; }catch(e){ return null; } }
+function importObanCamera(obj,how){
+  const nT=state.tracks.length;
+  const hadCam=state.tracks.some(t=>t.type==='camera');
+  importJSON(obj);
+  const cam=(obj.tracks||[]).filter(t=>t&&t.type==='camera').length;
+  /* CAMERA は1本だけ（dedupeCameras が先にあった方を残す）＝すでにカメラがあると新しいカメラは入らない。
+     黙って捨てると「読んだのに変わらない」になるので、そのことを1行に書く */
+  const camNote=cam?(hadCam?'カメラは既にあるので入れていません（今の CAMERA を消してから読むと入れ替わります）':'カメラ追加'):'カメラなし';
+  const msg=`OBAN ▶ COMPOSER｜${how}｜コンポ ${state.width}×${state.height}・${state.totalFrames}f｜追加 ${state.tracks.length-nT} トラック・${camNote}`;
+  flashLive(msg,hadCam&&cam?7000:4000); linkLog('ob-co','recv',msg);
+}
 $('#btn-paste-json').addEventListener('click',async()=>{
-  let j='';
+  let j='', why='', denied=false;
   try{ j=await navigator.clipboard.readText(); }
-  catch(e){ j=await modalPrompt('PASTE PROJECT JSON:','')||''; } // クリップボード不許可環境のフォールバック（iPadはここに落ちる）
-  if(!j.trim()){ flashLive('クリップボードが空です'); return; }
-  try{ importJSON(JSON.parse(j)); flashLive('📋 JSON PASTED'); }
-  catch(err){ modalAlert('JSON error: '+err.message); }
+  catch(e){ denied=true; why='クリップボードを読めませんでした（許可がない）'; }
+  let obj=null;
+  if(!denied){
+    if(!j.trim()) why='クリップボードが空です';
+    else { try{ obj=JSON.parse(j); }catch(err){ why='クリップボードの中身は JSON ではありません'; }
+           if(obj&&!isComposerJSON(obj)){ obj=null; why='クリップボードの JSON は COMPOSER で読める形ではありません'; } }
+  }
+  if(obj){ importObanCamera(obj,'クリップボード'); return; }
+  const t=j.trim().replace(/\s+/g,' ');
+  const head=t?`読んだもの：${clipKind(j)}「${t.slice(0,40)}${t.length>40?'…':''}」（${t.length}文字）\n`:'';
+  const db=await obanCameraFromDB();
+  if(db){
+    const when=String(db.exportedAt||'').replace('T',' ').slice(5,16);
+    const ok=await modalConfirm(`${why}。\n${head}\n共有DBに OBAN のカメラがあります：\n${db.width}×${db.height}・${db.fps}fps・${db.sec}秒（${when} に OBAN で COPY／保存）\n\nこのカメラを読み込みますか？`);
+    if(ok) importObanCamera(db.json,'共有DB');
+    return;
+  }
+  if(denied){   // iPad など：従来どおり手で貼る
+    const p=await modalPrompt('PASTE PROJECT JSON:','')||'';
+    if(!p.trim()) return;
+    try{ const o=JSON.parse(p); if(!isComposerJSON(o)) throw new Error('COMPOSER で読める形ではありません'); importObanCamera(o,'貼り付け'); }
+    catch(err){ modalAlert('読み込めませんでした：'+err.message+'\n\nOBAN の ⚙ ▸ COMPOSER ▶ で「カメラJSONを保存」したファイルを IMPORT から読んでください。'); }
+    return;
+  }
+  const ok=await modalConfirm(`${why}。\n${head}\nOBAN の ⚙ SETTINGS ▸ COMPOSER ▶ で「COPY JSON」か「カメラJSONを保存」を押してから、もう一度 ▶ OBAN を押してください（どちらでも共有DBに入るので、クリップボードが別の内容でも読めます）。\n\n保存したファイルがあるなら、ファイルから読みますか？`);
+  if(ok) $('#file-input').click();
 });
 // 連番画像グループ → 1トラックのシーケンス（1画像=1コマ）。OBANの addFiles と同じ判定。
 function fileToDataURL(f){
@@ -5759,10 +5805,29 @@ $('#btn-home').addEventListener('click',()=>{location.href='index.html';});
 // ── LIVE SYNC（ANIMATORの編集をリアルタイム受信 / BroadcastChannel）──
 let gLiveChan=null, gLiveOn=true;
 function postLive(msg){ if(gLiveChan){ try{ gLiveChan.postMessage(msg); }catch(e){} } }
-function flashLive(text){
+function flashLive(text,ms){   // ms: 受信の1行（L4）など読んでほしいものは長めに出す
   const el=$('#live-toast'); if(!el) return;
   el.textContent=text; el.classList.add('show');
-  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),1600);
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),ms||1600);
+}
+/* L5（2026-11-04）: LINK MAP が読む「ルートごとの最後の送信／受信」。
+   キーは tdr_link_log_v1:<ルート>:<send|recv> の1件ずつ（1つのキーに全部入れると、
+   送り側と受け側のタブがほぼ同時に読み書きして片方の記録が消える＝実測で消えた）。
+   oban-builder / manga-plate / composer / rough で同じ形にそろえること */
+function linkLog(rt,kind,msg){
+  try{localStorage.setItem('tdr_link_log_v1:'+rt+':'+kind,
+    JSON.stringify({t:new Date().toISOString(),app:'COMPOSER',msg:String(msg).slice(0,160)}));}catch(e){}
+}
+/* L4（2026-11-04）: ?id= で届いたときの1行。どこから・寸法（枠／のりしろ込み → コンポ）・トラック数 */
+function receiveLine(rec){
+  const id=String(rec.projectId||'');
+  const from=id.indexOf('mp_')===0?'MANGA PLATE':'ANIMATOR';
+  const nm=String(rec.scene||rec.name||id).slice(0,24);
+  const pl=rec.plate||null;
+  const src=(pl&&pl.w)?`枠 ${pl.w}×${pl.h}・のりしろ込み ${rec.width}×${rec.height}${pl.pad?'（'+Math.round(pl.pad*100)+'%）':''}`
+                       :`${rec.width||'?'}×${rec.height||'?'}`;
+  return {route:from==='MANGA PLATE'?'mp-co':'an-co',
+    msg:`${nm} ← ${from}｜${src} → コンポ ${state.width}×${state.height}｜新規 ${state.tracks.length} トラック`};
 }
 // トラックの「絵」だけ差し替え（KF/マーカー/トランスフォーム/表示状態は保持）
 function liveUpdateTrack(track,json){
@@ -5849,7 +5914,8 @@ $('#btn-live').addEventListener('click',()=>{
   if(urlId){
     try{
       const rec=await exGet(urlId);
-      if(rec){ loadJSON(rec); history.replaceState(null,'','composer.html'); }
+      if(rec){ loadJSON(rec); history.replaceState(null,'','composer.html');
+        const R=receiveLine(rec); flashLive(R.msg,5000); linkLog(R.route,'recv',R.msg); }
     }catch(e){ console.warn('exchange load failed',e); }
   }
   setupLiveSync(); // ライブ連携を起動（トラック読込後に同期要求）
