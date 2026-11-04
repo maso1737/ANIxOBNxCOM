@@ -1,0 +1,3 @@
+# 改行は LF にそろえる（2026-11-05）。Windows の core.autocrlf=true で作業ツリーが CRLF になり、
+# 1行も変えていないファイルが git 上は全行差分に見えた（TAB LINK STEP2）ため。
+* text=auto eol=lf
