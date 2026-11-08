@@ -768,6 +768,68 @@ body.ui-big #tl-mini-swatch{width:34px;height:24px}
 body.ui-big #board-topbar .btn{padding:9px 14px}
 body.ui-big #tl-audio .btn{padding:7px 11px}
 body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;font-size:10px}
+/* ---------- CROP（SPEC_24・2026-11-05）：写真ごとの切り出し枠と一括書き出し ----------
+   STUDIO / GRID には手を入れない独立した3つ目の画面。cuts[] とは別データ（p.crop / gCrop） */
+#view-crop{display:none;flex-direction:column}
+#view-crop.on{display:flex}
+#crop-top{flex:none;display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--border);
+  background:rgba(16,7,34,.92);overflow-x:auto;scrollbar-width:none;font-size:9px;letter-spacing:.1em}
+#crop-top::-webkit-scrollbar{height:0}
+#crop-top > *{flex:none}
+#crop-top .ttl{font-family:var(--bank);letter-spacing:.3em;color:var(--ice);margin-right:6px}
+#crop-label{min-width:44px;text-align:center;color:var(--gold);letter-spacing:.12em}
+#crop-top select,#crop-top input[type=text]{background:#0c061d;border:1px solid var(--border);color:var(--white);
+  font-family:var(--mono);font-size:10px;padding:4px 6px}
+#crop-custom{width:56px}
+#crop-main{flex:1;display:flex;min-height:0;position:relative}
+#crop-main .crop-empty{right:330px}
+#crop-stage{flex:1;position:relative;min-width:0;background:#07030f}
+#crop-cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
+#crop-info{position:absolute;left:10px;bottom:8px;color:var(--grey);letter-spacing:.08em;pointer-events:none;
+  background:rgba(7,3,15,.75);padding:4px 8px}
+#crop-info b{color:var(--ice);font-weight:400}
+.crop-empty{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;
+  color:var(--grey);font-family:var(--jp);font-size:12px;line-height:1.9;pointer-events:none}
+#view-crop.empty .crop-empty{display:flex}
+#crop-table{flex:1;min-width:0;overflow:auto;display:none;padding:14px;align-content:start;
+  grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+#view-crop.table #crop-stage{display:none}
+#view-crop.table #crop-table{display:grid}
+.ct-card{border:1px solid var(--border);background:rgba(16,7,34,.7);padding:6px;cursor:grab}
+.ct-card.cur{border-color:var(--ice);box-shadow:0 0 10px rgba(90,233,255,.25)}
+.ct-card.off{opacity:.35}
+.ct-card.dragover{border-color:var(--acid)}
+.ct-card canvas{display:block;width:100%;height:auto;background:#000}
+.ct-card .nm{margin-top:5px;display:flex;gap:6px;font-size:9px;color:var(--grey);white-space:nowrap;overflow:hidden}
+.ct-card .nm b{color:var(--gold);font-weight:400}
+#crop-side{width:330px;flex:none;border-left:1px solid var(--border);background:var(--panel);overflow-y:auto;
+  padding:10px 12px;font-size:10px;letter-spacing:.06em}
+.crop-sec{margin-bottom:12px}
+.crop-h{font-family:var(--bank);letter-spacing:.2em;color:var(--acid);margin-bottom:6px;font-size:9px}
+.crop-h span{color:var(--grey);letter-spacing:.06em;font-family:var(--mono)}
+.crop-row{display:flex;align-items:center;gap:6px;margin:4px 0;flex-wrap:wrap}
+.crop-row .k{width:4.6em;color:var(--grey)}
+.crop-row input[type=text],.crop-row input[type=number],.crop-row select{background:#0c061d;border:1px solid var(--border);
+  color:var(--white);font-family:var(--mono);font-size:10px;padding:3px 5px;min-width:0}
+.crop-row input[type=number]{width:62px}
+.crop-row .btn{padding:5px 9px}
+.crop-note{font-family:var(--jp);font-size:10px;line-height:1.6;color:var(--grey);margin-top:4px}
+.crop-note.warn{color:var(--amber)}
+#crop-list{display:flex;flex-direction:column;gap:3px}
+.cl-row{display:flex;align-items:center;gap:6px;padding:3px;border:1px solid transparent;cursor:pointer}
+.cl-row:hover{border-color:var(--border)}
+.cl-row.cur{border-color:var(--ice);background:rgba(90,233,255,.06)}
+.cl-row.off{opacity:.4}
+.cl-row canvas{width:64px;height:44px;flex:none;background:#000;object-fit:contain}
+.cl-row .tx{flex:1;min-width:0;line-height:1.45}
+.cl-row .tx .n{color:var(--gold)}
+.cl-row .tx .f{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgba(255,255,255,.75)}
+.cl-row .tx .s{color:var(--grey)}
+.cl-row .tag{font-size:8px;padding:1px 4px;border:1px solid var(--border);color:var(--grey)}
+.cl-row .tag.own{border-color:rgba(255,201,79,.5);color:var(--amber)}
+.cl-row .tag.offt{border-color:rgba(255,79,168,.5);color:var(--acid)}
+.cl-row .tag.mis{border-color:rgba(255,201,79,.6);color:var(--amber)}
+.cl-row .mini{padding:2px 5px;font-size:9px}
 </style>
 </head>
 <body>
@@ -776,6 +838,7 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
   <span class="title">E<b>CONTE</b></span>
   <button class="btn mode on" id="btn-view-studio" title="STUDIO (1) ／ X で GRID と行き来">STUDIO</button>
   <button class="btn mode" id="btn-view-edit" title="GRID＝カラースクリプト一覧で描く (2) ／ X で STUDIO と行き来 ／ セルのWタップで FOCUS（1枚を画面いっぱい）">GRID</button>
+  <button class="btn mode" id="btn-view-crop" title="CROP＝写真ごとに切り出し枠を決めて、まとめて書き出す／OBAN・LIVE PLATE へ送る (3)">CROP</button>
   <button class="btn ex" id="btn-import" title="写真をBOARDに紙として置く（考える場に散らす。1枚が1カットになるわけではありません）">&#9654; IMPORT</button>
   <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none;">
   <button class="btn ex" id="btn-import-cuts" title="&#9654; C.SCRIPT ＝ 画像を1枚＝1カット（16:9）として取り込む（&#9654; IMPORT はBOARDに写真を置くだけ、こちらはカットが増えます）。&#8681; C.SCRIPT で書き出したPNGは自動で格子に分けます。SHEETへドラッグ＆ドロップでも同じ（BOARDへ落とすと今までどおり写真）"><span class="lb-w">&#9654; C.SCRIPT</span><span class="lb-n">&#9654;&#9707;</span></button>
@@ -821,6 +884,10 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
         <button class="btn mode" id="btn-tool-cut" title="矩形ドラッグでコマを切り出す (C)">CUT 16:9</button>
         <!-- CUT枠の表示ON/OFF (H)。OFFのあいだは枠を掴めない＝写真だけを気楽に動かせる -->
         <button class="btn mode on eye-only" id="btn-cut-vis" title="CUT枠の表示 ON/OFF (H)。OFFのあいだは枠を選べません">&#128065;</button>
+        <!-- SPEC_24: 選んでいる写真で CROP を開く（選んでいなければ一覧の先頭）。
+             取り込みの並べ方（格子／重ねる）はその右。重ねる＝同じ画角を比べたいとき -->
+        <button class="btn" id="btn-board-crop" title="選んでいる写真で CROP を開く (3)">&#9986; CROP</button>
+        <button class="btn" id="btn-import-lay" title="取り込みの並べ方：格子に並べる／重ねる（2枚以上を一度に入れたとき）">&#8862; 格子</button>
         <!-- 選択中CUT枠の表示と ＋枠 はここ（旧「CUT 枠列（カメラ）」パネルは撤去した。
              ✎編集は中央の ✎EDIT／✕削除は SHEET行と Delete にあるので、ここには置かない） -->
         <span id="cutsel-box">
@@ -995,6 +1062,83 @@ body.ui-big .ta-load,body.ui-big .ta-scrub,body.ui-big .ta-mk{padding:8px 13px;f
 </div>
 
 <!-- ================= EDIT ================= -->
+<!-- ==================== CROP（SPEC_24） ====================
+     写真ごとに切り出し枠 p.crop（向き補正後の写真に対する 0..1）を決めて、元解像度のまま書き出す。
+     最初に描いた枠が「基準」になって全写真に当たる。1枚を直すとその写真だけ「個別」 -->
+<div class="view" id="view-crop">
+  <div id="crop-top">
+    <span class="ttl">CROP</span>
+    <button class="btn" id="crop-prev" title="前の写真 (←)">&#9664;</button>
+    <span id="crop-label">—</span>
+    <button class="btn" id="crop-next" title="次の写真 (→)">&#9654;</button>
+    <span class="tb-div"></span>
+    <label title="画面全体で1つの比。変えると全部の枠の中心と幅を保って比だけ合わせます">比
+      <select id="crop-aspect">
+        <option value="free">FREE</option>
+        <option value="1:1">1:1</option>
+        <option value="4:3">4:3</option>
+        <option value="3:2">3:2</option>
+        <option value="16:9">16:9</option>
+        <option value="a">A判（√2）</option>
+        <option value="custom">任意</option>
+      </select>
+    </label>
+    <input type="text" id="crop-custom" title="任意の比（例 5:4）" value="5:4">
+    <button class="btn mode" id="crop-portrait" title="縦長にする（比が FREE 以外のとき）">縦</button>
+    <span class="tb-div"></span>
+    <button class="btn" id="crop-setbase" title="いまの枠を基準にする（個別にしていない写真が全部これに揃う）">&#9678; 基準にする</button>
+    <button class="btn" id="crop-applyall" title="基準を全部の写真に当てる（個別に直した枠も上書き・確認あり）">&#8649; 全部に当てる</button>
+    <button class="btn" id="crop-reset" title="この写真を基準の枠に戻す (R)">&#8634; 基準に戻す</button>
+    <button class="btn mode" id="crop-off" title="この写真を書き出さない／戻す (Delete)。枠は残ります">&#10005; 外す</button>
+    <span style="flex:1"></span>
+    <button class="btn mode" id="crop-layout" title="1枚 ⇄ 表 (Q)">&#8862; 表</button>
+  </div>
+  <div id="crop-main">
+    <div id="crop-stage">
+      <canvas id="crop-cv"></canvas>
+      <div id="crop-info"></div>
+    </div>
+    <div id="crop-table"></div>
+    <div class="crop-empty">写真がありません。<br>ここか BOARD に写真を D&amp;D するか、▶ IMPORT で読み込んでください。</div>
+    <div id="crop-side">
+      <div class="crop-sec">
+        <div class="crop-h">名前</div>
+        <div class="crop-row"><span class="k">付け方</span>
+          <select id="crop-name-mode"><option value="num">連番</option><option value="src">元の名前</option></select></div>
+        <div class="crop-row"><span class="k">頭</span><input type="text" id="crop-prefix" style="width:120px">
+          <span class="k" style="width:auto">開始</span><input type="number" id="crop-start" min="0" step="1"></div>
+        <div class="crop-row"><span class="k">桁</span><input type="number" id="crop-digits" min="1" max="8" step="1">
+          <span class="k" style="width:auto">形式</span>
+          <select id="crop-fmt"><option value="png">PNG</option><option value="jpg">JPG</option></select>
+          <input type="number" id="crop-q" min="0.5" max="1" step="0.01" title="JPG の画質（0.5〜1）"></div>
+        <div class="crop-note" id="crop-name-ex"></div>
+      </div>
+      <div class="crop-sec">
+        <div class="crop-h">書き出し <span>元の解像度のまま</span></div>
+        <div class="crop-row">
+          <button class="btn" id="crop-dl-one" title="いまの写真だけ">&#8681; この1枚</button>
+          <button class="btn" id="crop-dl-dir" title="フォルダを選んで1枚ずつ（同じ名前があれば先に聞きます）">&#8681; フォルダへ</button>
+          <button class="btn" id="crop-dl-zip" title="まとめて ZIP（無圧縮）">&#8681; ZIP</button>
+        </div>
+      </div>
+      <div class="crop-sec">
+        <div class="crop-h">送る <span>同じブラウザ</span></div>
+        <div class="crop-row"><span class="k">送り方</span>
+          <select id="crop-send-mode"><option value="seq">連番（1つのシーケンス）</option><option value="still">1枚ずつ</option></select></div>
+        <div class="crop-row">
+          <button class="btn ex" id="crop-send-oban" title="OBAN へ（開いていればその場で入る・閉じていれば次に開いたとき）">&#9654; OBAN</button>
+          <button class="btn ex" id="crop-send-lp" title="LIVE PLATE の素材棚へ（開いていればその場で入る・閉じていれば次に開いたとき）">&#9654; LIVE PLATE</button>
+        </div>
+        <div class="crop-note" id="crop-send-note"></div>
+      </div>
+      <div class="crop-sec">
+        <div class="crop-h">一覧 <span id="crop-count"></span></div>
+        <div id="crop-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="view" id="view-edit">
   <div id="edit-top">
     <!-- ◀STUDIO は最上部メニューの STUDIO と重複するので置かない。
@@ -1227,7 +1371,8 @@ let db = null;
 let gFocusCut = -1;                          // 現在カット = cutIndexAt(tl.frame).i の導出値
 // TOOLパネル左右 / 右パネル開閉 / ペイン幅(%) / TIMELINE高さ / ミニツール表示 / 内容欄の高さ / 大きいUI
 let gUi = { side: 'left', sheet: true, boardW: 40, sheetW: 22, tlH: 66,
-            tools: false, curH: 58, uiBig: null };
+            tools: false, curH: 58, uiBig: null,
+            importLay: 'grid' };   // SPEC_24: 2枚以上の取り込み＝格子に並べる｜'stack'＝重ねる
 /* 色の濃さ・描画モードは **絵コンテ全体のトーン**（SPEC_15 P3-1）。カット固有にすると
    PAN/T.U. で「塗ってみたら違う見え方」をあちこちで合わせ直す作業が発生する。
    カットごとの上書きは作らない（要望が出るまで足さない）。 */
@@ -1414,7 +1559,8 @@ async function saveAll(){
   if(HARNESS_ON || !db) return;
   try{
     const phItems = photos.map(p => ({ id: p.id, name: p.name, x: p.x, y: p.y, w: p.w, h: p.h, blob: p.blob,
-                                       rot: p.rot || 0, filter: p.filter || null, ref: p.ref || null }));
+                                       rot: p.rot || 0, filter: p.filter || null, ref: p.ref || null,
+                                       crop: p.crop || null }));   // SPEC_24
     const cutItems = [];
     for(let i = 0; i < cuts.length; i++){
       const c = cuts[i];
@@ -1438,7 +1584,7 @@ async function saveAll(){
     await idbClearPut('photos', phItems);
     await idbClearPut('cuts', cutItems);
     await idbClearPut('meta', [
-      { k: 'main', board: { x: state.board.x, y: state.board.y, z: state.board.z } },
+      { k: 'main', board: { x: state.board.x, y: state.board.y, z: state.board.z }, crop: gCrop },
       { k: 'audio', blob: gAudio ? gAudio.blob : null, name: gAudio ? gAudio.name : '',
         offset: gAudioOffset, muted: gAudioMuted,
         markers: gMarkers.map(m => ({ f: m.f | 0, label: m.label || '' })) }
@@ -1583,7 +1729,8 @@ async function loadAll(){
       if(!p.blob) continue;
       const img = await blobToImage(p.blob);
       photos.push({ id: p.id, name: p.name, img, blob: p.blob, x: p.x, y: p.y, w: p.w, h: p.h,
-                    rot: p.rot || 0, filter: normFilter(p.filter), ref: p.ref || null });
+                    rot: p.rot || 0, filter: normFilter(p.filter), ref: p.ref || null,
+                    crop: normPhotoCrop(p.crop) });
     }
     const cutItems = await idbGetAll('cuts');
     cutItems.sort((a, b) => a.order - b.order);
@@ -1648,6 +1795,7 @@ async function loadAll(){
     const metas = await idbGetAll('meta');
     const m = metas.find(x => x.k === 'main');
     if(m && m.board){ state.board.x = m.board.x; state.board.y = m.board.y; state.board.z = m.board.z; }
+    if(m) gCrop = normCrop(m.crop);   // SPEC_24
     const am = metas.find(x => x.k === 'audio');
     if(am){
       gAudioOffset = am.offset | 0;
@@ -1659,7 +1807,7 @@ async function loadAll(){
     if(migrated){
       // meta ストアは clear→put なので、音のレコードも一緒に書き戻す（落とすと音が消える）
       await idbClearPut('meta', [
-        { k: 'main', board: { x: state.board.x, y: state.board.y, z: state.board.z }, ver: 2 },
+        { k: 'main', board: { x: state.board.x, y: state.board.y, z: state.board.z }, ver: 2, crop: gCrop },
         { k: 'audio', blob: gAudio ? gAudio.blob : null, name: gAudio ? gAudio.name : '',
           offset: gAudioOffset, muted: gAudioMuted }
       ]);
@@ -2261,8 +2409,11 @@ function setView(v){
   state.view = v;
   $('#view-studio').classList.toggle('on', v === 'studio');
   $('#view-edit').classList.toggle('on', v === 'edit');
+  $('#view-crop').classList.toggle('on', v === 'crop');
   $('#btn-view-studio').classList.toggle('on', v === 'studio');
   $('#btn-view-edit').classList.toggle('on', v === 'edit');
+  $('#btn-view-crop').classList.toggle('on', v === 'crop');
+  if(v === 'crop') cropEnter();   // SPEC_24
   if(v === 'studio'){
     renderSheetPanel(); layoutStudio(); renderStudioSync(true);   // 描く先は触らない（§5-B1）
   }
@@ -2480,7 +2631,13 @@ function drawPhoto(ctx, p, hiRes){
   const fs = filterStr(p.filter);
   const rot = p.rot || 0;
   const useNative = CTX_FILTER_OK && !!fs;
-  const img = useNative ? p.img : filteredSource(p, hiRes);
+  let img = useNative ? p.img : filteredSource(p, hiRes);
+  // SPEC_24: BOARD の表示だけ縮小版（256 / 1024px・idle で作る）。ベイク（hiRes）と書き出しは原寸のまま
+  if(!hiRes && img === p.img){
+    const need = Math.max(p.w, p.h) * state.board.z * (window.devicePixelRatio || 1);
+    const px = need <= 256 ? proxyGet(p, 256) : (need <= 1024 ? proxyGet(p, 1024) : null);
+    if(px) img = px;
+  }
   if(!fs && !rot){ ctx.drawImage(img, p.x, p.y, p.w, p.h); return; }
   ctx.save();
   if(useNative) ctx.filter = fs;
@@ -2526,6 +2683,19 @@ function renderBoard(){
       boardCtx.lineWidth = 2 / b.z;
       boardCtx.strokeRect(p.x, p.y, p.w, p.h);
     }
+  }
+  // SPEC_24: CROP の切り出し枠を薄く（見るだけ。H で CUT 枠と一緒に消える・ここでは掴めない）
+  if(state.showCuts){
+    boardCtx.save();
+    boardCtx.setLineDash([8 / b.z, 6 / b.z]);
+    boardCtx.lineWidth = 1 / b.z;
+    for(const p of photos){
+      const c = p.crop;
+      if(!c || c.off) continue;
+      boardCtx.strokeStyle = c.own ? 'rgba(255,201,79,0.55)' : 'rgba(255,255,255,0.4)';
+      boardCtx.strokeRect(p.x + c.x * p.w, p.y + c.y * p.h, c.w * p.w, c.h * p.h);
+    }
+    boardCtx.restore();
   }
   // 焼く範囲（bakeRect）＝実際に写真から焼き取る矩形。**「余」を動かすとここが伸び縮みする**。
   // 枠が2つ以上のカットを選んでいるときだけ出す（FIXは枠そのもの＝二重線になるだけなので出さない）
@@ -2821,15 +2991,15 @@ function bUp(e){
 
 /* ---------------- photos / import ---------------- */
 let importCount = 0;
-function addPhotoFromImage(img, name, blob, at){
+function addPhotoFromImage(img, name, blob, at, pos){
   const w = 1400;
   const h = w * img.height / Math.max(1, img.width);
   const c = at || viewCenterBoard();
-  const off = (importCount % 6) * 46;
-  importCount++;
+  const off = pos ? 0 : (importCount % 6) * 46;   // pos＝格子に並べる位置（左上）。そのときはずらさない
+  if(!pos) importCount++;
   const p = { id: uid(), name: name || 'photo', img, blob: blob || null,
-              x: c.x - w / 2 + off, y: c.y - h / 2 + off, w, h,
-              rot: 0, filter: normFilter(null), ref: null };
+              x: pos ? pos.x : c.x - w / 2 + off, y: pos ? pos.y : c.y - h / 2 + off, w, h,
+              rot: 0, filter: normFilter(null), ref: null, crop: null };
   photos.push(p);
   // REF BOARD のクリップがあれば、増えた写真に紐づけて棚を空にする（複数枚なら先頭1枚だけ）
   if(clipConsume(p)) toast('REF: 「' + (p.ref.title || p.ref.url) + '」を ' + (name || 'photo') + ' に紐づけました');
@@ -3144,16 +3314,50 @@ async function decodeHeic(f){
   const jpg = Array.isArray(out) ? out[0] : out;
   return { img: await blobToImage(jpg), blob: jpg };
 }
+/* SPEC_24: 2枚以上を一度に入れたら格子に並べる（1枚幅 1400・cols=ceil(√n)）。
+   置こうとした場所が既存の写真・CUT 枠と重なるなら、全体の下へずらす。gUi.importLay='stack' で従来の重ね置き */
+function importGridSlots(imgs, at){
+  const W = 1400, GAP = 120, n = imgs.length, cols = Math.ceil(Math.sqrt(n));
+  const hs = imgs.map(im => W * (im.naturalHeight || im.height) / Math.max(1, im.naturalWidth || im.width));
+  const rowH = [];
+  hs.forEach((h, i) => { const r = Math.floor(i / cols); rowH[r] = Math.max(rowH[r] || 0, h); });
+  const tw = cols * W + (cols - 1) * GAP, th = rowH.reduce((a, b) => a + b, 0) + (rowH.length - 1) * GAP;
+  const c = at || viewCenterBoard();
+  let x0 = c.x - tw / 2, y0 = c.y - th / 2;
+  const items = photos.map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h }));
+  cuts.forEach(cut => { for(let k = 0; k < camCount(cut); k++) items.push(camRect(cut, k)); });
+  const hit = items.some(r => r.x < x0 + tw && r.x + r.w > x0 && r.y < y0 + th && r.y + r.h > y0);
+  if(hit && items.length){
+    x0 = Math.min(...items.map(r => r.x));
+    y0 = Math.max(...items.map(r => r.y + r.h)) + GAP * 2;
+  }
+  let y = y0;
+  return hs.map((h, i) => {
+    const r = Math.floor(i / cols), col = i % cols;
+    if(col === 0 && r > 0) y += rowH[r - 1] + GAP;
+    return { x: x0 + col * (W + GAP), y };
+  });
+}
 async function importFiles(files, at){
+  const got = [];
   for(const f of files){
     const heic = isHeic(f);
     if(!heic && !(f.type || '').startsWith('image/')) continue;
     try{
       const r = heic ? await decodeHeic(f) : { img: await blobToImage(f), blob: f };
-      addPhotoFromImage(r.img, f.name, r.blob, at);
-      toast((f.name || '画像') + ' を読み込みました');
+      got.push({ img: r.img, blob: r.blob, name: f.name });
     }catch(e){ toast('読み込み失敗: ' + (f.name || '画像') + '（' + (e.message || e) + '）'); }
   }
+  if(!got.length) return [];
+  const grid = got.length >= 2 && gUi.importLay !== 'stack';
+  const slots = grid ? importGridSlots(got.map(g => g.img), at) : null;
+  const added = got.map((g, i) => addPhotoFromImage(g.img, g.name, g.blob, at, slots ? slots[i] : null));
+  cropList();   // SPEC_24: CROP の並びを取り込んだ順で決めておく（読み直しても変わらない）
+  if(got.length >= 2) boardFit();
+  toast(got.length === 1 ? ((got[0].name || '画像') + ' を読み込みました')
+                         : (got.length + ' 枚を読み込みました（' + (grid ? '格子に並べました' : '重ねて置きました') + '）'));
+  if(state.view === 'crop') cropRefresh();   // CROP を開いたまま ▶ IMPORT したときも一覧に出す
+  return added;
 }
 /* 削除の確認ダイアログは出さない（Ctrl+Z で戻せる操作は聞かずにやる） */
 function deleteSelPhoto(){
@@ -3181,6 +3385,7 @@ function rotatePhoto(d){
     const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
     p.rot = (((p.rot || 0) + dd) % 360 + 360) % 360;
     const t = p.w; p.w = p.h; p.h = t;
+    cropRotate(p, dd);   // SPEC_24: 切り出し枠も一緒に回す
     p.x = cx - p.w / 2; p.y = cy - p.h / 2;
   };
   apply(d);
@@ -3699,6 +3904,7 @@ async function exportProject(){
       if(p.blob) zip.file(file, p.blob);
       meta.photos.push({ id: p.id, name: p.name, x: p.x, y: p.y, w: p.w, h: p.h,
                          rot: p.rot || 0, filter: normFilter(p.filter), ref: p.ref || null,
+                         crop: p.crop || null,   // SPEC_24
                          file: p.blob ? file : null });
     }
     for(let i = 0; i < cuts.length; i++){
@@ -3731,6 +3937,7 @@ async function exportProject(){
       meta.audio = { file: af, name: gAudio.name, offset: gAudioOffset, muted: gAudioMuted };
     }
     meta.markers = gMarkers.slice();
+    meta.crop = gCrop;   // SPEC_24
     zip.file('project.json', JSON.stringify(meta, null, 1));
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
     downloadBlob(blob, stampName('econte_project', 'zip'));
@@ -3764,8 +3971,10 @@ async function importProject(file){
       }
       if(!img) continue;
       photos.push({ id: p.id, name: p.name, img, blob, x: p.x, y: p.y, w: p.w, h: p.h,
-                    rot: p.rot || 0, filter: normFilter(p.filter), ref: p.ref || null });
+                    rot: p.rot || 0, filter: normFilter(p.filter), ref: p.ref || null,
+                    crop: normPhotoCrop(p.crop) });
     }
+    gCrop = normCrop(meta.crop);   // SPEC_24（無い ZIP は既定に戻る）
     let patchMig = 0;
     const list = (meta.cuts || []).slice().sort((a, b) => a.order - b.order);
     for(const c of list){
@@ -9478,6 +9687,8 @@ const SHORTCUT_ACTIONS = [
   // 旧 3=GRID / 4=SINGLE は撤去（キーマップに残っていても loadKeymap が知らない id として読み飛ばす）
   { id: 'viewEdit',   label: 'GRID へ',             def: '2', global: true, run: () => enterEdit('grid') },
   { id: 'swapView',   label: 'STUDIO ⇄ GRID 入替',  def: 'X', global: true, run: () => swapStudioGrid() },
+  // SPEC_24: 3 = CROP（写真の切り出し・一括書き出し）。旧 3=GRID は撤去済みなので空いていた
+  { id: 'viewCrop',   label: 'CROP へ',             def: '3', global: true, run: () => setView('crop') },
   { id: 'play',      label: '再生 / 停止',          def: 'Space',      prevent: true, run: () => togglePlay() },
   { id: 'prevFrame', label: '1コマ戻る (Shift=10)', def: 'ArrowLeft',  prevent: true, run: e => { pause(); seek(state.tl.frame - (e && e.shiftKey ? 10 : 1)); } },
   { id: 'nextFrame', label: '1コマ進む (Shift=10)', def: 'ArrowRight', prevent: true, run: e => { pause(); seek(state.tl.frame + (e && e.shiftKey ? 10 : 1)); } },
@@ -9529,6 +9740,7 @@ function loadUi(){
     if(typeof o.tools === 'boolean') gUi.tools = o.tools;
     if(typeof o.curH === 'number') gUi.curH = clamp(o.curH, CUR_H_MIN, CUR_H_MAX);
     if(typeof o.uiBig === 'boolean') gUi.uiBig = o.uiBig;
+    if(o.importLay === 'grid' || o.importLay === 'stack') gUi.importLay = o.importLay;
     if(typeof o.selWarp === 'boolean') state.selWarp = o.selWarp;
     if(o.paint){                                   // 濃/描画モードは全体設定（SPEC_15 P3-1）
       if(typeof o.paint.colorAlpha === 'number') gPaint.colorAlpha = clamp(o.paint.colorAlpha, 0, 1);
@@ -9734,6 +9946,7 @@ function togglePaneMax(){
   el.classList.add('pane-max');
   gPaneMax = el;
   layoutStudio();
+  if(el === $('#studio-board')) boardFit();   // SPEC_24: AE の @ と同じく「全体が見える」
   toast('最大化（@ でもとに戻す）');
 }
 /* 全消去（SETTINGSのCLOSE隣）。ZIPが唯一の保険なので、2段確認にしてある */
@@ -10000,6 +10213,13 @@ function bindDoubleTap(el, fn){
 /* ---------------- SETTINGS: ショートカット一覧（表示のみ・SPEC_13 §9f） ---------------- */
 const HELP_GROUPS = [
   { t: 'TRANSPORT / 表示（STUDIO）', rows: 'keymap' },   // SHORTCUT_ACTIONS から自動生成＝再割当も反映される
+  { t: 'CROP（3）写真の切り出し・一括書き出し', rows: [
+    ['ドラッグ（枠の外）', '枠を描き直す。最初の1枚の枠が全写真の「基準」になる'],
+    ['角をドラッグ／中をドラッグ', '拡縮（比は固定）／移動'], ['ホイール', '中心で拡縮'],
+    ['← / →', '前後の写真'], ['Shift+矢印', '枠を少し動かす（4px）'], ['+ / −', '枠を少し拡縮'],
+    ['R', '基準に戻す（個別をやめる）'], ['Delete', '外す／戻す（書き出さない・枠は残る）'],
+    ['Q', '1枚 ⇄ 表（表は D&D で並べ替え・Wクリックで1枚へ）'], ['Esc', 'STUDIO へ']
+  ] },
   { t: 'PAINT（ANIMATOR準拠）', rows: [
     ['B / P', 'ペン（P は ANIMATOR 合わせ）'], ['E', '消しゴム'],
     ['G', '投げ縄（バケツはありません）'], ['A', 'SEL＝浮いた選択（FOCUS限定）'],
@@ -10360,6 +10580,8 @@ function onKey(e){
       }
     }
   }
+  // SPEC_24: CROP 中のキーは CROP だけで完結させる（ペイントキーに落とさない）
+  if(state.view === 'crop'){ cropKey(e); return; }
   if(state.view === 'studio'){
     // Ctrl+↑/↓ = 現在カットを並べ替え（SHEET行ドラッグと同じ操作）
     // Ctrl+Shift+↑/↓ = **最上位 / 最下位へ**（SPEC_16 §5-C7）
@@ -10924,6 +11146,7 @@ function wire(){
     applyCurHeight();
     if($('#help-ovl').classList.contains('on')) fitHelpBody();
     if(state.view === 'studio') layoutStudio();
+    else if(state.view === 'crop') cropRefresh();
     else if(gEditMode === 'grid') renderGrid();
     else fitEditCanvas();
   };
@@ -10932,8 +11155,845 @@ function wire(){
   document.addEventListener('webkitfullscreenchange', relayout);
 }
 
+/* ============================================================
+   SPEC_24 — CROP（写真取り込み × 可変枠クロップ × 一括書き出し）2026-11-05
+   ------------------------------------------------------------
+   ・データは写真ごとの p.crop = {x,y,w,h, own, off}（**向き補正後の写真に対する 0..1**）と、
+     全体設定 gCrop だけ。ピクセルは書き出すときに1枚ずつ作る（覚えておかない）。
+   ・最初に描いた枠が「基準」(gCrop.base) になって全写真に当たる（own=false）。
+     1枚を直すと own=true＝その写真だけ「個別」。off＝書き出さない（枠は残す）。
+   ・基準 → 写真：中心と幅の割合を保ち、比があれば高さを w*W/(A*H) で決めて写真の中にクランプ。
+     比が FREE のときは基準の形（ピクセル比）を保つ。
+   ・Undo は統合ログ gLog に type:'crop'（全枠＋基準＋比＋並びのスナップショット）。
+   ・cuts[]（16:9 の映像カット）とは無関係。STUDIO / GRID の処理には入らない。
+   ============================================================ */
+const CROP_ASPECTS = { free: null, '1:1': 1, '4:3': 4 / 3, '3:2': 3 / 2, '16:9': 16 / 9, a: Math.SQRT2 };
+function defaultCrop(){
+  return { base: null, aspect: 'free', custom: '5:4', portrait: false, order: [],
+           name: { mode: 'num', prefix: 'rough_', start: 1, digits: 4, fmt: 'png', q: 0.92 },
+           send: 'seq', layout: 'single' };
+}
+let gCrop = defaultCrop();
+let gCropCur = null;          // 1枚の画面で見ている写真の id
+let gCropDrag = null;         // 枠エディタのドラッグ中の状態
+let gCropView = null;         // 枠エディタの写真の置き場所（画面px）{ox,oy,dw,dh}
+/* 保存データから戻す（壊れた値・知らない値は既定へ） */
+function normCrop(o){
+  const d = defaultCrop();
+  if(!o || typeof o !== 'object') return d;
+  const r = (v, f) => (typeof v === 'number' && isFinite(v)) ? v : f;
+  if(o.base && typeof o.base.w === 'number') d.base = { x: r(o.base.x, 0), y: r(o.base.y, 0), w: r(o.base.w, 1), h: r(o.base.h, 1), ar: r(o.base.ar, 1) };
+  if(o.aspect === 'custom' || o.aspect in CROP_ASPECTS) d.aspect = o.aspect;
+  if(typeof o.custom === 'string') d.custom = o.custom.slice(0, 16);
+  d.portrait = !!o.portrait;
+  if(Array.isArray(o.order)) d.order = o.order.filter(x => typeof x === 'string');
+  if(o.name){
+    const n = o.name;
+    if(n.mode === 'src' || n.mode === 'num') d.name.mode = n.mode;
+    if(typeof n.prefix === 'string') d.name.prefix = n.prefix.slice(0, 40);
+    d.name.start = Math.max(0, r(n.start, 1) | 0);
+    d.name.digits = clamp(r(n.digits, 4) | 0, 1, 8);
+    if(n.fmt === 'jpg' || n.fmt === 'png') d.name.fmt = n.fmt;
+    d.name.q = clamp(r(n.q, 0.92), 0.5, 1);
+  }
+  if(o.send === 'still' || o.send === 'seq') d.send = o.send;
+  if(o.layout === 'table' || o.layout === 'single') d.layout = o.layout;
+  return d;
+}
+function normPhotoCrop(c){
+  if(!c || typeof c.w !== 'number') return null;
+  return { x: clamp(+c.x || 0, 0, 1), y: clamp(+c.y || 0, 0, 1), w: clamp(+c.w || 1, 0.001, 1), h: clamp(+c.h || 1, 0.001, 1),
+           own: !!c.own, off: !!c.off };
+}
+/* 向き補正後（回転を当てたあと）の写真の画素寸法 */
+function photoNat(p){
+  const w = p.img.naturalWidth || p.img.width || 1, h = p.img.naturalHeight || p.img.height || 1;
+  return (p.rot === 90 || p.rot === 270) ? { w: h, h: w } : { w, h };
+}
+/* いまの比（幅/高さ・画素）。FREE は null */
+function cropAspect(){
+  let a = null;
+  if(gCrop.aspect === 'custom'){
+    const m = String(gCrop.custom).match(/^\s*(\d+(?:\.\d+)?)\s*[:x×\/]\s*(\d+(?:\.\d+)?)\s*$/i);
+    if(m && +m[1] > 0 && +m[2] > 0) a = (+m[1]) / (+m[2]);
+  }else a = CROP_ASPECTS[gCrop.aspect] || null;
+  if(!a) return null;
+  return gCrop.portrait ? Math.min(a, 1 / a) : Math.max(a, 1 / a);
+}
+/* 中心と幅を保って比 A（画素）に合わせ、写真の中へ収める */
+function cropFit(r, W, H, A){
+  let w = r.w, h = r.h;
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  if(A){
+    h = w * W / (A * H);
+    if(h > 1){ h = 1; w = A * H / W; }
+    if(w > 1){ w = 1; h = W / (A * H); }
+  }
+  w = clamp(w, 0.002, 1); h = clamp(h, 0.002, 1);
+  return { x: clamp(cx - w / 2, 0, 1 - w), y: clamp(cy - h / 2, 0, 1 - h), w, h };
+}
+/* 基準をこの写真に当てた枠（FREE のときは基準の画素比を保つ） */
+function cropBaseFor(p){
+  const b = gCrop.base;
+  if(!b) return null;
+  const { w: W, h: H } = photoNat(p);
+  return cropFit(b, W, H, cropAspect() || (b.w / b.h) * b.ar);
+}
+/* 写真の枠を確定させる（無ければ基準から作る。基準も無ければ null＝まだ枠が無い） */
+function ensureCrop(p){
+  if(p.crop) return p.crop;
+  const r = cropBaseFor(p);
+  if(!r) return null;
+  p.crop = Object.assign(r, { own: false, off: false });
+  return p.crop;
+}
+/* 基準を当て直す。includeOwn=true は個別に直した枠も上書き */
+function cropApplyBase(includeOwn){
+  for(const p of photos){
+    if(p.crop && p.crop.own && !includeOwn) continue;
+    const r = cropBaseFor(p);
+    if(!r) continue;
+    p.crop = Object.assign(r, { own: false, off: !!(p.crop && p.crop.off) });
+  }
+}
+/* 並び（gCrop.order に無い写真は BOARD の重なり順で後ろへ） */
+function cropList(){
+  const byId = new Map(photos.map(p => [p.id, p]));
+  const out = [], seen = new Set();
+  for(const id of gCrop.order){ const p = byId.get(id); if(p && !seen.has(id)){ out.push(p); seen.add(id); } }
+  /* 並びに無い写真は後ろへ足して、その場で並びに書き込む（Undo には積まない）。
+     ★ 書き込まないと、読み直したとき IndexedDB の戻り順（id 順）で入れ替わる（実測で入れ替わった） */
+  let grew = false;
+  for(const p of photos) if(!seen.has(p.id)){ out.push(p); gCrop.order.push(p.id); grew = true; }
+  if(grew) scheduleSave();
+  return out;
+}
+function cropCurPhoto(){
+  const list = cropList();
+  let p = list.find(q => q.id === gCropCur);
+  if(!p && list.length){ p = list[0]; gCropCur = p.id; }
+  return p || null;
+}
+/* 書き出す写真（外していない・枠がある）と、その名前 */
+function cropIncluded(){ return cropList().filter(p => { const c = ensureCrop(p); return c && !c.off; }); }
+function cropNames(list, forceNum){
+  const n = gCrop.name, ext = n.fmt === 'jpg' ? 'jpg' : 'png';
+  const used = new Set();
+  return list.map((p, i) => {
+    const base = (n.mode === 'src' && !forceNum)
+      ? (String(p.name || 'photo').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_') || 'photo')
+      : (n.prefix || '') + String(n.start + i).padStart(n.digits, '0');
+    let nm = base + '.' + ext, k = 2;
+    while(used.has(nm.toLowerCase())) nm = base + '_' + (k++) + '.' + ext;
+    used.add(nm.toLowerCase());
+    return nm;
+  });
+}
+function cropPx(p){
+  const c = ensureCrop(p);
+  if(!c) return null;
+  const { w: W, h: H } = photoNat(p);
+  return { w: Math.max(1, Math.round(c.w * W)), h: Math.max(1, Math.round(c.h * H)) };
+}
+
+/* ---- Undo（統合ログ）。枠・基準・比・並びを丸ごと写して戻す ---- */
+function cropSnap(){
+  return JSON.stringify({ base: gCrop.base, aspect: gCrop.aspect, custom: gCrop.custom, portrait: gCrop.portrait,
+                          order: gCrop.order, crops: photos.map(p => [p.id, p.crop || null]) });
+}
+function cropRestore(s){
+  const o = JSON.parse(s);
+  gCrop.base = o.base; gCrop.aspect = o.aspect; gCrop.custom = o.custom; gCrop.portrait = o.portrait; gCrop.order = o.order;
+  const m = new Map(o.crops);
+  photos.forEach(p => { if(m.has(p.id)) p.crop = m.get(p.id); });
+  if(state.view === 'crop') cropSyncControls();   // 比の欄・縦ボタンも戻す（Undo で表示だけ残っていた）
+  cropRefresh();
+}
+function cropCommit(before){
+  const after = cropSnap();
+  if(after === before) return;
+  pushLog({ type: 'crop', undo(){ cropRestore(before); }, redo(){ cropRestore(after); } });
+  cropRefresh();
+  scheduleSave();
+}
+/* 写真を回したら枠も回す（+90 / −90 を回数ぶん） */
+function cropRotate(p, d){
+  if(!p.crop) return;
+  const steps = (((d / 90) % 4) + 4) % 4;
+  for(let i = 0; i < steps; i++){
+    const c = p.crop;   // +90°：{x:1-y-h, y:x, w:h, h:w}
+    Object.assign(c, { x: 1 - c.y - c.h, y: c.x, w: c.h, h: c.w });
+  }
+}
+
+/* ---- 縮小版（BOARD と CROP の表示用。書き出し・ベイクは常に原寸） ----
+   12MP の写真を 0.1 倍で毎フレーム描くのは重い。256 / 1024px を idle で順に作る */
+const gProxyQ = [];
+let gProxyBusy = false;
+function proxyNow(p, s){
+  p._px = p._px || {};
+  if(p._px[s]) return p._px[s];
+  const w = p.img.naturalWidth || p.img.width, h = p.img.naturalHeight || p.img.height;
+  const k = Math.min(1, s / Math.max(w, h));
+  if(k >= 1){ p._px[s] = p.img; return p.img; }
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+  const g = c.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(p.img, 0, 0, c.width, c.height);
+  p._px[s] = c;
+  return c;
+}
+function proxyGet(p, s){
+  if(p._px && p._px[s]) return p._px[s];
+  if(!gProxyQ.some(q => q.p === p && q.s === s)) gProxyQ.push({ p, s });
+  if(!gProxyBusy){
+    gProxyBusy = true;
+    const idle = window.requestIdleCallback || (f => setTimeout(f, 30));
+    const step = () => {
+      const q = gProxyQ.shift();
+      if(!q){ gProxyBusy = false; if(state.view === 'studio') renderBoard(); return; }
+      if(photos.indexOf(q.p) >= 0) proxyNow(q.p, q.s);
+      idle(step);
+    };
+    idle(step);
+  }
+  return null;
+}
+/* 回転を当てて描く（dw/dh は向き補正後の大きさ） */
+function drawOriented(ctx, src, rot, dx, dy, dw, dh){
+  ctx.save();
+  ctx.translate(dx + dw / 2, dy + dh / 2);
+  if(rot) ctx.rotate(rot * Math.PI / 180);
+  const sw = (rot === 90 || rot === 270);
+  const iw = sw ? dh : dw, ih = sw ? dw : dh;
+  ctx.drawImage(src, -iw / 2, -ih / 2, iw, ih);
+  ctx.restore();
+}
+/* 表示用（フィルタは GRAY 等も当てる。ctx.filter が無い環境は焼いたキャッシュ） */
+function drawPhotoView(ctx, p, dx, dy, dw, dh, size){
+  const fs = filterStr(normFilter(p.filter));
+  let src = proxyNow(p, size);
+  ctx.save();
+  if(fs){ if(CTX_FILTER_OK) ctx.filter = fs; else src = filteredSource(p, false); }
+  drawOriented(ctx, src, p.rot || 0, dx, dy, dw, dh);
+  ctx.restore();
+}
+
+/* ---- 書き出しの画素（元解像度・回転とフィルタを当てて矩形だけ切る） ---- */
+function cropCanvas(p){
+  const c = ensureCrop(p);
+  const { w: W, h: H } = photoNat(p);
+  const sx = Math.round(c.x * W), sy = Math.round(c.y * H);
+  const cw = Math.max(1, Math.round(c.w * W)), ch = Math.max(1, Math.round(c.h * H));
+  const cv = document.createElement('canvas');
+  cv.width = cw; cv.height = ch;
+  const g = cv.getContext('2d');
+  if(gCrop.name.fmt === 'jpg'){ g.fillStyle = '#ffffff'; g.fillRect(0, 0, cw, ch); }   // JPG は透明が黒くなるので白地
+  const fs = filterStr(normFilter(p.filter));
+  let src = p.img;
+  if(fs){ if(CTX_FILTER_OK) g.filter = fs; else src = filteredSource(p, true); }
+  g.imageSmoothingQuality = 'high';
+  g.translate(-sx, -sy);
+  drawOriented(g, src, p.rot || 0, 0, 0, W, H);
+  return cv;
+}
+async function cropBlob(p){
+  const jpg = gCrop.name.fmt === 'jpg';
+  return canvasToBlob(cropCanvas(p), jpg ? 'image/jpeg' : 'image/png', jpg ? gCrop.name.q : undefined);
+}
+
+/* ---- 画面 ---- */
+function cropEnter(pid){
+  if(pid) gCropCur = pid;
+  cropSyncControls();
+  cropRefresh();
+}
+function cropRefresh(){
+  if(state.view !== 'crop'){ if(state.view === 'studio') renderBoard(); return; }
+  const list = cropList();
+  const v = $('#view-crop');
+  v.classList.toggle('empty', !list.length);
+  v.classList.toggle('table', gCrop.layout === 'table');
+  $('#crop-layout').classList.toggle('on', gCrop.layout === 'table');
+  const p = cropCurPhoto();
+  const c = p ? ensureCrop(p) : null;
+  const i = p ? list.indexOf(p) : -1;
+  $('#crop-label').textContent = p ? ('#' + String(i + 1).padStart(2, '0') + ' / ' + list.length) : '—';
+  $('#crop-off').classList.toggle('on', !!(c && c.off));
+  $('#crop-reset').disabled = !(c && c.own && gCrop.base);
+  $('#crop-setbase').disabled = !c;
+  $('#crop-applyall').disabled = !gCrop.base;
+  if(gCrop.layout === 'table') cropRenderTable(); else cropRenderEditor();
+  cropRenderList();
+  cropRenderNameEx();
+}
+function cropSyncControls(){
+  $('#crop-aspect').value = gCrop.aspect;
+  $('#crop-custom').value = gCrop.custom;
+  $('#crop-custom').style.display = gCrop.aspect === 'custom' ? '' : 'none';
+  $('#crop-portrait').classList.toggle('on', !!gCrop.portrait);
+  $('#crop-portrait').disabled = gCrop.aspect === 'free';
+  const n = gCrop.name;
+  $('#crop-name-mode').value = n.mode;
+  $('#crop-prefix').value = n.prefix;
+  $('#crop-start').value = n.start;
+  $('#crop-digits').value = n.digits;
+  $('#crop-fmt').value = n.fmt;
+  $('#crop-q').value = n.q;
+  // 連番以外では「頭・開始・桁」は効かない／PNG では画質は効かない ＝ グレーにする
+  ['#crop-prefix', '#crop-start', '#crop-digits'].forEach(id => { $(id).disabled = n.mode !== 'num'; });
+  $('#crop-q').disabled = n.fmt !== 'jpg';
+  $('#crop-send-mode').value = gCrop.send;
+}
+function cropRenderNameEx(){
+  const inc = cropIncluded();
+  const nm = cropNames(inc, false);
+  const ex = nm.length ? (nm[0] + (nm.length > 1 ? ' … ' + nm[nm.length - 1] : '')) : '—';
+  $('#crop-name-ex').textContent = '書き出す ' + inc.length + ' 枚：' + ex;
+  const note = $('#crop-send-note');
+  const sizes = new Set(inc.map(p => { const s = cropPx(p); return s.w + 'x' + s.h; }));
+  if(gCrop.send === 'seq' && sizes.size > 1){
+    note.textContent = '⚠ 大きさが揃っていません（' + sizes.size + ' 種類）。連番で送ると受け側は1枚目の大きさに合わせて伸び縮みします。一覧の「寸」の印の写真を見直してください（元の写真の大きさや向きが違うと、同じ枠でも画素数が変わります）。';
+    note.classList.add('warn');
+  }else{
+    note.textContent = gCrop.send === 'seq'
+      ? '連番：名前は「頭＋番号」になります（元の名前モードでも）。4枚以上で1つのシーケンス。'
+      : '1枚ずつ：受け側で1枚ずつ別の素材になります。';
+    note.classList.remove('warn');
+  }
+}
+/* 1枚の画面：枠エディタ */
+function cropRenderEditor(){
+  const cv = $('#crop-cv');
+  const host = $('#crop-stage');
+  const dpr = window.devicePixelRatio || 1;
+  const cw = host.clientWidth, ch = host.clientHeight;
+  if(!cw || !ch) return;
+  if(cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)){
+    cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+  }
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, cw, ch);
+  const p = cropCurPhoto();
+  if(!p){ gCropView = null; $('#crop-info').textContent = ''; return; }
+  const { w: W, h: H } = photoNat(p);
+  const m = 28, k = Math.min((cw - m * 2) / W, (ch - m * 2) / H);
+  const dw = W * k, dh = H * k, ox = (cw - dw) / 2, oy = (ch - dh) / 2;
+  gCropView = { ox, oy, dw, dh };
+  g.imageSmoothingQuality = 'high';
+  drawPhotoView(g, p, ox, oy, dw, dh, Math.max(dw, dh) * dpr > 1024 ? 4096 : 1024);
+  const c = (gCropDrag && gCropDrag.p === p) ? gCropDrag.r : ensureCrop(p);
+  if(c){
+    const rx = ox + c.x * dw, ry = oy + c.y * dh, rw = c.w * dw, rh = c.h * dh;
+    // 枠の外を暗く（外したときはもっと暗く）
+    g.fillStyle = (c.off ? 'rgba(7,3,15,0.82)' : 'rgba(7,3,15,0.6)');
+    g.beginPath();
+    g.rect(ox, oy, dw, dh);
+    g.rect(rx, ry, rw, rh);
+    g.fill('evenodd');
+    // 個別のときは基準を破線で重ねる（どれだけずらしたかが見える）
+    const b = (c.own || (gCropDrag && gCropDrag.p === p)) ? cropBaseFor(p) : null;
+    if(b){
+      g.save(); g.setLineDash([6, 5]); g.strokeStyle = 'rgba(255,201,79,0.8)'; g.lineWidth = 1;
+      g.strokeRect(ox + b.x * dw, oy + b.y * dh, b.w * dw, b.h * dh); g.restore();
+    }
+    g.strokeStyle = c.off ? 'rgba(255,79,168,0.9)' : 'rgba(90,233,255,0.95)';
+    g.lineWidth = 1.5;
+    g.strokeRect(rx, ry, rw, rh);
+    g.fillStyle = g.strokeStyle;
+    const hs = 7;
+    [[rx, ry], [rx + rw, ry], [rx, ry + rh], [rx + rw, ry + rh]].forEach(([x, y]) => g.fillRect(x - hs / 2, y - hs / 2, hs, hs));
+    const px = { w: Math.round(c.w * W), h: Math.round(c.h * H) };
+    $('#crop-info').innerHTML = '';
+    const tag = c.off ? '外す' : (c.own ? '個別' : '基準');
+    $('#crop-info').textContent = (p.name || 'photo') + '　出力 ' + px.w + '×' + px.h + ' px　［' + tag + '］';
+  }else{
+    $('#crop-info').textContent = (p.name || 'photo') + '　ドラッグで切り出す範囲を描くと、それが全部の写真の基準になります';
+  }
+}
+/* 表：カラースクリプト風の全幅グリッド（D&D で並べ替え・Wクリックで1枚へ） */
+function cropRenderTable(){
+  const box = $('#crop-table');
+  box.innerHTML = '';
+  const list = cropList(), inc = cropIncluded(), names = cropNames(inc, false);
+  list.forEach((p, i) => {
+    const c = ensureCrop(p);
+    const card = document.createElement('div');
+    card.className = 'ct-card' + (p.id === gCropCur ? ' cur' : '') + (c && c.off ? ' off' : '');
+    card.draggable = true;
+    card.dataset.id = p.id;
+    card.appendChild(cropThumb(p, 200, 130));
+    const k = inc.indexOf(p);
+    const nm = document.createElement('div');
+    nm.className = 'nm';
+    nm.innerHTML = '<b>#' + String(i + 1).padStart(2, '0') + '</b>';
+    nm.appendChild(document.createTextNode(k >= 0 ? names[k] : '（外す）'));
+    card.appendChild(nm);
+    card.addEventListener('click', () => { gCropCur = p.id; cropRefresh(); });
+    card.addEventListener('dblclick', () => { gCropCur = p.id; gCrop.layout = 'single'; cropRefresh(); saveCropUi(); });
+    card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/x-crop', p.id); e.dataTransfer.effectAllowed = 'move'; });
+    card.addEventListener('dragover', e => { if([...e.dataTransfer.types].includes('text/x-crop')){ e.preventDefault(); card.classList.add('dragover'); } });
+    card.addEventListener('dragleave', () => card.classList.remove('dragover'));
+    card.addEventListener('drop', e => {
+      const id = e.dataTransfer.getData('text/x-crop');
+      card.classList.remove('dragover');
+      if(!id || id === p.id) return;
+      e.preventDefault(); e.stopPropagation();
+      cropMoveTo(id, cropList().indexOf(p));
+    });
+    box.appendChild(card);
+  });
+}
+/* 枠の中だけを小さく描いたキャンバス（一覧と表で使う） */
+function cropThumb(p, tw, th){
+  const cv = document.createElement('canvas');
+  cv.width = tw; cv.height = th;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#07030f'; g.fillRect(0, 0, tw, th);
+  const c = ensureCrop(p) || { x: 0, y: 0, w: 1, h: 1 };
+  const { w: W, h: H } = photoNat(p);
+  const cwp = c.w * W, chp = c.h * H;
+  const k = Math.min(tw / cwp, th / chp);
+  const dw = W * k, dh = H * k;
+  const ox = (tw - cwp * k) / 2 - c.x * dw, oy = (th - chp * k) / 2 - c.y * dh;
+  g.save();
+  g.beginPath(); g.rect((tw - cwp * k) / 2, (th - chp * k) / 2, cwp * k, chp * k); g.clip();
+  drawPhotoView(g, p, ox, oy, dw, dh, 1024);
+  g.restore();
+  return cv;
+}
+/* 右の一覧：番号・元の名前 → 出力名・寸法・基準/個別/外す・⇩・▲▼ */
+function cropRenderList(){
+  const box = $('#crop-list');
+  box.innerHTML = '';
+  const list = cropList(), inc = cropIncluded(), names = cropNames(inc, false);
+  const sizeOf = p => { const s = cropPx(p); return s ? s.w + '×' + s.h : '—'; };
+  // 一番多い寸法と違うものに印（連番で送るときの注意）
+  const cnt = {};
+  inc.forEach(p => { const s = sizeOf(p); cnt[s] = (cnt[s] || 0) + 1; });
+  const major = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+  $('#crop-count').textContent = inc.length + ' / ' + list.length + ' 枚' + (Object.keys(cnt).length > 1 ? '・大きさ ' + Object.keys(cnt).length + ' 種類' : '');
+  list.forEach((p, i) => {
+    const c = ensureCrop(p);
+    const row = document.createElement('div');
+    row.className = 'cl-row' + (p.id === gCropCur ? ' cur' : '') + (c && c.off ? ' off' : '');
+    row.appendChild(cropThumb(p, 64, 44));
+    const k = inc.indexOf(p);
+    const tx = document.createElement('div');
+    tx.className = 'tx';
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = '#' + String(i + 1).padStart(2, '0') + ' ';
+    const s = document.createElement('span'); s.className = 's'; s.textContent = sizeOf(p);
+    const f = document.createElement('span'); f.className = 'f';
+    f.textContent = (p.name || 'photo') + ' → ' + (k >= 0 ? names[k] : '（書き出さない）');
+    f.title = f.textContent;
+    tx.appendChild(n); tx.appendChild(s); tx.appendChild(f);
+    row.appendChild(tx);
+    const tag = document.createElement('span');
+    tag.className = 'tag' + (!c ? '' : c.off ? ' offt' : c.own ? ' own' : '');
+    tag.textContent = !c ? '枠なし' : c.off ? '外す' : c.own ? '個別' : '基準';
+    row.appendChild(tag);
+    if(k >= 0 && sizeOf(p) !== major){
+      const mis = document.createElement('span'); mis.className = 'tag mis'; mis.textContent = '寸';
+      mis.title = '他と大きさが違います（連番で送るときは注意）';
+      row.appendChild(mis);
+    }
+    const mk = (t, title, fn) => {
+      const b = document.createElement('button');
+      b.className = 'btn mini'; b.textContent = t; b.title = title;
+      b.addEventListener('click', e => { e.stopPropagation(); fn(); });
+      row.appendChild(b);
+    };
+    mk('⇩', 'この1枚を書き出す', () => cropExportOne(p));
+    mk('▲', '前へ', () => cropMoveTo(p.id, i - 1));
+    mk('▼', '後ろへ', () => cropMoveTo(p.id, i + 1));
+    row.addEventListener('click', () => { gCropCur = p.id; cropRefresh(); });
+    box.appendChild(row);
+  });
+}
+function cropMoveTo(id, to){
+  const list = cropList().map(p => p.id);
+  const from = list.indexOf(id);
+  to = clamp(to, 0, list.length - 1);
+  if(from < 0 || from === to) return;
+  const before = cropSnap();
+  list.splice(from, 1);
+  list.splice(to, 0, id);
+  gCrop.order = list;
+  cropCommit(before);
+}
+function cropStep(d){
+  const list = cropList();
+  if(!list.length) return;
+  const i = list.findIndex(p => p.id === gCropCur);
+  gCropCur = list[clamp((i < 0 ? 0 : i) + d, 0, list.length - 1)].id;
+  cropRefresh();
+}
+/* ---- 枠エディタの操作（角＝拡縮・中＝移動・外＝描き直し・ホイール＝中心で拡縮） ---- */
+function cropToNorm(e){
+  const r = $('#crop-cv').getBoundingClientRect(), v = gCropView;
+  return { u: (e.clientX - r.left - v.ox) / v.dw, v: (e.clientY - r.top - v.oy) / v.dh };
+}
+/* 固定した角 (ax,ay) と指の位置 (u,v) から枠を作る。比があれば画素で合わせて写真の中へ */
+function cropFromAnchor(ax, ay, u, v, W, H){
+  u = clamp(u, 0, 1); v = clamp(v, 0, 1);
+  let w = Math.abs(u - ax), h = Math.abs(v - ay);
+  const A = cropAspect();
+  if(A){
+    let wp = w * W, hp = h * H;
+    if(wp / Math.max(hp, 1e-9) > A) hp = wp / A; else wp = hp * A;
+    w = wp / W; h = hp / H;
+    const maxW = u < ax ? ax : 1 - ax, maxH = v < ay ? ay : 1 - ay;   // 写真の外へ出ないように比を保って縮める
+    const s = Math.min(1, maxW / Math.max(w, 1e-9), maxH / Math.max(h, 1e-9));
+    w *= s; h *= s;
+  }
+  w = Math.max(w, 0.002); h = Math.max(h, 0.002);
+  return { x: u < ax ? ax - w : ax, y: v < ay ? ay - h : ay, w, h };
+}
+function cropDown(e){
+  const p = cropCurPhoto();
+  if(!p || !gCropView) return;
+  try{ $('#crop-cv').setPointerCapture(e.pointerId); }catch(err){}
+  const { u, v } = cropToNorm(e);
+  const c = ensureCrop(p);
+  const { w: W, h: H } = photoNat(p);
+  const tol = 10 / Math.min(gCropView.dw, gCropView.dh);
+  const base = { before: cropSnap(), p, W, H, sx: u, sy: v };
+  if(c){
+    const corners = [[c.x, c.y, c.x + c.w, c.y + c.h], [c.x + c.w, c.y, c.x, c.y + c.h],
+                     [c.x, c.y + c.h, c.x + c.w, c.y], [c.x + c.w, c.y + c.h, c.x, c.y]];
+    for(const [cx, cy, ax, ay] of corners){
+      if(Math.abs(u - cx) < tol && Math.abs(v - cy) < tol){
+        gCropDrag = Object.assign(base, { mode: 'corner', ax, ay, r: Object.assign({}, c) });
+        return;
+      }
+    }
+    if(u >= c.x && u <= c.x + c.w && v >= c.y && v <= c.y + c.h){
+      gCropDrag = Object.assign(base, { mode: 'move', o: Object.assign({}, c), r: Object.assign({}, c) });
+      return;
+    }
+  }
+  gCropDrag = Object.assign(base, { mode: 'new', ax: clamp(u, 0, 1), ay: clamp(v, 0, 1),
+                                    r: Object.assign({ x: clamp(u, 0, 1), y: clamp(v, 0, 1), w: 0.002, h: 0.002 }, { own: !!(c && c.own), off: !!(c && c.off) }) });
+}
+function cropMove(e){
+  const d = gCropDrag;
+  if(!d) return;
+  const { u, v } = cropToNorm(e);
+  if(d.mode === 'move'){
+    d.r.x = clamp(d.o.x + (u - d.sx), 0, 1 - d.o.w);
+    d.r.y = clamp(d.o.y + (v - d.sy), 0, 1 - d.o.h);
+  }else{
+    Object.assign(d.r, cropFromAnchor(d.ax, d.ay, u, v, d.W, d.H));
+  }
+  cropRenderEditor();
+}
+function cropUp(){
+  const d = gCropDrag;
+  if(!d) return;
+  gCropDrag = null;
+  const tiny = d.r.w * d.W < 8 || d.r.h * d.H < 8;   // クリックだけ（描いていない）は何もしない
+  if(d.mode === 'new' && tiny){ cropRenderEditor(); return; }
+  cropSetRect(d.p, d.r);
+  cropCommit(d.before);
+}
+/* 枠を決めた。基準がまだ無ければこれが基準になって全写真に当たる。あれば「個別」 */
+function cropSetRect(p, r){
+  const rr = { x: r.x, y: r.y, w: r.w, h: r.h };
+  if(!gCrop.base){
+    const { w: W, h: H } = photoNat(p);
+    gCrop.base = Object.assign({}, rr, { ar: W / H });
+    p.crop = Object.assign(rr, { own: false, off: !!(p.crop && p.crop.off) });
+    cropApplyBase(false);
+    toast('この枠を基準にして ' + photos.length + ' 枚に当てました（1枚ずつ直すとその写真だけ「個別」）');
+    return;
+  }
+  p.crop = Object.assign(rr, { own: true, off: !!(p.crop && p.crop.off) });
+}
+function cropWheel(e){
+  e.preventDefault();
+  const p = cropCurPhoto();
+  const c = p && ensureCrop(p);
+  if(!c) return;
+  const before = cropSnap();
+  const { w: W, h: H } = photoNat(p);
+  const f = Math.exp(e.deltaY * 0.0012);
+  const r = cropFit({ x: c.x + c.w / 2 - c.w * f / 2, y: c.y + c.h / 2 - c.h * f / 2, w: c.w * f, h: c.h * f }, W, H, cropAspect() || (c.w * W) / (c.h * H));
+  cropSetRect(p, r);
+  cropCommitSoon(before);
+}
+/* ホイール・矢印の連打は1手にまとめる（最後に止まってから 400ms） */
+let gCropSoon = null;
+function cropCommitSoon(before){
+  if(!gCropSoon) gCropSoon = { before };
+  clearTimeout(gCropSoon.t);
+  cropRefresh();
+  gCropSoon.t = setTimeout(() => { const b = gCropSoon.before; gCropSoon = null; cropCommit(b); }, 400);
+}
+function cropNudge(dx, dy, scale){
+  const p = cropCurPhoto();
+  const c = p && ensureCrop(p);
+  if(!c) return;
+  const before = cropSnap();
+  const { w: W, h: H } = photoNat(p);
+  let r = { x: c.x + dx, y: c.y + dy, w: c.w, h: c.h };
+  if(scale) r = { x: c.x + c.w / 2 - c.w * scale / 2, y: c.y + c.h / 2 - c.h * scale / 2, w: c.w * scale, h: c.h * scale };
+  r = cropFit(r, W, H, cropAspect() || (c.w * W) / (c.h * H));
+  cropSetRect(p, r);
+  cropCommitSoon(before);
+}
+/* ---- ボタン ---- */
+function cropSetBase(){
+  const p = cropCurPhoto();
+  const c = p && ensureCrop(p);
+  if(!c) return;
+  const before = cropSnap();
+  const { w: W, h: H } = photoNat(p);
+  gCrop.base = { x: c.x, y: c.y, w: c.w, h: c.h, ar: W / H };
+  c.own = false;
+  cropApplyBase(false);
+  cropCommit(before);
+  toast('いまの枠を基準にしました（個別にしていない写真が揃いました）');
+}
+async function cropApplyAll(){
+  if(!gCrop.base) return;
+  const own = photos.filter(p => p.crop && p.crop.own).length;
+  if(own && !(await modalConfirm('基準の枠を全部の写真に当てます。\n個別に直した ' + own + ' 枚も上書きされます（Ctrl+Z で戻せます）。'))) return;
+  const before = cropSnap();
+  cropApplyBase(true);
+  cropCommit(before);
+  toast('基準を ' + photos.length + ' 枚に当てました');
+}
+function cropResetOne(){
+  const p = cropCurPhoto();
+  if(!p || !gCrop.base) return;
+  const before = cropSnap();
+  const r = cropBaseFor(p);
+  p.crop = Object.assign(r, { own: false, off: !!(p.crop && p.crop.off) });
+  cropCommit(before);
+}
+function cropToggleOff(){
+  const p = cropCurPhoto();
+  const c = p && ensureCrop(p);
+  if(!c){ toast('まだ枠がありません（ドラッグで描いてください）'); return; }
+  const before = cropSnap();
+  c.off = !c.off;
+  cropCommit(before);
+  toast(c.off ? 'この写真は書き出しません（枠は残っています）' : '書き出しに戻しました');
+}
+function cropSetAspect(v, custom, portrait){
+  const before = cropSnap();
+  if(v !== undefined) gCrop.aspect = v;
+  if(custom !== undefined) gCrop.custom = custom;
+  if(portrait !== undefined) gCrop.portrait = portrait;
+  const A = cropAspect();
+  if(A){
+    for(const p of photos){
+      if(!p.crop) continue;
+      const { w: W, h: H } = photoNat(p);
+      Object.assign(p.crop, cropFit(p.crop, W, H, A));
+    }
+    if(gCrop.base) Object.assign(gCrop.base, cropFit(gCrop.base, gCrop.base.ar, 1, A));
+  }
+  cropSyncControls();
+  cropCommit(before);
+}
+function saveCropUi(){ scheduleSave(); }
+
+/* ---- 書き出し ---- */
+async function cropExportOne(p){
+  p = p || cropCurPhoto();
+  const c = p && ensureCrop(p);
+  if(!c){ toast('まだ枠がありません'); return; }
+  const inc = cropIncluded(), k = inc.indexOf(p);
+  const name = k >= 0 ? cropNames(inc, false)[k] : cropNames([p], false)[0];
+  downloadBlob(await cropBlob(p), name);
+  toast(name + ' を書き出しました（' + cropPx(p).w + '×' + cropPx(p).h + '）');
+}
+async function cropExportZip(){
+  const inc = cropIncluded();
+  if(!inc.length){ toast('書き出す写真がありません（枠を描くか「外す」を戻してください）'); return; }
+  try{
+    toast(inc.length + ' 枚をまとめています…');
+    await loadJSZip();
+    const zip = new window.JSZip();
+    const names = cropNames(inc, false);
+    for(let i = 0; i < inc.length; i++) zip.file(names[i], await cropBlob(inc[i]));
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+    downloadBlob(blob, stampName('econte_crop', 'zip'));
+    toast(inc.length + ' 枚を ZIP にしました（' + Math.round(blob.size / 1024) + 'KB）');
+  }catch(e){ toast('ZIP にできませんでした：' + (e.message || e)); }
+}
+async function cropExportDir(){
+  const inc = cropIncluded();
+  if(!inc.length){ toast('書き出す写真がありません'); return; }
+  if(!window.showDirectoryPicker){ toast('このブラウザはフォルダへ直接は書けません — ZIP にします'); cropExportZip(); return; }
+  let dir;
+  try{ dir = await window.showDirectoryPicker({ mode: 'readwrite' }); }catch(e){ return; }   // 選ばずに閉じた
+  const names = cropNames(inc, false);
+  const exist = [];
+  for(const nm of names){ try{ await dir.getFileHandle(nm); exist.push(nm); }catch(e){} }
+  let skip = false;
+  if(exist.length){
+    const pick = await modalPick('同じ名前のファイルが ' + exist.length + ' 件あります（' + exist.slice(0, 3).join('、') + (exist.length > 3 ? ' …' : '') + '）。\nどうしますか？（キャンセル＝やめる）',
+                                 ['上書きする', '飛ばす（いまあるファイルを残す）']);
+    if(pick === null) return;
+    skip = pick === 1;
+  }
+  let ok = 0, skipped = 0;
+  const fail = [];
+  for(let i = 0; i < inc.length; i++){
+    if(skip && exist.indexOf(names[i]) >= 0){ skipped++; continue; }
+    try{
+      const fh = await dir.getFileHandle(names[i], { create: true });
+      const w = await fh.createWritable();
+      await w.write(await cropBlob(inc[i]));
+      await w.close();
+      ok++;
+    }catch(e){ fail.push(names[i] + '（' + (e.message || e) + '）'); }
+  }
+  if(fail.length) modalConfirm('書けなかったもの ' + fail.length + ' 件：\n' + fail.slice(0, 12).join('\n'));
+  toast(ok + ' 枚をフォルダへ書き出しました' + (skipped ? '（' + skipped + ' 枚は飛ばしました）' : '') + (fail.length ? '・失敗 ' + fail.length : ''));
+}
+
+/* ---- 直送（OBAN / LIVE PLATE）。共有 IDB tdr_crop_push に宛先ごと1件（上書き） ----
+   tdr_exchange は使わない（他のアプリが getAll して PROJECT_v1 だと思って読むため）。
+   通知は localStorage（閉じているタブは次に開いたとき）＋ BroadcastChannel（開いているタブ）。
+   1.5 秒で crop-ack が来なければ「開くと受け取ります」 */
+const CROP_PUSH_DB = 'tdr_crop_push';
+const CROP_TARGETS = { oban: { name: 'OBAN', url: 'oban-builder.html', route: 'ec-ob' },
+                       liveplate: { name: 'LIVE PLATE', url: 'live-plate/index.html', route: 'ec-lp' } };
+let gCropChan = null;
+function cropPushDB(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(CROP_PUSH_DB, 1);
+    r.onupgradeneeded = () => { const d = r.result; if(!d.objectStoreNames.contains('push')) d.createObjectStore('push', { keyPath: 'id' }); };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+/* L5 と同じ形の送受信記録（LINK MAP が読む） */
+function linkLog(rt, kind, msg){
+  try{ localStorage.setItem('tdr_link_log_v1:' + rt + ':' + kind,
+    JSON.stringify({ t: new Date().toISOString(), app: 'ECONTE', msg: String(msg).slice(0, 160) })); }catch(e){}
+}
+async function cropSend(target){
+  const T = CROP_TARGETS[target];
+  const inc = cropIncluded();
+  if(!inc.length){ toast('送る写真がありません（枠を描くか「外す」を戻してください）'); return; }
+  const mode = gCrop.send;
+  const names = cropNames(inc, mode === 'seq');   // 連番で送るときは名前モードに関係なく番号名
+  toast(T.name + ' へ ' + inc.length + ' 枚を用意しています…');
+  const files = [];
+  for(let i = 0; i < inc.length; i++){
+    const blob = await cropBlob(inc[i]);
+    const s = cropPx(inc[i]);
+    files.push({ name: names[i], type: blob.type, blob, w: s.w, h: s.h });
+  }
+  const ts = Date.now();
+  try{
+    const d = await cropPushDB();
+    await new Promise((res, rej) => { const tx = d.transaction('push', 'readwrite'); tx.objectStore('push').put({ id: target, v: 1, ts, from: 'ECONTE', mode, files }); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }catch(e){ toast('送れませんでした（共有DBに書けない）：' + (e.message || e)); return; }
+  try{ localStorage.setItem('tdr_crop_inbox_v1:' + target, JSON.stringify({ v: 1, ts, n: files.length, mode })); }catch(e){}
+  const sizes = [...new Set(files.map(f => f.w + '×' + f.h))];
+  linkLog(T.route, 'send', files.length + ' 枚・' + (mode === 'seq' ? '連番 ' : '1枚ずつ ') + names[0] + (sizes.length === 1 ? '・' + sizes[0] : '・大きさ ' + sizes.length + ' 種類'));
+  const ack = await new Promise(res => {
+    let done = false;
+    const fin = v => { if(done) return; done = true; if(gCropChan) gCropChan.removeEventListener('message', on); res(v); };
+    const on = ev => { const m = ev.data; if(m && m.type === 'crop-ack' && m.target === target && m.ts === ts) fin(m); };
+    if(gCropChan){ gCropChan.addEventListener('message', on); gCropChan.postMessage({ type: 'crop-push', target, ts }); }
+    setTimeout(() => fin(null), 1500);
+  });
+  if(ack){ toast(T.name + ' に ' + files.length + ' 枚入りました'); return; }
+  if(await modalConfirm(T.name + ' はまだ開いていないようです。\n開くと受け取ります（' + files.length + ' 枚・' + (mode === 'seq' ? '連番' : '1枚ずつ') + '）。\n\n' + T.name + ' を新しいタブで開きますか？')){
+    window.open(T.url, '_blank');
+  }
+}
+
+/* ---- キー（CROP 中だけ。onKey の global の直後から呼ぶ） ---- */
+function cropKey(e){
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
+  if(k === 'ArrowLeft' || k === 'ArrowRight' || k === 'ArrowUp' || k === 'ArrowDown'){
+    e.preventDefault();
+    if(e.shiftKey){
+      const p = cropCurPhoto(); if(!p) return;
+      const { w: W, h: H } = photoNat(p);
+      const st = 4;   // 画素
+      cropNudge(k === 'ArrowLeft' ? -st / W : k === 'ArrowRight' ? st / W : 0, k === 'ArrowUp' ? -st / H : k === 'ArrowDown' ? st / H : 0, 0);
+    }else if(k === 'ArrowLeft' || k === 'ArrowUp') cropStep(-1);
+    else cropStep(1);
+    return;
+  }
+  if(k === '+' || k === '=' || k === ';'){ e.preventDefault(); cropNudge(0, 0, 1.05); return; }
+  if(k === '-' || k === '_'){ e.preventDefault(); cropNudge(0, 0, 1 / 1.05); return; }
+  if(k === 'r' || k === 'R'){ e.preventDefault(); cropResetOne(); return; }
+  if(k === 'Delete' || k === 'Backspace'){ e.preventDefault(); cropToggleOff(); return; }
+  if(k === 'q' || k === 'Q'){ e.preventDefault(); gCrop.layout = gCrop.layout === 'table' ? 'single' : 'table'; cropRefresh(); saveCropUi(); return; }
+  if(k === 'Escape'){ e.preventDefault(); setView('studio'); }
+}
+function wireCrop(){
+  $('#btn-view-crop').addEventListener('click', () => setView('crop'));
+  $('#btn-board-crop').addEventListener('click', () => { if(state.selPhoto) gCropCur = state.selPhoto; setView('crop'); });
+  $('#btn-import-lay').addEventListener('click', () => {
+    gUi.importLay = gUi.importLay === 'stack' ? 'grid' : 'stack';
+    syncImportLay(); saveUi();
+    toast(gUi.importLay === 'stack' ? '取り込み：重ねる（同じ画角を比べるとき）' : '取り込み：格子に並べる');
+  });
+  syncImportLay();
+  const cv = $('#crop-cv');
+  cv.addEventListener('pointerdown', cropDown);
+  cv.addEventListener('pointermove', cropMove);
+  cv.addEventListener('pointerup', cropUp);
+  cv.addEventListener('pointercancel', cropUp);
+  cv.addEventListener('wheel', cropWheel, { passive: false });
+  $('#crop-prev').addEventListener('click', () => cropStep(-1));
+  $('#crop-next').addEventListener('click', () => cropStep(1));
+  $('#crop-aspect').addEventListener('change', e => cropSetAspect(e.target.value));
+  $('#crop-custom').addEventListener('change', e => cropSetAspect(undefined, e.target.value));
+  $('#crop-portrait').addEventListener('click', () => cropSetAspect(undefined, undefined, !gCrop.portrait));
+  $('#crop-setbase').addEventListener('click', cropSetBase);
+  $('#crop-applyall').addEventListener('click', cropApplyAll);
+  $('#crop-reset').addEventListener('click', cropResetOne);
+  $('#crop-off').addEventListener('click', cropToggleOff);
+  $('#crop-layout').addEventListener('click', () => { gCrop.layout = gCrop.layout === 'table' ? 'single' : 'table'; cropRefresh(); saveCropUi(); });
+  const nm = () => {
+    const n = gCrop.name;
+    n.mode = $('#crop-name-mode').value === 'src' ? 'src' : 'num';
+    n.prefix = String($('#crop-prefix').value || '').replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
+    n.start = Math.max(0, parseInt($('#crop-start').value, 10) || 0);
+    n.digits = clamp(parseInt($('#crop-digits').value, 10) || 4, 1, 8);
+    n.fmt = $('#crop-fmt').value === 'jpg' ? 'jpg' : 'png';
+    n.q = clamp(parseFloat($('#crop-q').value) || 0.92, 0.5, 1);
+    cropSyncControls(); cropRefresh(); saveCropUi();
+  };
+  ['#crop-name-mode', '#crop-prefix', '#crop-start', '#crop-digits', '#crop-fmt', '#crop-q'].forEach(id => $(id).addEventListener('change', nm));
+  $('#crop-send-mode').addEventListener('change', e => { gCrop.send = e.target.value === 'still' ? 'still' : 'seq'; cropRefresh(); saveCropUi(); });
+  $('#crop-dl-one').addEventListener('click', () => cropExportOne());
+  $('#crop-dl-dir').addEventListener('click', cropExportDir);
+  $('#crop-dl-zip').addEventListener('click', cropExportZip);
+  $('#crop-send-oban').addEventListener('click', () => cropSend('oban'));
+  $('#crop-send-lp').addEventListener('click', () => cropSend('liveplate'));
+  // CROP への D&D ＝ BOARD に並べて、そのまま CROP で開く
+  const v = $('#view-crop');
+  v.addEventListener('dragover', e => { if(e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+  v.addEventListener('drop', async e => {
+    if(!(e.dataTransfer && e.dataTransfer.files.length)) return;
+    e.preventDefault();
+    const added = await importFiles([...e.dataTransfer.files], null);
+    if(added.length){ gCropCur = added[0].id; cropRefresh(); }
+  });
+  try{ gCropChan = new BroadcastChannel('tdr_crop'); }catch(e){ gCropChan = null; }
+}
+function syncImportLay(){
+  const b = $('#btn-import-lay');
+  b.innerHTML = gUi.importLay === 'stack' ? '&#10697; 重ねる' : '&#8862; 格子';
+}
+
 async function init(){
   wire();
+  wireCrop();
   loadKeymap();
   loadPalette();
   loadUi();

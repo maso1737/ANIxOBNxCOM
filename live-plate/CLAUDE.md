@@ -65,6 +65,7 @@ P2＝ペン／消し／バケツ（線が壁・1px 潜る）／投げ縄／ス�
 ## 変えない約束（SPEC_21 §2 の実装側の言い方）
 
 1. **BOOK が唯一のデータ。** `LP.state` は「いまどこを見ているか」だけ。送る／取り込む／同期は作らない。
+   **例外は1つだけ（2026-11-05・SPEC_24）**：ECONTE CROP からの受け箱（`js/io/import.js` の `setupCropInbox`）。共有 IDB `tdr_crop_push` の `'liveplate'` を**素材棚へ取り込むだけの一方通行**（取り込んだら消す・`crop-ack` を返す）。`tdr_live` / `tdr_exchange` には今も参加しない
 2. **描画は `renderFrame` 1本。** ステージ・SHEETS のサムネ・PLAY・HTML ビューア・VRT が全部これを通る。
    新しい見え方を足すときは `view.mode` を足すか、既存モードの上に UI を重ねる（合成を別に書かない）。
 3. **セル番号の式は `time.js` の `cellIndexAt` 1か所。** タイムラインの線の行もこれで並べている。

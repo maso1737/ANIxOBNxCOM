@@ -19,7 +19,8 @@
   相互リンク: 新UI = ⚙ SETTINGS ▸ FILE／連携 の `CLASSIC UI`（`#b-classic`）／ 従来版 = `#bar-right` の `NEW UI`（`#b-se`）
 - `composer.html` — マルチトラック合成（カメラ/キーフレーム/書き出し）
 - `manga-plate.html` — **MANGA PLATE v2。漫画ページ＆コマ割り**（ジャンプ規定B4 600dpi・多角形コマの縦/横/斜め分割・コマ内マスク・境界効果・ページ一覧・**左右見開き作業**・グレー→網点。SPEC_09 §v2 / §v2-6b）
-- `econte.html` — ECONTE。プリプロ（紙ネーム写真→BOARD切り出し→SHEET絵コンテ→加筆。SPEC_10。パイプライン上は animator の前）
+- `econte.html` — ECONTE。プリプロ（紙ネーム写真→BOARD切り出し→SHEET絵コンテ→加筆。SPEC_10。パイプライン上は animator の前）。
+  **2026-11-05〜 3つ目の画面 CROP（キー 3・SPEC_24）**：写真ごとに切り出し枠 `p.crop`（向き補正後の 0..1）を決めて元解像度のまま一括書き出し（1枚／フォルダ／ZIP）・OBAN／LIVE PLATE へ直送（共有 IDB `tdr_crop_push`＋`BroadcastChannel('tdr_crop')`）。全体設定は `gCrop`（IDB meta `main` と PROJ ZIP `meta.crop`）。取り込みは2枚以上で格子に並べる（BOARD の ⊞／⧉ で重ねるに切替）・BOARD の表示は 256／1024px の縮小版（ベイクと書き出しは原寸）
 - `brush-lab.html` — **BRUSH LAB（TOOL MECHANICS LAB_05）。econte にブラシを増やす前の設計レビュー用ラボ**。
   PENCIL/MARKER/FLAT/AIR/GLOW/GRIT の6プリセット＋Procreate風パラメータ23個＋筆先PNGのドロップ。
   PAINT / SPLIT（**econte 現行の硬い丸ペンと並べて比較**）/ SHEET の3モード。
@@ -56,7 +57,7 @@
   **econte へ `→ECONTE` でリファレンスを送る送り手**（受け側の契約は SPEC_13 §2-1a / §2-1a-2）。
   データは `localStorage['refboard.v1']` にしか無く、**HTMLファイル自体に個人データは1件も含まれない**（下の「公開リポジトリ」参照）。
   設計メモは [Tools/ref-board/CLAUDE.md](../Tools/ref-board/CLAUDE.md)（本体はこちら、資料はあちら）
-- `link-map.html` — **LINK MAP。アプリ間の連携マップ**（GLOSSテーマ・ノード6つと11ルート。
+- `link-map.html` — **LINK MAP。アプリ間の連携マップ**（GLOSSテーマ・ノード7つと13ルート。2026-11-05 に LIVE PLATE ノードと ECONTE→OBAN／ECONTE→LIVE PLATE を追加。
   矢印/ノードをクリックで手順が出て、やってみたらチェック→全部で CLEAR。進捗は `localStorage['linkmap_done_v1']`）。
   **2026-11-04〜 各ルートに「最後の送信／最後の受信」**（時刻・アプリ・中身1行。各アプリが `localStorage['tdr_link_log_v1:<ルート>:<send|recv>']` に書いたものを読むだけ・完了チェックには使わない）。
   **中身は `GUIDE_MANGA_LINKS.md` と同じ情報＝連携を変えたら両方直す**
@@ -89,7 +90,7 @@
 
 手順書（人間向け・ボタン名で追える）:
 `GUIDE_MANGA_LINKS.md` … ANIMATOR⇄MANGA PLATE⇄OBAN/COMPOSER。**連携ボタンの表記を変えたら更新**
-`link-map.html` … 上の内容を絵にしたもの（6アプリ・11ルート。ECONTE だけ未接続＝破線。ROUGH→ANIMATOR は 2026-10-15 追加）。**同じく表記変更で更新**
+`link-map.html` … 上の内容を絵にしたもの（7アプリ・13ルート。ECONTE だけ未接続＝破線。ROUGH→ANIMATOR は 2026-10-15 追加）。**同じく表記変更で更新**
 
 仕様（SPEC）— 状態は 2026-09-02 時点:
 
@@ -114,6 +115,7 @@
 | `SPEC_20_ANIMATOR_LINE_FILL` | ANIMATOR：コマを**線＋塗の2レーン**（1本のタイムライン）・塗りは線を壁にして1px潜る・**REF レーン**（帯・`offset`/`×N`）・SEQ PNG 4択・econte の変形（`箱+rot+warp`）移植・UI は**現行デザインのまま** | **P0〜P4 実装済**（2026-09-23）。レーン見出し列・REF レーン（offset/×N）・SEQ PNG 4択・EXPORT JSON `layers`・SEL（A キー・AA OFF はニアレスト焼き込み）。残りは §7-9 の任意項目と実機確認だけ |
 | `SPEC_22_ROUGH` | **ラフ原専用アプリ ROUGH**（`rough.html`）：レーン1本・13色（色番号で持つ）・SEL の「次のコマへ ▶」・REF コラージュ・ドック式 UI・→ ANIMATOR REF（受け箱） | **P0 実装済**（2026-10-15）。残りは iPad 実機・VRT・link-map への追加（§12） |
 | `SPEC_21_LIVE_PLATE` | **一本化アプリ LIVE PLATE の設計・仕様**。5本を足すのではなく「1つの BOOK に4つの見方（SHEET/DRAW/TAKE/SHOW）」。プレート（SPEC_19）・線＋塗（SPEC_20）・composer の透視式・OBAN の手つき・新 OBAN 規約を土台に、連携（10ルート・3チャンネル）を構造ごと消す。複数ファイル・ビルド無し | **P0 骨格・P1 SHEET・BOOK zip 実装済**（2026-09-24・`live-plate/`。§15＝P0・§16＝P1 に決めたことと動作チェック表）。**P2 DRAW 実装済**（2026-09-26・§17）＋ **P2 の残り（ブラシ・トーンインク・パレット・GRID）実装済**（2026-11-01・§18。残りは iPad／ペン）＋ **P3a TAKE 実装済**（2026-11-03・§19：カメラ KF・繋ぎ・画ブレ・MONITOR・VIDEO）。次は P3b（DOF・FX・AE JSX・旧3形式）。起草 2026-09-18。§13 の発注者判断は2026-09-24に**全7件確定**（旧5本は凍結せず並行して極め続ける／名前LIVE PLATE／用紙SCREEN 3840×2160／テーマSPOTLIGHTのみ・他テーマ当面無し／複数ファイル・ビルド無し／P0はPC専念・iPadは旧アプリの知見が固まってから統一／置き場所`live-plate/`。詳細はSPEC_21 §13） |
+| `SPEC_24_ECONTE_CROP` | econte の3つ目の画面 **CROP**：写真ごとの可変枠クロップ・基準枠（最初の枠が全写真に当たる／直すと個別）・一括書き出し・OBAN／LIVE PLATE 直送・取り込みの格子並べ・BOARD の縮小版表示 | **実装済**（2026-11-05）。残りは iPad 実機・フォルダ書き出しの実機確認 |
 | **`SPEC_23_MOTION_COMIC_NORTH_STAR`** | **北極星＝「作りたいもの」**。プロのモーションコミック2本（NARUTO 公式 DVD 特典 OP・DB40）の実測から逆算：動きの正体は層×カメラ×繋ぎ×紙の刷り＋1カットの3D。足りないもの R1〜R9（層を切る・層の演技・コマ打ち・画ブレ・2色刷り・繋ぎ・流れる線・粒・立体の受け渡し）と載せ先（LIVE PLATE）・ラボ L1〜L6・試金石 T1〜T4 | **設計だけ**（2026-11-02）。§9 の判断待ち（立体は Blender で撮る案を推奨）。**各 SPEC より上位の「何のために作るか」** |
 | `MOTION_COMIC_SPEC` | composer モーションコミック | Phase 1〜3 済／**Phase 4〜5 要判定** |
 | `EXPORT_WEB_SPEC` | スクロールビューアHTML書き出し | 実装済 |

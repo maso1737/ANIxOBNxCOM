@@ -172,7 +172,52 @@ LP.io = LP.io || {};
     if(el.closest('#timeline')) return 'timeline';
     return 'stage';
   }
+  /* ---- SPEC_24（2026-11-05）: ECONTE CROP からの直送の受け箱 ----
+     連携チャンネル（tdr_live / tdr_exchange）には今も参加しない。これは ECONTE の切り出しを
+     素材棚へ入れる一方通行の受け口だけ：共有 IDB tdr_crop_push の 'liveplate'（1件・上書き）を
+     ts が前回より新しければ棚へ取り込む → 消す → crop-ack。
+     連番＝一度に渡す（4枚以上で1素材 cells n枚）／1枚ずつ＝1枚ずつ渡す（別々の素材） */
+  const CROP_ID = 'liveplate', CROP_SEEN = 'tdr_crop_seen_v1:liveplate';
+  let cropChan = null, cropBusy = false;
+  function cropDB(){
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('tdr_crop_push', 1);
+      r.onupgradeneeded = () => { const d = r.result; if(!d.objectStoreNames.contains('push')) d.createObjectStore('push', { keyPath: 'id' }); };
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  }
+  async function cropInboxCheck(){
+    if(cropBusy || LP.state.exporting) return;
+    cropBusy = true;
+    try{
+      const d = await cropDB();
+      const rec = await new Promise(res => { const r = d.transaction('push', 'readonly').objectStore('push').get(CROP_ID); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); });
+      if(!rec || !Array.isArray(rec.files) || !rec.files.length) return;
+      let seen = 0;
+      try{ seen = +localStorage.getItem(CROP_SEEN) || 0; }catch(e){}
+      if(!(rec.ts > seen)) return;
+      try{ localStorage.setItem(CROP_SEEN, String(rec.ts)); }catch(e){}
+      const files = rec.files.map(f => new File([f.blob], f.name, { type: f.type || 'image/png' }));
+      if(rec.mode === 'seq') await importFiles(files, 'shelf');
+      else for(const f of files) await importFiles([f], 'shelf');
+      await new Promise(res => { const tx = d.transaction('push', 'readwrite'); tx.objectStore('push').delete(CROP_ID); tx.oncomplete = res; tx.onerror = res; });
+      if(cropChan) cropChan.postMessage({ type: 'crop-ack', target: CROP_ID, ts: rec.ts, n: files.length });
+      const sz = [...new Set(rec.files.map(f => f.w + '×' + f.h))];
+      const msg = 'ECONTE CROP → 素材棚｜' + files.length + '枚・' + (rec.mode === 'seq' ? '連番' : '1枚ずつ') + '｜' + (sz.length === 1 ? sz[0] : ('大きさ ' + sz.length + ' 種類'));
+      LP.ui.toast(msg);
+      try{ localStorage.setItem('tdr_link_log_v1:ec-lp:recv', JSON.stringify({ t: new Date().toISOString(), app: 'LIVE PLATE', msg })); }catch(e){}
+    }catch(e){ console.warn('crop inbox', e); }
+    finally{ cropBusy = false; }
+  }
+  function setupCropInbox(){
+    try{ cropChan = new BroadcastChannel('tdr_crop'); cropChan.onmessage = ev => { const m = ev.data; if(m && m.type === 'crop-push' && m.target === CROP_ID) cropInboxCheck(); }; }catch(e){}
+    window.addEventListener('storage', e => { if(e.key === 'tdr_crop_inbox_v1:' + CROP_ID) cropInboxCheck(); });
+    window.addEventListener('focus', cropInboxCheck);
+    setTimeout(cropInboxCheck, 800);
+  }
+
   function init(){
+    setupCropInbox();
     $('#file-in').addEventListener('change', e => {
       const fs = e.target.files;
       if(fs && fs.length) importFiles(fs, pickTarget, null, null);

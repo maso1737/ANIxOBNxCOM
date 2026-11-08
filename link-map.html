@@ -284,6 +284,7 @@ const NODES={
   mp:{x:450,y:450,nm:'MANGA PLATE',jp:'漫画ページ・コマ割り',file:'manga-plate.html'},
   co:{x:830,y:450,nm:'COMPOSER', jp:'合成・書き出し',      file:'composer.html'},
   ro:{x:120,y:450,nm:'ROUGH',    jp:'ラフ原（2026-10-15）', file:'rough.html'},
+  lp:{x:120,y:285,nm:'LIVE PLATE',jp:'一本化アプリ（受け口のみ）',file:'live-plate/index.html'},
 };
 const NW=200,NH=82;   // カードの幅・高さ
 
@@ -298,6 +299,21 @@ const ROUTES=[
     +'<span class="k">→ ANIMATOR REF</span>。<br>ANIMATOR が開いていればその場で REF に入り、閉じていれば<b>次に開いたとき</b>入る。'
     +'同じラフを送り直すと、置いた位置と濃さはそのまま<b>絵だけ差し替わる</b>。<br>'
     +'<span class="warn">※ 書き出し設定（OUT）で下書／指示を「入れない」にすると、その色は送られない。</span>'},
+ /* SPEC_24（2026-11-05）: ECONTE の CROP から写真の切り出しを直送（共有 IDB tdr_crop_push） */
+ {id:'ec-ob',a:'ec',b:'ob',
+  d:'M 160,79 Q 480,8 800,79', lx:480,ly:38,
+  lab:'CROP → 直送',
+  ti:'ECONTE で切り出した写真を OBAN へまとめて送る',
+  dt:'ECONTE の <span class="k">CROP</span>（キー 3・BOARD の <span class="k">✂ CROP</span>）で写真ごとに切り出し枠を決め、'
+    +'<span class="k">送る ▸ ▶ OBAN</span>。<b>連番</b>なら4枚以上で1つのシーケンス、<b>1枚ずつ</b>なら別々のパネルで入ります。<br>'
+    +'OBAN が開いていればその場で、閉じていれば<b>次に開いたとき</b>入ります（OBAN は画像を保存しないので、開き直したら再ドロップ）。'},
+ {id:'ec-lp',a:'ec',b:'lp',
+  d:'M 120,161 L 120,240', lx:178,ly:204,
+  lab:'CROP → 棚',
+  ti:'ECONTE で切り出した写真を LIVE PLATE の素材棚へ送る',
+  dt:'ECONTE の <span class="k">CROP</span> → <span class="k">送る ▸ ▶ LIVE PLATE</span>。素材棚に入ります（紙には置かない）。'
+    +'<b>連番</b>なら1つの素材（セル n 枚）、<b>1枚ずつ</b>なら別々の素材。<br>'
+    +'LIVE PLATE が他のアプリとつながるのはこの受け口だけです（BOOK 1つで完結する設計は変えない）。'},
  {id:'ec-an',a:'ec',b:'an',dash:1,
   d:'M 220,120 L 342,120', lx:281,ly:102,
   lab:'手渡し',
@@ -547,7 +563,7 @@ document.addEventListener('keydown',e=>{
    ここは読んで見せるだけ。**完了チェックには使わない**（チェックは手で付けるもの）。
    ANIMATOR は改修しないので、ANIMATOR が送る側・受ける側の記録は無い（LOG_SIDES で「記録しない」と出す） */
 const LOG_KEY='tdr_link_log_v1';
-const LOG_SIDES={'ro-an':['send','recv'],'ec-an':[],'an-ob':['recv'],'ob-an':[],'an-mp':['recv'],'mp-an':['send'],
+const LOG_SIDES={'ro-an':['send','recv'],'ec-ob':['send','recv'],'ec-lp':['send','recv'],'ec-an':[],'an-ob':['recv'],'ob-an':[],'an-mp':['recv'],'mp-an':['send'],
   'mp-ob':['send','recv'],'ob-mp':['send','recv'],'an-co':['recv'],'mp-co':['send','recv'],'ob-co':['send','recv']};
 function fmtLogT(iso){
   const d=new Date(iso);if(isNaN(d))return '';
